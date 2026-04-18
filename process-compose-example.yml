@@ -34,7 +34,7 @@ processes:
       failure_threshold: 999
       period_seconds: 10
 
-   docs:
+  docs:
     working_dir: "docs"
     command: "pnpm run dev --port 3001"
     availability:
