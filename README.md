@@ -6,48 +6,7 @@
   />
 </p>
 
-<p align="center">
-  <a href="https://github.com/evroon/bracket/actions"
-    ><img
-      src="https://img.shields.io/github/actions/workflow/status/evroon/bracket/backend.yml"
-      alt="build status"
-  /></a>
-  <a href="https://crowdin.com/project/bracket"
-    ><img
-      src="https://badges.crowdin.net/bracket/localized.svg"
-      alt="translations"
-  /></a>
-  <a href="https://github.com/evroon/bracket/commits/"
-    ><img
-      src="https://img.shields.io/github/last-commit/evroon/bracket"
-      alt="last commit"
-  /></a>
-  <a href="https://github.com/evroon/bracket/releases"
-    ><img
-      src="https://img.shields.io/github/v/release/evroon/bracket"
-      alt="release"
-  /></a>
-  <a href="https://codecov.io/gh/evroon/bracket"
-    ><img
-      src="https://codecov.io/gh/evroon/bracket/branch/master/graph/badge.svg?token=YJL0DVPFFG"
-      alt="codecov"
-  /></a>
-</p>
-<p align="center">
-  <a href="https://www.bracketapp.nl/demo">Demo</a>
-  ·
-  <a href="https://docs.bracketapp.nl">Documentation</a>
-  ·
-  <a href="https://docs.bracketapp.nl/docs/running-bracket/quickstart">Quickstart</a>
-  ·
-  <a href="https://github.com/evroon/bracket">GitHub</a>
-  ·
-  <a href="https://github.com/evroon/bracket/releases">Releases</a>
-</p>
-<p align="center">
-<a href="https://trendshift.io/repositories/13714" target="_blank"><img src="https://trendshift.io/api/badge/repositories/13714" alt="evroon/bracket | Trendshift" width="250" height="55"/></a>
-</p>
-<h1></h1>
+Based on [evroon/bracket]("https://github.com/evroon/bracket/actions") with some vibe-coded changes.
 
 Tournament system meant to be easy to use. Bracket is written in async Python (with
 [FastAPI](https://fastapi.tiangolo.com)) and [Vite](https://vite.dev/) as frontend using the
