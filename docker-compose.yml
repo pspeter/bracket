@@ -9,31 +9,34 @@ volumes:
 services:
   bracket:
     container_name: bracket
+    build: .
     depends_on:
       - postgres
     environment:
-      ENVIRONMENT: DEVELOPMENT
-      CORS_ORIGINS: http://localhost:8400
-      PG_DSN: postgresql://bracket_dev:bracket_dev@postgres:5432/bracket_dev
-      SERVE_FRONTEND: true
-      API_PREFIX: '/api'
-    image: ghcr.io/evroon/bracket
+      ENVIRONMENT: PRODUCTION
+      CORS_ORIGINS: https://turnier.pyter.at
+      PG_DSN: postgresql://bracket_prod:${POSTGRES_PASSWORD}@postgres:5432/bracket_prod
+      JWT_SECRET: ${JWT_SECRET}
+      SERVE_FRONTEND: "true"
+      API_PREFIX: /api
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     networks:
       - bracket_lan
     ports:
-      - 8400:8400
+      - 127.0.0.1:8400:8400
     restart: unless-stopped
     volumes:
       - bracket_static_data:/app/static
 
   postgres:
+    image: postgres:17
     environment:
-      POSTGRES_DB: bracket_dev
-      POSTGRES_PASSWORD: bracket_dev
-      POSTGRES_USER: bracket_dev
-    image: postgres
+      POSTGRES_DB: bracket_prod
+      POSTGRES_USER: bracket_prod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
       - bracket_lan
     restart: always
     volumes:
-      - bracket_pg_data:/var/lib/postgresql
+      - bracket_pg_data:/var/lib/postgresql/data

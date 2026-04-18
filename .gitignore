@@ -8,6 +8,7 @@ __pycache__
 
 *.env
 !ci.env
+!.env.example
 node_modules
 .coverage
 coverage.xml
