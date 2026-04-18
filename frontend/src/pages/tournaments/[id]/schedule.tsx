@@ -8,9 +8,13 @@ import {
   Grid,
   Group,
   Menu,
+  Paper,
   Stack,
   Text,
   Title,
+  alpha,
+  useMantineColorScheme,
+  useMantineTheme,
 } from '@mantine/core';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { IconAlertCircle, IconCalendarPlus, IconDots, IconTrash } from '@tabler/icons-react';
@@ -35,9 +39,12 @@ import {
   getMatchLookupByCourt,
   getScheduleData,
   getStageItemLookup,
+  getUnscheduledMatches,
   stringToColour,
 } from '@services/lookups';
-import { rescheduleMatch, scheduleMatches } from '@services/match';
+import { rescheduleMatch, scheduleMatches, unscheduleMatch } from '@services/match';
+
+const UNSCHEDULED_DROPPABLE_ID = 'unscheduled';
 
 function ScheduleRow({
   index,
@@ -101,6 +108,81 @@ function ScheduleRow({
         </div>
       )}
     </Draggable>
+  );
+}
+
+function UnscheduledColumn({
+  matches,
+  openMatchModal,
+  stageItemsLookup,
+  matchesLookup,
+}: {
+  matches: MatchWithDetails[];
+  openMatchModal: any;
+  stageItemsLookup: any;
+  matchesLookup: any;
+}) {
+  const { t } = useTranslation();
+  const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
+
+  const subtleLaneBg =
+    colorScheme === 'dark' ? alpha(theme.white, 0.045) : alpha(theme.black, 0.022);
+  const subtleLaneBorder =
+    colorScheme === 'dark' ? alpha(theme.colors.dark[2], 0.4) : alpha(theme.colors.gray[6], 0.35);
+
+  const rows = matches.map((match, index) => (
+    <ScheduleRow
+      index={index}
+      stageItemsLookup={stageItemsLookup}
+      matchesLookup={matchesLookup}
+      match={match}
+      openMatchModal={openMatchModal}
+      key={match.id}
+    />
+  ));
+
+  const noItemsAlert =
+    matches.length < 1 ? (
+      <Alert
+        icon={<IconAlertCircle size={16} />}
+        title={t('all_matches_scheduled_title')}
+        color="green"
+        radius="md"
+        mt="1rem"
+      >
+        {t('unscheduled_column_empty_description')}
+      </Alert>
+    ) : null;
+
+  return (
+    <Droppable droppableId={UNSCHEDULED_DROPPABLE_ID} direction="vertical">
+      {(provided) => (
+        <div {...provided.droppableProps} ref={provided.innerRef}>
+          <Paper
+            shadow="none"
+            p="md"
+            radius="md"
+            withBorder
+            style={{
+              width: '25rem',
+              borderStyle: 'dashed',
+              borderWidth: 2,
+              borderColor: subtleLaneBorder,
+              backgroundColor: subtleLaneBg,
+              minHeight: '200px',
+            }}
+          >
+            <Title order={4} mb="sm" ta="center">
+              {t('unscheduled_title')}
+            </Title>
+            {rows}
+            {noItemsAlert}
+            {provided.placeholder}
+          </Paper>
+        </div>
+      )}
+    </Droppable>
   );
 }
 
@@ -193,6 +275,7 @@ function Schedule({
   stageItemsLookup,
   matchesLookup,
   schedule,
+  unscheduledMatches,
   openMatchModal,
 }: {
   t: Translator;
@@ -201,31 +284,10 @@ function Schedule({
   stageItemsLookup: any;
   matchesLookup: any;
   schedule: { court: Court; matches: MatchWithDetails[] }[];
+  unscheduledMatches: MatchWithDetails[];
   openMatchModal: CallableFunction;
 }) {
-  const columns = schedule.map((item) => (
-    <ScheduleColumn
-      tournamentId={tournament.id}
-      swrCourtsResponse={swrCourtsResponse}
-      stageItemsLookup={stageItemsLookup}
-      matchesLookup={matchesLookup}
-      key={item.court.id}
-      court={item.court}
-      matches={item.matches}
-      openMatchModal={openMatchModal}
-    />
-  ));
-
-  columns.push(
-    <div style={{ width: '25rem' }}>
-      <CourtModal
-        swrCourtsResponse={swrCourtsResponse}
-        tournamentId={tournament.id}
-        buttonSize="xs"
-      />
-    </div>
-  );
-  if (columns.length < 2) {
+  if (schedule.length < 1) {
     return (
       <Stack align="center">
         <NoContent title={t('no_courts_title')} description={t('no_courts_description')} />
@@ -237,6 +299,35 @@ function Schedule({
       </Stack>
     );
   }
+
+  const columns = [
+    <UnscheduledColumn
+      key="unscheduled"
+      matches={unscheduledMatches}
+      openMatchModal={openMatchModal}
+      stageItemsLookup={stageItemsLookup}
+      matchesLookup={matchesLookup}
+    />,
+    ...schedule.map((item) => (
+      <ScheduleColumn
+        tournamentId={tournament.id}
+        swrCourtsResponse={swrCourtsResponse}
+        stageItemsLookup={stageItemsLookup}
+        matchesLookup={matchesLookup}
+        key={item.court.id}
+        court={item.court}
+        matches={item.matches}
+        openMatchModal={openMatchModal}
+      />
+    )),
+    <div key="add-court" style={{ width: '25rem' }}>
+      <CourtModal
+        swrCourtsResponse={swrCourtsResponse}
+        tournamentId={tournament.id}
+        buttonSize="xs"
+      />
+    </div>,
+  ];
 
   return (
     <Group wrap="nowrap" align="top">
@@ -266,6 +357,10 @@ export default function SchedulePage() {
     responseIsValid(swrCourtsResponse) && responseIsValid(swrStagesResponse)
       ? getScheduleData(swrCourtsResponse, matchesByCourtId)
       : [];
+
+  const unscheduledMatches = responseIsValid(swrStagesResponse)
+    ? getUnscheduledMatches(swrStagesResponse)
+    : [];
 
   if (!responseIsValid(swrStagesResponse)) return null;
   if (!responseIsValid(swrCourtsResponse)) return null;
@@ -316,12 +411,25 @@ export default function SchedulePage() {
         <DragDropContext
           onDragEnd={async ({ destination, source, draggableId: matchId }) => {
             if (destination == null || source == null) return;
-            await rescheduleMatch(tournamentData.id, +matchId, {
-              old_court_id: +source.droppableId,
-              old_position: source.index,
-              new_court_id: +destination.droppableId,
-              new_position: destination.index,
-            });
+
+            const fromUnscheduled = source.droppableId === UNSCHEDULED_DROPPABLE_ID;
+            const toUnscheduled = destination.droppableId === UNSCHEDULED_DROPPABLE_ID;
+
+            if (fromUnscheduled && toUnscheduled) {
+              return;
+            }
+
+            if (toUnscheduled) {
+              await unscheduleMatch(tournamentData.id, +matchId);
+            } else {
+              await rescheduleMatch(tournamentData.id, +matchId, {
+                old_court_id: fromUnscheduled ? null : +source.droppableId,
+                old_position: fromUnscheduled ? null : source.index,
+                new_court_id: +destination.droppableId,
+                new_position: destination.index,
+              });
+            }
+
             await swrStagesResponse.mutate();
           }}
         >
@@ -330,6 +438,7 @@ export default function SchedulePage() {
             tournament={tournamentData}
             swrCourtsResponse={swrCourtsResponse}
             schedule={data}
+            unscheduledMatches={unscheduledMatches}
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
             openMatchModal={openMatchModal}

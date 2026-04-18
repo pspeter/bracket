@@ -212,6 +212,17 @@ async def sql_reschedule_match_and_determine_duration_and_margin(
     )
 
 
+async def sql_unschedule_match(match_id: MatchId) -> None:
+    query = """
+        UPDATE matches
+        SET court_id = NULL,
+            start_time = NULL,
+            position_in_schedule = NULL
+        WHERE matches.id = :match_id
+        """
+    await database.execute(query=query, values={"match_id": match_id})
+
+
 async def sql_get_match(match_id: MatchId) -> Match:
     query = """
         SELECT *

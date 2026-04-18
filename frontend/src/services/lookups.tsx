@@ -119,6 +119,22 @@ export function getMatchLookupByCourt(swrStagesResponse: SWRResponse) {
   return groupBy(['court_id'])(matches);
 }
 
+export function getUnscheduledMatches(swrStagesResponse: SWRResponse): MatchWithDetails[] {
+  const matches: MatchWithDetails[] = [];
+  for (const stage of swrStagesResponse.data.data) {
+    for (const stageItem of stage.stage_items) {
+      for (const round of stageItem.rounds) {
+        for (const match of round.matches) {
+          if (match.start_time == null) {
+            matches.push(match);
+          }
+        }
+      }
+    }
+  }
+  return matches;
+}
+
 export function getScheduleData(
   swrCourtsResponse: SWRResponse<CourtsResponse>,
   matchesByCourtId: any

@@ -99,10 +99,51 @@ async def reorder_matches_for_court(
 async def handle_match_reschedule(
     tournament: Tournament, body: MatchRescheduleBody, match_id: MatchId
 ) -> None:
-    if body.old_position == body.new_position and body.old_court_id == body.new_court_id:
+    if body.old_court_id is None and body.old_position is not None:
+        raise ValueError("old_court_id and old_position must both be set or both omitted")
+    if body.old_position is None and body.old_court_id is not None:
+        raise ValueError("old_court_id and old_position must both be set or both omitted")
+
+    if (
+        body.old_court_id is not None
+        and body.old_position is not None
+        and body.old_position == body.new_position
+        and body.old_court_id == body.new_court_id
+    ):
         return
 
     stages = await get_full_tournament_details(tournament.id)
+
+    if body.old_court_id is None:
+        all_matches = [
+            MatchPosition(match=match, position=float(assert_some(match.position_in_schedule)))
+            for stage in stages
+            for stage_item in stage.stage_items
+            for round_ in stage_item.rounds
+            for match in round_.matches
+            if match.start_time is not None and match.id != match_id
+        ]
+        target_match = next(
+            match
+            for stage in stages
+            for stage_item in stage.stage_items
+            for round_ in stage_item.rounds
+            for match in round_.matches
+            if match.id == match_id
+        )
+        if target_match.court_id is not None or target_match.start_time is not None:
+            raise ValueError("match_id doesn't match unscheduled match state")
+
+        offset = -0.5
+        all_matches.append(
+            MatchPosition(
+                match=target_match.model_copy(update={"court_id": body.new_court_id}),
+                position=body.new_position + offset,
+            )
+        )
+        await reorder_matches_for_court(tournament, all_matches, body.new_court_id)
+        return
+
     scheduled_matches_old = get_scheduled_matches(stages)
 
     # For match in prev position: set new position

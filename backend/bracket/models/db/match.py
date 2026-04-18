@@ -112,8 +112,8 @@ class MatchCreateBody(MatchCreateBodyFrontend):
 
 
 class MatchRescheduleBody(BaseModelORM):
-    old_court_id: CourtId
-    old_position: int
+    old_court_id: CourtId | None = None
+    old_position: int | None = None
     new_court_id: CourtId
     new_position: int
 

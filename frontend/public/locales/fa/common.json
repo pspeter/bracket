@@ -29,6 +29,7 @@
     "adjust_start_times_checkbox_label": "تنظیم زمان شروع به زمان فعلی",
     "all_matches_radio_label": "همه بازی‌ها",
     "all_matches_scheduled_description": "تمام بازی‌ها برنامه‌ریزی شده‌اند",
+    "all_matches_scheduled_title": "All scheduled",
     "api_docs_title": "راهنمای رابط برنامه‌نویسی",
     "archive_tournament_button": "بایگانی مسابقه",
     "archived_header_label": "این مسابقه بایگانی شده است",
@@ -258,5 +259,7 @@
     "user_settings_title": "تنظیمات کاربری",
     "view_tournament_button": "مشاهده مسابقه",
     "win_points_input_label": "امتیاز برد",
+    "unscheduled_column_empty_description": "All matches have been assigned to courts",
+    "unscheduled_title": "Unscheduled",
     "your_tournaments_title": "مسابقات شما"
 } 

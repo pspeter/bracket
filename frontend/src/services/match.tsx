@@ -21,6 +21,21 @@ export async function updateMatch(tournament_id: number, match_id: number, match
     .catch((response: any) => handleRequestError(response));
 }
 
+export async function unscheduleMatch(tournament_id: number, match_id: number) {
+  return createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`)
+    .catch((response: any) => handleRequestError(response))
+    .then((response: any) => {
+      if (response != null && response.status === 200) {
+        showNotification({
+          color: 'green',
+          title: 'Successfully unscheduled match',
+          message: '',
+        });
+      }
+    });
+}
+
 export async function rescheduleMatch(
   tournament_id: number,
   match_id: number,

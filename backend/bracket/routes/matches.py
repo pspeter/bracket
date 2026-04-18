@@ -32,7 +32,12 @@ from bracket.routes.auth import user_authenticated_for_tournament
 from bracket.routes.models import SingleMatchResponse, SuccessResponse, UpcomingMatchesResponse
 from bracket.routes.util import disallow_archived_tournament, match_dependency
 from bracket.sql.courts import get_all_courts_in_tournament
-from bracket.sql.matches import sql_create_match, sql_delete_match, sql_update_match
+from bracket.sql.matches import (
+    sql_create_match,
+    sql_delete_match,
+    sql_unschedule_match,
+    sql_update_match,
+)
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
@@ -134,6 +139,28 @@ async def schedule_matches(
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await schedule_all_unscheduled_matches(tournament_id, stages)
+    return SuccessResponse()
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/unschedule", response_model=SuccessResponse
+)
+async def unschedule_match(
+    tournament_id: TournamentId,
+    tournament: Tournament = Depends(disallow_archived_tournament),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    match_row: Match = Depends(match_dependency),
+) -> SuccessResponse:
+    old_court_id = match_row.court_id
+
+    await sql_unschedule_match(match_row.id)
+
+    if old_court_id is not None:
+        stages = await get_full_tournament_details(tournament_id)
+        scheduled_matches = get_scheduled_matches(stages)
+        await reorder_matches_for_court(tournament, scheduled_matches, old_court_id)
+
+    await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
 
 
