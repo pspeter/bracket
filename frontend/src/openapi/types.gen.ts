@@ -386,11 +386,11 @@ export type MatchRescheduleBody = {
   /**
    * Old Court Id
    */
-  old_court_id: number;
+  old_court_id: number | null;
   /**
    * Old Position
    */
-  old_position: number;
+  old_position: number | null;
 };
 
 /**
@@ -1690,6 +1690,16 @@ export type UserToUpdate = {
  */
 export type ValidationError = {
   /**
+   * Context
+   */
+  ctx?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Input
+   */
+  input?: unknown;
+  /**
    * Location
    */
   loc: Array<string | number>;
@@ -2402,6 +2412,42 @@ export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostRe
 
 export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponse =
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses[keyof RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses];
+
+export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/unschedule';
+};
+
+export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostError =
+  UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors[keyof UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors];
+
+export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponse =
+  UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses[keyof UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses];
 
 export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetData = {
   body?: never;

@@ -143,6 +143,9 @@ import type {
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostData,
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors,
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses,
+  UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
+  UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
+  UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
   UpdateClubClubsClubIdPutData,
   UpdateClubClubsClubIdPutErrors,
   UpdateClubClubsClubIdPutResponses,
@@ -190,7 +193,8 @@ import type {
 export type Options<
   TData extends TDataShape = TDataShape,
   ThrowOnError extends boolean = boolean,
-> = Options2<TData, ThrowOnError> & {
+  TResponse = unknown,
+> = Options2<TData, ThrowOnError, TResponse> & {
   /**
    * You can provide a client instance returned by `createClient()` instead of
    * individual options. This might be also useful if you want to implement a
@@ -647,6 +651,28 @@ export const rescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePost 
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Unschedule Match
+ */
+export const unscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
+    UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/unschedule',
+    ...options,
   });
 
 /**

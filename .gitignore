@@ -17,4 +17,4 @@ backend/static
 backend/frontend-dist
 
 /process-compose.yml
-/.pgdata
+**/.pgdata
