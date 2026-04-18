@@ -384,7 +384,7 @@ function GeneralTournamentForm({
           mt="md"
           label={t('max_team_size_label')}
           min={1}
-          {...form.getInputProps('max_team_size', { type: 'number' })}
+          {...form.getInputProps('max_team_size')}
         />
         <Checkbox
           mt="md"
