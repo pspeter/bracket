@@ -12,7 +12,8 @@ export async function createTournament(
   duration_minutes: number,
   margin_minutes: number,
   signup_enabled: boolean = false,
-  max_team_size: number = 4
+  max_team_size: number = 4,
+  signup_team_choice_enabled: boolean = true
 ) {
   return createAxios()
     .post('tournaments', {
@@ -27,6 +28,7 @@ export async function createTournament(
       margin_minutes,
       signup_enabled,
       max_team_size,
+      signup_team_choice_enabled,
     })
     .catch((response: any) => handleRequestError(response));
 }
@@ -54,7 +56,8 @@ export async function updateTournament(
   duration_minutes: number,
   margin_minutes: number,
   signup_enabled: boolean,
-  max_team_size: number
+  max_team_size: number,
+  signup_team_choice_enabled: boolean
 ) {
   return createAxios()
     .put(`tournaments/${tournament_id}`, {
@@ -68,6 +71,7 @@ export async function updateTournament(
       margin_minutes,
       signup_enabled,
       max_team_size,
+      signup_team_choice_enabled,
     })
     .catch((response: any) => handleRequestError(response));
 }

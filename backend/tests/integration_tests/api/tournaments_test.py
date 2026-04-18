@@ -45,6 +45,7 @@ async def test_tournaments_endpoint(
                 "signup_enabled": False,
                 "signup_token": None,
                 "max_team_size": 4,
+                "signup_team_choice_enabled": True,
             }
         ],
     }
@@ -74,6 +75,7 @@ async def test_tournament_endpoint(
             "signup_enabled": False,
             "signup_token": None,
             "max_team_size": 4,
+            "signup_team_choice_enabled": True,
         },
     }
 
@@ -95,6 +97,7 @@ async def test_create_tournament(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "signup_team_choice_enabled": True,
     }
     assert (
         await send_auth_request(HTTPMethod.POST, "tournaments", auth_context, json=body)
@@ -122,6 +125,7 @@ async def test_create_tournament_duplicate_dashboard_endpoint(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "signup_team_choice_enabled": True,
     }
     assert await send_auth_request(HTTPMethod.POST, "tournaments", auth_context, json=body) == {
         "detail": "This dashboard link is already taken"
@@ -142,6 +146,7 @@ async def test_update_tournament(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "signup_team_choice_enabled": True,
     }
     assert (
         await send_tournament_request(HTTPMethod.PUT, "", auth_context, json=body)

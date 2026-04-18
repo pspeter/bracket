@@ -286,5 +286,8 @@
     "signup_team_full": "This team is full.",
     "signup_view_dashboard": "View Public Dashboard",
     "signup_description": "Enter your name, then join an existing team with free space, start a new team, or sign up without a team and an organizer can assign you later.",
-    "signup_redirecting": "Redirecting to the dashboard…"
+    "signup_redirecting": "Redirecting to the dashboard…",
+    "teams_tab_max_team_size": "max {{count}} players per team",
+    "signup_team_choice_label": "Allow players to create or join teams during signup",
+    "signup_description_no_teams": "Enter your name to register for this tournament. An organizer will assign you to a team later."
 }

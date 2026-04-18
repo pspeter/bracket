@@ -1463,6 +1463,7 @@ export type SignupTeamInfo = {
 export type SignupTournamentInfo = {
   dashboard_endpoint: string | null;
   max_team_size: number;
+  signup_team_choice_enabled: boolean;
   teams: Array<SignupTeamInfo>;
   tournament_id: number;
   tournament_name: string;
@@ -1525,6 +1526,10 @@ export type Tournament = {
    */
   signup_enabled: boolean;
   /**
+   * Signup Team Choice Enabled
+   */
+  signup_team_choice_enabled: boolean;
+  /**
    * Signup Token
    */
   signup_token: string | null;
@@ -1579,6 +1584,10 @@ export type TournamentBody = {
    * Signup Enabled
    */
   signup_enabled: boolean;
+  /**
+   * Signup Team Choice Enabled
+   */
+  signup_team_choice_enabled: boolean;
   /**
    * Start Time
    */
@@ -1644,6 +1653,10 @@ export type TournamentUpdateBody = {
    * Signup Enabled
    */
   signup_enabled: boolean;
+  /**
+   * Signup Team Choice Enabled
+   */
+  signup_team_choice_enabled: boolean;
   /**
    * Start Time
    */

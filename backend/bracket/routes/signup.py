@@ -33,6 +33,7 @@ from bracket.utils.types import assert_some
 router = APIRouter(prefix=config.api_prefix)
 
 _TEAM_NOT_FOUND = "Team not found"
+_TEAM_CHOICE_DISABLED = "Team selection is not enabled for this signup"
 
 
 class SignupBody(BaseModelORM):
@@ -74,6 +75,7 @@ async def get_signup_info(
             teams=team_infos,
             max_team_size=tournament.max_team_size,
             dashboard_endpoint=tournament.dashboard_endpoint,
+            signup_team_choice_enabled=tournament.signup_team_choice_enabled,
         )
     )
 
@@ -87,6 +89,12 @@ async def post_signup(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A player with this name already exists",
+        )
+
+    if not tournament.signup_team_choice_enabled and body.team_action != "none":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_TEAM_CHOICE_DISABLED,
         )
 
     if body.team_action == "join":

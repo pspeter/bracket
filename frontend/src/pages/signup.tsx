@@ -122,6 +122,7 @@ export default function SignupPage() {
 
   if (info == null) return null;
 
+  const teamChoiceEnabled = info.data.signup_team_choice_enabled ?? true;
   const maxTeamSize = info.data.max_team_size;
   const joinableTeams = info.data.teams.filter((team) => !team.is_full);
 
@@ -156,15 +157,15 @@ export default function SignupPage() {
       ) : (
         <form
           onSubmit={form.onSubmit(async (values) => {
+            const action = teamChoiceEnabled ? values.team_action : 'none';
             const body: SignupBody = {
               player_name: values.player_name.trim(),
-              team_action: values.team_action,
+              team_action: action,
               team_id:
-                values.team_action === 'join' && values.team_id != null
+                action === 'join' && values.team_id != null
                   ? parseInt(values.team_id, 10)
                   : null,
-              team_name:
-                values.team_action === 'create' ? values.team_name.trim() : null,
+              team_name: action === 'create' ? values.team_name.trim() : null,
             };
 
             try {
@@ -179,7 +180,9 @@ export default function SignupPage() {
             <Title order={2}>
               {t('signup_page_title', { tournamentName: info.data.tournament_name })}
             </Title>
-            <Text size="sm">{t('signup_description')}</Text>
+            <Text size="sm">
+              {teamChoiceEnabled ? t('signup_description') : t('signup_description_no_teams')}
+            </Text>
 
             <TextInput
               withAsterisk
@@ -189,37 +192,41 @@ export default function SignupPage() {
               {...form.getInputProps('player_name')}
             />
 
-            <Radio.Group
-              label={t('signup_team_action_label')}
-              {...form.getInputProps('team_action')}
-            >
-              <Stack gap="xs" mt="xs">
-                <Radio value="join" label={t('signup_join_team')} />
-                <Radio value="create" label={t('signup_create_team')} />
-                <Radio value="none" label={t('signup_no_team')} />
-              </Stack>
-            </Radio.Group>
+            {teamChoiceEnabled ? (
+              <>
+                <Radio.Group
+                  label={t('signup_team_action_label')}
+                  {...form.getInputProps('team_action')}
+                >
+                  <Stack gap="xs" mt="xs">
+                    <Radio value="join" label={t('signup_join_team')} />
+                    <Radio value="create" label={t('signup_create_team')} />
+                    <Radio value="none" label={t('signup_no_team')} />
+                  </Stack>
+                </Radio.Group>
 
-            {form.values.team_action === 'join' ? (
-              <Select
-                label={t('teams_title')}
-                placeholder={t('signup_team_select_placeholder')}
-                data={joinableTeams.map((team) => ({
-                  value: `${team.id}`,
-                  label: `${team.name} (${team.player_count}/${maxTeamSize})`,
-                }))}
-                {...form.getInputProps('team_id')}
-              />
-            ) : null}
+                {form.values.team_action === 'join' ? (
+                  <Select
+                    label={t('teams_title')}
+                    placeholder={t('signup_team_select_placeholder')}
+                    data={joinableTeams.map((team) => ({
+                      value: `${team.id}`,
+                      label: `${team.name} (${team.player_count}/${maxTeamSize})`,
+                    }))}
+                    {...form.getInputProps('team_id')}
+                  />
+                ) : null}
 
-            {form.values.team_action === 'create' ? (
-              <TextInput
-                withAsterisk
-                label={t('signup_team_name_label')}
-                placeholder={t('signup_team_name_placeholder')}
-                maxLength={30}
-                {...form.getInputProps('team_name')}
-              />
+                {form.values.team_action === 'create' ? (
+                  <TextInput
+                    withAsterisk
+                    label={t('signup_team_name_label')}
+                    placeholder={t('signup_team_name_placeholder')}
+                    maxLength={30}
+                    {...form.getInputProps('team_name')}
+                  />
+                ) : null}
+              </>
             ) : null}
 
             <Button type="submit">{t('signup_submit_button')}</Button>

@@ -138,6 +138,7 @@ function GeneralTournamentForm({
       margin_minutes: tournament.margin_minutes,
       signup_enabled: tournament.signup_enabled,
       max_team_size: tournament.max_team_size,
+      signup_team_choice_enabled: tournament.signup_team_choice_enabled ?? true,
     },
 
     validate: {
@@ -172,7 +173,8 @@ function GeneralTournamentForm({
           values.duration_minutes,
           values.margin_minutes,
           values.signup_enabled ?? tournament.signup_enabled,
-          maxTeamSize
+          maxTeamSize,
+          values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true
         );
 
         await swrTournamentResponse.mutate();
@@ -297,6 +299,12 @@ function GeneralTournamentForm({
         <Checkbox
           label={t('signup_enabled_label')}
           {...form.getInputProps('signup_enabled', { type: 'checkbox' })}
+        />
+        <Checkbox
+          mt="md"
+          disabled={!form.values.signup_enabled}
+          label={t('signup_team_choice_label')}
+          {...form.getInputProps('signup_team_choice_enabled', { type: 'checkbox' })}
         />
         {form.values.signup_enabled === true && tournament.signup_token != null ? (
           <Grid mt="md">

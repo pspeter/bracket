@@ -123,6 +123,7 @@ class SignupTournamentInfo(BaseModel):
     teams: list[SignupTeamInfo]
     max_team_size: int
     dashboard_endpoint: str | None
+    signup_team_choice_enabled: bool
 
 
 class SignupInfoResponse(DataResponse[SignupTournamentInfo]):

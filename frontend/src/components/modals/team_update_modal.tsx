@@ -9,14 +9,22 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { showNotification } from '@mantine/notifications';
 import { BiEditAlt } from '@react-icons/all-files/bi/BiEditAlt';
+import { AxiosError } from 'axios';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
 import { DropzoneButton } from '@components/utils/file_upload';
 import { FullTeamWithPlayers, Player, TeamsWithPlayersResponse } from '@openapi';
-import { getBaseApiUrl, getPlayers, removeTeamLogo, requestSucceeded } from '@services/adapter';
+import {
+  getBaseApiUrl,
+  getPlayers,
+  getTournamentById,
+  handleRequestError,
+  removeTeamLogo,
+} from '@services/adapter';
 import { updateTeam } from '@services/team';
 
 function TeamLogo({ team }: { team: FullTeamWithPlayers | null }) {
@@ -42,6 +50,8 @@ export default function TeamUpdateModal({
   const { t } = useTranslation();
   const { data } = getPlayers(tournament_id, false);
   const players: Player[] = data != null ? data.data.players : [];
+  const swrTournament = getTournamentById(tournament_id);
+  const maxTeamSize = swrTournament.data?.data.max_team_size;
   const [opened, setOpened] = useState(false);
 
   const form = useForm({
@@ -61,16 +71,37 @@ export default function TeamUpdateModal({
       <Modal opened={opened} onClose={() => setOpened(false)} title={t('edit_team_title')}>
         <form
           onSubmit={form.onSubmit(async (values) => {
-            const result = await updateTeam(
-              tournament_id,
-              team.id,
-              values.name,
-              values.active,
-              values.player_ids
-            );
-            if (requestSucceeded(result)) {
+            try {
+              await updateTeam(
+                tournament_id,
+                team.id,
+                values.name,
+                values.active,
+                values.player_ids
+              );
               await swrTeamsResponse.mutate();
               setOpened(false);
+            } catch (exc: unknown) {
+              if (
+                exc instanceof AxiosError &&
+                exc.response?.data != null &&
+                typeof exc.response.data === 'object' &&
+                'detail' in exc.response.data &&
+                exc.response.data.detail === 'This team is full'
+              ) {
+                showNotification({
+                  color: 'red',
+                  title: t('signup_team_full'),
+                  message: '',
+                  autoClose: 8000,
+                });
+                return;
+              }
+              if (exc instanceof AxiosError) {
+                handleRequestError(exc);
+                return;
+              }
+              throw exc;
             }
           })}
         >
@@ -95,6 +126,7 @@ export default function TeamUpdateModal({
             searchable
             mt={12}
             limit={25}
+            maxValues={maxTeamSize}
             {...form.getInputProps('player_ids')}
           />
 

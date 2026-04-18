@@ -1,4 +1,4 @@
-import { Grid, Select, Title } from '@mantine/core';
+import { Grid, Group, Select, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +8,7 @@ import TeamsTable from '@components/tables/teams';
 import { capitalize, getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { FullTeamWithPlayers, StageItemWithRounds } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getStages, getTeamsPaginated } from '@services/adapter';
+import { getStages, getTeamsPaginated, getTournamentById } from '@services/adapter';
 import { getStageItemList, getStageItemTeamIdsLookup } from '@services/lookups';
 
 function StageItemSelect({
@@ -43,6 +43,8 @@ export default function TeamsPage() {
   const { tournamentData } = getTournamentIdFromRouter();
   const swrTeamsResponse = getTeamsPaginated(tournamentData.id, tableStateToPagination(tableState));
   const swrStagesResponse = getStages(tournamentData.id);
+  const swrTournament = getTournamentById(tournamentData.id);
+  const maxTeamSize = swrTournament.data?.data.max_team_size;
   const stageItemInputLookup = responseIsValid(swrStagesResponse)
     ? getStageItemList(swrStagesResponse)
     : [];
@@ -65,7 +67,14 @@ export default function TeamsPage() {
     <TournamentLayout tournament_id={tournamentData.id}>
       <Grid justify="space-between" mb="1rem">
         <Grid.Col span="auto">
-          <Title>{capitalize(t('teams_title'))}</Title>
+          <Group gap="sm" align="baseline" wrap="nowrap">
+            <Title>{capitalize(t('teams_title'))}</Title>
+            {maxTeamSize != null ? (
+              <Text component="span" fz="md" c="dimmed" fw={500}>
+                {t('teams_tab_max_team_size', { count: maxTeamSize })}
+              </Text>
+            ) : null}
+          </Group>
         </Grid.Col>
         <Grid.Col span="content">
           <Grid align="flex-end">

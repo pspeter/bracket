@@ -8,7 +8,7 @@ import { SWRResponse } from 'swr';
 import SaveButton from '@components/buttons/save';
 import { MultiTeamsInput } from '@components/forms/player_create_csv_input';
 import { Player, TeamsWithPlayersResponse } from '@openapi';
-import { getPlayers } from '@services/adapter';
+import { getPlayers, getTournamentById } from '@services/adapter';
 import { createTeam, createTeams } from '@services/team';
 
 function MultiTeamTab({
@@ -65,6 +65,8 @@ function SingleTeamTab({
   const { t } = useTranslation();
   const { data } = getPlayers(tournament_id, false);
   const players: Player[] = data != null ? data.data.players : [];
+  const swrTournament = getTournamentById(tournament_id);
+  const maxTeamSize = swrTournament.data?.data.max_team_size;
   const form = useForm({
     initialValues: {
       name: '',
@@ -104,6 +106,7 @@ function SingleTeamTab({
         mb="12rem"
         mt={12}
         limit={25}
+        maxValues={maxTeamSize}
         {...form.getInputProps('player_ids')}
       />
       <Button fullWidth style={{ marginTop: 10 }} color="green" type="submit">

@@ -1690,6 +1690,10 @@
             "title": "Max Team Size",
             "type": "integer"
           },
+          "signup_team_choice_enabled": {
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
           "teams": {
             "items": {
               "$ref": "#/components/schemas/SignupTeamInfo"
@@ -1711,7 +1715,8 @@
           "tournament_name",
           "teams",
           "max_team_size",
-          "dashboard_endpoint"
+          "dashboard_endpoint",
+          "signup_team_choice_enabled"
         ],
         "title": "SignupTournamentInfo",
         "type": "object"
@@ -2759,6 +2764,11 @@
             "title": "Signup Enabled",
             "type": "boolean"
           },
+          "signup_team_choice_enabled": {
+            "default": true,
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
           "signup_token": {
             "anyOf": [
               {
@@ -2796,6 +2806,7 @@
           "signup_enabled",
           "signup_token",
           "max_team_size",
+          "signup_team_choice_enabled",
           "id"
         ],
         "title": "Tournament",
@@ -2851,6 +2862,10 @@
             "title": "Signup Enabled",
             "type": "boolean"
           },
+          "signup_team_choice_enabled": {
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
           "start_time": {
             "format": "date-time",
             "title": "Start Time",
@@ -2868,6 +2883,7 @@
           "margin_minutes",
           "signup_enabled",
           "max_team_size",
+          "signup_team_choice_enabled",
           "club_id"
         ],
         "title": "TournamentBody",
@@ -2951,6 +2967,10 @@
             "title": "Signup Enabled",
             "type": "boolean"
           },
+          "signup_team_choice_enabled": {
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
           "start_time": {
             "format": "date-time",
             "title": "Start Time",
@@ -2967,7 +2987,8 @@
           "duration_minutes",
           "margin_minutes",
           "signup_enabled",
-          "max_team_size"
+          "max_team_size",
+          "signup_team_choice_enabled"
         ],
         "title": "TournamentUpdateBody",
         "type": "object"

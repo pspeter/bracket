@@ -4,13 +4,13 @@ import pytest
 
 from bracket.database import database
 from bracket.models.db.team import Team
-from bracket.schema import players, teams
+from bracket.schema import players, teams, tournaments
 from bracket.utils.db import fetch_one_parsed_certain
-from bracket.utils.dummy_records import DUMMY_MOCK_TIME, DUMMY_TEAM1
+from bracket.utils.dummy_records import DUMMY_MOCK_TIME, DUMMY_PLAYER1, DUMMY_PLAYER2, DUMMY_TEAM1
 from bracket.utils.http import HTTPMethod
 from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
 from tests.integration_tests.models import AuthContext
-from tests.integration_tests.sql import assert_row_count_and_clear, inserted_team
+from tests.integration_tests.sql import assert_row_count_and_clear, inserted_player, inserted_team
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -100,6 +100,39 @@ async def test_update_team(
         assert response["data"]["name"] == body["name"]
 
         await assert_row_count_and_clear(teams, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_team_rejects_more_players_than_max_team_size(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tid = auth_context.tournament.id
+    await database.execute(
+        tournaments.update().where(tournaments.c.id == tid).values(max_team_size=1)
+    )
+    try:
+        async with inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": tid})
+        ) as team_inserted:
+            async with inserted_player(
+                DUMMY_PLAYER1.model_copy(update={"tournament_id": tid})
+            ) as p1:
+                async with inserted_player(
+                    DUMMY_PLAYER2.model_copy(update={"tournament_id": tid})
+                ) as p2:
+                    body = {
+                        "name": team_inserted.name,
+                        "active": True,
+                        "player_ids": [p1.id, p2.id],
+                    }
+                    response = await send_tournament_request(
+                        HTTPMethod.PUT, f"teams/{team_inserted.id}", auth_context, None, body
+                    )
+                    assert response == {"detail": "This team is full"}
+    finally:
+        await database.execute(
+            tournaments.update().where(tournaments.c.id == tid).values(max_team_size=4)
+        )
 
 
 @pytest.mark.asyncio(loop_scope="session")

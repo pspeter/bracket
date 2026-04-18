@@ -30,6 +30,7 @@ class TournamentInsertable(BaseModelORM):
     signup_enabled: bool = False
     signup_token: str | None = None
     max_team_size: int = Field(4, ge=1)
+    signup_team_choice_enabled: bool = True
 
 
 class Tournament(TournamentInsertable):
@@ -48,6 +49,7 @@ class TournamentUpdateBody(BaseModelORM):
     # Required on PUT: omitted keys must not fall back to insert defaults (e.g. max_team_size=4).
     signup_enabled: bool
     max_team_size: int = Field(..., ge=1)
+    signup_team_choice_enabled: bool
 
 
 class TournamentChangeStatusBody(BaseModelORM):

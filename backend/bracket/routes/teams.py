@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import aiofiles
 import aiofiles.os
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from heliclockter import datetime_utc
 
 from bracket.config import config
@@ -44,6 +44,7 @@ from bracket.sql.teams import (
     get_teams_with_members,
     sql_delete_team,
 )
+from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
 from bracket.utils.db import fetch_one_parsed
 from bracket.utils.errors import ForeignKey, check_foreign_key_violation
@@ -58,6 +59,13 @@ router = APIRouter(prefix=config.api_prefix)
 async def update_team_members(
     team_id: TeamId, tournament_id: TournamentId, player_ids: set[PlayerId]
 ) -> None:
+    tournament = await sql_get_tournament(tournament_id)
+    if len(player_ids) > tournament.max_team_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This team is full",
+        )
+
     [team] = await get_teams_with_members(tournament_id, team_id=team_id)
 
     # Add members to the team
@@ -226,6 +234,14 @@ async def create_multiple_teams(
 
     check_requirement(existing_teams, user, "max_teams", additions=len(reader))
     check_requirement(existing_players, user, "max_players", additions=len(all_players))
+
+    tournament = await sql_get_tournament(tournament_id)
+    for _, player_names in teams_and_players:
+        if len(player_names) > tournament.max_team_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This team is full",
+            )
 
     async with database.transaction():
         for team_name, player_names in teams_and_players:

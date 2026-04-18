@@ -89,7 +89,8 @@ async def sql_update_tournament(
             duration_minutes = :duration_minutes,
             margin_minutes = :margin_minutes,
             signup_enabled = :signup_enabled,
-            max_team_size = :max_team_size
+            max_team_size = :max_team_size,
+            signup_team_choice_enabled = :signup_team_choice_enabled
             {token_clause}
         WHERE tournaments.id = :tournament_id
         """
@@ -128,7 +129,8 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             margin_minutes,
             signup_enabled,
             signup_token,
-            max_team_size
+            max_team_size,
+            signup_team_choice_enabled
         )
         VALUES (
             :name,
@@ -143,7 +145,8 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             :margin_minutes,
             :signup_enabled,
             :signup_token,
-            :max_team_size
+            :max_team_size,
+            :signup_team_choice_enabled
         )
         RETURNING id
         """

@@ -1,4 +1,4 @@
-import { awaitRequestAndHandleError, createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError } from './adapter';
 
 export async function createTeam(
   tournament_id: number,
@@ -34,11 +34,9 @@ export async function updateTeam(
   active: boolean,
   player_ids: string[]
 ) {
-  return awaitRequestAndHandleError(async (axios) =>
-    axios.put(`tournaments/${tournament_id}/teams/${team_id}`, {
-      name,
-      active,
-      player_ids,
-    })
-  );
+  return createAxios().put(`tournaments/${tournament_id}/teams/${team_id}`, {
+    name,
+    active,
+    player_ids,
+  });
 }
