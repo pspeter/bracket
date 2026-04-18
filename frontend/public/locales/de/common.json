@@ -281,6 +281,7 @@
     "signup_url_label": "Anmelde-URL",
     "signup_link_copied": "Anmelde-URL kopiert",
     "signup_copy_button": "Anmelde-URL kopieren",
+    "signup_show_qr_button": "Show QR code",
     "max_team_size_label": "Maximale Anzahl an Spielern pro Team",
     "signup_page_title": "Für {{tournamentName}} anmelden",
     "signup_player_name_label": "Dein Name",
@@ -301,6 +302,7 @@
     "signup_view_dashboard": "Dashboard anzeigen",
     "signup_description": "Gib deinen Namen ein, dann wähle ein bestehendes Team, starte ein neues Team, oder melde dich ohne Team an (ein Organisator kann dich später zuweisen).",
     "signup_redirecting": "Weiterleitung zum Dashboard…",
+    "signup_qr_heading": "Signup QR code",
     "teams_tab_max_team_size": "maximal {{count}} Spieler pro Team",
     "signup_team_choice_label": "Erlaube Spielern, Teams während der Anmeldung zu erstellen oder beizutreten",
     "signup_description_no_teams": "Gib deinen Namen ein, um dich für dieses Turnier zu registrieren. Ein Organisator wird dich später einem Team zuweisen."

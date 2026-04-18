@@ -282,6 +282,7 @@
     "signup_url_label": "Signup URL",
     "signup_link_copied": "Copied Signup URL",
     "signup_copy_button": "Copy Signup URL",
+    "signup_show_qr_button": "Show QR code",
     "max_team_size_label": "Maximum players per team",
     "signup_page_title": "Sign up for {{tournamentName}}",
     "signup_player_name_label": "Your name",
@@ -302,6 +303,5 @@
     "signup_view_dashboard": "View Public Dashboard",
     "signup_description": "Enter your name, then join an existing team with free space, start a new team, or sign up without a team and an organizer can assign you later.",
     "signup_redirecting": "Redirecting to the dashboard…",
-    "signup_team_choice_label": "Allow players to create or join teams during signup",
-    "signup_description_no_teams": "Enter your name to register for this tournament. An organizer will assign you to a team later."
+    "signup_qr_heading": "Signup QR code"
 }

@@ -9,8 +9,10 @@ import {
   Grid,
   Group,
   Image,
+  Input,
   NumberInput,
   Select,
+  Stack,
   Text,
   TextInput,
 } from '@mantine/core';
@@ -18,7 +20,13 @@ import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { MdDelete } from '@react-icons/all-files/md/MdDelete';
 import { MdUnarchive } from '@react-icons/all-files/md/MdUnarchive';
-import { IconCalendar, IconCalendarTime, IconCopy, IconPencil } from '@tabler/icons-react';
+import {
+  IconCalendar,
+  IconCalendarTime,
+  IconCopy,
+  IconPencil,
+  IconQrcode,
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { MdArchive } from 'react-icons/md';
 import { useNavigate } from 'react-router';
@@ -45,6 +53,7 @@ import {
   updateTournament,
 } from '@services/tournament';
 import dayjs from 'dayjs';
+import { useId } from 'react';
 
 export function TournamentLogo({ tournament }: { tournament: Tournament | null }) {
   if (tournament == null || tournament.logo_path == null) return null;
@@ -124,6 +133,7 @@ function GeneralTournamentForm({
 }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const signupUrlInputId = useId();
 
   const form = useForm({
     initialValues: {
@@ -307,48 +317,65 @@ function GeneralTournamentForm({
           {...form.getInputProps('signup_team_choice_enabled', { type: 'checkbox' })}
         />
         {form.values.signup_enabled === true && tournament.signup_token != null ? (
-          <Grid mt="md">
-            <Grid.Col span={{ sm: 9 }}>
-              <TextInput
-                readOnly
-                label={t('signup_url_label')}
-                value={`${getBaseURL()}/signup/${tournament.signup_token}`}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ sm: 3 }}>
-              <CopyButton value={`${getBaseURL()}/signup/${tournament.signup_token}`}>
-                {({ copied, copy }) => (
-                  <Button
-                    mt={28}
-                    leftSection={<IconCopy size="1.1rem" stroke={1.5} />}
-                    fullWidth
-                    color={copied ? 'teal' : 'indigo'}
-                    onClick={copy}
-                  >
-                    {copied ? t('signup_link_copied') : t('signup_copy_button')}
-                  </Button>
-                )}
-              </CopyButton>
-            </Grid.Col>
-          </Grid>
+          <Stack mt="md" gap={6}>
+            <Input.Label htmlFor={signupUrlInputId}>{t('signup_url_label')}</Input.Label>
+            <Grid gutter={{ base: 'xs', md: 'md' }} align="center">
+              <Grid.Col span={{ base: 12, md: 9 }}>
+                <TextInput
+                  readOnly
+                  id={signupUrlInputId}
+                  label={undefined}
+                  value={`${getBaseURL()}/signup/${tournament.signup_token}`}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 3 }}>
+                <CopyButton value={`${getBaseURL()}/signup/${tournament.signup_token}`}>
+                  {({ copied, copy }) => (
+                    <Button
+                      leftSection={<IconCopy size="1.1rem" stroke={1.5} />}
+                      fullWidth
+                      color={copied ? 'teal' : 'indigo'}
+                      onClick={copy}
+                      styles={{ label: { whiteSpace: 'normal' } }}
+                    >
+                      {copied ? t('signup_link_copied') : t('signup_copy_button')}
+                    </Button>
+                  )}
+                </CopyButton>
+              </Grid.Col>
+            </Grid>
+          </Stack>
         ) : null}
-        {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
-          <Button
-            mt="md"
-            variant="light"
-            component="a"
-            href={`${getBaseURL()}/tournaments/${tournament.dashboard_endpoint}/dashboard`}
-            disabled={!tournament.dashboard_public}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('signup_view_dashboard')}
-          </Button>
-        ) : (
-          <Button mt="md" variant="light" disabled>
-            {t('signup_view_dashboard')}
-          </Button>
-        )}
+        <Group mt="md" gap="sm" wrap="wrap">
+          {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
+            <Button
+              variant="light"
+              component="a"
+              href={`${getBaseURL()}/tournaments/${tournament.dashboard_endpoint}/dashboard`}
+              disabled={!tournament.dashboard_public}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('signup_view_dashboard')}
+            </Button>
+          ) : (
+            <Button variant="light" disabled>
+              {t('signup_view_dashboard')}
+            </Button>
+          )}
+          {form.values.signup_enabled === true && tournament.signup_token != null ? (
+            <Button
+              component="a"
+              href={`${getBaseURL()}/signup-qr/${tournament.signup_token}`}
+              target="_blank"
+              rel="noreferrer"
+              leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
+              variant="light"
+            >
+              {t('signup_show_qr_button')}
+            </Button>
+          ) : null}
+        </Group>
       </Fieldset>
       <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
         <NumberInput
