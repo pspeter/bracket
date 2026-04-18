@@ -346,7 +346,23 @@ function GeneralTournamentForm({
             </Grid>
           </Stack>
         ) : null}
-        <Group mt="md" gap="sm" wrap="wrap">
+        {form.values.signup_enabled === true && tournament.signup_token != null ? (
+          <Group mt="md" gap="sm" wrap="wrap">
+            <Button
+              component="a"
+              href={`${getBaseURL()}/signup-qr/${tournament.signup_token}`}
+              target="_blank"
+              rel="noreferrer"
+              leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
+              variant="light"
+            >
+              {t('signup_show_qr_button')}
+            </Button>
+          </Group>
+        ) : null}
+      </Fieldset>
+      <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
+        <Group gap="sm" wrap="wrap">
           {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
             <Button
               variant="light"
@@ -363,22 +379,9 @@ function GeneralTournamentForm({
               {t('signup_view_dashboard')}
             </Button>
           )}
-          {form.values.signup_enabled === true && tournament.signup_token != null ? (
-            <Button
-              component="a"
-              href={`${getBaseURL()}/signup-qr/${tournament.signup_token}`}
-              target="_blank"
-              rel="noreferrer"
-              leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
-              variant="light"
-            >
-              {t('signup_show_qr_button')}
-            </Button>
-          ) : null}
         </Group>
-      </Fieldset>
-      <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
         <NumberInput
+          mt="md"
           label={t('max_team_size_label')}
           min={1}
           {...form.getInputProps('max_team_size', { type: 'number' })}
