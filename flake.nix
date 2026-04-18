@@ -49,6 +49,8 @@
             fi
 
             trap "echo 'Stopping Postgres...'; pg_ctl stop -D '$PGDATA' --wait" EXIT
+
+            alias dev="process-compose up -f process-compose-example.yml"
           '';
         };
       });
