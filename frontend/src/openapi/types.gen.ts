@@ -1431,6 +1431,44 @@ export type TokenResponse = {
 };
 
 /**
+ * SignupBody
+ */
+export type SignupBody = {
+  player_name: string;
+  team_action: 'join' | 'create' | 'none';
+  team_id: number | null;
+  team_name: string | null;
+};
+
+/**
+ * SignupInfoResponse
+ */
+export type SignupInfoResponse = {
+  data: SignupTournamentInfo;
+};
+
+/**
+ * SignupTeamInfo
+ */
+export type SignupTeamInfo = {
+  id: number;
+  is_full: boolean;
+  name: string;
+  player_count: number;
+};
+
+/**
+ * SignupTournamentInfo
+ */
+export type SignupTournamentInfo = {
+  dashboard_endpoint: string | null;
+  max_team_size: number;
+  teams: Array<SignupTeamInfo>;
+  tournament_id: number;
+  tournament_name: string;
+};
+
+/**
  * Tournament
  */
 export type Tournament = {
@@ -1471,6 +1509,10 @@ export type Tournament = {
    */
   margin_minutes: number;
   /**
+   * Max Team Size
+   */
+  max_team_size: number;
+  /**
    * Name
    */
   name: string;
@@ -1478,6 +1520,14 @@ export type Tournament = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Signup Enabled
+   */
+  signup_enabled: boolean;
+  /**
+   * Signup Token
+   */
+  signup_token: string | null;
   /**
    * Start Time
    */
@@ -1514,6 +1564,10 @@ export type TournamentBody = {
    */
   margin_minutes: number;
   /**
+   * Max Team Size
+   */
+  max_team_size: number;
+  /**
    * Name
    */
   name: string;
@@ -1521,6 +1575,10 @@ export type TournamentBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Signup Enabled
+   */
+  signup_enabled: boolean;
   /**
    * Start Time
    */
@@ -1571,6 +1629,10 @@ export type TournamentUpdateBody = {
    */
   margin_minutes: number;
   /**
+   * Max Team Size
+   */
+  max_team_size: number;
+  /**
    * Name
    */
   name: string;
@@ -1578,6 +1640,10 @@ export type TournamentUpdateBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Signup Enabled
+   */
+  signup_enabled: boolean;
   /**
    * Start Time
    */

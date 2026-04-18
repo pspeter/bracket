@@ -136,6 +136,8 @@ function GeneralTournamentForm({
       auto_assign_courts: tournament.auto_assign_courts,
       duration_minutes: tournament.duration_minutes,
       margin_minutes: tournament.margin_minutes,
+      signup_enabled: tournament.signup_enabled,
+      max_team_size: tournament.max_team_size,
     },
 
     validate: {
@@ -154,6 +156,11 @@ function GeneralTournamentForm({
       onSubmit={form.onSubmit(async (values) => {
         assert_not_none(values.club_id);
 
+        const maxTeamSize =
+          typeof values.max_team_size === 'number' && !Number.isNaN(values.max_team_size)
+            ? values.max_team_size
+            : tournament.max_team_size;
+
         await updateTournament(
           tournament.id,
           values.name,
@@ -163,7 +170,9 @@ function GeneralTournamentForm({
           values.auto_assign_courts,
           values.start_time.toISOString(),
           values.duration_minutes,
-          values.margin_minutes
+          values.margin_minutes,
+          values.signup_enabled ?? tournament.signup_enabled,
+          maxTeamSize
         );
 
         await swrTournamentResponse.mutate();
@@ -284,8 +293,63 @@ function GeneralTournamentForm({
           {t('remove_logo')}
         </Button>
       </Fieldset>
-      <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
+      <Fieldset legend={t('self_signup_title')} mt="lg" radius="md">
         <Checkbox
+          label={t('signup_enabled_label')}
+          {...form.getInputProps('signup_enabled', { type: 'checkbox' })}
+        />
+        {form.values.signup_enabled === true && tournament.signup_token != null ? (
+          <Grid mt="md">
+            <Grid.Col span={{ sm: 9 }}>
+              <TextInput
+                readOnly
+                label={t('signup_url_label')}
+                value={`${getBaseURL()}/signup/${tournament.signup_token}`}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ sm: 3 }}>
+              <CopyButton value={`${getBaseURL()}/signup/${tournament.signup_token}`}>
+                {({ copied, copy }) => (
+                  <Button
+                    mt={28}
+                    leftSection={<IconCopy size="1.1rem" stroke={1.5} />}
+                    fullWidth
+                    color={copied ? 'teal' : 'indigo'}
+                    onClick={copy}
+                  >
+                    {copied ? t('signup_link_copied') : t('signup_copy_button')}
+                  </Button>
+                )}
+              </CopyButton>
+            </Grid.Col>
+          </Grid>
+        ) : null}
+        {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
+          <Button
+            mt="md"
+            variant="light"
+            component="a"
+            href={`${getBaseURL()}/tournaments/${tournament.dashboard_endpoint}/dashboard`}
+            disabled={!tournament.dashboard_public}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t('signup_view_dashboard')}
+          </Button>
+        ) : (
+          <Button mt="md" variant="light" disabled>
+            {t('signup_view_dashboard')}
+          </Button>
+        )}
+      </Fieldset>
+      <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
+        <NumberInput
+          label={t('max_team_size_label')}
+          min={1}
+          {...form.getInputProps('max_team_size', { type: 'number' })}
+        />
+        <Checkbox
+          mt="md"
           label={t('miscellaneous_label')}
           {...form.getInputProps('players_can_be_in_multiple_teams', { type: 'checkbox' })}
         />

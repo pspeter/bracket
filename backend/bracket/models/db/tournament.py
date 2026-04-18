@@ -27,6 +27,9 @@ class TournamentInsertable(BaseModelORM):
     players_can_be_in_multiple_teams: bool
     auto_assign_courts: bool
     status: TournamentStatus = TournamentStatus.OPEN
+    signup_enabled: bool = False
+    signup_token: str | None = None
+    max_team_size: int = Field(4, ge=1)
 
 
 class Tournament(TournamentInsertable):
@@ -42,6 +45,9 @@ class TournamentUpdateBody(BaseModelORM):
     auto_assign_courts: bool
     duration_minutes: int = Field(..., ge=1)
     margin_minutes: int = Field(..., ge=0)
+    # Required on PUT: omitted keys must not fall back to insert defaults (e.g. max_team_size=4).
+    signup_enabled: bool
+    max_team_size: int = Field(..., ge=1)
 
 
 class TournamentChangeStatusBody(BaseModelORM):

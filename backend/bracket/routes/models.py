@@ -15,7 +15,7 @@ from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
 from bracket.routes.auth import Token
-from bracket.utils.id_types import StageId, StageItemId
+from bracket.utils.id_types import StageId, StageItemId, TeamId, TournamentId
 
 
 class SuccessResponse(BaseModel):
@@ -107,4 +107,23 @@ class StageItemInputOptionsResponse(
 
 
 class StageRankingResponse(DataResponse[dict[StageItemId, list[StageItemInputUpdate]]]):
+    pass
+
+
+class SignupTeamInfo(BaseModel):
+    id: TeamId
+    name: str
+    player_count: int
+    is_full: bool
+
+
+class SignupTournamentInfo(BaseModel):
+    tournament_id: TournamentId
+    tournament_name: str
+    teams: list[SignupTeamInfo]
+    max_team_size: int
+    dashboard_endpoint: str | None
+
+
+class SignupInfoResponse(DataResponse[SignupTournamentInfo]):
     pass

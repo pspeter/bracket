@@ -1583,6 +1583,139 @@
         "title": "RoundWithMatches",
         "type": "object"
       },
+      "SignupBody": {
+        "properties": {
+          "player_name": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Player Name",
+            "type": "string"
+          },
+          "team_action": {
+            "enum": [
+              "join",
+              "create",
+              "none"
+            ],
+            "title": "Team Action",
+            "type": "string"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          }
+        },
+        "required": [
+          "player_name",
+          "team_action",
+          "team_id",
+          "team_name"
+        ],
+        "title": "SignupBody",
+        "type": "object"
+      },
+      "SignupInfoResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SignupTournamentInfo"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SignupInfoResponse",
+        "type": "object"
+      },
+      "SignupTeamInfo": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_full": {
+            "title": "Is Full",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "player_count": {
+            "title": "Player Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "player_count",
+          "is_full"
+        ],
+        "title": "SignupTeamInfo",
+        "type": "object"
+      },
+      "SignupTournamentInfo": {
+        "properties": {
+          "dashboard_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Endpoint"
+          },
+          "max_team_size": {
+            "title": "Max Team Size",
+            "type": "integer"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/SignupTeamInfo"
+            },
+            "title": "Teams",
+            "type": "array"
+          },
+          "tournament_id": {
+            "title": "Tournament Id",
+            "type": "integer"
+          },
+          "tournament_name": {
+            "title": "Tournament Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tournament_id",
+          "tournament_name",
+          "teams",
+          "max_team_size",
+          "dashboard_endpoint"
+        ],
+        "title": "SignupTournamentInfo",
+        "type": "object"
+      },
       "SingleCourtResponse": {
         "properties": {
           "data": {
@@ -2607,6 +2740,12 @@
             "title": "Margin Minutes",
             "type": "integer"
           },
+          "max_team_size": {
+            "default": 4,
+            "minimum": 1.0,
+            "title": "Max Team Size",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2614,6 +2753,22 @@
           "players_can_be_in_multiple_teams": {
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
+          },
+          "signup_enabled": {
+            "default": false,
+            "title": "Signup Enabled",
+            "type": "boolean"
+          },
+          "signup_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Token"
           },
           "start_time": {
             "format": "date-time",
@@ -2638,6 +2793,9 @@
           "players_can_be_in_multiple_teams",
           "auto_assign_courts",
           "status",
+          "signup_enabled",
+          "signup_token",
+          "max_team_size",
           "id"
         ],
         "title": "Tournament",
@@ -2676,12 +2834,21 @@
             "title": "Margin Minutes",
             "type": "integer"
           },
+          "max_team_size": {
+            "minimum": 1.0,
+            "title": "Max Team Size",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "players_can_be_in_multiple_teams": {
             "title": "Players Can Be In Multiple Teams",
+            "type": "boolean"
+          },
+          "signup_enabled": {
+            "title": "Signup Enabled",
             "type": "boolean"
           },
           "start_time": {
@@ -2699,6 +2866,8 @@
           "auto_assign_courts",
           "duration_minutes",
           "margin_minutes",
+          "signup_enabled",
+          "max_team_size",
           "club_id"
         ],
         "title": "TournamentBody",
@@ -2765,12 +2934,21 @@
             "title": "Margin Minutes",
             "type": "integer"
           },
+          "max_team_size": {
+            "minimum": 1.0,
+            "title": "Max Team Size",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "players_can_be_in_multiple_teams": {
             "title": "Players Can Be In Multiple Teams",
+            "type": "boolean"
+          },
+          "signup_enabled": {
+            "title": "Signup Enabled",
             "type": "boolean"
           },
           "start_time": {
@@ -2787,7 +2965,9 @@
           "players_can_be_in_multiple_teams",
           "auto_assign_courts",
           "duration_minutes",
-          "margin_minutes"
+          "margin_minutes",
+          "signup_enabled",
+          "max_team_size"
         ],
         "title": "TournamentUpdateBody",
         "type": "object"
@@ -2992,7 +3172,7 @@
     }
   },
   "info": {
-    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
+    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
     "license": {
       "name": "AGPL-3.0",
       "url": "https://www.gnu.org/licenses/agpl-3.0.en.html"
@@ -3215,6 +3395,98 @@
         "summary": "Healthcheck ping",
         "tags": [
           "Internals"
+        ]
+      }
+    },
+    "/signup/{signup_token}": {
+      "get": {
+        "operationId": "get_signup_info_signup__signup_token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signup_token",
+            "required": true,
+            "schema": {
+              "title": "Signup Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Signup Info",
+        "tags": [
+          "Signup"
+        ]
+      },
+      "post": {
+        "operationId": "post_signup_signup__signup_token__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signup_token",
+            "required": true,
+            "schema": {
+              "title": "Signup Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Signup",
+        "tags": [
+          "Signup"
         ]
       }
     },

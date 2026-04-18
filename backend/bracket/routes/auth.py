@@ -13,6 +13,7 @@ from bracket.database import database
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserInDB, UserPublic
 from bracket.schema import tournaments
+from bracket.sql.signup import get_tournament_by_signup_token
 from bracket.sql.tournaments import sql_get_tournament_by_endpoint_name
 from bracket.sql.users import get_user, get_user_access_to_club, get_user_access_to_tournament
 from bracket.utils.db import fetch_all_parsed
@@ -150,6 +151,17 @@ async def user_authenticated_or_public_dashboard(
         )
 
     return None
+
+
+async def tournament_by_signup_token(signup_token: str) -> Tournament:
+    """Fetch tournament by signup token. Raises 404 if not found or signup disabled."""
+    tournament = await get_tournament_by_signup_token(signup_token)
+    if tournament is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Signup link is invalid or signup is closed",
+        )
+    return tournament
 
 
 async def user_authenticated_or_public_dashboard_by_endpoint_name(

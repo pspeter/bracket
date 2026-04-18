@@ -67,9 +67,17 @@ async def sql_delete_tournament(tournament_id: TournamentId) -> None:
 
 
 async def sql_update_tournament(
-    tournament_id: TournamentId, tournament: TournamentUpdateBody
+    tournament_id: TournamentId,
+    tournament: TournamentUpdateBody,
+    signup_token_update: str | None = None,
 ) -> None:
-    query = """
+    values = {"tournament_id": tournament_id, **tournament.model_dump()}
+    token_clause = ""
+    if signup_token_update is not None:
+        token_clause = ", signup_token = :signup_token"
+        values["signup_token"] = signup_token_update
+
+    query = f"""
         UPDATE tournaments
         SET
             start_time = :start_time,
@@ -79,13 +87,13 @@ async def sql_update_tournament(
             players_can_be_in_multiple_teams = :players_can_be_in_multiple_teams,
             auto_assign_courts = :auto_assign_courts,
             duration_minutes = :duration_minutes,
-            margin_minutes = :margin_minutes
+            margin_minutes = :margin_minutes,
+            signup_enabled = :signup_enabled,
+            max_team_size = :max_team_size
+            {token_clause}
         WHERE tournaments.id = :tournament_id
         """
-    await database.execute(
-        query=query,
-        values={"tournament_id": tournament_id, **tournament.model_dump()},
-    )
+    await database.execute(query=query, values=values)
 
 
 async def sql_update_tournament_status(
@@ -117,7 +125,10 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             players_can_be_in_multiple_teams,
             auto_assign_courts,
             duration_minutes,
-            margin_minutes
+            margin_minutes,
+            signup_enabled,
+            signup_token,
+            max_team_size
         )
         VALUES (
             :name,
@@ -129,9 +140,14 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             :players_can_be_in_multiple_teams,
             :auto_assign_courts,
             :duration_minutes,
-            :margin_minutes
+            :margin_minutes,
+            :signup_enabled,
+            :signup_token,
+            :max_team_size
         )
         RETURNING id
         """
-    new_id = await database.fetch_val(query=query, values=tournament.model_dump())
+    values = dict(tournament.model_dump(exclude_none=False))
+    values.setdefault("signup_token", None)
+    new_id = await database.fetch_val(query=query, values=values)
     return TournamentId(new_id)

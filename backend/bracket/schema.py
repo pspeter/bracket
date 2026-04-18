@@ -40,6 +40,9 @@ tournaments = Table(
         server_default="OPEN",
         index=True,
     ),
+    Column("signup_enabled", Boolean, nullable=False, server_default="false"),
+    Column("signup_token", String, nullable=True),
+    Column("max_team_size", Integer, nullable=False, server_default="4"),
 )
 
 stages = Table(

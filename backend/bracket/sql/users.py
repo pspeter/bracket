@@ -128,6 +128,18 @@ async def get_user(email: str) -> UserInDB | None:
     return await fetch_one_parsed(database, UserInDB, users.select().where(users.c.email == email))
 
 
+async def get_club_owner_user(club_id: ClubId) -> UserPublic | None:
+    query = """
+        SELECT users.*
+        FROM users
+        INNER JOIN users_x_clubs uxc ON users.id = uxc.user_id
+        WHERE uxc.club_id = :club_id AND uxc.relation = 'OWNER'
+        LIMIT 1
+        """
+    result = await database.fetch_one(query=query, values={"club_id": club_id})
+    return UserPublic.model_validate(dict(result._mapping)) if result is not None else None
+
+
 async def delete_user_and_owned_clubs(user_id: UserId) -> None:
     for club in await get_clubs_for_user_id(user_id):
         for tournament in await sql_get_tournaments((club.id,), None):
