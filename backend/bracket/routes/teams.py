@@ -219,27 +219,34 @@ async def create_multiple_teams(
         for row in reader
         if len(row) > 0
     ]
-    players = [player for row in teams_and_players for player in row[1]]
+    all_players = [player for row in teams_and_players for player in row[1]]
 
     existing_teams = await get_teams_with_members(tournament_id)
     existing_players = await get_all_players_in_tournament(tournament_id)
 
     check_requirement(existing_teams, user, "max_teams", additions=len(reader))
-    check_requirement(existing_players, user, "max_players", additions=len(players))
+    check_requirement(existing_players, user, "max_players", additions=len(all_players))
 
     async with database.transaction():
-        for team_name, players in teams_and_players:
-            await database.execute(
-                query=teams.insert(),
-                values=TeamInsertable(
-                    name=team_name,
-                    active=team_body.active,
-                    created=datetime_utc.now(),
-                    tournament_id=tournament_id,
-                ).model_dump(),
+        for team_name, player_names in teams_and_players:
+            team_id = TeamId(
+                await database.execute(
+                    query=teams.insert(),
+                    values=TeamInsertable(
+                        name=team_name,
+                        active=team_body.active,
+                        created=datetime_utc.now(),
+                        tournament_id=tournament_id,
+                    ).model_dump(),
+                )
             )
-            for player in players:
-                player_body = PlayerBody(name=player, active=team_body.active)
-                await insert_player(player_body, tournament_id)
+            for player_name in player_names:
+                player_id = await insert_player(
+                    PlayerBody(name=player_name, active=team_body.active), tournament_id
+                )
+                await database.execute(
+                    query=players_x_teams.insert(),
+                    values={"team_id": team_id, "player_id": player_id},
+                )
 
     return SuccessResponse()

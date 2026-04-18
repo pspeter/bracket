@@ -79,13 +79,12 @@ def determine_available_inputs(
 
     Inputs are either from:
     - Teams directly
-    - Previous ROUND_ROBIN or SWISS stage items (tentative options)
+    - Previous stage items of any type (tentative options)
     """
     all_team_options = {
         team.id: StageItemInputOptionFinal(team_id=team.id, already_taken=False) for team in teams
     }
-    # Add inputs from non-elimination stage items that can be used in the next stage.
-    # Elimination stage items have no "outputs" but are final.
+    # Add inputs from stage items that can be used as outputs in the next phase.
     all_tentative_options = {
         (stage_item.id, winner_position): StageItemInputOptionTentative(
             winner_from_stage_item_id=stage_item.id,
@@ -94,7 +93,6 @@ def determine_available_inputs(
         )
         for stage in stages
         for stage_item in stage.stage_items
-        if stage_item.type in {StageType.ROUND_ROBIN, StageType.SWISS}
         for winner_position in range(1, stage_item.team_count + 1)
     }
 
