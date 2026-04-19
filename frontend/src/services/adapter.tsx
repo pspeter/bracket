@@ -136,10 +136,11 @@ export function getPlayers(
   tournament_id: number,
   not_in_team: boolean = false
 ): SWRResponse<PlayersResponse> {
-  return useSWR(
-    `tournaments/${tournament_id}/players?not_in_team=${not_in_team}&limit=100`,
-    fetcher
-  );
+  return useSWR(getPlayersKey(tournament_id, not_in_team), fetcher);
+}
+
+export function getPlayersKey(tournament_id: number, not_in_team: boolean = false): string {
+  return `tournaments/${tournament_id}/players?not_in_team=${not_in_team}&limit=100`;
 }
 
 export function getPlayersPaginated(

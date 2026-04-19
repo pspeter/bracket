@@ -1,14 +1,20 @@
 import { Button, Checkbox, Modal, MultiSelect, Tabs, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconUser, IconUsers, IconUsersPlus } from '@tabler/icons-react';
+import { AxiosError } from 'axios';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SWRResponse } from 'swr';
+import { mutate, SWRResponse } from 'swr';
 
 import SaveButton from '@components/buttons/save';
 import { MultiTeamsInput } from '@components/forms/player_create_csv_input';
 import { Player, TeamsWithPlayersResponse } from '@openapi';
-import { getPlayers, getTournamentById } from '@services/adapter';
+import {
+  getPlayers,
+  getPlayersKey,
+  getTournamentById,
+  handleRequestError,
+} from '@services/adapter';
 import { createTeam, createTeams } from '@services/team';
 
 function MultiTeamTab({
@@ -34,9 +40,17 @@ function MultiTeamTab({
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
-        await createTeams(tournament_id, values.names, values.active);
-        await swrTeamsResponse.mutate();
-        setOpened(false);
+        try {
+          await createTeams(tournament_id, values.names, values.active);
+          await swrTeamsResponse.mutate();
+          setOpened(false);
+        } catch (exc: unknown) {
+          if (exc instanceof AxiosError) {
+            handleRequestError(exc);
+            return;
+          }
+          throw exc;
+        }
       })}
     >
       <MultiTeamsInput form={form} />
@@ -63,9 +77,11 @@ function SingleTeamTab({
   setOpened: any;
 }) {
   const { t } = useTranslation();
-  const { data } = getPlayers(tournament_id, false);
-  const players: Player[] = data != null ? data.data.players : [];
   const swrTournament = getTournamentById(tournament_id);
+  const allowPlayersInMultipleTeams =
+    swrTournament.data?.data.players_can_be_in_multiple_teams ?? false;
+  const { data } = getPlayers(tournament_id, !allowPlayersInMultipleTeams);
+  const players: Player[] = data != null ? data.data.players : [];
   const maxTeamSize = swrTournament.data?.data.max_team_size;
   const form = useForm({
     initialValues: {
@@ -80,9 +96,18 @@ function SingleTeamTab({
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
-        await createTeam(tournament_id, values.name, values.active, values.player_ids);
-        await swrTeamsResponse.mutate();
-        setOpened(false);
+        try {
+          await createTeam(tournament_id, values.name, values.active, values.player_ids);
+          await swrTeamsResponse.mutate();
+          await mutate(getPlayersKey(tournament_id, true));
+          setOpened(false);
+        } catch (exc: unknown) {
+          if (exc instanceof AxiosError) {
+            handleRequestError(exc);
+            return;
+          }
+          throw exc;
+        }
       })}
     >
       <TextInput
@@ -101,6 +126,7 @@ function SingleTeamTab({
       <MultiSelect
         data={players.map((p) => ({ value: `${p.id}`, label: p.name }))}
         label={t('team_member_select_title')}
+        placeholder={t('team_member_select_placeholder')}
         maxDropdownHeight={160}
         searchable
         mb="12rem"

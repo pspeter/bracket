@@ -1,6 +1,6 @@
 import { Badge, Center, Pagination, Table } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { SWRResponse } from 'swr';
+import { mutate, SWRResponse } from 'swr';
 
 import DeleteButton from '@components/buttons/delete';
 import PlayerList from '@components/info/player_list';
@@ -11,6 +11,7 @@ import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { FullTeamWithPlayers, TeamsWithPlayersResponse } from '@openapi';
+import { getPlayersKey } from '@services/adapter';
 import { deleteTeam } from '@services/team';
 import TableLayout, { TableState, ThNotSortable, ThSortable, sortTableEntries } from './table';
 
@@ -64,6 +65,7 @@ export default function TeamsTable({
             onClick={async () => {
               await deleteTeam(tournamentData.id, team.id);
               await swrTeamsResponse.mutate();
+              await mutate(getPlayersKey(tournamentData.id, true));
             }}
             title={t('delete_team_button')}
           />

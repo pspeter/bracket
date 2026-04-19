@@ -14,13 +14,14 @@ import { BiEditAlt } from '@react-icons/all-files/bi/BiEditAlt';
 import { AxiosError } from 'axios';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SWRResponse } from 'swr';
+import { mutate, SWRResponse } from 'swr';
 
 import { DropzoneButton } from '@components/utils/file_upload';
 import { FullTeamWithPlayers, Player, TeamsWithPlayersResponse } from '@openapi';
 import {
   getBaseApiUrl,
   getPlayers,
+  getPlayersKey,
   getTournamentById,
   handleRequestError,
   removeTeamLogo,
@@ -48,9 +49,16 @@ export default function TeamUpdateModal({
   swrTeamsResponse: SWRResponse<TeamsWithPlayersResponse>;
 }) {
   const { t } = useTranslation();
-  const { data } = getPlayers(tournament_id, false);
-  const players: Player[] = data != null ? data.data.players : [];
   const swrTournament = getTournamentById(tournament_id);
+  const allowPlayersInMultipleTeams =
+    swrTournament.data?.data.players_can_be_in_multiple_teams ?? false;
+  const { data } = getPlayers(tournament_id, !allowPlayersInMultipleTeams);
+  const playersFromApi: Player[] = data != null ? data.data.players : [];
+  const playersById = new Map<string, Player>();
+  for (const player of [...team.players, ...playersFromApi]) {
+    playersById.set(`${player.id}`, player);
+  }
+  const players = [...playersById.values()];
   const maxTeamSize = swrTournament.data?.data.max_team_size;
   const [opened, setOpened] = useState(false);
 
@@ -80,6 +88,7 @@ export default function TeamUpdateModal({
                 values.player_ids
               );
               await swrTeamsResponse.mutate();
+              await mutate(getPlayersKey(tournament_id, true));
               setOpened(false);
             } catch (exc: unknown) {
               if (
