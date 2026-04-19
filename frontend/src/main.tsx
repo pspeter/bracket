@@ -35,6 +35,8 @@ import PlayersPage from './pages/tournaments/[id]/players';
 import RankingsPage from './pages/tournaments/[id]/rankings';
 import ResultsPage from './pages/tournaments/[id]/results';
 import SchedulePage from './pages/tournaments/[id]/schedule';
+import TournamentScoreTrackingPage from './pages/tournaments/[id]/score_tracking';
+import TournamentScoreTrackingMatchPage from './pages/tournaments/[id]/score_tracking_match';
 import SettingsPage from './pages/tournaments/[id]/settings';
 import StagesPage from './pages/tournaments/[id]/stages';
 import SwissTournamentPage from './pages/tournaments/[id]/stages/swiss/[stage_item_id]';
@@ -102,6 +104,11 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="teams" element={<TeamsPage />} />
                   <Route path="schedule" element={<SchedulePage />} />
                   <Route path="rankings" element={<RankingsPage />} />
+                  <Route path="score-tracking" element={<TournamentScoreTrackingPage />} />
+                  <Route
+                    path="score-tracking/matches/:match_id"
+                    element={<TournamentScoreTrackingMatchPage />}
+                  />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="results" element={<ResultsPage />} />
                   <Route path="stages">

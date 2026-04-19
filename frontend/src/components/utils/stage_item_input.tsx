@@ -35,7 +35,8 @@ export function formatStageItemInputTentative(
   stageItemsLookup: any
 ) {
   const winnerFromStageItemId = assert_not_none(stage_item_input.winner_from_stage_item_id);
-  const stageItemName = stageItemsLookup[winnerFromStageItemId]?.name ?? `stage item ${winnerFromStageItemId}`;
+  const stageItemName =
+    stageItemsLookup[winnerFromStageItemId]?.name ?? `stage item ${winnerFromStageItemId}`;
   return `${getPositionName(assert_not_none(stage_item_input.winner_position))} of ${stageItemName}`;
 }
 

@@ -6,6 +6,7 @@ import {
   IconBrandGithub,
   IconBrowser,
   IconCalendar,
+  IconDeviceGamepad2,
   IconDots,
   IconHome,
   IconScoreboard,
@@ -142,6 +143,11 @@ export function TournamentLinks({ tournament_id }: any) {
       icon: IconScoreboard,
       label: capitalize(t('rankings_title')),
       link: `${tm_prefix}/rankings`,
+    },
+    {
+      icon: IconDeviceGamepad2,
+      label: capitalize(t('score_tracking_title')),
+      link: `${tm_prefix}/score-tracking`,
     },
     {
       icon: IconSettings,
