@@ -24,6 +24,12 @@ export default function ActivatePreviousStageModal({
     initialValues: {},
   });
 
+  const hasActiveStage =
+    swrStagesResponse.data?.data?.some((stage) => stage.is_active) ?? false;
+  if (!hasActiveStage) {
+    return null;
+  }
+
   return (
     <>
       <Modal
