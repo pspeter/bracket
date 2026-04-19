@@ -19,3 +19,4 @@ backend/frontend-dist
 
 /process-compose.yml
 **/.pgdata
+.rodney
