@@ -81,6 +81,12 @@ import type {
   DeleteTournamentTournamentsTournamentIdDeleteData,
   DeleteTournamentTournamentsTournamentIdDeleteErrors,
   DeleteTournamentTournamentsTournamentIdDeleteResponses,
+  GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetData,
+  GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetErrors,
+  GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetResponses,
+  GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetData,
+  GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetErrors,
+  GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetResponses,
   GetAvailableInputsTournamentsTournamentIdAvailableInputsGetData,
   GetAvailableInputsTournamentsTournamentIdAvailableInputsGetErrors,
   GetAvailableInputsTournamentsTournamentIdAvailableInputsGetResponses,
@@ -158,6 +164,9 @@ import type {
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
+  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutData,
+  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors,
+  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses,
   UpdateClubClubsClubIdPutData,
   UpdateClubClubsClubIdPutErrors,
   UpdateClubClubsClubIdPutResponses,
@@ -1081,6 +1090,74 @@ export const scheduleMatchesTournamentsTournamentIdScheduleMatchesPost = <
     url: '/tournaments/{tournament_id}/schedule_matches',
     ...options,
   });
+
+/**
+ * Get Authenticated Score Tracking Info
+ */
+export const getAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).get<
+    GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetResponses,
+    GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/score-tracking',
+    ...options,
+  });
+
+/**
+ * Get Authenticated Score Tracking Match
+ */
+export const getAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGet =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetData,
+      ThrowOnError
+    >
+  ) =>
+    (options.client ?? client).get<
+      GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetResponses,
+      GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetErrors,
+      ThrowOnError
+    >({
+      responseType: 'json',
+      security: [{ scheme: 'bearer', type: 'http' }],
+      url: '/tournaments/{tournament_id}/score-tracking/matches/{match_id}',
+      ...options,
+    });
+
+/**
+ * Update Authenticated Score Tracking Match
+ */
+export const updateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPut =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutData,
+      ThrowOnError
+    >
+  ) =>
+    (options.client ?? client).put<
+      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses,
+      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors,
+      ThrowOnError
+    >({
+      responseType: 'json',
+      security: [{ scheme: 'bearer', type: 'http' }],
+      url: '/tournaments/{tournament_id}/score-tracking/matches/{match_id}',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
 /**
  * Create Stage Item

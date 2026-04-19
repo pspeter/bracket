@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from bracket.database import database
-from bracket.models.db.match import Match
+from bracket.models.db.match import Match, MatchState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputInsertable,
@@ -19,6 +19,7 @@ from bracket.utils.dummy_records import (
     DUMMY_PLAYER4,
     DUMMY_ROUND1,
     DUMMY_STAGE1,
+    DUMMY_STAGE2,
     DUMMY_STAGE_ITEM1,
     DUMMY_TEAM1,
     DUMMY_TEAM2,
@@ -231,6 +232,88 @@ async def test_update_match(
         assert updated_match.court_id == body["court_id"]
 
         await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_match_fails_when_stage_has_not_started(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input1_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input2_inserted,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court1_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "completed_at": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"matches/{match_inserted.id}",
+            auth_context,
+            None,
+            {
+                "stage_item_input1_score": 0,
+                "stage_item_input2_score": 0,
+                "round_id": round_inserted.id,
+                "court_id": court1_inserted.id,
+                "state": "IN_PROGRESS",
+            },
+        )
+        updated_match = await fetch_one_parsed_certain(
+            database,
+            Match,
+            query=matches.select().where(matches.c.id == match_inserted.id),
+        )
+
+        await assert_row_count_and_clear(matches, 1)
+
+    assert response["detail"] == (
+        'Cannot start this match because stage "Knockout Stage" has not started yet. '
+        "Start that stage first."
+    )
+    assert updated_match.state.name == "NOT_STARTED"
 
 
 @pytest.mark.asyncio(loop_scope="session")

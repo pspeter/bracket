@@ -58,6 +58,47 @@ from bracket.utils.id_types import MatchId, StageItemId, TournamentId
 router = APIRouter(prefix=config.api_prefix)
 
 
+async def validate_match_can_be_started(
+    tournament_id: TournamentId, existing_match: Match, next_state: MatchState
+) -> None:
+    if existing_match.state is MatchState.NOT_STARTED and next_state in {
+        MatchState.IN_PROGRESS,
+        MatchState.COMPLETED,
+    }:
+        stages = await get_full_tournament_details(tournament_id, round_id=existing_match.round_id)
+        for stage in stages:
+            for stage_item in stage.stage_items:
+                for round_ in stage_item.rounds:
+                    if round_.id == existing_match.round_id:
+                        if stage.is_active:
+                            return
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=(
+                                f'Cannot start this match because stage "{stage.name}" '
+                                "has not started yet. Start that stage first."
+                            ),
+                        )
+
+        raise ValueError(
+            f"Could not find stage for match {existing_match.id} in tournament {tournament_id}"
+        )
+
+
+def validate_match_can_be_unscheduled(match: Match) -> None:
+    if match.state is MatchState.NOT_STARTED:
+        return
+
+    state_label = "in progress" if match.state is MatchState.IN_PROGRESS else "completed"
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f"Cannot move a {state_label} match back to Unscheduled. "
+            "Only not started matches can be unscheduled."
+        ),
+    )
+
+
 def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBody) -> MatchBody:
     missing_fields = {
         "round_id": existing_match.round_id,
@@ -90,7 +131,8 @@ def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBo
     if match_body.state is MatchState.COMPLETED:
         completed_at = (
             existing_match.completed_at
-            if existing_match.state is MatchState.COMPLETED and existing_match.completed_at is not None
+            if existing_match.state is MatchState.COMPLETED
+            and existing_match.completed_at is not None
             else datetime_utc.now()
         )
 
@@ -213,6 +255,7 @@ async def unschedule_match(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     match_row: Match = Depends(match_dependency),
 ) -> SuccessResponse:
+    validate_match_can_be_unscheduled(match_row)
     old_court_id = match_row.court_id
 
     await sql_unschedule_match(match_row.id)
@@ -253,6 +296,7 @@ async def update_match_by_id(
 ) -> SuccessResponse:
     await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
     tournament = await sql_get_tournament(tournament_id)
+    await validate_match_can_be_started(tournament_id, match, match_body.state)
     match_body = get_match_body_with_state_updates(match, match_body)
 
     await sql_update_match(match_id, match_body, tournament)

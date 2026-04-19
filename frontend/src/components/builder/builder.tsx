@@ -271,7 +271,7 @@ function StageItemRow({
 
       return (
         <StageItemInputSection
-          key={i}
+          key={input.id}
           tournament={tournament}
           stageItemInput={input}
           currentOptionValue={currentOptionValue}

@@ -2403,11 +2403,18 @@
           "ranking_id": {
             "title": "Ranking Id",
             "type": "integer"
+          },
+          "team_count": {
+            "maximum": 64.0,
+            "minimum": 2.0,
+            "title": "Team Count",
+            "type": "integer"
           }
         },
         "required": [
           "name",
-          "ranking_id"
+          "ranking_id",
+          "team_count"
         ],
         "title": "StageItemUpdateBody",
         "type": "object"
@@ -5682,6 +5689,173 @@
         "summary": "Schedule Matches",
         "tags": [
           "Matches"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/score-tracking": {
+      "get": {
+        "operationId": "get_authenticated_score_tracking_info_tournaments__tournament_id__score_tracking_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Authenticated Score Tracking Info",
+        "tags": [
+          "Score Tracking"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/score-tracking/matches/{match_id}": {
+      "get": {
+        "operationId": "get_authenticated_score_tracking_match_tournaments__tournament_id__score_tracking_matches__match_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Authenticated Score Tracking Match",
+        "tags": [
+          "Score Tracking"
+        ]
+      },
+      "put": {
+        "operationId": "update_authenticated_score_tracking_match_tournaments__tournament_id__score_tracking_matches__match_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchScoreTrackingBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Update Authenticated Score Tracking Match",
+        "tags": [
+          "Score Tracking"
         ]
       }
     },

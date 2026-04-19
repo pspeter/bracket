@@ -4,19 +4,62 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+
+    pyproject-nix = {
+      url = "github:pyproject-nix/pyproject.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+    };
+
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.uv2nix.follows = "uv2nix";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    pyproject-nix,
+    uv2nix,
+    pyproject-build-systems,
+  }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        lib = pkgs.lib;
+
+        python = pkgs.python314;
+        workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./backend; };
+
+        pythonBase = pkgs.callPackage pyproject-nix.build.packages {
+          inherit python;
+        };
+
+        pythonSet = pythonBase.overrideScope (
+          lib.composeManyExtensions [
+            pyproject-build-systems.overlays.wheel
+            (workspace.mkPyprojectOverlay {
+              sourcePreference = "wheel";
+            })
+          ]
+        );
+
+        backendEnv = pythonSet.mkVirtualEnv "bracket-backend-env" workspace.deps.all;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            # Backend
+            backendEnv
             pkgs.uv
-            pkgs.python314
 
             # Frontend + docs
             pkgs.nodejs_22
@@ -27,7 +70,15 @@
             pkgs.process-compose
           ];
 
+          env = {
+            UV_NO_SYNC = "1";
+            UV_PYTHON = python.interpreter;
+            UV_PYTHON_DOWNLOADS = "never";
+          };
+
           shellHook = ''
+            unset PYTHONPATH
+
             export PGDATA="$PWD/.pgdata"
             export PGHOST="$PGDATA"  # use unix socket in PGDATA dir
             export PGPORT=5432

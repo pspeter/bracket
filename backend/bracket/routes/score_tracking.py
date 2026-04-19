@@ -7,11 +7,15 @@ from bracket.models.db.match import Match, MatchScoreTrackingBody
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
-from bracket.routes.auth import tournament_by_score_tracking_token, user_authenticated_for_tournament
+from bracket.routes.auth import (
+    tournament_by_score_tracking_token,
+    user_authenticated_for_tournament,
+)
 from bracket.routes.matches import (
     get_full_match_body_from_score_tracking,
     get_match_body_with_state_updates,
     get_score_tracking_match_response,
+    validate_match_can_be_started,
 )
 from bracket.routes.models import (
     ScoreTrackingInfo,
@@ -109,6 +113,7 @@ async def update_authenticated_score_tracking_match(
     match: Match = Depends(tournament_score_tracking_match_dependency),
 ) -> ScoreTrackingMatchResponse:
     tournament = await sql_get_tournament(tournament_id)
+    await validate_match_can_be_started(tournament_id, match, body.state)
     match_body = get_match_body_with_state_updates(
         match, get_full_match_body_from_score_tracking(match, body)
     )
@@ -147,6 +152,7 @@ async def update_score_tracking_match(
     match: Match = Depends(score_tracking_match_dependency),
 ) -> ScoreTrackingMatchResponse:
     tournament_full = await sql_get_tournament(tournament.id)
+    await validate_match_can_be_started(tournament.id, match, body.state)
     match_body = get_match_body_with_state_updates(
         match, get_full_match_body_from_score_tracking(match, body)
     )

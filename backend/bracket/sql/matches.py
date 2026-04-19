@@ -3,7 +3,7 @@ from datetime import datetime
 from heliclockter import datetime_utc
 
 from bracket.database import database
-from bracket.models.db.match import Match, MatchBody, MatchCreateBody, MatchState, MatchWithDetails
+from bracket.models.db.match import Match, MatchBody, MatchCreateBody, MatchWithDetails
 from bracket.models.db.tournament import Tournament
 from bracket.utils.id_types import (
     CourtId,
@@ -21,6 +21,11 @@ async def sql_delete_match(match_id: MatchId) -> None:
         WHERE matches.id = :match_id
         """
     await database.execute(query=query, values={"match_id": match_id})
+
+
+async def sql_delete_matches(match_ids: list[MatchId]) -> None:
+    for match_id in match_ids:
+        await sql_delete_match(match_id)
 
 
 async def sql_delete_matches_for_stage_item_id(stage_item_id: StageItemId) -> None:
@@ -283,7 +288,9 @@ async def sql_get_match_with_details(
     return MatchWithDetails.model_validate(dict(result._mapping)) if result is not None else None
 
 
-async def sql_get_scheduled_matches_with_details(tournament_id: TournamentId) -> list[MatchWithDetails]:
+async def sql_get_scheduled_matches_with_details(
+    tournament_id: TournamentId,
+) -> list[MatchWithDetails]:
     query = """
         WITH inputs_with_teams AS (
             SELECT DISTINCT ON (stage_item_inputs.id)
@@ -309,6 +316,7 @@ async def sql_get_scheduled_matches_with_details(tournament_id: TournamentId) ->
         LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
         LEFT JOIN courts c ON c.id = matches.court_id
         WHERE stages.tournament_id = :tournament_id
+        AND stages.is_active IS TRUE
         AND rounds.is_draft IS FALSE
         AND matches.start_time IS NOT NULL
         ORDER BY matches.id, matches.start_time, c.name, matches.id
