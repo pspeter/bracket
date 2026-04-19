@@ -278,6 +278,24 @@ function GeneralTournamentForm({
             </CopyButton>
           </Grid.Col>
         </Grid>
+        <Group mt="md" gap="sm" wrap="wrap">
+          {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
+            <Button
+              variant="light"
+              component="a"
+              href={`${getBaseURL()}/tournaments/${tournament.dashboard_endpoint}/dashboard`}
+              disabled={!tournament.dashboard_public}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('signup_view_dashboard')}
+            </Button>
+          ) : (
+            <Button variant="light" disabled>
+              {t('signup_view_dashboard')}
+            </Button>
+          )}
+        </Group>
 
         <Checkbox
           mt="lg"
@@ -412,26 +430,7 @@ function GeneralTournamentForm({
         ) : null}
       </Fieldset>
       <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
-        <Group gap="sm" wrap="wrap">
-          {tournament.dashboard_endpoint != null && tournament.dashboard_endpoint !== '' ? (
-            <Button
-              variant="light"
-              component="a"
-              href={`${getBaseURL()}/tournaments/${tournament.dashboard_endpoint}/dashboard`}
-              disabled={!tournament.dashboard_public}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t('signup_view_dashboard')}
-            </Button>
-          ) : (
-            <Button variant="light" disabled>
-              {t('signup_view_dashboard')}
-            </Button>
-          )}
-        </Group>
         <NumberInput
-          mt="md"
           label={t('max_team_size_label')}
           min={1}
           {...form.getInputProps('max_team_size')}
