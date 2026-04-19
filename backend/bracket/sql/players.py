@@ -6,7 +6,7 @@ from bracket.database import database
 from bracket.logic.ranking.statistics import START_ELO
 from bracket.models.db.player import Player, PlayerBody, PlayerToInsert
 from bracket.schema import players
-from bracket.utils.id_types import PlayerId, TournamentId
+from bracket.utils.id_types import PlayerId, TeamId, TournamentId
 from bracket.utils.pagination import PaginationPlayers
 from bracket.utils.types import dict_without_none
 
@@ -17,7 +17,19 @@ async def get_all_players_in_tournament(
     not_in_team: bool = False,
     pagination: PaginationPlayers | None = None,
 ) -> list[Player]:
-    not_in_team_filter = "AND players.team_id IS NULL" if not_in_team else ""
+    not_in_team_filter = (
+        """
+        AND NOT EXISTS (
+            SELECT 1
+            FROM players_x_teams pxt
+            INNER JOIN teams t ON t.id = pxt.team_id
+            WHERE pxt.player_id = players.id
+            AND t.tournament_id = :tournament_id
+        )
+        """
+        if not_in_team
+        else ""
+    )
     limit_filter = "LIMIT :limit" if pagination is not None and pagination.limit is not None else ""
     offset_filter = (
         "OFFSET :offset" if pagination is not None and pagination.offset is not None else ""
@@ -66,7 +78,19 @@ async def get_player_count(
     *,
     not_in_team: bool = False,
 ) -> int:
-    not_in_team_filter = "AND players.team_id IS NULL" if not_in_team else ""
+    not_in_team_filter = (
+        """
+        AND NOT EXISTS (
+            SELECT 1
+            FROM players_x_teams pxt
+            INNER JOIN teams t ON t.id = pxt.team_id
+            WHERE pxt.player_id = players.id
+            AND t.tournament_id = :tournament_id
+        )
+        """
+        if not_in_team
+        else ""
+    )
     query = f"""
         SELECT count(*)
         FROM players
@@ -101,3 +125,41 @@ async def insert_player(player_body: PlayerBody, tournament_id: TournamentId) ->
             ).model_dump(),
         )
     )
+
+
+async def get_player_by_name(name: str, tournament_id: TournamentId) -> Player | None:
+    query = """
+        SELECT *
+        FROM players
+        WHERE tournament_id = :tournament_id
+        AND LOWER(name) = LOWER(:name)
+        ORDER BY id
+        LIMIT 1
+    """
+    result = await database.fetch_one(
+        query=query, values={"tournament_id": tournament_id, "name": name}
+    )
+    return Player.model_validate(result) if result is not None else None
+
+
+async def get_player_team_ids(
+    player_id: PlayerId, tournament_id: TournamentId, *, exclude_team_id: TeamId | None = None
+) -> set[TeamId]:
+    exclude_filter = "AND t.id != :exclude_team_id" if exclude_team_id is not None else ""
+    values = dict_without_none(
+        {
+            "player_id": player_id,
+            "tournament_id": tournament_id,
+            "exclude_team_id": exclude_team_id,
+        }
+    )
+    query = f"""
+        SELECT t.id
+        FROM players_x_teams pxt
+        INNER JOIN teams t ON t.id = pxt.team_id
+        WHERE pxt.player_id = :player_id
+        AND t.tournament_id = :tournament_id
+        {exclude_filter}
+    """
+    result = await database.fetch_all(query=query, values=values)
+    return {TeamId(row["id"]) for row in result}

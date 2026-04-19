@@ -37,7 +37,12 @@ from bracket.routes.util import (
     team_with_players_dependency,
 )
 from bracket.schema import players_x_teams, teams
-from bracket.sql.players import get_all_players_in_tournament, insert_player
+from bracket.sql.players import (
+    get_all_players_in_tournament,
+    get_player_by_name,
+    get_player_team_ids,
+    insert_player,
+)
 from bracket.sql.teams import (
     get_team_by_id,
     get_team_count,
@@ -54,6 +59,24 @@ from bracket.utils.pagination import PaginationTeams
 from bracket.utils.types import assert_some
 
 router = APIRouter(prefix=config.api_prefix)
+_PLAYER_ALREADY_ASSIGNED = "One or more players are already assigned to another team"
+
+
+async def validate_team_member_assignments(
+    tournament: Tournament, player_ids: set[PlayerId], *, current_team_id: TeamId | None = None
+) -> None:
+    if tournament.players_can_be_in_multiple_teams:
+        return
+
+    for player_id in player_ids:
+        existing_team_ids = await get_player_team_ids(
+            player_id, tournament.id, exclude_team_id=current_team_id
+        )
+        if len(existing_team_ids) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PLAYER_ALREADY_ASSIGNED,
+            )
 
 
 async def update_team_members(
@@ -67,6 +90,7 @@ async def update_team_members(
         )
 
     [team] = await get_teams_with_members(tournament_id, team_id=team_id)
+    await validate_team_member_assignments(tournament, player_ids, current_team_id=team_id)
 
     # Add members to the team
     for player_id in player_ids:
@@ -198,6 +222,8 @@ async def create_team(
 
     existing_teams = await get_teams_with_members(tournament_id)
     check_requirement(existing_teams, user, "max_teams")
+    tournament = await sql_get_tournament(tournament_id)
+    await validate_team_member_assignments(tournament, team_to_insert.player_ids)
 
     last_record_id = await database.execute(
         query=teams.insert(),
@@ -256,13 +282,27 @@ async def create_multiple_teams(
                     ).model_dump(),
                 )
             )
+            assigned_player_ids_for_team: set[PlayerId] = set()
             for player_name in player_names:
-                player_id = await insert_player(
-                    PlayerBody(name=player_name, active=team_body.active), tournament_id
-                )
+                existing_player = await get_player_by_name(player_name, tournament_id)
+                if existing_player is not None:
+                    player_id = existing_player.id
+                    if not tournament.players_can_be_in_multiple_teams:
+                        existing_team_ids = await get_player_team_ids(player_id, tournament_id)
+                        if len(existing_team_ids) > 0:
+                            continue
+                else:
+                    player_id = await insert_player(
+                        PlayerBody(name=player_name, active=team_body.active), tournament_id
+                    )
+
+                if player_id in assigned_player_ids_for_team:
+                    continue
+
                 await database.execute(
                     query=players_x_teams.insert(),
                     values={"team_id": team_id, "player_id": player_id},
                 )
+                assigned_player_ids_for_team.add(player_id)
 
     return SuccessResponse()
