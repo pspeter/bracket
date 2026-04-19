@@ -229,6 +229,7 @@
     "special_character_required": "Enthält Sonderzeichen",
     "stage_spotlight_description": "Layout des Turniers ändern",
     "stage_title": "Phasen",
+    "stage_unassigned_teams_notice": "Teams, die noch keiner Phase zugewiesen sind: {{count}}",
     "stage_type_select_label": "Phasen-Typ",
     "start_demo_button": "Demo starten",
     "start_time": "Startzeit",

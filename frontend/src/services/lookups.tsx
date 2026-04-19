@@ -58,6 +58,22 @@ export function getStageItemTeamIdsLookup(swrStagesResponse: SWRResponse) {
   return Object.fromEntries(result);
 }
 
+export function getAssignedTeamIds(swrStagesResponse: SWRResponse): number[] {
+  const teamIds = new Set<number>();
+
+  swrStagesResponse.data.data.forEach((stage: StageWithStageItems) => {
+    stage.stage_items.forEach((stageItem) => {
+      stageItem.inputs.forEach((input) => {
+        if (input.team_id != null) {
+          teamIds.add(input.team_id);
+        }
+      });
+    });
+  });
+
+  return [...teamIds];
+}
+
 export function getStageItemTeamsLookup(swrStagesResponse: SWRResponse) {
   let result: any[] = [];
 

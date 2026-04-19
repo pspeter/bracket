@@ -1,4 +1,4 @@
-import { Group, Stack } from '@mantine/core';
+import { Group, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 import Builder from '@components/builder/builder';
@@ -15,13 +15,16 @@ import {
   getRankings,
   getRankingsPerStageItem,
   getStages,
+  getTeams,
   getTournamentById,
 } from '@services/adapter';
+import { getAssignedTeamIds } from '@services/lookups';
 
 export default function StagesPage() {
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
   const swrStagesResponse = getStages(tournamentData.id);
+  const swrTeamsResponse = getTeams(tournamentData.id);
   const swrRankingsResponse = getRankings(tournamentData.id);
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const swrAvailableInputsResponse = getAvailableStageItemInputs(tournamentData.id);
@@ -32,10 +35,15 @@ export default function StagesPage() {
 
   const stages: StageWithStageItems[] =
     swrStagesResponse.data != null ? swrStagesResponse.data.data : [];
+  const assignedTeamCount =
+    swrStagesResponse.data != null ? getAssignedTeamIds(swrStagesResponse).length : 0;
+  const totalTeamCount = swrTeamsResponse.data?.data.count ?? 0;
+  const unassignedTeamCount = Math.max(totalTeamCount - assignedTeamCount, 0);
 
   let content;
   if (
     swrStagesResponse.isLoading ||
+    swrTeamsResponse.isLoading ||
     swrTournamentResponse.isLoading ||
     swrAvailableInputsResponse.isLoading ||
     swrRankingsResponse.isLoading
@@ -57,18 +65,23 @@ export default function StagesPage() {
   } else {
     content = (
       <>
-        <Group grow mt="1rem" maw="30rem">
-          <ActivatePreviousStageModal
-            tournamentId={tournamentData.id}
-            swrStagesResponse={swrStagesResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-          />
-          <ActivateNextStageModal
-            tournamentId={tournamentData.id}
-            swrStagesResponse={swrStagesResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-          />
-        </Group>
+        <Stack gap="xs" mt="1rem" maw="30rem">
+          <Group grow>
+            <ActivatePreviousStageModal
+              tournamentId={tournamentData.id}
+              swrStagesResponse={swrStagesResponse}
+              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+            />
+            <ActivateNextStageModal
+              tournamentId={tournamentData.id}
+              swrStagesResponse={swrStagesResponse}
+              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+            />
+          </Group>
+          <Text c="dimmed" size="sm">
+            {t('stage_unassigned_teams_notice', { count: unassignedTeamCount })}
+          </Text>
+        </Stack>
         <Group mt="1rem" align="top">
           <Builder
             tournament={tournamentDataFull}

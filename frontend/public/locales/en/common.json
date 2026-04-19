@@ -229,6 +229,7 @@
     "special_character_required": "Includes special character",
     "stage_spotlight_description": "Change the layout of the tournament",
     "stage_title": "Stages",
+    "stage_unassigned_teams_notice": "Teams not assigned to any stages yet: {{count}}",
     "stage_type_select_label": "Stage type",
     "start_demo_button": "Start demo",
     "start_time": "Start time",
