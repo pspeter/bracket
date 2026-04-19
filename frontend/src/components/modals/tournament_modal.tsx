@@ -80,7 +80,11 @@ function GeneralTournamentForm({
           values.auto_assign_courts,
           values.start_time,
           values.duration_minutes,
-          values.margin_minutes
+          values.margin_minutes,
+          false,
+          4,
+          true,
+          false
         );
         await swrTournamentsResponse.mutate();
         setOpened(false);

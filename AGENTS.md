@@ -36,6 +36,34 @@ pnpm run dev --port 3000
 pnpm run dev --port 3001
 ```
 
+### Manual Browser Testing With Rodney
+
+For Rodney-based manual browser testing, do not rely on the default `localhost`-only setup.
+Start the backend and frontend on addresses the browser can reach, and make sure CORS allows the
+frontend origin:
+
+```bash
+# Backend (from backend/):
+CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000 \
+ENVIRONMENT=DEVELOPMENT \
+uv run gunicorn -k bracket.uvicorn.RestartableUvicornWorker \
+  bracket.app:app \
+  --bind 0.0.0.0:8400 \
+  --workers 1 \
+  --reload
+
+# Frontend (from frontend/):
+VITE_API_BASE_URL=http://127.0.0.1:8400 pnpm run dev --port 3000 --host 0.0.0.0
+```
+
+If you use different ports, update both `CORS_ORIGINS` and `VITE_API_BASE_URL` to match.
+
+To see Rodney's available commands, run:
+
+```bash
+nix develop -c uvx rodney --help
+```
+
 ### Seed Database
 
 ```bash

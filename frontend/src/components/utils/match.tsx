@@ -22,8 +22,15 @@ export function getMatchEndTime(match: MatchWithDetails) {
   return getMatchStartTime(match).add(match.duration_minutes + match.margin_minutes, 'minutes');
 }
 
+export function isMatchCompletedRecently(match: MatchWithDetails, minutes: number) {
+  return (
+    match.completed_at != null &&
+    dayjs(match.completed_at).isAfter(dayjs().subtract(minutes, 'minute'))
+  );
+}
+
 export function isMatchHappening(match: MatchWithDetails) {
-  return getMatchStartTime(match) < dayjs() && getMatchEndTime(match) > dayjs();
+  return match.state === 'IN_PROGRESS';
 }
 
 export function isMatchInTheFutureOrPresent(match: MatchWithDetails) {
@@ -32,6 +39,43 @@ export function isMatchInTheFutureOrPresent(match: MatchWithDetails) {
 
 export function isMatchInTheFuture(match: MatchWithDetails) {
   return getMatchStartTime(match) > dayjs();
+}
+
+export function getScoreColors(match: MatchWithDetails) {
+  if (match.state === 'IN_PROGRESS') {
+    return {
+      stage_item_input1_score: '#74c0fc',
+      stage_item_input2_score: '#74c0fc',
+      textColor: '#1c1c1c',
+    };
+  }
+
+  if (match.state === 'NOT_STARTED') {
+    return {
+      stage_item_input1_score: '#868e96',
+      stage_item_input2_score: '#868e96',
+      textColor: 'white',
+    };
+  }
+
+  const winColor = '#2a8f37';
+  const drawColor = '#656565';
+  const loseColor = '#af4034';
+  return {
+    stage_item_input1_score:
+      match.stage_item_input1_score > match.stage_item_input2_score
+        ? winColor
+        : match.stage_item_input1_score === match.stage_item_input2_score
+          ? drawColor
+          : loseColor,
+    stage_item_input2_score:
+      match.stage_item_input2_score > match.stage_item_input1_score
+        ? winColor
+        : match.stage_item_input1_score === match.stage_item_input2_score
+          ? drawColor
+          : loseColor,
+    textColor: 'white',
+  };
 }
 
 export function formatMatchInput1(

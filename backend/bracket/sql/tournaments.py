@@ -70,12 +70,16 @@ async def sql_update_tournament(
     tournament_id: TournamentId,
     tournament: TournamentUpdateBody,
     signup_token_update: str | None = None,
+    score_tracking_token_update: str | None = None,
 ) -> None:
     values = {"tournament_id": tournament_id, **tournament.model_dump()}
     token_clause = ""
     if signup_token_update is not None:
         token_clause = ", signup_token = :signup_token"
         values["signup_token"] = signup_token_update
+    if score_tracking_token_update is not None:
+        token_clause += ", score_tracking_token = :score_tracking_token"
+        values["score_tracking_token"] = score_tracking_token_update
 
     query = f"""
         UPDATE tournaments
@@ -90,7 +94,8 @@ async def sql_update_tournament(
             margin_minutes = :margin_minutes,
             signup_enabled = :signup_enabled,
             max_team_size = :max_team_size,
-            signup_team_choice_enabled = :signup_team_choice_enabled
+            signup_team_choice_enabled = :signup_team_choice_enabled,
+            score_tracking_enabled = :score_tracking_enabled
             {token_clause}
         WHERE tournaments.id = :tournament_id
         """
@@ -130,7 +135,9 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             signup_enabled,
             signup_token,
             max_team_size,
-            signup_team_choice_enabled
+            signup_team_choice_enabled,
+            score_tracking_enabled,
+            score_tracking_token
         )
         VALUES (
             :name,
@@ -146,11 +153,15 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             :signup_enabled,
             :signup_token,
             :max_team_size,
-            :signup_team_choice_enabled
+            :signup_team_choice_enabled,
+            :score_tracking_enabled,
+            :score_tracking_token
         )
         RETURNING id
         """
     values = dict(tournament.model_dump(exclude_none=False))
     values.setdefault("signup_token", None)
+    values.setdefault("score_tracking_enabled", False)
+    values.setdefault("score_tracking_token", None)
     new_id = await database.fetch_val(query=query, values=values)
     return TournamentId(new_id)

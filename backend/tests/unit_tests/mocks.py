@@ -1,6 +1,6 @@
 from heliclockter import datetime_utc
 
-from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.team import Team
@@ -77,6 +77,8 @@ def get_2_definitive_matches_mock(
         stage_item_input1_conflict=False,
         stage_item_input2_conflict=False,
         position_in_schedule=1,
+        state=MatchState.COMPLETED,
+        completed_at=DUMMY_MOCK_TIME,
     )
     match2 = MatchWithDetailsDefinitive(
         id=MatchId(-2),
@@ -95,6 +97,8 @@ def get_2_definitive_matches_mock(
         stage_item_input1_conflict=False,
         stage_item_input2_conflict=False,
         position_in_schedule=1,
+        state=MatchState.COMPLETED,
+        completed_at=DUMMY_MOCK_TIME,
     )
     return match1, match2
 

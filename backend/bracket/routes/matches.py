@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.config import config
@@ -24,17 +25,26 @@ from bracket.models.db.match import (
     MatchCreateBodyFrontend,
     MatchFilter,
     MatchRescheduleBody,
+    MatchScoreTrackingBody,
+    MatchState,
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import user_authenticated_for_tournament
-from bracket.routes.models import SingleMatchResponse, SuccessResponse, UpcomingMatchesResponse
+from bracket.routes.models import (
+    ScoreTrackingMatchResponse,
+    SingleMatchResponse,
+    SuccessResponse,
+    UpcomingMatchesResponse,
+)
 from bracket.routes.util import disallow_archived_tournament, match_dependency
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
     sql_create_match,
     sql_delete_match,
+    sql_get_match_with_details,
+    sql_get_scheduled_matches_with_details,
     sql_unschedule_match,
     sql_update_match,
 )
@@ -44,9 +54,61 @@ from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
 from bracket.utils.id_types import MatchId, StageItemId, TournamentId
-from bracket.utils.types import assert_some
 
 router = APIRouter(prefix=config.api_prefix)
+
+
+def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBody) -> MatchBody:
+    missing_fields = {
+        "round_id": existing_match.round_id,
+        "stage_item_input1_score": existing_match.stage_item_input1_score,
+        "stage_item_input2_score": existing_match.stage_item_input2_score,
+        "court_id": existing_match.court_id,
+        "custom_duration_minutes": existing_match.custom_duration_minutes,
+        "custom_margin_minutes": existing_match.custom_margin_minutes,
+        "state": existing_match.state,
+    }
+    match_body = match_body.model_copy(
+        update={
+            key: value
+            for key, value in missing_fields.items()
+            if key not in match_body.model_fields_set
+        }
+    )
+
+    scores_changed = (
+        existing_match.stage_item_input1_score != match_body.stage_item_input1_score
+        or existing_match.stage_item_input2_score != match_body.stage_item_input2_score
+    )
+    if scores_changed and match_body.state is not MatchState.IN_PROGRESS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Scores can only be changed while the match is in progress",
+        )
+
+    completed_at = None
+    if match_body.state is MatchState.COMPLETED:
+        completed_at = (
+            existing_match.completed_at
+            if existing_match.state is MatchState.COMPLETED and existing_match.completed_at is not None
+            else datetime_utc.now()
+        )
+
+    return match_body.model_copy(update={"completed_at": completed_at})
+
+
+def get_full_match_body_from_score_tracking(
+    existing_match: Match, body: MatchScoreTrackingBody
+) -> MatchBody:
+    return MatchBody(
+        round_id=existing_match.round_id,
+        court_id=existing_match.court_id,
+        custom_duration_minutes=existing_match.custom_duration_minutes,
+        custom_margin_minutes=existing_match.custom_margin_minutes,
+        stage_item_input1_score=body.stage_item_input1_score,
+        stage_item_input2_score=body.stage_item_input2_score,
+        state=body.state,
+    )
 
 
 @router.get(
@@ -191,6 +253,7 @@ async def update_match_by_id(
 ) -> SuccessResponse:
     await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
     tournament = await sql_get_tournament(tournament_id)
+    match_body = get_match_body_with_state_updates(match, match_body)
 
     await sql_update_match(match_id, match_body, tournament)
 
@@ -201,12 +264,24 @@ async def update_match_by_id(
     if (
         match_body.custom_duration_minutes != match.custom_duration_minutes
         or match_body.custom_margin_minutes != match.custom_margin_minutes
-    ):
+    ) and match.court_id is not None:
         tournament = await sql_get_tournament(tournament_id)
         scheduled_matches = get_scheduled_matches(await get_full_tournament_details(tournament_id))
-        await reorder_matches_for_court(tournament, scheduled_matches, assert_some(match.court_id))
+        await reorder_matches_for_court(tournament, scheduled_matches, match.court_id)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
 
     return SuccessResponse()
+
+
+async def get_score_tracking_match_response(
+    tournament_id: TournamentId, match_id: MatchId
+) -> ScoreTrackingMatchResponse:
+    match = await sql_get_match_with_details(tournament_id, match_id)
+    if match is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Could not find match with id {match_id}",
+        )
+    return ScoreTrackingMatchResponse(data=match)

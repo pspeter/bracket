@@ -1,4 +1,14 @@
-import { Button, Center, Checkbox, Divider, Grid, Modal, NumberInput, Text } from '@mantine/core';
+import {
+  Button,
+  Center,
+  Checkbox,
+  Divider,
+  Grid,
+  Modal,
+  NumberInput,
+  Select,
+  Text,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,6 +74,7 @@ function MatchModalForm({
       stage_item_input2_score: match.stage_item_input2_score,
       custom_duration_minutes: match.custom_duration_minutes,
       custom_margin_minutes: match.custom_margin_minutes,
+      state: match.state,
     },
 
     validate: {
@@ -101,6 +112,8 @@ function MatchModalForm({
             court_id: match.court_id || null,
             custom_duration_minutes: customDurationEnabled ? values.custom_duration_minutes : null,
             custom_margin_minutes: customMarginEnabled ? values.custom_margin_minutes : null,
+            state: values.state,
+            completed_at: match.completed_at,
           };
           await updateMatch(tournamentData.id, match.id, updatedMatch);
           await swrStagesResponse.mutate();
@@ -112,6 +125,7 @@ function MatchModalForm({
           withAsterisk
           label={`${t('score_of_label')} ${team1Name}`}
           placeholder={`${t('score_of_label')} ${team1Name}`}
+          disabled={form.values.state !== 'IN_PROGRESS'}
           {...form.getInputProps('stage_item_input1_score')}
         />
         <NumberInput
@@ -119,7 +133,18 @@ function MatchModalForm({
           mt="lg"
           label={`${t('score_of_label')} ${team2Name}`}
           placeholder={`${t('score_of_label')} ${team2Name}`}
+          disabled={form.values.state !== 'IN_PROGRESS'}
           {...form.getInputProps('stage_item_input2_score')}
+        />
+        <Select
+          mt="lg"
+          label={t('match_state_label')}
+          data={[
+            { value: 'NOT_STARTED', label: t('match_state_not_started') },
+            { value: 'IN_PROGRESS', label: t('match_state_in_progress') },
+            { value: 'COMPLETED', label: t('match_state_completed') },
+          ]}
+          {...form.getInputProps('state')}
         />
         <Divider mt="lg" />
 

@@ -26,6 +26,9 @@ class EnumAutoStr(EnumValues):
     ) -> str:
         return name
 
+    def __str__(self) -> str:
+        return str(self.value)
+
 
 def assert_some[T](result: T | None) -> T:
     assert result is not None

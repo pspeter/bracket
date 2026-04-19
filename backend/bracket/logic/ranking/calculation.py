@@ -3,7 +3,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from bracket.logic.ranking.statistics import START_ELO, TeamStatistics
-from bracket.models.db.match import MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import StageItemWithRounds
@@ -76,6 +76,7 @@ def determine_ranking_for_stage_item(
         if not round_.is_draft
         for match in round_.matches
         if isinstance(match, MatchWithDetailsDefinitive)
+        if match.state is MatchState.COMPLETED
     ]
     for match in matches:
         for team_index, stage_item_input in enumerate(match.stage_item_inputs):

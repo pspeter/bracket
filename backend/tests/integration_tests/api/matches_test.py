@@ -209,6 +209,7 @@ async def test_update_match(
             "stage_item_input2_score": 24,
             "round_id": round_inserted.id,
             "court_id": None,
+            "state": "IN_PROGRESS",
         }
         assert (
             await send_tournament_request(
@@ -308,6 +309,86 @@ async def test_update_endpoint_custom_duration_margin(
         )
         assert updated_match.custom_duration_minutes == body["custom_duration_minutes"]
         assert updated_match.custom_margin_minutes == body["custom_margin_minutes"]
+
+        await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_endpoint_custom_duration_margin_unscheduled_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input1_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input2_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": None,
+                    "start_time": None,
+                    "position_in_schedule": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        body = {
+            "round_id": round_inserted.id,
+            "custom_duration_minutes": 30,
+            "custom_margin_minutes": 20,
+        }
+        assert (
+            await send_tournament_request(
+                HTTPMethod.PUT,
+                f"matches/{match_inserted.id}",
+                auth_context,
+                None,
+                body,
+            )
+            == SUCCESS_RESPONSE
+        )
+        updated_match = await fetch_one_parsed_certain(
+            database,
+            Match,
+            query=matches.select().where(matches.c.id == match_inserted.id),
+        )
+        assert updated_match.custom_duration_minutes == body["custom_duration_minutes"]
+        assert updated_match.custom_margin_minutes == body["custom_margin_minutes"]
+        assert updated_match.court_id is None
+        assert updated_match.start_time is None
+        assert updated_match.position_in_schedule is None
 
         await assert_row_count_and_clear(matches, 1)
 

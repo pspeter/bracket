@@ -31,6 +31,8 @@ class TournamentInsertable(BaseModelORM):
     signup_token: str | None = None
     max_team_size: int = Field(4, ge=1)
     signup_team_choice_enabled: bool = True
+    score_tracking_enabled: bool = False
+    score_tracking_token: str | None = None
 
 
 class Tournament(TournamentInsertable):
@@ -50,6 +52,7 @@ class TournamentUpdateBody(BaseModelORM):
     signup_enabled: bool
     max_team_size: int = Field(..., ge=1)
     signup_team_choice_enabled: bool
+    score_tracking_enabled: bool = False
 
 
 class TournamentChangeStatusBody(BaseModelORM):

@@ -80,7 +80,8 @@ export function DoubleHeader({ tournamentData }: { tournamentData: Tournament })
   const pathName = navigate.pathname.replace('[id]', endpoint).replace(/\/+$/, '');
 
   const mainLinks = [
-    { link: `/tournaments/${endpoint}/dashboard`, label: 'Matches' },
+    { link: `/tournaments/${endpoint}/dashboard`, label: 'Live' },
+    { link: `/tournaments/${endpoint}/dashboard/matches`, label: 'Matches' },
     { link: `/tournaments/${endpoint}/dashboard/standings`, label: 'Standings' },
   ];
 

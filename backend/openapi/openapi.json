@@ -363,6 +363,18 @@
       },
       "Match": {
         "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "court_id": {
             "anyOf": [
               {
@@ -533,6 +545,10 @@
               }
             ],
             "title": "Start Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState",
+            "default": "NOT_STARTED"
           }
         },
         "required": [
@@ -549,6 +565,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "state",
+          "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
@@ -562,6 +580,18 @@
       },
       "MatchBody": {
         "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "court_id": {
             "anyOf": [
               {
@@ -608,6 +638,10 @@
             "default": 0,
             "title": "Stage Item Input2 Score",
             "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState",
+            "default": "NOT_STARTED"
           }
         },
         "required": [
@@ -616,7 +650,9 @@
           "stage_item_input2_score",
           "court_id",
           "custom_duration_minutes",
-          "custom_margin_minutes"
+          "custom_margin_minutes",
+          "state",
+          "completed_at"
         ],
         "title": "MatchBody",
         "type": "object"
@@ -736,9 +772,55 @@
         "title": "MatchRescheduleBody",
         "type": "object"
       },
+      "MatchScoreTrackingBody": {
+        "properties": {
+          "stage_item_input1_score": {
+            "default": 0,
+            "title": "Stage Item Input1 Score",
+            "type": "integer"
+          },
+          "stage_item_input2_score": {
+            "default": 0,
+            "title": "Stage Item Input2 Score",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState",
+            "default": "NOT_STARTED"
+          }
+        },
+        "required": [
+          "stage_item_input1_score",
+          "stage_item_input2_score",
+          "state"
+        ],
+        "title": "MatchScoreTrackingBody",
+        "type": "object"
+      },
+      "MatchState": {
+        "enum": [
+          "NOT_STARTED",
+          "IN_PROGRESS",
+          "COMPLETED"
+        ],
+        "title": "MatchState",
+        "type": "string"
+      },
       "MatchWithDetails": {
         "description": "MatchWithDetails has zero or one defined stage item inputs, but not both.",
         "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "court": {
             "anyOf": [
               {
@@ -919,6 +1001,10 @@
               }
             ],
             "title": "Start Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState",
+            "default": "NOT_STARTED"
           }
         },
         "required": [
@@ -935,6 +1021,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "state",
+          "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
@@ -949,6 +1037,18 @@
       },
       "MatchWithDetailsDefinitive": {
         "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "court": {
             "anyOf": [
               {
@@ -1123,6 +1223,10 @@
               }
             ],
             "title": "Start Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState",
+            "default": "NOT_STARTED"
           }
         },
         "required": [
@@ -1139,6 +1243,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "state",
+          "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
@@ -1581,6 +1687,56 @@
           "matches"
         ],
         "title": "RoundWithMatches",
+        "type": "object"
+      },
+      "ScoreTrackingInfo": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/MatchWithDetails"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "tournament_id": {
+            "title": "Tournament Id",
+            "type": "integer"
+          },
+          "tournament_name": {
+            "title": "Tournament Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tournament_id",
+          "tournament_name",
+          "matches"
+        ],
+        "title": "ScoreTrackingInfo",
+        "type": "object"
+      },
+      "ScoreTrackingInfoResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ScoreTrackingInfo"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ScoreTrackingInfoResponse",
+        "type": "object"
+      },
+      "ScoreTrackingMatchResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MatchWithDetails"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ScoreTrackingMatchResponse",
         "type": "object"
       },
       "SignupBody": {
@@ -2759,6 +2915,22 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "score_tracking_enabled": {
+            "default": false,
+            "title": "Score Tracking Enabled",
+            "type": "boolean"
+          },
+          "score_tracking_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Tracking Token"
+          },
           "signup_enabled": {
             "default": false,
             "title": "Signup Enabled",
@@ -2807,6 +2979,8 @@
           "signup_token",
           "max_team_size",
           "signup_team_choice_enabled",
+          "score_tracking_enabled",
+          "score_tracking_token",
           "id"
         ],
         "title": "Tournament",
@@ -2858,6 +3032,11 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "score_tracking_enabled": {
+            "default": false,
+            "title": "Score Tracking Enabled",
+            "type": "boolean"
+          },
           "signup_enabled": {
             "title": "Signup Enabled",
             "type": "boolean"
@@ -2884,6 +3063,7 @@
           "signup_enabled",
           "max_team_size",
           "signup_team_choice_enabled",
+          "score_tracking_enabled",
           "club_id"
         ],
         "title": "TournamentBody",
@@ -2963,6 +3143,11 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "score_tracking_enabled": {
+            "default": false,
+            "title": "Score Tracking Enabled",
+            "type": "boolean"
+          },
           "signup_enabled": {
             "title": "Signup Enabled",
             "type": "boolean"
@@ -2988,7 +3173,8 @@
           "margin_minutes",
           "signup_enabled",
           "max_team_size",
-          "signup_team_choice_enabled"
+          "signup_team_choice_enabled",
+          "score_tracking_enabled"
         ],
         "title": "TournamentUpdateBody",
         "type": "object"
@@ -3193,7 +3379,7 @@
     }
   },
   "info": {
-    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
+    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Score Tracking](#tag/Score-Tracking)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
     "license": {
       "name": "AGPL-3.0",
       "url": "https://www.gnu.org/licenses/agpl-3.0.en.html"
@@ -3416,6 +3602,158 @@
         "summary": "Healthcheck ping",
         "tags": [
           "Internals"
+        ]
+      }
+    },
+    "/score-tracking/{score_tracking_token}": {
+      "get": {
+        "operationId": "get_score_tracking_info_score_tracking__score_tracking_token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Score Tracking Info",
+        "tags": [
+          "Score Tracking"
+        ]
+      }
+    },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}": {
+      "get": {
+        "operationId": "get_score_tracking_match_score_tracking__score_tracking_token__matches__match_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Score Tracking Match",
+        "tags": [
+          "Score Tracking"
+        ]
+      },
+      "put": {
+        "operationId": "update_score_tracking_match_score_tracking__score_tracking_token__matches__match_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchScoreTrackingBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Score Tracking Match",
+        "tags": [
+          "Score Tracking"
         ]
       }
     },

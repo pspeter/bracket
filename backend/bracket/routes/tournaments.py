@@ -109,11 +109,19 @@ async def update_tournament_by_id(
 ) -> SuccessResponse:
     existing_tournament = await sql_get_tournament(tournament_id)
     signup_token_update: str | None = None
+    score_tracking_token_update: str | None = None
     if tournament_body.signup_enabled and not existing_tournament.signup_token:
         signup_token_update = secrets.token_urlsafe(32)
+    if tournament_body.score_tracking_enabled and not existing_tournament.score_tracking_token:
+        score_tracking_token_update = secrets.token_urlsafe(32)
 
     with check_unique_constraint_violation({UniqueIndex.ix_tournaments_dashboard_endpoint}):
-        await sql_update_tournament(tournament_id, tournament_body, signup_token_update)
+        await sql_update_tournament(
+            tournament_id,
+            tournament_body,
+            signup_token_update,
+            score_tracking_token_update,
+        )
 
     await update_start_times_of_matches(tournament_id)
     return SuccessResponse()

@@ -106,6 +106,15 @@ import type {
   GetRankingsTournamentsTournamentIdRankingsGetData,
   GetRankingsTournamentsTournamentIdRankingsGetErrors,
   GetRankingsTournamentsTournamentIdRankingsGetResponses,
+  GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetData,
+  GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors,
+  GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses,
+  GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetData,
+  GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetErrors,
+  GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses,
+  GetSignupInfoSignupSignupTokenGetData,
+  GetSignupInfoSignupSignupTokenGetErrors,
+  GetSignupInfoSignupSignupTokenGetResponses,
   GetStagesTournamentsTournamentIdStagesGetData,
   GetStagesTournamentsTournamentIdStagesGetErrors,
   GetStagesTournamentsTournamentIdStagesGetResponses,
@@ -125,6 +134,9 @@ import type {
   LoginForAccessTokenTokenPostResponses,
   PingPingGetData,
   PingPingGetResponses,
+  PostSignupSignupSignupTokenPostData,
+  PostSignupSignupSignupTokenPostErrors,
+  PostSignupSignupSignupTokenPostResponses,
   PutUserPasswordUsersUserIdPasswordPutData,
   PutUserPasswordUsersUserIdPasswordPutErrors,
   PutUserPasswordUsersUserIdPasswordPutResponses,
@@ -164,6 +176,9 @@ import type {
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutData,
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutErrors,
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses,
+  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData,
+  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors,
+  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutData,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutErrors,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutResponses,
@@ -302,6 +317,106 @@ export const pingPingGet = <ThrowOnError extends boolean = false>(
     responseType: 'json',
     url: '/ping',
     ...options,
+  });
+
+/**
+ * Get Score Tracking Info
+ */
+export const getScoreTrackingInfoScoreTrackingScoreTrackingTokenGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses,
+    GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}',
+    ...options,
+  });
+
+/**
+ * Get Score Tracking Match
+ */
+export const getScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).get<
+    GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses,
+    GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}',
+    ...options,
+  });
+
+/**
+ * Update Score Tracking Match
+ */
+export const updateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPut = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).put<
+    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses,
+    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get Signup Info
+ */
+export const getSignupInfoSignupSignupTokenGet = <ThrowOnError extends boolean = false>(
+  options: Options<GetSignupInfoSignupSignupTokenGetData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    GetSignupInfoSignupSignupTokenGetResponses,
+    GetSignupInfoSignupSignupTokenGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/signup/{signup_token}',
+    ...options,
+  });
+
+/**
+ * Post Signup
+ */
+export const postSignupSignupSignupTokenPost = <ThrowOnError extends boolean = false>(
+  options: Options<PostSignupSignupSignupTokenPostData, ThrowOnError>
+) =>
+  (options.client ?? client).post<
+    PostSignupSignupSignupTokenPostResponses,
+    PostSignupSignupSignupTokenPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/signup/{signup_token}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

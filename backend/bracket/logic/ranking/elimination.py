@@ -1,4 +1,4 @@
-from bracket.models.db.match import Match
+from bracket.models.db.match import Match, MatchState
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.matches import (
@@ -25,6 +25,7 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
     affected_matches: dict[MatchId, Match] = {
         match.id: match
         for match in current_round.matches
+        if match.state is MatchState.COMPLETED
         if match_ids is None or match.id in match_ids
     }
     subsequent_rounds = [round_ for round_ in stage_item.rounds if round_.id > current_round.id]

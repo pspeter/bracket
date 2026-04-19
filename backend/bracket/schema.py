@@ -44,6 +44,8 @@ tournaments = Table(
     Column("signup_token", String, nullable=True),
     Column("max_team_size", Integer, nullable=False, server_default="4"),
     Column("signup_team_choice_enabled", Boolean, nullable=False, server_default="true"),
+    Column("score_tracking_enabled", Boolean, nullable=False, server_default="false"),
+    Column("score_tracking_token", String, nullable=True),
 )
 
 stages = Table(
@@ -143,6 +145,19 @@ matches = Table(
     Column("stage_item_input1_score", Integer, nullable=False),
     Column("stage_item_input2_score", Integer, nullable=False),
     Column("position_in_schedule", Integer, nullable=True),
+    Column(
+        "state",
+        Enum(
+            "NOT_STARTED",
+            "IN_PROGRESS",
+            "COMPLETED",
+            name="match_state",
+        ),
+        nullable=False,
+        server_default="NOT_STARTED",
+        index=True,
+    ),
+    Column("completed_at", DateTimeTZ, nullable=True),
 )
 
 teams = Table(

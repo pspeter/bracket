@@ -4,7 +4,7 @@ from heliclockter import datetime_utc
 
 from bracket.logic.ranking.calculation import determine_ranking_for_stage_item
 from bracket.logic.ranking.statistics import TeamStatistics
-from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
@@ -59,6 +59,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                             stage_item_input2_score=0,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.COMPLETED,
                         ),
                         MatchWithDetailsDefinitive(
                             id=MatchId(-2),
@@ -72,6 +73,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                             stage_item_input2_score=2,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.COMPLETED,
                         ),
                         MatchWithDetails(  # This gets ignored in ranking calculation
                             id=MatchId(-3),
@@ -83,6 +85,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                             stage_item_input2_score=2,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.IN_PROGRESS,
                         ),
                     ],
                     stage_item_id=StageItemId(-1),
@@ -155,6 +158,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                             stage_item_input2_score=0,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.COMPLETED,
                         ),
                         MatchWithDetailsDefinitive(
                             id=MatchId(-2),
@@ -168,6 +172,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                             stage_item_input2_score=2,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.COMPLETED,
                         ),
                         MatchWithDetails(  # This gets ignored in ranking calculation
                             id=MatchId(-3),
@@ -179,6 +184,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                             stage_item_input2_score=2,
                             stage_item_input1_conflict=False,
                             stage_item_input2_conflict=False,
+                            state=MatchState.IN_PROGRESS,
                         ),
                     ],
                     stage_item_id=StageItemId(-1),

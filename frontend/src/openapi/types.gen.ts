@@ -230,6 +230,10 @@ export type HttpValidationError = {
  */
 export type Match = {
   /**
+   * Completed At
+   */
+  completed_at: string | null;
+  /**
    * Court Id
    */
   court_id: number | null;
@@ -309,12 +313,17 @@ export type Match = {
    * Start Time
    */
   start_time: string | null;
+  state: MatchState;
 };
 
 /**
  * MatchBody
  */
 export type MatchBody = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
   /**
    * Court Id
    */
@@ -339,6 +348,7 @@ export type MatchBody = {
    * Stage Item Input2 Score
    */
   stage_item_input2_score: number;
+  state: MatchState;
 };
 
 /**
@@ -394,11 +404,35 @@ export type MatchRescheduleBody = {
 };
 
 /**
+ * MatchScoreTrackingBody
+ */
+export type MatchScoreTrackingBody = {
+  /**
+   * Stage Item Input1 Score
+   */
+  stage_item_input1_score: number;
+  /**
+   * Stage Item Input2 Score
+   */
+  stage_item_input2_score: number;
+  state: MatchState;
+};
+
+/**
+ * MatchState
+ */
+export type MatchState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+
+/**
  * MatchWithDetails
  *
  * MatchWithDetails has zero or one defined stage item inputs, but not both.
  */
 export type MatchWithDetails = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
   court: Court | null;
   /**
    * Court Id
@@ -480,12 +514,17 @@ export type MatchWithDetails = {
    * Start Time
    */
   start_time: string | null;
+  state: MatchState;
 };
 
 /**
  * MatchWithDetailsDefinitive
  */
 export type MatchWithDetailsDefinitive = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
   court: Court | null;
   /**
    * Court Id
@@ -567,6 +606,7 @@ export type MatchWithDetailsDefinitive = {
    * Start Time
    */
   start_time: string | null;
+  state: MatchState;
 };
 
 /**
@@ -830,6 +870,119 @@ export type RoundWithMatches = {
    * Stage Item Id
    */
   stage_item_id: number;
+};
+
+/**
+ * ScoreTrackingInfo
+ */
+export type ScoreTrackingInfo = {
+  /**
+   * Matches
+   */
+  matches: Array<MatchWithDetails>;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
+  /**
+   * Tournament Name
+   */
+  tournament_name: string;
+};
+
+/**
+ * ScoreTrackingInfoResponse
+ */
+export type ScoreTrackingInfoResponse = {
+  data: ScoreTrackingInfo;
+};
+
+/**
+ * ScoreTrackingMatchResponse
+ */
+export type ScoreTrackingMatchResponse = {
+  data: MatchWithDetails;
+};
+
+/**
+ * SignupBody
+ */
+export type SignupBody = {
+  /**
+   * Player Name
+   */
+  player_name: string;
+  /**
+   * Team Action
+   */
+  team_action: 'join' | 'create' | 'none';
+  /**
+   * Team Id
+   */
+  team_id: number | null;
+  /**
+   * Team Name
+   */
+  team_name: string | null;
+};
+
+/**
+ * SignupInfoResponse
+ */
+export type SignupInfoResponse = {
+  data: SignupTournamentInfo;
+};
+
+/**
+ * SignupTeamInfo
+ */
+export type SignupTeamInfo = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Is Full
+   */
+  is_full: boolean;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Player Count
+   */
+  player_count: number;
+};
+
+/**
+ * SignupTournamentInfo
+ */
+export type SignupTournamentInfo = {
+  /**
+   * Dashboard Endpoint
+   */
+  dashboard_endpoint: string | null;
+  /**
+   * Max Team Size
+   */
+  max_team_size: number;
+  /**
+   * Signup Team Choice Enabled
+   */
+  signup_team_choice_enabled: boolean;
+  /**
+   * Teams
+   */
+  teams: Array<SignupTeamInfo>;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
+  /**
+   * Tournament Name
+   */
+  tournament_name: string;
 };
 
 /**
@@ -1431,45 +1584,6 @@ export type TokenResponse = {
 };
 
 /**
- * SignupBody
- */
-export type SignupBody = {
-  player_name: string;
-  team_action: 'join' | 'create' | 'none';
-  team_id: number | null;
-  team_name: string | null;
-};
-
-/**
- * SignupInfoResponse
- */
-export type SignupInfoResponse = {
-  data: SignupTournamentInfo;
-};
-
-/**
- * SignupTeamInfo
- */
-export type SignupTeamInfo = {
-  id: number;
-  is_full: boolean;
-  name: string;
-  player_count: number;
-};
-
-/**
- * SignupTournamentInfo
- */
-export type SignupTournamentInfo = {
-  dashboard_endpoint: string | null;
-  max_team_size: number;
-  signup_team_choice_enabled: boolean;
-  teams: Array<SignupTeamInfo>;
-  tournament_id: number;
-  tournament_name: string;
-};
-
-/**
  * Tournament
  */
 export type Tournament = {
@@ -1521,6 +1635,14 @@ export type Tournament = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Score Tracking Enabled
+   */
+  score_tracking_enabled: boolean;
+  /**
+   * Score Tracking Token
+   */
+  score_tracking_token: string | null;
   /**
    * Signup Enabled
    */
@@ -1580,6 +1702,10 @@ export type TournamentBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Score Tracking Enabled
+   */
+  score_tracking_enabled: boolean;
   /**
    * Signup Enabled
    */
@@ -1649,6 +1775,10 @@ export type TournamentUpdateBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Score Tracking Enabled
+   */
+  score_tracking_enabled: boolean;
   /**
    * Signup Enabled
    */
@@ -1933,6 +2063,174 @@ export type PingPingGetResponses = {
 };
 
 export type PingPingGetResponse = PingPingGetResponses[keyof PingPingGetResponses];
+
+export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetData = {
+  body?: never;
+  path: {
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}';
+};
+
+export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetError =
+  GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors[keyof GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors];
+
+export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingInfoResponse;
+};
+
+export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponse =
+  GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses[keyof GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses];
+
+export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetData = {
+  body?: never;
+  path: {
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}';
+};
+
+export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetError =
+  GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetErrors[keyof GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetErrors];
+
+export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponse =
+  GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses[keyof GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses];
+
+export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData = {
+  body: MatchScoreTrackingBody;
+  path: {
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}';
+};
+
+export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutError =
+  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors[keyof UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors];
+
+export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponse =
+  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses[keyof UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses];
+
+export type GetSignupInfoSignupSignupTokenGetData = {
+  body?: never;
+  path: {
+    /**
+     * Signup Token
+     */
+    signup_token: string;
+  };
+  query?: never;
+  url: '/signup/{signup_token}';
+};
+
+export type GetSignupInfoSignupSignupTokenGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetSignupInfoSignupSignupTokenGetError =
+  GetSignupInfoSignupSignupTokenGetErrors[keyof GetSignupInfoSignupSignupTokenGetErrors];
+
+export type GetSignupInfoSignupSignupTokenGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: SignupInfoResponse;
+};
+
+export type GetSignupInfoSignupSignupTokenGetResponse =
+  GetSignupInfoSignupSignupTokenGetResponses[keyof GetSignupInfoSignupSignupTokenGetResponses];
+
+export type PostSignupSignupSignupTokenPostData = {
+  body: SignupBody;
+  path: {
+    /**
+     * Signup Token
+     */
+    signup_token: string;
+  };
+  query?: never;
+  url: '/signup/{signup_token}';
+};
+
+export type PostSignupSignupSignupTokenPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type PostSignupSignupSignupTokenPostError =
+  PostSignupSignupSignupTokenPostErrors[keyof PostSignupSignupSignupTokenPostErrors];
+
+export type PostSignupSignupSignupTokenPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type PostSignupSignupSignupTokenPostResponse =
+  PostSignupSignupSignupTokenPostResponses[keyof PostSignupSignupSignupTokenPostResponses];
 
 export type LoginForAccessTokenTokenPostData = {
   body: BodyLoginForAccessTokenTokenPost;

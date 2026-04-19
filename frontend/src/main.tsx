@@ -19,11 +19,15 @@ import ClubsPage from './pages/clubs';
 import CreateAccountPage from './pages/create_account';
 import CreateDemoAccountPage from './pages/demo';
 import LoginPage from './pages/login';
+import PasswordResetPage from './pages/password_reset';
+import ScoreTrackingPage from './pages/score_tracking';
+import ScoreTrackingMatchPage from './pages/score_tracking_match';
+import ScoreTrackingQrPage from './pages/score_tracking_qr';
 import SignupPage from './pages/signup';
 import SignupQrPage from './pages/signup_qr';
-import PasswordResetPage from './pages/password_reset';
 import DashboardSchedulePage from './pages/tournaments/[id]/dashboard';
 import DashboardNotFoundPage from './pages/tournaments/[id]/dashboard/dashboard_404';
+import DashboardMatchesPage from './pages/tournaments/[id]/dashboard/matches';
 import CourtsPresentPage from './pages/tournaments/[id]/dashboard/present/courts';
 import StandingsPresentPage from './pages/tournaments/[id]/dashboard/present/standings';
 import DashboardStandingsPage from './pages/tournaments/[id]/dashboard/standings';
@@ -85,6 +89,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/create-account" element={<CreateAccountPage />} />
               <Route path="/signup/:signup_token" element={<SignupPage />} />
               <Route path="/signup-qr/:token" element={<SignupQrPage />} />
+              <Route path="/score-tracking/:score_tracking_token" element={<ScoreTrackingPage />} />
+              <Route
+                path="/score-tracking/:score_tracking_token/matches/:match_id"
+                element={<ScoreTrackingMatchPage />}
+              />
+              <Route path="/score-tracking-qr/:token" element={<ScoreTrackingQrPage />} />
 
               <Route path="/tournaments">
                 <Route path=":id">
@@ -100,6 +110,7 @@ createRoot(document.getElementById('root')!).render(
                   </Route>
                   <Route path="dashboard">
                     <Route index element={<DashboardSchedulePage />} />
+                    <Route path="matches" element={<DashboardMatchesPage />} />
                     <Route path="standings" element={<DashboardStandingsPage />} />
                     <Route path="present">
                       <Route path="courts" element={<CourtsPresentPage />} />

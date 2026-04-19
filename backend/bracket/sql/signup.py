@@ -16,6 +16,21 @@ async def get_tournament_by_signup_token(signup_token: str) -> Tournament | None
     return Tournament.model_validate(result) if result is not None else None
 
 
+async def get_tournament_by_score_tracking_token(score_tracking_token: str) -> Tournament | None:
+    """Fetch tournament where score_tracking_token matches and score tracking is enabled."""
+    query = """
+        SELECT *
+        FROM tournaments
+        WHERE score_tracking_token = :score_tracking_token
+        AND score_tracking_enabled IS TRUE
+        AND status = 'OPEN'
+        """
+    result = await database.fetch_one(
+        query=query, values={"score_tracking_token": score_tracking_token}
+    )
+    return Tournament.model_validate(result) if result is not None else None
+
+
 async def check_player_name_exists(tournament_id: TournamentId, name: str) -> bool:
     """Case-insensitive check for duplicate player name in tournament."""
     query = """

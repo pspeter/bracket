@@ -162,9 +162,7 @@ export default function SignupPage() {
               player_name: values.player_name.trim(),
               team_action: action,
               team_id:
-                action === 'join' && values.team_id != null
-                  ? parseInt(values.team_id, 10)
-                  : null,
+                action === 'join' && values.team_id != null ? parseInt(values.team_id, 10) : null,
               team_name: action === 'create' ? values.team_name.trim() : null,
             };
 

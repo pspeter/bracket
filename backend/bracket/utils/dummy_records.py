@@ -6,7 +6,7 @@ from heliclockter import datetime_utc
 from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubInsertable
 from bracket.models.db.court import CourtInsertable
-from bracket.models.db.match import MatchInsertable
+from bracket.models.db.match import MatchInsertable, MatchState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import RankingInsertable
@@ -134,6 +134,8 @@ DUMMY_MATCH1 = MatchInsertable(
     position_in_schedule=1,
     stage_item_input1_conflict=False,
     stage_item_input2_conflict=False,
+    state=MatchState.COMPLETED,
+    completed_at=DUMMY_MOCK_TIME,
 )
 
 DUMMY_USER = UserInsertable(

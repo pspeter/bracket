@@ -149,6 +149,7 @@ function GeneralTournamentForm({
       signup_enabled: tournament.signup_enabled,
       max_team_size: tournament.max_team_size,
       signup_team_choice_enabled: tournament.signup_team_choice_enabled ?? true,
+      score_tracking_enabled: tournament.score_tracking_enabled ?? false,
     },
 
     validate: {
@@ -184,7 +185,8 @@ function GeneralTournamentForm({
           values.margin_minutes,
           values.signup_enabled ?? tournament.signup_enabled,
           maxTeamSize,
-          values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true
+          values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true,
+          values.score_tracking_enabled ?? tournament.score_tracking_enabled ?? false
         );
 
         await swrTournamentResponse.mutate();
@@ -359,6 +361,54 @@ function GeneralTournamentForm({
               {t('signup_show_qr_button')}
             </Button>
           </Group>
+        ) : null}
+      </Fieldset>
+      <Fieldset legend={t('score_tracking_title')} mt="lg" radius="md">
+        <Checkbox
+          label={t('score_tracking_enabled_label')}
+          {...form.getInputProps('score_tracking_enabled', { type: 'checkbox' })}
+        />
+        {form.values.score_tracking_enabled === true && tournament.score_tracking_token != null ? (
+          <Stack mt="md" gap={6}>
+            <Input.Label>{t('score_tracking_url_label')}</Input.Label>
+            <Grid gutter={{ base: 'xs', md: 'md' }} align="center">
+              <Grid.Col span={{ base: 12, md: 9 }}>
+                <TextInput
+                  readOnly
+                  value={`${getBaseURL()}/score-tracking/${tournament.score_tracking_token}`}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 3 }}>
+                <CopyButton
+                  value={`${getBaseURL()}/score-tracking/${tournament.score_tracking_token}`}
+                >
+                  {({ copied, copy }) => (
+                    <Button
+                      leftSection={<IconCopy size="1.1rem" stroke={1.5} />}
+                      fullWidth
+                      color={copied ? 'teal' : 'indigo'}
+                      onClick={copy}
+                      styles={{ label: { whiteSpace: 'normal' } }}
+                    >
+                      {copied ? t('score_tracking_link_copied') : t('score_tracking_copy_button')}
+                    </Button>
+                  )}
+                </CopyButton>
+              </Grid.Col>
+            </Grid>
+            <Group mt="md" gap="sm" wrap="wrap">
+              <Button
+                component="a"
+                href={`${getBaseURL()}/score-tracking-qr/${tournament.score_tracking_token}`}
+                target="_blank"
+                rel="noreferrer"
+                leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
+                variant="light"
+              >
+                {t('score_tracking_show_qr_button')}
+              </Button>
+            </Group>
+          </Stack>
         ) : null}
       </Fieldset>
       <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">

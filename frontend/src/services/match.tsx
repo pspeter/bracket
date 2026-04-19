@@ -21,6 +21,20 @@ export async function updateMatch(tournament_id: number, match_id: number, match
     .catch((response: any) => handleRequestError(response));
 }
 
+export async function updateScoreTrackingMatch(
+  score_tracking_token: string,
+  match_id: number,
+  match: {
+    stage_item_input1_score: number;
+    stage_item_input2_score: number;
+    state: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  }
+) {
+  return createAxios()
+    .put(`score-tracking/${score_tracking_token}/matches/${match_id}`, match)
+    .catch((response: any) => handleRequestError(response));
+}
+
 export async function unscheduleMatch(tournament_id: number, match_id: number) {
   return createAxios()
     .post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`)

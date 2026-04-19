@@ -1,13 +1,21 @@
+import json
 from decimal import Decimal
+from enum import auto
 
 from heliclockter import datetime_utc, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from bracket.models.db.court import Court
 from bracket.models.db.shared import BaseModelORM
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.utils.id_types import CourtId, MatchId, RoundId, StageItemInputId
-from bracket.utils.types import assert_some
+from bracket.utils.types import EnumAutoStr, assert_some
+
+
+class MatchState(EnumAutoStr):
+    NOT_STARTED = auto()
+    IN_PROGRESS = auto()
+    COMPLETED = auto()
 
 
 class MatchBaseInsertable(BaseModelORM):
@@ -24,6 +32,8 @@ class MatchBaseInsertable(BaseModelORM):
     court_id: CourtId | None = None
     stage_item_input1_conflict: bool
     stage_item_input2_conflict: bool
+    state: MatchState = MatchState.NOT_STARTED
+    completed_at: datetime_utc | None = None
 
     @property
     def end_time(self) -> datetime_utc:
@@ -44,6 +54,8 @@ class Match(MatchInsertable):
     stage_item_input2: StageItemInput | None = None
 
     def get_winner(self) -> StageItemInput | None:
+        if self.state is not MatchState.COMPLETED:
+            return None
         if self.stage_item_input1_score > self.stage_item_input2_score:
             return self.stage_item_input1
         if self.stage_item_input1_score < self.stage_item_input2_score:
@@ -58,6 +70,13 @@ class MatchWithDetails(Match):
     """
 
     court: Court | None = None
+
+    @field_validator("stage_item_input1", "stage_item_input2", "court", mode="before")
+    @staticmethod
+    def parse_nested_json(value: str | dict[str, object] | None) -> str | dict[str, object] | None:
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
 
 
 def get_match_hash(
@@ -93,6 +112,14 @@ class MatchBody(BaseModelORM):
     court_id: CourtId | None = None
     custom_duration_minutes: int | None = None
     custom_margin_minutes: int | None = None
+    state: MatchState = MatchState.NOT_STARTED
+    completed_at: datetime_utc | None = None
+
+
+class MatchScoreTrackingBody(BaseModelORM):
+    stage_item_input1_score: int = 0
+    stage_item_input2_score: int = 0
+    state: MatchState = MatchState.NOT_STARTED
 
 
 class MatchCreateBodyFrontend(BaseModelORM):

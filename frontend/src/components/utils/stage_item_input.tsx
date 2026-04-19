@@ -34,7 +34,9 @@ export function formatStageItemInputTentative(
   stage_item_input: StageItemInputTentative | StageItemInputOptionTentative,
   stageItemsLookup: any
 ) {
-  return `${getPositionName(assert_not_none(stage_item_input.winner_position))} of ${stageItemsLookup[assert_not_none(stage_item_input.winner_from_stage_item_id)].name}`;
+  const winnerFromStageItemId = assert_not_none(stage_item_input.winner_from_stage_item_id);
+  const stageItemName = stageItemsLookup[winnerFromStageItemId]?.name ?? `stage item ${winnerFromStageItemId}`;
+  return `${getPositionName(assert_not_none(stage_item_input.winner_position))} of ${stageItemName}`;
 }
 
 export function formatStageItemInput(
