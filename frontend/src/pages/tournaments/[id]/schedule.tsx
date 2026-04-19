@@ -46,6 +46,12 @@ import { rescheduleMatch, scheduleMatches, unscheduleMatch } from '@services/mat
 
 const UNSCHEDULED_DROPPABLE_ID = 'unscheduled';
 
+function getMatchStateColor(state: string) {
+  if (state === 'IN_PROGRESS') return 'blue';
+  if (state === 'COMPLETED') return 'green';
+  return 'gray';
+}
+
 function ScheduleRow({
   index,
   match,
@@ -94,6 +100,9 @@ function ScheduleRow({
                 <Stack gap="xs" align="end">
                   <Badge variant="default" size="lg">
                     {match.start_time != null ? <Time datetime={match.start_time} /> : null}
+                  </Badge>
+                  <Badge color={getMatchStateColor(match.state)} variant="light">
+                    {t(`match_state_${String(match.state).toLowerCase()}`)}
                   </Badge>
                   <Badge
                     color={stringToColour(`${matchesLookup[match.id].stageItem.id}`)}
