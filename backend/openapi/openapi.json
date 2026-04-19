@@ -2506,10 +2506,34 @@
             },
             "title": "Data",
             "type": "object"
+          },
+          "has_pending_matches": {
+            "default": false,
+            "title": "Has Pending Matches",
+            "type": "boolean"
+          },
+          "pending_match_count": {
+            "default": 0,
+            "title": "Pending Match Count",
+            "type": "integer"
+          },
+          "pending_matches_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Matches Message"
           }
         },
         "required": [
-          "data"
+          "data",
+          "has_pending_matches",
+          "pending_match_count",
+          "pending_matches_message"
         ],
         "title": "StageRankingResponse",
         "type": "object"

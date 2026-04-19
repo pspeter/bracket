@@ -79,6 +79,10 @@ export default function ActivateNextStageModal({
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
+  const isPreviewLoading = swrRankingsPerStageItemResponse.isLoading;
+  const hasPendingMatches = swrRankingsPerStageItemResponse.data?.has_pending_matches ?? false;
+  const pendingMatchesMessage =
+    swrRankingsPerStageItemResponse.data?.pending_matches_message ?? null;
 
   const form = useForm({
     initialValues: {},
@@ -94,14 +98,23 @@ export default function ActivateNextStageModal({
       >
         <form
           onSubmit={form.onSubmit(async () => {
-            await activateNextStage(tournamentId, 'next');
-            swrStagesResponse.mutate();
-            setOpened(false);
+            const response = await activateNextStage(tournamentId, 'next');
+            if (response != null) {
+              await swrStagesResponse.mutate();
+              await swrRankingsPerStageItemResponse.mutate();
+              setOpened(false);
+            }
           })}
         >
           <Alert icon={<IconAlertCircle size={16} />} color="gray" radius="lg">
             {t('active_next_stage_modal_description')}
           </Alert>
+
+          {hasPendingMatches && pendingMatchesMessage != null ? (
+            <Alert icon={<IconAlertCircle size={16} />} color="orange" radius="lg" mt="md">
+              {pendingMatchesMessage}
+            </Alert>
+          ) : null}
 
           <Container mt="1rem">
             <UpdatesToStageItemInputsTables
@@ -116,6 +129,7 @@ export default function ActivateNextStageModal({
             size="md"
             mt="lg"
             type="submit"
+            disabled={isPreviewLoading || hasPendingMatches}
             leftSection={<IconSquareArrowRight size={24} />}
           >
             {t('plan_next_stage_button')}

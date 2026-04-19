@@ -8,6 +8,7 @@ from bracket.logic.ranking.calculation import (
     determine_team_ranking_for_stage_item,
 )
 from bracket.logic.ranking.statistics import TeamStatistics
+from bracket.models.db.match import MatchState
 from bracket.models.db.stage_item_inputs import (
     StageItemInputEmpty,
     StageItemInputFinal,
@@ -36,6 +37,25 @@ StageItemXTeamRanking = dict[StageItemId, list[tuple[StageItemInputId, TeamStati
 class StageItemInputUpdate(BaseModel):
     stage_item_input: StageItemInputTentative
     team: Team
+
+
+def get_pending_matches_message(pending_match_count: int) -> str:
+    match_label = "match" if pending_match_count == 1 else "matches"
+    return (
+        "The active stage still has pending matches. "
+        f"Complete all {pending_match_count} pending {match_label} before "
+        "starting the next stage."
+    )
+
+
+def get_pending_match_count_in_stage(stage: StageWithStageItems) -> int:
+    return sum(
+        1
+        for stage_item in stage.stage_items
+        for round_ in stage_item.rounds
+        for match in round_.matches
+        if match.state is not MatchState.COMPLETED
+    )
 
 
 def determine_team_id(

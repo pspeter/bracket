@@ -1368,6 +1368,18 @@ export type StageRankingResponse = {
   data: {
     [key: string]: Array<StageItemInputUpdate>;
   };
+  /**
+   * Has Pending Matches
+   */
+  has_pending_matches: boolean;
+  /**
+   * Pending Match Count
+   */
+  pending_match_count: number;
+  /**
+   * Pending Matches Message
+   */
+  pending_matches_message: string | null;
 };
 
 /**

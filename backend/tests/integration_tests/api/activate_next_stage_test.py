@@ -1,7 +1,7 @@
 import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchBody, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchBody, MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -109,16 +109,20 @@ async def test_activate_next_stage(
         await build_matches_for_stage_item(stage_item_1, tournament_id)
         await build_matches_for_stage_item(stage_item_2, tournament_id)
 
-        # Set match score to get a winner (team 2) that goes to the next round
+        # Complete the whole active stage so advancing is allowed.
         [prev_stage, _] = await get_full_tournament_details(auth_context.tournament.id)
-        match1 = prev_stage.stage_items[0].rounds[0].matches[0]
-        assert isinstance(match1, MatchWithDetailsDefinitive)
-        assert match1.stage_item_input2.team_id == team_inserted_2.id
-        await sql_update_match(
-            match1.id,
-            MatchBody(**match1.model_copy(update={"stage_item_input2_score": 42}).model_dump()),
-            auth_context.tournament,
-        )
+        for round_ in prev_stage.stage_items[0].rounds:
+            for match in round_.matches:
+                assert isinstance(match, MatchWithDetailsDefinitive)
+                await sql_update_match(
+                    match.id,
+                    MatchBody(
+                        **match.model_copy(
+                            update={"stage_item_input1_score": 21, "state": MatchState.COMPLETED}
+                        ).model_dump()
+                    ),
+                    auth_context.tournament,
+                )
 
         response = await send_tournament_request(
             HTTPMethod.POST, "stages/activate?direction=next", auth_context, json={}
@@ -136,3 +140,83 @@ async def test_activate_next_stage(
     #     next_stage.stage_items[0].rounds[0].matches[0].stage_item_input1.team_id
     #     == team_inserted_2.id
     # )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_activate_next_stage_blocks_when_active_stage_has_pending_matches(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ),
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted_1,
+        inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted_2,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_1,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_2,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_3,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_4,
+    ):
+        tournament_id = auth_context.tournament.id
+        stage_item_1 = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_1.id,
+                name=DUMMY_STAGE_ITEM1.name,
+                team_count=DUMMY_STAGE_ITEM1.team_count,
+                type=DUMMY_STAGE_ITEM1.type,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=team_inserted_1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=team_inserted_2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=team_inserted_3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=team_inserted_4.id),
+                ],
+            ),
+        )
+        stage_item_2 = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_2.id,
+                name=DUMMY_STAGE_ITEM3.name,
+                team_count=2,
+                type=DUMMY_STAGE_ITEM3.type,
+                inputs=[
+                    StageItemInputCreateBodyTentative(
+                        slot=1,
+                        winner_from_stage_item_id=stage_item_1.id,
+                        winner_position=1,
+                    ),
+                    StageItemInputCreateBodyTentative(
+                        slot=2,
+                        winner_from_stage_item_id=stage_item_1.id,
+                        winner_position=2,
+                    ),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(stage_item_1, tournament_id)
+        await build_matches_for_stage_item(stage_item_2, tournament_id)
+
+        response = await send_tournament_request(
+            HTTPMethod.POST, "stages/activate?direction=next", auth_context, json={}
+        )
+
+        await sql_delete_stage_item_with_foreign_keys(stage_item_2.id)
+        await sql_delete_stage_item_with_foreign_keys(stage_item_1.id)
+
+    assert response["detail"] == (
+        "The active stage still has pending matches. "
+        "Complete all 6 pending matches before starting the next stage."
+    )

@@ -5,6 +5,8 @@ from bracket.config import config
 from bracket.database import database
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.scheduling.handle_stage_activation import (
+    get_pending_match_count_in_stage,
+    get_pending_matches_message,
     get_updates_to_inputs_in_activated_stage,
     update_matches_in_activated_stage,
     update_matches_in_deactivated_stage,
@@ -133,6 +135,13 @@ async def activate_next_stage(
     deactivated_stage = next((stage for stage in stages if stage.is_active), None)
 
     if stage_body.direction == "next":
+        if deactivated_stage is not None:
+            pending_match_count = get_pending_match_count_in_stage(deactivated_stage)
+            if pending_match_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=get_pending_matches_message(pending_match_count),
+                )
         await update_matches_in_activated_stage(tournament_id, new_active_stage_id)
     else:
         if deactivated_stage:
@@ -163,11 +172,38 @@ async def get_next_stage_rankings(
     """
     Get the rankings for the stage items in this stage.
     """
+    stages = await get_full_tournament_details(tournament_id)
+    active_stage = next((stage for stage in stages if stage.is_active), None)
+    pending_match_count = (
+        get_pending_match_count_in_stage(active_stage) if active_stage is not None else 0
+    )
+    pending_matches_message = (
+        get_pending_matches_message(pending_match_count)
+        if pending_match_count > 0
+        else None
+    )
+
+    if pending_match_count > 0:
+        return StageRankingResponse(
+            data={},
+            has_pending_matches=True,
+            pending_match_count=pending_match_count,
+            pending_matches_message=pending_matches_message,
+        )
+
     next_stage_id = await get_next_stage_in_tournament(tournament_id, "next")
 
     if next_stage_id is None:
-        return StageRankingResponse(data={})
+        return StageRankingResponse(
+            data={},
+            has_pending_matches=pending_match_count > 0,
+            pending_match_count=pending_match_count,
+            pending_matches_message=pending_matches_message,
+        )
 
     return StageRankingResponse(
-        data=await get_updates_to_inputs_in_activated_stage(tournament_id, next_stage_id)
+        data=await get_updates_to_inputs_in_activated_stage(tournament_id, next_stage_id),
+        has_pending_matches=pending_match_count > 0,
+        pending_match_count=pending_match_count,
+        pending_matches_message=pending_matches_message,
     )

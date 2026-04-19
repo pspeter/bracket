@@ -107,7 +107,9 @@ class StageItemInputOptionsResponse(
 
 
 class StageRankingResponse(DataResponse[dict[StageItemId, list[StageItemInputUpdate]]]):
-    pass
+    has_pending_matches: bool = False
+    pending_match_count: int = 0
+    pending_matches_message: str | None = None
 
 
 class SignupTeamInfo(BaseModel):
