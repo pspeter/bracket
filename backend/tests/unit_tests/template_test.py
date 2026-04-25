@@ -188,39 +188,53 @@ def test_2_groups_sf_until_rank_4() -> None:
 
 
 def test_2_groups_sf_until_rank_6() -> None:
+    # make_2g_sf uses 12 teams (6 per group), so rank 6 is valid
     bp = build_template_blueprint(make_2g_sf(until_rank=6))
-    assert item_names_in(bp, "Semi-finals") == [
-        "Semi-final A", "Semi-final B", "5th-8th Semi A", "5th-8th Semi B",
-    ]
+    # semis stage only ever contains the two main semi-finals — no 5th-8th sub-bracket
+    assert item_names_in(bp, "Semi-finals") == ["Semi-final A", "Semi-final B"]
     assert item_names_in(bp, "Finals") == ["Final", "3rd Place", "5th Place"]
 
-    semi_5a, semi_5b = items_in(bp, "Semi-finals")[2], items_in(bp, "Semi-finals")[3]
-    assert semi_5a.inputs == [
-        BlueprintInput(slot=1, winner_from="Group A", winner_position=2),
-        BlueprintInput(slot=2, winner_from="Group B", winner_position=1),
-    ]
-    assert semi_5b.inputs == [
-        BlueprintInput(slot=1, winner_from="Group B", winner_position=2),
-        BlueprintInput(slot=2, winner_from="Group A", winner_position=1),
+    # 5th place uses group position 3 directly (not semi-final losers)
+    fifth = items_in(bp, "Finals")[2]
+    assert fifth.inputs == [
+        BlueprintInput(slot=1, winner_from="Group A", winner_position=3),
+        BlueprintInput(slot=2, winner_from="Group B", winner_position=3),
     ]
 
 
 def test_2_groups_sf_until_rank_8() -> None:
     bp = build_template_blueprint(make_2g_sf(until_rank=8))
+    assert item_names_in(bp, "Semi-finals") == ["Semi-final A", "Semi-final B"]
     assert item_names_in(bp, "Finals") == ["Final", "3rd Place", "5th Place", "7th Place"]
 
     seventh = items_in(bp, "Finals")[3]
     assert seventh.inputs == [
-        BlueprintInput(slot=1, winner_from="5th-8th Semi A", winner_position=2),
-        BlueprintInput(slot=2, winner_from="5th-8th Semi B", winner_position=2),
+        BlueprintInput(slot=1, winner_from="Group A", winner_position=4),
+        BlueprintInput(slot=2, winner_from="Group B", winner_position=4),
     ]
 
 
-def test_2_groups_sf_all_resolves_to_rank_8() -> None:
-    bp_all = build_template_blueprint(make_2g_sf(until_rank="all"))
-    bp_8 = build_template_blueprint(make_2g_sf(until_rank=8))
-    assert item_names_in(bp_all, "Finals") == item_names_in(bp_8, "Finals")
-    assert item_names_in(bp_all, "Semi-finals") == item_names_in(bp_8, "Semi-finals")
+def test_2_groups_sf_all_resolves_to_2x_teams_per_group() -> None:
+    # 12 teams, 2 groups → 6 per group → max rank 12
+    bp = build_template_blueprint(make_2g_sf(until_rank="all"))
+    assert item_names_in(bp, "Semi-finals") == ["Semi-final A", "Semi-final B"]
+    ko_items = items_in(bp, "Finals")
+    assert ko_items[0].name == "Final"
+    assert ko_items[-1].inputs == [
+        BlueprintInput(slot=1, winner_from="Group A", winner_position=6),
+        BlueprintInput(slot=2, winner_from="Group B", winner_position=6),
+    ]
+
+
+def test_2_groups_sf_4_teams_raises() -> None:
+    with pytest.raises(ValueError, match="teams per group must be at least 3"):
+        build_template_blueprint(make_config(groups=2, total_teams=4, include_semi_final=True, until_rank=2))
+
+
+def test_2_groups_sf_rank_exceeds_team_count_raises() -> None:
+    # 6 teams, 2 groups → 3 per group → max rank 6; until_rank=8 should fail
+    with pytest.raises(ValueError, match="until_rank.*exceeds maximum"):
+        build_template_blueprint(make_config(groups=2, total_teams=6, include_semi_final=True, until_rank=8))
 
 
 # ---------------------------------------------------------------------------

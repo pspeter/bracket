@@ -54,8 +54,9 @@ def _t(slot: int, winner_from: str, winner_position: int) -> BlueprintInput:
 
 
 def _max_rank(config: TemplateConfig) -> int:
-    if config.groups == 4 or (config.groups == 2 and config.include_semi_final):
+    if config.groups == 4:
         return 8
+    # Both 2-group variants: each group position pair yields one place match
     return (config.total_teams // config.groups) * 2
 
 
@@ -64,8 +65,10 @@ def _validate(config: TemplateConfig) -> None:
         raise ValueError("total_teams must be at least 4")
     if config.total_teams % config.groups != 0:
         raise ValueError("total_teams must be divisible by groups")
-    if config.total_teams // config.groups < 2:
-        raise ValueError("teams per group must be at least 2")
+    teams_per_group = config.total_teams // config.groups
+    min_per_group = 3 if (config.groups == 2 and config.include_semi_final) else 2
+    if teams_per_group < min_per_group:
+        raise ValueError(f"teams per group must be at least {min_per_group}")
     if config.until_rank != "all":
         if config.until_rank < 2:
             raise ValueError("until_rank must be at least 2")
@@ -137,7 +140,8 @@ def _build_4group_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintStag
     return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
 
 
-def _build_2group_sf_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintStage]:
+def _build_2group_sf_stages(until_rank: int, teams_per_group: int) -> tuple[BlueprintStage, BlueprintStage]:
+    # Semi-finals stage: only the two main cross-seeded semis, always
     semis_items = [
         _item("Semi-final A", [_t(1, "Group A", 1), _t(2, "Group B", 2)]),
         _item("Semi-final B", [_t(1, "Group B", 1), _t(2, "Group A", 2)]),
@@ -151,19 +155,15 @@ def _build_2group_sf_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintS
             _item("3rd Place", [_t(1, "Semi-final A", 2), _t(2, "Semi-final B", 2)])
         )
 
-    if until_rank >= 6:
-        semis_items += [
-            _item("5th-8th Semi A", [_t(1, "Group A", 2), _t(2, "Group B", 1)]),
-            _item("5th-8th Semi B", [_t(1, "Group B", 2), _t(2, "Group A", 1)]),
-        ]
-        finals_items.append(
-            _item("5th Place", [_t(1, "5th-8th Semi A", 1), _t(2, "5th-8th Semi B", 1)])
-        )
-
-    if until_rank >= 8:
-        finals_items.append(
-            _item("7th Place", [_t(1, "5th-8th Semi A", 2), _t(2, "5th-8th Semi B", 2)])
-        )
+    # Ranks 5+ use direct group position matches (positions 3, 4, …)
+    # The main semi-finals already consume positions 1 and 2 from each group.
+    place_names = ["5th Place", "7th Place", "9th Place", "11th Place"]
+    for i, position in enumerate(range(3, teams_per_group + 1)):
+        rank = 4 + (position - 2) * 2
+        if rank > until_rank:
+            break
+        name = place_names[i] if i < len(place_names) else f"{rank - 1}th Place"
+        finals_items.append(_item(name, [_t(1, "Group A", position), _t(2, "Group B", position)]))
 
     return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
 
@@ -186,8 +186,10 @@ def build_template_blueprint(config: TemplateConfig) -> Blueprint:
     group_stage = _build_group_stage(config)
 
     if config.groups == 4 or config.include_semi_final:
-        builder = _build_4group_stages if config.groups == 4 else _build_2group_sf_stages
-        semis_stage, finals_stage = builder(until_rank)
+        if config.groups == 4:
+            semis_stage, finals_stage = _build_4group_stages(until_rank)
+        else:
+            semis_stage, finals_stage = _build_2group_sf_stages(until_rank, config.total_teams // config.groups)
         return Blueprint(stages=[group_stage, semis_stage, finals_stage])
 
     teams_per_group = config.total_teams // config.groups
