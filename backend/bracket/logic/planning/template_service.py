@@ -7,8 +7,8 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyTentative,
 )
 from bracket.models.db.util import StageWithStageItems
-from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
-from bracket.sql.stage_items import sql_create_stage_item_with_inputs
+from bracket.sql.shared import sql_delete_stage_item_matches, sql_delete_stage_item_relations
+from bracket.sql.stage_items import sql_create_stage_item_with_inputs, sql_delete_stage_item
 from bracket.sql.stages import get_full_tournament_details, sql_create_stage
 from bracket.utils.id_types import StageItemId, TournamentId
 
@@ -45,9 +45,20 @@ async def replace_stages_from_template(
     existing_stages = await get_full_tournament_details(tournament_id)
 
     async with database.transaction():
-        for stage in reversed(existing_stages):
-            for stage_item in reversed(stage.stage_items):
-                await sql_delete_stage_item_with_foreign_keys(stage_item.id)
+        # Matches may reference stage_item_inputs from other stage items (e.g. elimination
+        # propagation). Delete all matches in the tournament first, then inputs/rounds,
+        # mirroring sql_delete_tournament_completely.
+        for stage in existing_stages:
+            for stage_item in stage.stage_items:
+                await sql_delete_stage_item_matches(stage_item.id)
+
+        for stage in existing_stages:
+            for stage_item in stage.stage_items:
+                await sql_delete_stage_item_relations(stage_item.id)
+
+        for stage in existing_stages:
+            for stage_item in stage.stage_items:
+                await sql_delete_stage_item(stage_item.id)
 
         await database.execute(
             query="""
