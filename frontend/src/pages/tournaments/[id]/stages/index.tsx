@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Builder from '@components/builder/builder';
 import { CreateStageButtonLarge } from '@components/buttons/create_stage';
 import ActivateNextStageModal from '@components/modals/activate_next_stage_modal';
+import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import ActivatePreviousStageModal from '@components/modals/activate_previous_stage_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { TableSkeletonTwoColumnsSmall } from '@components/utils/skeletons';
@@ -56,10 +57,20 @@ export default function StagesPage() {
     content = (
       <Stack align="center">
         <NoContent title={t('no_matches_title')} description={t('no_matches_description')} />
-        <CreateStageButtonLarge
-          tournament={tournamentDataFull}
-          swrStagesResponse={swrStagesResponse}
-        />
+        <Group justify="center" gap="md" wrap="wrap">
+          <CreateStageButtonLarge
+            tournament={tournamentDataFull}
+            swrStagesResponse={swrStagesResponse}
+          />
+          <CreateFromTemplateButton
+            tournament={tournamentDataFull}
+            registeredTeamCount={totalTeamCount}
+            swrStagesResponse={swrStagesResponse}
+            swrAvailableInputsResponse={swrAvailableInputsResponse}
+            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+            buttonSize="lg"
+          />
+        </Group>
       </Stack>
     );
   } else {
@@ -85,6 +96,7 @@ export default function StagesPage() {
         <Group mt="1rem" align="top">
           <Builder
             tournament={tournamentDataFull}
+            registeredTeamCount={totalTeamCount}
             swrStagesResponse={swrStagesResponse}
             swrAvailableInputsResponse={swrAvailableInputsResponse}
             swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}

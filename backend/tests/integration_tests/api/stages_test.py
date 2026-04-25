@@ -1,6 +1,10 @@
 import pytest
 
+from bracket.database import database
+from bracket.logic.planning.template import build_template_blueprint
+from bracket.logic.planning.template_service import replace_stages_from_template
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
+from bracket.models.db.stage import StageTemplateCreateBody
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import StageItemInputCreateBodyFinal
 from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stages
@@ -128,47 +132,71 @@ async def test_create_stages_from_template(
         HTTPMethod.POST, "stages/from-template", auth_context, json=body
     )
 
-    assert len(response["data"]) == 2
-    assert response["data"][0]["name"] == "Group Phase"
-    assert response["data"][1]["name"] == "Knockout Phase"
-
-    group_stage_items = {
-        stage_item["name"]: stage_item for stage_item in response["data"][0]["stage_items"]
+    assert len(response["data"]) == 3
+    assert {stage["name"] for stage in response["data"]} == {
+        "Group Phase",
+        "Semi-finals",
+        "Finals",
     }
+
+    group_stage = next(s for s in response["data"] if s["name"] == "Group Phase")
+    semis_stage = next(s for s in response["data"] if s["name"] == "Semi-finals")
+    finals_stage = next(s for s in response["data"] if s["name"] == "Finals")
+
+    group_stage_items = {item["name"]: item for item in group_stage["stage_items"]}
     assert set(group_stage_items) == {"Group A", "Group B"}
     assert {stage_item["team_count"] for stage_item in group_stage_items.values()} == {4}
     assert {stage_item["type"] for stage_item in group_stage_items.values()} == {"ROUND_ROBIN"}
     assert {len(stage_item["inputs"]) for stage_item in group_stage_items.values()} == {4}
     assert {len(stage_item["rounds"]) for stage_item in group_stage_items.values()} == {3}
 
-    knockout_stage_items = {
-        stage_item["name"]: stage_item for stage_item in response["data"][1]["stage_items"]
-    }
-    assert set(knockout_stage_items) == {"Semi-final A", "Semi-final B", "Final", "3rd Place"}
-    assert {stage_item["type"] for stage_item in knockout_stage_items.values()} == {
+    semis_stage_items = {item["name"]: item for item in semis_stage["stage_items"]}
+    assert set(semis_stage_items) == {"Semi-final A", "Semi-final B"}
+    assert {stage_item["type"] for stage_item in semis_stage_items.values()} == {
         "SINGLE_ELIMINATION"
     }
-    assert {len(stage_item["rounds"]) for stage_item in knockout_stage_items.values()} == {1}
+    assert {len(stage_item["rounds"]) for stage_item in semis_stage_items.values()} == {1}
+
+    finals_stage_items = {item["name"]: item for item in finals_stage["stage_items"]}
+    assert set(finals_stage_items) == {"Final", "3rd Place"}
+    assert {stage_item["type"] for stage_item in finals_stage_items.values()} == {
+        "SINGLE_ELIMINATION"
+    }
+    assert {len(stage_item["rounds"]) for stage_item in finals_stage_items.values()} == {1}
 
     group_a_id = group_stage_items["Group A"]["id"]
     group_b_id = group_stage_items["Group B"]["id"]
-    semi_final_a_id = knockout_stage_items["Semi-final A"]["id"]
-    semi_final_b_id = knockout_stage_items["Semi-final B"]["id"]
+    semi_final_a_id = semis_stage_items["Semi-final A"]["id"]
+    semi_final_b_id = semis_stage_items["Semi-final B"]["id"]
 
-    def relevant_inputs(stage_item_name: str) -> list[tuple[int, int, int | None]]:
+    def relevant_inputs(
+        items: dict[str, dict], stage_item_name: str
+    ) -> list[tuple[int, int, int | None]]:
         return sorted(
             (
                 input_["slot"],
                 input_["winner_from_stage_item_id"],
                 input_["winner_position"],
             )
-            for input_ in knockout_stage_items[stage_item_name]["inputs"]
+            for input_ in items[stage_item_name]["inputs"]
         )
 
-    assert relevant_inputs("Semi-final A") == [(1, group_a_id, 1), (2, group_b_id, 2)]
-    assert relevant_inputs("Semi-final B") == [(1, group_b_id, 1), (2, group_a_id, 2)]
-    assert relevant_inputs("Final") == [(1, semi_final_a_id, 1), (2, semi_final_b_id, 1)]
-    assert relevant_inputs("3rd Place") == [(1, semi_final_a_id, 2), (2, semi_final_b_id, 2)]
+    assert relevant_inputs(semis_stage_items, "Semi-final A") == [
+        (1, group_a_id, 1),
+        (2, group_b_id, 2),
+    ]
+    assert relevant_inputs(semis_stage_items, "Semi-final B") == [
+        (1, group_b_id, 1),
+        (2, group_a_id, 2),
+    ]
+    assert relevant_inputs(finals_stage_items, "Final") == [
+        (1, semi_final_a_id, 1),
+        (2, semi_final_b_id, 1),
+    ]
+    assert relevant_inputs(finals_stage_items, "3rd Place") == [
+        (1, semi_final_a_id, 2),
+        (2, semi_final_b_id, 2),
+    ]
 
     assert response == await send_tournament_request(HTTPMethod.GET, "stages", auth_context, {})
 
@@ -176,7 +204,69 @@ async def test_create_stages_from_template(
     await assert_row_count_and_clear(rounds, 10)
     await assert_row_count_and_clear(stage_item_inputs, 16)
     await assert_row_count_and_clear(stage_items, 6)
-    await assert_row_count_and_clear(stages, 2)
+    await assert_row_count_and_clear(stages, 3)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_create_stages_from_template_twice_after_final_match_references_semi_inputs(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    A Finals match can reference stage_item_input ids from the Semi-finals stage (same as
+    after elimination propagation). replace_stages_from_template must delete all tournament
+    matches before removing stage_item_inputs so this never raises a FK violation.
+    """
+    body: dict[str, object] = {
+        "groups": 2,
+        "total_teams": 8,
+        "until_rank": 4,
+        "include_semi_final": True,
+    }
+    created = await send_tournament_request(
+        HTTPMethod.POST, "stages/from-template", auth_context, json=body
+    )
+    assert "detail" not in created
+    semis_stage = next(stage for stage in created["data"] if stage["name"] == "Semi-finals")
+    finals_stage = next(stage for stage in created["data"] if stage["name"] == "Finals")
+    semis_by_name = {item["name"]: item for item in semis_stage["stage_items"]}
+    finals_by_name = {item["name"]: item for item in finals_stage["stage_items"]}
+    final_match = finals_by_name["Final"]["rounds"][0]["matches"][0]
+    semi_a_input_id = semis_by_name["Semi-final A"]["inputs"][0]["id"]
+    semi_b_input_id = semis_by_name["Semi-final B"]["inputs"][0]["id"]
+
+    await database.execute(
+        query="""
+            UPDATE matches
+            SET stage_item_input1_id = :semi_a_input_id,
+                stage_item_input2_id = :semi_b_input_id,
+                stage_item_input1_winner_from_match_id = NULL,
+                stage_item_input2_winner_from_match_id = NULL
+            WHERE matches.id = :match_id
+            """,
+        values={
+            "semi_a_input_id": semi_a_input_id,
+            "semi_b_input_id": semi_b_input_id,
+            "match_id": final_match["id"],
+        },
+    )
+
+    config = StageTemplateCreateBody(
+        groups=2,
+        total_teams=8,
+        until_rank=4,
+        include_semi_final=True,
+    ).to_template_config()
+    blueprint = build_template_blueprint(config)
+    await replace_stages_from_template(auth_context.tournament.id, blueprint)
+
+    second = await send_tournament_request(HTTPMethod.GET, "stages", auth_context, {})
+    assert len(second["data"]) == 3
+
+    await assert_row_count_and_clear(matches, 16)
+    await assert_row_count_and_clear(rounds, 10)
+    await assert_row_count_and_clear(stage_item_inputs, 16)
+    await assert_row_count_and_clear(stage_items, 6)
+    await assert_row_count_and_clear(stages, 3)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -223,14 +313,18 @@ async def test_create_stages_from_template_replaces_existing_stages(
         assert stage_item_inserted.id not in created_stage_item_ids
         assert round_inserted.id not in created_round_ids
 
-        assert len(response["data"]) == 2
-        assert {stage["name"] for stage in response["data"]} == {"Group Phase", "Knockout Phase"}
+        assert len(response["data"]) == 3
+        assert {stage["name"] for stage in response["data"]} == {
+            "Group Phase",
+            "Semi-finals",
+            "Finals",
+        }
 
     await assert_row_count_and_clear(matches, 15)
     await assert_row_count_and_clear(rounds, 9)
     await assert_row_count_and_clear(stage_item_inputs, 14)
     await assert_row_count_and_clear(stage_items, 5)
-    await assert_row_count_and_clear(stages, 2)
+    await assert_row_count_and_clear(stages, 3)
 
 
 @pytest.mark.parametrize(
@@ -253,15 +347,6 @@ async def test_create_stages_from_template_replaces_existing_stages(
                 "include_semi_final": True,
             },
             "total_teams must be at least 4",
-        ),
-        (
-            {
-                "groups": 4,
-                "total_teams": 10,
-                "until_rank": 2,
-                "include_semi_final": True,
-            },
-            "total_teams must be divisible by groups",
         ),
         (
             {

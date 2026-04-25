@@ -60,12 +60,6 @@ def validate_stage_template_body(stage_body: StageTemplateCreateBody) -> None:
             detail="total_teams must be at least 4",
         )
 
-    if stage_body.total_teams % stage_body.groups != 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="total_teams must be divisible by groups",
-        )
-
     teams_per_group = stage_body.total_teams // stage_body.groups
     if teams_per_group < 2:
         raise HTTPException(

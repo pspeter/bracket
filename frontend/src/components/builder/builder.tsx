@@ -17,12 +17,13 @@ import { useColorScheme } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { BiCheck } from '@react-icons/all-files/bi/BiCheck';
 import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BiSolidWrench } from 'react-icons/bi';
 import { SWRResponse } from 'swr';
 
 import CreateStageButton from '@components/buttons/create_stage';
+import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import { CreateStageItemModal } from '@components/modals/create_stage_item';
 import { UpdateStageModal } from '@components/modals/update_stage';
 import { UpdateStageItemModal } from '@components/modals/update_stage_item';
@@ -71,6 +72,10 @@ function StageItemInputComboBox({
     availableInputs.find((o) => o.value === current_key) || null
   );
   const [successIcon, setSuccessIcon] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSelectedInput(availableInputs.find((o) => o.value === current_key) ?? null);
+  }, [current_key, swrAvailableInputsResponse.data, swrStagesResponse.data]);
   const [search, setSearch] = useState('');
   const combobox = useCombobox({
     onDropdownClose: () => {
@@ -465,12 +470,14 @@ function StageColumn({
 
 export default function Builder({
   tournament,
+  registeredTeamCount,
   swrStagesResponse,
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
   rankings,
 }: {
   tournament: Tournament;
+  registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
   swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
@@ -501,12 +508,21 @@ export default function Builder({
   const button = (
     <Stack miw="24rem" align="top" key={-1}>
       <h4 style={{ marginTop: '0rem' }}>
-        <CreateStageButton
-          tournament={tournament}
-          swrStagesResponse={swrStagesResponse}
-          swrAvailableInputsResponse={swrAvailableInputsResponse}
-          swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-        />
+        <Group gap="xs" align="flex-start" wrap="wrap">
+          <CreateStageButton
+            tournament={tournament}
+            swrStagesResponse={swrStagesResponse}
+            swrAvailableInputsResponse={swrAvailableInputsResponse}
+            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+          />
+          <CreateFromTemplateButton
+            tournament={tournament}
+            registeredTeamCount={registeredTeamCount}
+            swrStagesResponse={swrStagesResponse}
+            swrAvailableInputsResponse={swrAvailableInputsResponse}
+            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+          />
+        </Group>
       </h4>
     </Stack>
   );
