@@ -309,9 +309,42 @@ def test_2_groups_nosf_swiss_group_stage() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_total_teams_not_divisible_by_groups_raises() -> None:
-    with pytest.raises(ValueError, match="total_teams must be divisible by groups"):
-        build_template_blueprint(make_config(groups=4, total_teams=14))
+def test_uneven_2_groups_group_sizes() -> None:
+    # 7 teams, 2 groups → Group A: 4 slots, Group B: 3 slots
+    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=False, until_rank=2))
+    group_a, group_b = items_in(bp, "Group Phase")
+    assert group_a.team_count == 4
+    assert len(group_a.inputs) == 4
+    assert group_b.team_count == 3
+    assert len(group_b.inputs) == 3
+
+
+def test_uneven_4_groups_group_sizes() -> None:
+    # 17 teams, 4 groups → Group A: 5 slots, Groups B/C/D: 4 slots each
+    bp = build_template_blueprint(make_config(groups=4, total_teams=17, until_rank=2))
+    group_items = items_in(bp, "Group Phase")
+    assert group_items[0].team_count == 5  # Group A gets the extra team
+    assert all(item.team_count == 4 for item in group_items[1:])
+
+
+def test_uneven_groups_knockout_uses_min_team_count() -> None:
+    # 7 teams, 2 groups → floor=3, max_rank=6; knockout references only positions 1–3
+    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=False, until_rank="all"))
+    ko_items = items_in(bp, "Finals")
+    assert len(ko_items) == 3  # Final, 3rd, 5th — not 4th rank (position 4 doesn't advance)
+    assert ko_items[-1].inputs == [
+        BlueprintInput(slot=1, winner_from="Group A", winner_position=3),
+        BlueprintInput(slot=2, winner_from="Group B", winner_position=3),
+    ]
+
+
+def test_uneven_2_groups_sf_valid() -> None:
+    # 7 teams, 2 groups with SF → floor=3 ≥ min 3, should not raise
+    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=True, until_rank=2))
+    assert stage_names(bp) == ["Group Phase", "Semi-finals", "Finals"]
+    group_a, group_b = items_in(bp, "Group Phase")
+    assert group_a.team_count == 4
+    assert group_b.team_count == 3
 
 
 def test_odd_until_rank_raises() -> None:

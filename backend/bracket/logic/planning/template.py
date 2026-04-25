@@ -63,9 +63,7 @@ def _max_rank(config: TemplateConfig) -> int:
 def _validate(config: TemplateConfig) -> None:
     if config.total_teams < 4:
         raise ValueError("total_teams must be at least 4")
-    if config.total_teams % config.groups != 0:
-        raise ValueError("total_teams must be divisible by groups")
-    teams_per_group = config.total_teams // config.groups
+    teams_per_group = config.total_teams // config.groups  # floor = smallest group size
     min_per_group = 3 if (config.groups == 2 and config.include_semi_final) else 2
     if teams_per_group < min_per_group:
         raise ValueError(f"teams per group must be at least {min_per_group}")
@@ -85,19 +83,18 @@ def _resolve_until_rank(config: TemplateConfig) -> int:
 
 
 def _build_group_stage(config: TemplateConfig) -> BlueprintStage:
-    teams_per_group = config.total_teams // config.groups
-    return BlueprintStage(
-        name="Group Phase",
-        items=[
-            BlueprintStageItem(
-                name=name,
-                type=config.group_stage_type,
-                team_count=teams_per_group,
-                inputs=_empty_inputs(teams_per_group),
-            )
-            for name in _group_names(config.groups)
-        ],
-    )
+    base = config.total_teams // config.groups
+    remainder = config.total_teams % config.groups
+    items = []
+    for i, name in enumerate(_group_names(config.groups)):
+        team_count = base + (1 if i < remainder else 0)
+        items.append(BlueprintStageItem(
+            name=name,
+            type=config.group_stage_type,
+            team_count=team_count,
+            inputs=_empty_inputs(team_count),
+        ))
+    return BlueprintStage(name="Group Phase", items=items)
 
 
 def _item(name: str, inputs: list[BlueprintInput]) -> BlueprintStageItem:
