@@ -132,15 +132,17 @@ async def sql_delete_stage(tournament_id: TournamentId, stage_id: StageId) -> No
         )
 
 
-async def sql_create_stage(tournament_id: TournamentId) -> Stage:
+async def sql_create_stage(
+    tournament_id: TournamentId, name: str = "Stage", *, is_active: bool = False
+) -> Stage:
     query = """
         INSERT INTO stages (created, is_active, name, tournament_id)
-        VALUES (NOW(), false, :name, :tournament_id)
+        VALUES (NOW(), :is_active, :name, :tournament_id)
         RETURNING *
         """
     result = await database.fetch_one(
         query=query,
-        values={"tournament_id": tournament_id, "name": "Stage"},
+        values={"tournament_id": tournament_id, "name": name, "is_active": is_active},
     )
 
     if result is None:

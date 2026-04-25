@@ -3,6 +3,8 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
+from bracket.logic.planning.template import build_template_blueprint
+from bracket.logic.planning.template_service import replace_stages_from_template
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.scheduling.handle_stage_activation import (
     get_pending_match_count_in_stage,
@@ -12,7 +14,12 @@ from bracket.logic.scheduling.handle_stage_activation import (
     update_matches_in_deactivated_stage,
 )
 from bracket.logic.subscriptions import check_requirement
-from bracket.models.db.stage import Stage, StageActivateBody, StageUpdateBody
+from bracket.models.db.stage import (
+    Stage,
+    StageActivateBody,
+    StageTemplateCreateBody,
+    StageUpdateBody,
+)
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
@@ -38,6 +45,51 @@ from bracket.sql.teams import get_teams_with_members
 from bracket.utils.id_types import StageId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
+
+
+def validate_stage_template_body(stage_body: StageTemplateCreateBody) -> None:
+    if stage_body.groups not in {2, 4}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="groups must be 2 or 4",
+        )
+
+    if stage_body.total_teams < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="total_teams must be at least 4",
+        )
+
+    if stage_body.total_teams % stage_body.groups != 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="total_teams must be divisible by groups",
+        )
+
+    teams_per_group = stage_body.total_teams // stage_body.groups
+    if teams_per_group < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Each group must contain at least 2 teams",
+        )
+
+    if stage_body.until_rank == "all":
+        return
+
+    if stage_body.until_rank < 2 or stage_body.until_rank % 2 != 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='until_rank must be an even integer >= 2 or "all"',
+        )
+
+    max_until_rank = (
+        8 if stage_body.groups == 4 or stage_body.include_semi_final else stage_body.total_teams
+    )
+    if stage_body.until_rank > max_until_rank:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"until_rank must be <= {max_until_rank} for this configuration",
+        )
 
 
 @router.get("/tournaments/{tournament_id}/stages", response_model=StagesWithStageItemsResponse)
@@ -92,6 +144,26 @@ async def create_stage(
 
     await sql_create_stage(tournament_id)
     return SuccessResponse()
+
+
+@router.post(
+    "/tournaments/{tournament_id}/stages/from-template",
+    response_model=StagesWithStageItemsResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_stages_from_template(
+    tournament_id: TournamentId,
+    stage_body: StageTemplateCreateBody,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    __: Tournament = Depends(disallow_archived_tournament),
+) -> StagesWithStageItemsResponse:
+    validate_stage_template_body(stage_body)
+
+    stages_ = await replace_stages_from_template(
+        tournament_id,
+        build_template_blueprint(stage_body.to_template_config()),
+    )
+    return StagesWithStageItemsResponse(data=stages_)
 
 
 @router.put("/tournaments/{tournament_id}/stages/{stage_id}", response_model=SuccessResponse)
@@ -178,9 +250,7 @@ async def get_next_stage_rankings(
         get_pending_match_count_in_stage(active_stage) if active_stage is not None else 0
     )
     pending_matches_message = (
-        get_pending_matches_message(pending_match_count)
-        if pending_match_count > 0
-        else None
+        get_pending_matches_message(pending_match_count) if pending_match_count > 0 else None
     )
 
     if pending_match_count > 0:
