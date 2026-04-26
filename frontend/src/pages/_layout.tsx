@@ -145,6 +145,13 @@ export default function Layout({ children, additionalNavbarLinks, breadcrumbs }:
         },
       }}
       padding="md"
+      styles={{
+        navbar: {
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
+        },
+      }}
     >
       <HeaderAction
         links={getBaseLinksDict()}
