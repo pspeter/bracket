@@ -7,6 +7,7 @@ import {
   CourtsResponse,
   FullTeamWithPlayers,
   MatchWithDetails,
+  StageItemWithRounds,
   StageWithStageItems,
 } from '@openapi';
 import { getTeams } from './adapter';
@@ -93,18 +94,29 @@ export function getStageItemTeamsLookup(swrStagesResponse: SWRResponse) {
   return Object.fromEntries(result);
 }
 
-export function getMatchLookup(swrStagesResponse: SWRResponse) {
-  let result: any[] = [];
+/** One match in the schedule tree with its parent stage item and top-level stage. */
+export type MatchLookupEntry = {
+  match: MatchWithDetails;
+  stageItem: StageItemWithRounds;
+  stage: StageWithStageItems;
+};
 
-  swrStagesResponse.data.data.map((stage: StageWithStageItems) =>
-    stage.stage_items.forEach((stageItem) => {
-      stageItem.rounds.forEach((round) => {
-        round.matches.forEach((match) => {
-          result = result.concat([[match.id, { match, stageItem }]]);
-        });
-      });
-    })
-  );
+/**
+ * Map each match id to its `MatchWithDetails` plus the owning `StageItemWithRounds` and parent
+ * `StageWithStageItems`, so UIs (e.g. the schedule) can group by stage without re-walking the tree.
+ */
+export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, MatchLookupEntry> {
+  const result: [number, MatchLookupEntry][] = [];
+
+  for (const stage of swrStagesResponse.data.data as StageWithStageItems[]) {
+    for (const stageItem of stage.stage_items) {
+      for (const round of stageItem.rounds) {
+        for (const match of round.matches) {
+          result.push([match.id, { match, stageItem, stage }]);
+        }
+      }
+    }
+  }
   return Object.fromEntries(result);
 }
 

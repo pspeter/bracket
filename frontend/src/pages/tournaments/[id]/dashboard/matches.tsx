@@ -44,7 +44,14 @@ export default function DashboardMatchesPage() {
     const data: any = sortedMatches[c];
     const startTime = formatTime(data.match.start_time);
 
-    if (c < 1 || startTime !== formatTime(sortedMatches[c - 1].match.start_time)) {
+    if (
+      c < 1 ||
+      startTime !==
+        formatTime(
+          // sortedMatches only includes matches with a start time (see filter above)
+          sortedMatches[c - 1].match.start_time as string
+        )
+    ) {
       rows.push(
         <Center mt="md" key={`time-${c}`}>
           <Text size="xl" fw={800}>
