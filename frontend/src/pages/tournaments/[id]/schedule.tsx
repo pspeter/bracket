@@ -481,11 +481,15 @@ function StackedScheduleView({
                 ) : null}
               </div>
             </Group>
-            <Group wrap="nowrap" align="flex-start" gap="md">
-              <div style={{ width: COL_WIDTH, flex: '0 0 auto' }}>
+            <Group wrap="nowrap" align="stretch" gap="md">
+              <div style={{ width: COL_WIDTH, flex: '0 0 auto', display: 'flex' }}>
                 <Droppable droppableId={unschedDroppableIdForStage(stage.id)} direction="vertical">
                   {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      style={{ width: '100%', display: 'flex' }}
+                    >
                       <Paper
                         shadow="none"
                         p="md"
@@ -498,6 +502,7 @@ function StackedScheduleView({
                           borderColor: subtleLaneBorder,
                           backgroundColor: subtleLaneBg,
                           minHeight: 100,
+                          flex: 1,
                         }}
                       >
                         {unschedForThisStage.map((m, index) => (
@@ -533,15 +538,19 @@ function StackedScheduleView({
                 return (
                   <div
                     key={`${item.court.id}-${stage.id}`}
-                    style={{ width: COL_WIDTH, flex: '0 0 auto', minHeight: 48 }}
+                    style={{ width: COL_WIDTH, flex: '0 0 auto', minHeight: 100, display: 'flex' }}
                   >
                     <Droppable
                       droppableId={courtStageDroppableId(item.court.id, stage.id)}
                       direction="vertical"
                     >
                       {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef}>
-                          <div>
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          style={{ width: '100%', display: 'flex' }}
+                        >
+                          <div style={{ width: '100%', flex: 1 }}>
                             {slice.map((m, index) => (
                               <ScheduleRow
                                 key={m.id}
