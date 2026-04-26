@@ -375,6 +375,15 @@ async def test_create_stages_from_template_replaces_existing_stages(
             },
             "until_rank must be <= 8 for this configuration",
         ),
+        (
+            {
+                "groups": 2,
+                "total_teams": 8,
+                "until_rank": 10,
+                "include_semi_final": True,
+            },
+            "until_rank must be <= 8 for this configuration",
+        ),
     ],
 )
 @pytest.mark.asyncio(loop_scope="session")

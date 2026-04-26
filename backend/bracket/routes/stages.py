@@ -3,7 +3,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
-from bracket.logic.planning.template import build_template_blueprint
+from bracket.logic.planning.template import build_template_blueprint, max_until_rank_for_template
 from bracket.logic.planning.template_service import replace_stages_from_template
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.scheduling.handle_stage_activation import (
@@ -76,9 +76,7 @@ def validate_stage_template_body(stage_body: StageTemplateCreateBody) -> None:
             detail='until_rank must be an even integer >= 2 or "all"',
         )
 
-    max_until_rank = (
-        8 if stage_body.groups == 4 or stage_body.include_semi_final else stage_body.total_teams
-    )
+    max_until_rank = max_until_rank_for_template(stage_body.groups, stage_body.total_teams)
     if stage_body.until_rank > max_until_rank:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

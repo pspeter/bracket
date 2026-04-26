@@ -53,11 +53,15 @@ def _t(slot: int, winner_from: str, winner_position: int) -> BlueprintInput:
     return BlueprintInput(slot=slot, winner_from=winner_from, winner_position=winner_position)
 
 
-def _max_rank(config: TemplateConfig) -> int:
-    if config.groups == 4:
+def max_until_rank_for_template(groups: int, total_teams: int) -> int:
+    """Largest even until_rank allowed (matches how until_rank='all' is resolved)."""
+    if groups == 4:
         return 8
-    # Both 2-group variants: each group position pair yields one place match
-    return (config.total_teams // config.groups) * 2
+    return (total_teams // groups) * 2
+
+
+def _max_rank(config: TemplateConfig) -> int:
+    return max_until_rank_for_template(config.groups, config.total_teams)
 
 
 def _validate(config: TemplateConfig) -> None:
