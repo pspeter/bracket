@@ -29,42 +29,50 @@ async def schedule_all_unscheduled_matches(
     if len(stages) < 1 or len(courts) < 1:
         return
 
-    time_last_match_from_previous_stage = tournament.start_time
-    position_last_match_from_previous_stage = 0
+    court_next_time = {court.id: tournament.start_time for court in courts}
+    court_next_position = {court.id: 0 for court in courts}
 
     for stage in stages:
         stage_items = sorted(stage.stage_items, key=lambda x: x.name)
 
-        stage_start_time = time_last_match_from_previous_stage
-        stage_position_in_schedule = position_last_match_from_previous_stage
+        # All courts wait for the slowest court before the next stage begins
+        stage_start_time = max(court_next_time.values())
 
+        # Collect unscheduled matches per court via round-robin stage-item assignment
+        court_matches: dict[CourtId, list] = {court.id: [] for court in courts}
         for i, stage_item in enumerate(stage_items):
-            court = courts[min(i, len(courts) - 1)]
-            start_time = stage_start_time
-            position_in_schedule = stage_position_in_schedule
+            court = courts[i % len(courts)]
             for round_ in sorted(stage_item.rounds, key=lambda r: r.id):
                 for match in round_.matches:
                     if match.start_time is None and match.position_in_schedule is None:
-                        await sql_reschedule_match_and_determine_duration_and_margin(
-                            court.id,
-                            start_time,
-                            position_in_schedule,
-                            match,
-                            tournament,
-                        )
+                        court_matches[court.id].append(match)
 
-                    start_time += timedelta(minutes=match.duration_minutes)
-                    position_in_schedule += 1
+        # Rebalance: move matches from the most-loaded court to the least-loaded
+        # until no court has more than 1 extra match compared to any other court
+        court_ids = [court.id for court in courts]
+        while True:
+            max_court = max(court_ids, key=lambda c: len(court_matches[c]))
+            min_court = min(court_ids, key=lambda c: len(court_matches[c]))
+            if len(court_matches[max_court]) - len(court_matches[min_court]) <= 1:
+                break
+            court_matches[min_court].append(court_matches[max_court].pop())
 
-                    time_last_match_from_previous_stage = max(
-                        time_last_match_from_previous_stage, start_time
-                    )
-
-                    position_last_match_from_previous_stage = max(
-                        position_last_match_from_previous_stage, position_in_schedule
-                    )
-
-    await update_start_times_of_matches(tournament_id)
+        # Schedule each court's matches, starting at the stage boundary
+        for court_id, matches in court_matches.items():
+            start_time = max(court_next_time[court_id], stage_start_time)
+            position = court_next_position[court_id]
+            for match in matches:
+                await sql_reschedule_match_and_determine_duration_and_margin(
+                    court_id,
+                    start_time,
+                    position,
+                    match,
+                    tournament,
+                )
+                start_time += timedelta(minutes=match.duration_minutes + match.margin_minutes)
+                position += 1
+            court_next_time[court_id] = start_time
+            court_next_position[court_id] = position
 
 
 class MatchPosition(NamedTuple):
