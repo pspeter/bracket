@@ -1,5 +1,7 @@
 import aiofiles.os
 
+from bracket.database import database
+from bracket.schema import levels
 from bracket.sql.courts import sql_delete_courts_of_tournament
 from bracket.sql.players import sql_delete_players_of_tournament
 from bracket.sql.rankings import get_all_rankings_in_tournament, sql_delete_ranking
@@ -47,4 +49,7 @@ async def sql_delete_tournament_completely(tournament_id: TournamentId) -> None:
     await sql_delete_players_of_tournament(tournament_id)
     await sql_delete_courts_of_tournament(tournament_id)
     await sql_delete_teams_of_tournament(tournament_id)
+    await database.execute(
+        query=levels.delete().where(levels.c.tournament_id == tournament_id)
+    )
     await sql_delete_tournament(tournament_id)

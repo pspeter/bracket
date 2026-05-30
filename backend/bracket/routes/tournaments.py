@@ -18,6 +18,7 @@ from bracket.models.db.tournament import (
     TournamentBody,
     TournamentChangeStatusBody,
     TournamentUpdateBody,
+    TournamentWithLevels,
 )
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import (
@@ -34,6 +35,7 @@ from bracket.sql.rankings import (
     sql_create_ranking,
     sql_delete_ranking,
 )
+from bracket.sql.levels import sql_create_level, sql_get_levels_for_tournament
 from bracket.sql.tournaments import (
     sql_create_tournament,
     sql_delete_tournament,
@@ -55,6 +57,11 @@ from bracket.utils.logging import logger
 
 router = APIRouter(prefix=config.api_prefix)
 
+
+async def _tournament_with_levels(tournament: Tournament) -> TournamentWithLevels:
+    levels = await sql_get_levels_for_tournament(tournament.id)
+    return TournamentWithLevels(**tournament.model_dump(), levels=levels)
+
 unauthorized_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="You don't have access to this tournament",
@@ -68,7 +75,7 @@ async def get_tournament(
     user: UserPublic | None = Depends(user_authenticated_or_public_dashboard),
 ) -> TournamentResponse:
     tournament = await sql_get_tournament(tournament_id)
-    return TournamentResponse(data=tournament)
+    return TournamentResponse(data=await _tournament_with_levels(tournament))
 
 
 @router.get("/tournaments", response_model=TournamentsResponse)
@@ -89,12 +96,15 @@ async def get_tournaments(
                     detail="Can't find this tournament",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            return TournamentsResponse(data=[tournament])
+            return TournamentsResponse(data=[await _tournament_with_levels(tournament)])
 
         case _, _ if isinstance(user, UserPublic):
             user_club_ids = await get_which_clubs_has_user_access_to(user.id)
+            tournaments_list = await sql_get_tournaments(
+                tuple(user_club_ids), endpoint_name, filter_
+            )
             return TournamentsResponse(
-                data=await sql_get_tournaments(tuple(user_club_ids), endpoint_name, filter_)
+                data=[await _tournament_with_levels(t) for t in tournaments_list]
             )
 
     raise RuntimeError()
@@ -191,6 +201,10 @@ async def create_tournament(
         ranking = RankingCreateBody()
         await sql_create_ranking(tournament_id, ranking, position=0)
 
+        if tournament_to_insert.levels:
+            for position, level_name in enumerate(tournament_to_insert.levels):
+                await sql_create_level(tournament_id, level_name, position)
+
     return SuccessResponse()
 
 
@@ -228,4 +242,5 @@ async def upload_logo(
         tournaments.update().where(tournaments.c.id == tournament_id),
         values={"logo_path": filename},
     )
-    return TournamentResponse(data=await sql_get_tournament(tournament_id))
+    tournament = await sql_get_tournament(tournament_id)
+    return TournamentResponse(data=await _tournament_with_levels(tournament))

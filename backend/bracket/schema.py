@@ -48,6 +48,16 @@ tournaments = Table(
     Column("score_tracking_token", String, nullable=True),
 )
 
+levels = Table(
+    "levels",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True),
+    Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
+)
+
 stages = Table(
     "stages",
     metadata,
@@ -56,6 +66,7 @@ stages = Table(
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
     Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), index=True, nullable=False),
     Column("is_active", Boolean, nullable=False, server_default="false"),
+    Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
 )
 
 stage_items = Table(
@@ -174,6 +185,7 @@ teams = Table(
     Column("draws", Integer, nullable=False, server_default="0"),
     Column("losses", Integer, nullable=False, server_default="0"),
     Column("logo_path", String, nullable=True),
+    Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
 )
 
 players = Table(
@@ -256,4 +268,5 @@ rankings = Table(
     Column("draw_points", Float, nullable=False),
     Column("loss_points", Float, nullable=False),
     Column("add_score_points", Boolean, nullable=False),
+    Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
 )

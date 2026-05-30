@@ -361,6 +361,42 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "LevelResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position"
+        ],
+        "title": "LevelResponse",
+        "type": "object"
+      },
+      "LevelUpdateBody": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LevelUpdateBody",
+        "type": "object"
+      },
       "Match": {
         "properties": {
           "completed_at": {
@@ -2919,7 +2955,215 @@
         "title": "TokenResponse",
         "type": "object"
       },
-      "Tournament": {
+      "TournamentBody": {
+        "properties": {
+          "auto_assign_courts": {
+            "title": "Auto Assign Courts",
+            "type": "boolean"
+          },
+          "club_id": {
+            "title": "Club Id",
+            "type": "integer"
+          },
+          "dashboard_endpoint": {
+            "anyOf": [
+              {},
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dashboard Endpoint"
+          },
+          "dashboard_public": {
+            "title": "Dashboard Public",
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "minimum": 1.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "levels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels"
+          },
+          "margin_minutes": {
+            "minimum": 0.0,
+            "title": "Margin Minutes",
+            "type": "integer"
+          },
+          "max_team_size": {
+            "minimum": 1.0,
+            "title": "Max Team Size",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "players_can_be_in_multiple_teams": {
+            "title": "Players Can Be In Multiple Teams",
+            "type": "boolean"
+          },
+          "score_tracking_enabled": {
+            "default": false,
+            "title": "Score Tracking Enabled",
+            "type": "boolean"
+          },
+          "signup_enabled": {
+            "title": "Signup Enabled",
+            "type": "boolean"
+          },
+          "signup_team_choice_enabled": {
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
+          "start_time": {
+            "format": "date-time",
+            "title": "Start Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_time",
+          "name",
+          "dashboard_public",
+          "dashboard_endpoint",
+          "players_can_be_in_multiple_teams",
+          "auto_assign_courts",
+          "duration_minutes",
+          "margin_minutes",
+          "signup_enabled",
+          "max_team_size",
+          "signup_team_choice_enabled",
+          "score_tracking_enabled",
+          "club_id",
+          "levels"
+        ],
+        "title": "TournamentBody",
+        "type": "object"
+      },
+      "TournamentChangeStatusBody": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TournamentStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "TournamentChangeStatusBody",
+        "type": "object"
+      },
+      "TournamentResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TournamentWithLevels"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "TournamentResponse",
+        "type": "object"
+      },
+      "TournamentStatus": {
+        "enum": [
+          "OPEN",
+          "ARCHIVED"
+        ],
+        "title": "TournamentStatus",
+        "type": "string"
+      },
+      "TournamentUpdateBody": {
+        "properties": {
+          "auto_assign_courts": {
+            "title": "Auto Assign Courts",
+            "type": "boolean"
+          },
+          "dashboard_endpoint": {
+            "anyOf": [
+              {},
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dashboard Endpoint"
+          },
+          "dashboard_public": {
+            "title": "Dashboard Public",
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "minimum": 1.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "margin_minutes": {
+            "minimum": 0.0,
+            "title": "Margin Minutes",
+            "type": "integer"
+          },
+          "max_team_size": {
+            "minimum": 1.0,
+            "title": "Max Team Size",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "players_can_be_in_multiple_teams": {
+            "title": "Players Can Be In Multiple Teams",
+            "type": "boolean"
+          },
+          "score_tracking_enabled": {
+            "default": false,
+            "title": "Score Tracking Enabled",
+            "type": "boolean"
+          },
+          "signup_enabled": {
+            "title": "Signup Enabled",
+            "type": "boolean"
+          },
+          "signup_team_choice_enabled": {
+            "title": "Signup Team Choice Enabled",
+            "type": "boolean"
+          },
+          "start_time": {
+            "format": "date-time",
+            "title": "Start Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_time",
+          "name",
+          "dashboard_public",
+          "dashboard_endpoint",
+          "players_can_be_in_multiple_teams",
+          "auto_assign_courts",
+          "duration_minutes",
+          "margin_minutes",
+          "signup_enabled",
+          "max_team_size",
+          "signup_team_choice_enabled",
+          "score_tracking_enabled"
+        ],
+        "title": "TournamentUpdateBody",
+        "type": "object"
+      },
+      "TournamentWithLevels": {
         "properties": {
           "auto_assign_courts": {
             "title": "Auto Assign Courts",
@@ -2957,6 +3201,14 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LevelResponse"
+            },
+            "title": "Levels",
+            "type": "array"
           },
           "logo_path": {
             "anyOf": [
@@ -3054,209 +3306,17 @@
           "signup_team_choice_enabled",
           "score_tracking_enabled",
           "score_tracking_token",
-          "id"
+          "id",
+          "levels"
         ],
-        "title": "Tournament",
-        "type": "object"
-      },
-      "TournamentBody": {
-        "properties": {
-          "auto_assign_courts": {
-            "title": "Auto Assign Courts",
-            "type": "boolean"
-          },
-          "club_id": {
-            "title": "Club Id",
-            "type": "integer"
-          },
-          "dashboard_endpoint": {
-            "anyOf": [
-              {},
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Dashboard Endpoint"
-          },
-          "dashboard_public": {
-            "title": "Dashboard Public",
-            "type": "boolean"
-          },
-          "duration_minutes": {
-            "minimum": 1.0,
-            "title": "Duration Minutes",
-            "type": "integer"
-          },
-          "margin_minutes": {
-            "minimum": 0.0,
-            "title": "Margin Minutes",
-            "type": "integer"
-          },
-          "max_team_size": {
-            "minimum": 1.0,
-            "title": "Max Team Size",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "players_can_be_in_multiple_teams": {
-            "title": "Players Can Be In Multiple Teams",
-            "type": "boolean"
-          },
-          "score_tracking_enabled": {
-            "default": false,
-            "title": "Score Tracking Enabled",
-            "type": "boolean"
-          },
-          "signup_enabled": {
-            "title": "Signup Enabled",
-            "type": "boolean"
-          },
-          "signup_team_choice_enabled": {
-            "title": "Signup Team Choice Enabled",
-            "type": "boolean"
-          },
-          "start_time": {
-            "format": "date-time",
-            "title": "Start Time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "start_time",
-          "name",
-          "dashboard_public",
-          "dashboard_endpoint",
-          "players_can_be_in_multiple_teams",
-          "auto_assign_courts",
-          "duration_minutes",
-          "margin_minutes",
-          "signup_enabled",
-          "max_team_size",
-          "signup_team_choice_enabled",
-          "score_tracking_enabled",
-          "club_id"
-        ],
-        "title": "TournamentBody",
-        "type": "object"
-      },
-      "TournamentChangeStatusBody": {
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/TournamentStatus"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "title": "TournamentChangeStatusBody",
-        "type": "object"
-      },
-      "TournamentResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/Tournament"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "TournamentResponse",
-        "type": "object"
-      },
-      "TournamentStatus": {
-        "enum": [
-          "OPEN",
-          "ARCHIVED"
-        ],
-        "title": "TournamentStatus",
-        "type": "string"
-      },
-      "TournamentUpdateBody": {
-        "properties": {
-          "auto_assign_courts": {
-            "title": "Auto Assign Courts",
-            "type": "boolean"
-          },
-          "dashboard_endpoint": {
-            "anyOf": [
-              {},
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Dashboard Endpoint"
-          },
-          "dashboard_public": {
-            "title": "Dashboard Public",
-            "type": "boolean"
-          },
-          "duration_minutes": {
-            "minimum": 1.0,
-            "title": "Duration Minutes",
-            "type": "integer"
-          },
-          "margin_minutes": {
-            "minimum": 0.0,
-            "title": "Margin Minutes",
-            "type": "integer"
-          },
-          "max_team_size": {
-            "minimum": 1.0,
-            "title": "Max Team Size",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "players_can_be_in_multiple_teams": {
-            "title": "Players Can Be In Multiple Teams",
-            "type": "boolean"
-          },
-          "score_tracking_enabled": {
-            "default": false,
-            "title": "Score Tracking Enabled",
-            "type": "boolean"
-          },
-          "signup_enabled": {
-            "title": "Signup Enabled",
-            "type": "boolean"
-          },
-          "signup_team_choice_enabled": {
-            "title": "Signup Team Choice Enabled",
-            "type": "boolean"
-          },
-          "start_time": {
-            "format": "date-time",
-            "title": "Start Time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "start_time",
-          "name",
-          "dashboard_public",
-          "dashboard_endpoint",
-          "players_can_be_in_multiple_teams",
-          "auto_assign_courts",
-          "duration_minutes",
-          "margin_minutes",
-          "signup_enabled",
-          "max_team_size",
-          "signup_team_choice_enabled",
-          "score_tracking_enabled"
-        ],
-        "title": "TournamentUpdateBody",
+        "title": "TournamentWithLevels",
         "type": "object"
       },
       "TournamentsResponse": {
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/Tournament"
+              "$ref": "#/components/schemas/TournamentWithLevels"
             },
             "title": "Data",
             "type": "array"
@@ -3452,7 +3512,7 @@
     }
   },
   "info": {
-    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Score Tracking](#tag/Score-Tracking)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
+    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Levels](#tag/Levels)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Rounds](#tag/Rounds)\n\n- [Score Tracking](#tag/Score-Tracking)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
     "license": {
       "name": "AGPL-3.0",
       "url": "https://www.gnu.org/licenses/agpl-3.0.en.html"
@@ -3632,6 +3692,63 @@
         "summary": "Update Club",
         "tags": [
           "Clubs"
+        ]
+      }
+    },
+    "/levels/{level_id}": {
+      "put": {
+        "operationId": "update_level_levels__level_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "level_id",
+            "required": true,
+            "schema": {
+              "title": "Level Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelUpdateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Update Level",
+        "tags": [
+          "Levels"
         ]
       }
     },

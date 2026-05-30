@@ -4,7 +4,7 @@ from heliclockter import datetime_utc
 from pydantic import Field
 
 from bracket.models.db.shared import BaseModelORM
-from bracket.utils.id_types import ClubId, TournamentId
+from bracket.utils.id_types import ClubId, LevelId, TournamentId
 from bracket.utils.pydantic import EmptyStrToNone
 from bracket.utils.types import EnumAutoStr
 
@@ -39,6 +39,16 @@ class Tournament(TournamentInsertable):
     id: TournamentId
 
 
+class LevelResponse(BaseModelORM):
+    id: LevelId
+    name: str
+    position: int
+
+
+class TournamentWithLevels(Tournament):
+    levels: list[LevelResponse] = []
+
+
 class TournamentUpdateBody(BaseModelORM):
     start_time: datetime_utc
     name: str
@@ -61,3 +71,4 @@ class TournamentChangeStatusBody(BaseModelORM):
 
 class TournamentBody(TournamentUpdateBody):
     club_id: ClubId
+    levels: list[str] | None = None
