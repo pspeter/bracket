@@ -136,6 +136,7 @@ class ScoreTrackingInfo(BaseModel):
     tournament_id: TournamentId
     tournament_name: str
     matches: list[MatchWithDetails]
+    has_active_stage: bool
 
 
 class ScoreTrackingInfoResponse(DataResponse[ScoreTrackingInfo]):

@@ -877,6 +877,10 @@ export type RoundWithMatches = {
  */
 export type ScoreTrackingInfo = {
   /**
+   * Has Active Stage
+   */
+  has_active_stage: boolean;
+  /**
    * Matches
    */
   matches: Array<MatchWithDetails>;
@@ -1384,6 +1388,28 @@ export type StageRankingResponse = {
    * Pending Matches Message
    */
   pending_matches_message: string | null;
+};
+
+/**
+ * StageTemplateCreateBody
+ */
+export type StageTemplateCreateBody = {
+  /**
+   * Groups
+   */
+  groups: number;
+  /**
+   * Include Semi Final
+   */
+  include_semi_final: boolean;
+  /**
+   * Total Teams
+   */
+  total_teams: number;
+  /**
+   * Until Rank
+   */
+  until_rank: number | 'all';
 };
 
 /**
@@ -3816,6 +3842,38 @@ export type ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses 
 
 export type ActivateNextStageTournamentsTournamentIdStagesActivatePostResponse =
   ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses[keyof ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses];
+
+export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostData = {
+  body: StageTemplateCreateBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/stages/from-template';
+};
+
+export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostError =
+  CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostErrors[keyof CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostErrors];
+
+export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponses = {
+  /**
+   * Successful Response
+   */
+  201: StagesWithStageItemsResponse;
+};
+
+export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponse =
+  CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponses[keyof CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponses];
 
 export type DeleteStageTournamentsTournamentIdStagesStageIdDeleteData = {
   body?: never;

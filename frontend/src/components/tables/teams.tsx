@@ -13,7 +13,7 @@ import { TournamentMinimal } from '@components/utils/tournament';
 import { FullTeamWithPlayers, TeamsWithPlayersResponse } from '@openapi';
 import { getPlayersKey } from '@services/adapter';
 import { deleteTeam } from '@services/team';
-import TableLayout, { TableState, ThNotSortable, ThSortable, sortTableEntries } from './table';
+import TableLayout, { sortTableEntries, TableState, ThNotSortable, ThSortable } from './table';
 
 export default function TeamsTable({
   tournamentData,

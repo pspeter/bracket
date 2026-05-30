@@ -117,7 +117,14 @@ export function UpdateStageItemModal({
       team_count_round_robin: stageItem.team_count,
       team_count_elimination: stageItem.team_count.toString(),
     });
-  }, [defaultRankingId, opened, stageItem.id, stageItem.name, stageItem.ranking_id, stageItem.team_count]);
+  }, [
+    defaultRankingId,
+    opened,
+    stageItem.id,
+    stageItem.name,
+    stageItem.ranking_id,
+    stageItem.team_count,
+  ]);
 
   const teamCount =
     stageItem.type === 'SINGLE_ELIMINATION'

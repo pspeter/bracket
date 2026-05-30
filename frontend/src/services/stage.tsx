@@ -9,7 +9,7 @@ export type StageTemplateCreateBody = {
 
 export async function createStagesFromTemplate(
   tournament_id: number,
-  body: StageTemplateCreateBody,
+  body: StageTemplateCreateBody
 ) {
   return createAxios().post(`tournaments/${tournament_id}/stages/from-template`, body);
 }

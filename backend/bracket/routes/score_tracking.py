@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from bracket.config import config
@@ -24,6 +26,7 @@ from bracket.routes.models import (
 )
 from bracket.routes.util import match_dependency
 from bracket.sql.matches import sql_get_scheduled_matches_with_details, sql_update_match
+from bracket.sql.stages import sql_has_active_stage
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.tournaments import sql_get_tournament
@@ -39,12 +42,16 @@ router = APIRouter(prefix=config.api_prefix)
 async def get_score_tracking_info(
     tournament: Tournament = Depends(tournament_by_score_tracking_token),
 ) -> ScoreTrackingInfoResponse:
-    matches = await sql_get_scheduled_matches_with_details(tournament.id)
+    matches, has_active_stage = await asyncio.gather(
+        sql_get_scheduled_matches_with_details(tournament.id),
+        sql_has_active_stage(tournament.id),
+    )
     return ScoreTrackingInfoResponse(
         data=ScoreTrackingInfo(
             tournament_id=tournament.id,
             tournament_name=tournament.name,
             matches=matches,
+            has_active_stage=has_active_stage,
         )
     )
 
@@ -77,13 +84,17 @@ async def get_authenticated_score_tracking_info(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
 ) -> ScoreTrackingInfoResponse:
-    tournament = await sql_get_tournament(tournament_id)
-    matches = await sql_get_scheduled_matches_with_details(tournament_id)
+    tournament, matches, has_active_stage = await asyncio.gather(
+        sql_get_tournament(tournament_id),
+        sql_get_scheduled_matches_with_details(tournament_id),
+        sql_has_active_stage(tournament_id),
+    )
     return ScoreTrackingInfoResponse(
         data=ScoreTrackingInfo(
             tournament_id=tournament.id,
             tournament_name=tournament.name,
             matches=matches,
+            has_active_stage=has_active_stage,
         )
     )
 

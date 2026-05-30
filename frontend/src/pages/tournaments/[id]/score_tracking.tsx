@@ -14,6 +14,7 @@ export default function TournamentScoreTrackingPage() {
         getMatchHref={(matchId) =>
           `/tournaments/${tournamentData.id}/score-tracking/matches/${matchId}`
         }
+        stagesHref={`/tournaments/${tournamentData.id}/stages`}
       />
     </TournamentLayout>
   );

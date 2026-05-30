@@ -151,6 +151,18 @@ async def sql_create_stage(
     return Stage.model_validate(dict(result._mapping))
 
 
+async def sql_has_active_stage(tournament_id: TournamentId) -> bool:
+    query = """
+        SELECT EXISTS(
+            SELECT 1 FROM stages
+            WHERE tournament_id = :tournament_id
+            AND is_active IS TRUE
+        )
+    """
+    result = await database.fetch_val(query=query, values={"tournament_id": tournament_id})
+    return bool(result)
+
+
 async def get_next_stage_in_tournament(
     tournament_id: TournamentId, direction: Literal["next", "previous"]
 ) -> StageId | None:

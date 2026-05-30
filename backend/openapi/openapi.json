@@ -1691,6 +1691,10 @@
       },
       "ScoreTrackingInfo": {
         "properties": {
+          "has_active_stage": {
+            "title": "Has Active Stage",
+            "type": "boolean"
+          },
           "matches": {
             "items": {
               "$ref": "#/components/schemas/MatchWithDetails"
@@ -1710,7 +1714,8 @@
         "required": [
           "tournament_id",
           "tournament_name",
-          "matches"
+          "matches",
+          "has_active_stage"
         ],
         "title": "ScoreTrackingInfo",
         "type": "object"
@@ -2543,6 +2548,43 @@
           "pending_matches_message"
         ],
         "title": "StageRankingResponse",
+        "type": "object"
+      },
+      "StageTemplateCreateBody": {
+        "properties": {
+          "groups": {
+            "title": "Groups",
+            "type": "integer"
+          },
+          "include_semi_final": {
+            "default": true,
+            "title": "Include Semi Final",
+            "type": "boolean"
+          },
+          "total_teams": {
+            "title": "Total Teams",
+            "type": "integer"
+          },
+          "until_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "const": "all",
+                "type": "string"
+              }
+            ],
+            "title": "Until Rank"
+          }
+        },
+        "required": [
+          "groups",
+          "total_teams",
+          "until_rank",
+          "include_semi_final"
+        ],
+        "title": "StageTemplateCreateBody",
         "type": "object"
       },
       "StageType": {
@@ -6463,6 +6505,63 @@
           }
         ],
         "summary": "Activate Next Stage",
+        "tags": [
+          "Stages"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/stages/from-template": {
+      "post": {
+        "operationId": "create_stages_from_template_tournaments__tournament_id__stages_from_template_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageTemplateCreateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StagesWithStageItemsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Create Stages From Template",
         "tags": [
           "Stages"
         ]

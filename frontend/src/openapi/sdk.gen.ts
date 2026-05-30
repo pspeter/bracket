@@ -42,6 +42,9 @@ import type {
   CreateStageItemTournamentsTournamentIdStageItemsPostData,
   CreateStageItemTournamentsTournamentIdStageItemsPostErrors,
   CreateStageItemTournamentsTournamentIdStageItemsPostResponses,
+  CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostData,
+  CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostErrors,
+  CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponses,
   CreateStageTournamentsTournamentIdStagesPostData,
   CreateStageTournamentsTournamentIdStagesPostErrors,
   CreateStageTournamentsTournamentIdStagesPostResponses,
@@ -1349,6 +1352,32 @@ export const activateNextStageTournamentsTournamentIdStagesActivatePost = <
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/stages/activate',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Create Stages From Template
+ */
+export const createStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostResponses,
+    CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/stages/from-template',
     ...options,
     headers: {
       'Content-Type': 'application/json',
