@@ -81,31 +81,31 @@ Use `nix develop --command` for all of these.
 
 ### Backend (run from `backend/`)
 
-| Task | Command |
-|---|---|
-| Run tests | `ENVIRONMENT=CI uv run pytest . -vvv` |
-| Run single test | `ENVIRONMENT=CI uv run pytest tests/path/to/test.py::test_name -vvv` |
-| Format | `uv run ruff format .` |
-| Lint | `uv run ruff check --fix .` |
-| Type check (mypy) | `uv run mypy .` |
-| Type check (pyrefly) | `uv run pyrefly check` |
-| Pylint | `uv run pylint bracket tests cli.py` |
-| Dead code | `uv run vulture` |
-| Generate OpenAPI | `uv run ./cli.py generate-openapi` |
-| Full precommit suite | `./precommit.sh` |
+| Task                 | Command                                                              |
+|----------------------|----------------------------------------------------------------------|
+| Run tests            | `ENVIRONMENT=CI uv run pytest . -vvv`                                |
+| Run single test      | `ENVIRONMENT=CI uv run pytest tests/path/to/test.py::test_name -vvv` |
+| Format               | `uv run ruff format .`                                               |
+| Lint                 | `uv run ruff check --fix .`                                          |
+| Type check (mypy)    | `uv run mypy .`                                                      |
+| Type check (pyrefly) | `uv run pyrefly check`                                               |
+| Pylint               | `uv run pylint bracket tests cli.py`                                 |
+| Dead code            | `uv run vulture`                                                     |
+| Generate OpenAPI     | `uv run ./cli.py generate-openapi`                                   |
+| Full precommit suite | `./precommit.sh`                                                     |
 
 Tests require a running Postgres. CI uses port 5532 with user/db `bracket_ci` (see `ci.env`). The dev shell uses port 5432 with user/db `bracket_dev`. Set `ENVIRONMENT=CI` when running tests locally to use CI config.
 
 ### Frontend (run from `frontend/`)
 
-| Task | Command |
-|---|---|
-| Type check + format | `pnpm test` |
-| Type check only | `pnpm run typecheck` |
-| Format check | `pnpm run prettier:check` |
-| Format fix | `pnpm run prettier:write` |
-| Build | `pnpm run build` |
-| Regenerate API client | `pnpm run openapi-ts` |
+| Task                  | Command                   |
+|-----------------------|---------------------------|
+| Type check + format   | `pnpm test`               |
+| Type check only       | `pnpm run typecheck`      |
+| Format check          | `pnpm run prettier:check` |
+| Format fix            | `pnpm run prettier:write` |
+| Build                 | `pnpm run build`          |
+| Regenerate API client | `pnpm run openapi-ts`     |
 
 ### Database Migrations
 
