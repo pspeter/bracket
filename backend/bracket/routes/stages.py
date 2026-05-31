@@ -17,6 +17,7 @@ from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.stage import (
     Stage,
     StageActivateBody,
+    StageCreateBody,
     StageTemplateCreateBody,
     StageUpdateBody,
 )
@@ -34,6 +35,7 @@ from bracket.routes.models import (
     SuccessResponse,
 )
 from bracket.routes.util import disallow_archived_tournament, stage_dependency
+from bracket.sql.levels import sql_get_level_for_tournament, sql_get_levels_for_tournament
 from bracket.sql.stages import (
     get_full_tournament_details,
     get_next_stage_in_tournament,
@@ -42,7 +44,7 @@ from bracket.sql.stages import (
     sql_delete_stage,
 )
 from bracket.sql.teams import get_teams_with_members
-from bracket.utils.id_types import StageId, TournamentId
+from bracket.utils.id_types import LevelId, StageId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -125,16 +127,42 @@ async def delete_stage(
     return SuccessResponse()
 
 
+async def _validate_level_id_for_tournament(
+    tournament_id: TournamentId, level_id: LevelId | None
+) -> None:
+    tournament_levels = await sql_get_levels_for_tournament(tournament_id)
+    if tournament_levels and level_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="level_id is required when the tournament has levels",
+        )
+    if not tournament_levels and level_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="level_id must be null when the tournament has no levels",
+        )
+    if level_id is not None:
+        level = await sql_get_level_for_tournament(tournament_id, level_id)
+        if level is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Could not find level with id {level_id}",
+            )
+
+
 @router.post("/tournaments/{tournament_id}/stages", response_model=SuccessResponse)
 async def create_stage(
     tournament_id: TournamentId,
+    body: StageCreateBody = StageCreateBody(),
     user: UserPublic = Depends(user_authenticated_for_tournament),
     _: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    await _validate_level_id_for_tournament(tournament_id, body.level_id)
+
     existing_stages = await get_full_tournament_details(tournament_id)
     check_requirement(existing_stages, user, "max_stages")
 
-    await sql_create_stage(tournament_id)
+    await sql_create_stage(tournament_id, level_id=body.level_id)
     return SuccessResponse()
 
 
@@ -150,10 +178,12 @@ async def create_stages_from_template(
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> StagesWithStageItemsResponse:
     validate_stage_template_body(stage_body)
+    await _validate_level_id_for_tournament(tournament_id, stage_body.level_id)
 
     stages_ = await replace_stages_from_template(
         tournament_id,
         build_template_blueprint(stage_body.to_template_config()),
+        level_id=stage_body.level_id,
     )
     return StagesWithStageItemsResponse(data=stages_)
 
@@ -188,7 +218,11 @@ async def activate_next_stage(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
-    new_active_stage_id = await get_next_stage_in_tournament(tournament_id, stage_body.direction)
+    await _validate_level_id_for_tournament(tournament_id, stage_body.level_id)
+
+    new_active_stage_id = await get_next_stage_in_tournament(
+        tournament_id, stage_body.direction, stage_body.level_id
+    )
     if new_active_stage_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -196,7 +230,14 @@ async def activate_next_stage(
         )
 
     stages = await get_full_tournament_details(tournament_id)
-    deactivated_stage = next((stage for stage in stages if stage.is_active), None)
+    deactivated_stage = next(
+        (
+            stage
+            for stage in stages
+            if stage.is_active and stage.level_id == stage_body.level_id
+        ),
+        None,
+    )
 
     if stage_body.direction == "next":
         if deactivated_stage is not None:
@@ -211,7 +252,7 @@ async def activate_next_stage(
         if deactivated_stage:
             await update_matches_in_deactivated_stage(tournament_id, deactivated_stage)
 
-    await sql_activate_next_stage(new_active_stage_id, tournament_id)
+    await sql_activate_next_stage(new_active_stage_id, tournament_id, stage_body.level_id)
     return SuccessResponse()
 
 

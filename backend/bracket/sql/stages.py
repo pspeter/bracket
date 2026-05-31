@@ -3,7 +3,7 @@ from typing import Literal, cast
 from bracket.database import database
 from bracket.models.db.stage import Stage
 from bracket.models.db.util import StageWithStageItems
-from bracket.utils.id_types import RoundId, StageId, StageItemId, TournamentId
+from bracket.utils.id_types import LevelId, RoundId, StageId, StageItemId, TournamentId
 from bracket.utils.types import dict_without_none
 
 
@@ -133,16 +133,25 @@ async def sql_delete_stage(tournament_id: TournamentId, stage_id: StageId) -> No
 
 
 async def sql_create_stage(
-    tournament_id: TournamentId, name: str = "Stage", *, is_active: bool = False
+    tournament_id: TournamentId,
+    name: str = "Stage",
+    *,
+    is_active: bool = False,
+    level_id: LevelId | None = None,
 ) -> Stage:
     query = """
-        INSERT INTO stages (created, is_active, name, tournament_id)
-        VALUES (NOW(), :is_active, :name, :tournament_id)
+        INSERT INTO stages (created, is_active, name, tournament_id, level_id)
+        VALUES (NOW(), :is_active, :name, :tournament_id, :level_id)
         RETURNING *
         """
     result = await database.fetch_one(
         query=query,
-        values={"tournament_id": tournament_id, "name": name, "is_active": is_active},
+        values={
+            "tournament_id": tournament_id,
+            "name": name,
+            "is_active": is_active,
+            "level_id": level_id,
+        },
     )
 
     if result is None:
@@ -164,7 +173,9 @@ async def sql_has_active_stage(tournament_id: TournamentId) -> bool:
 
 
 async def get_next_stage_in_tournament(
-    tournament_id: TournamentId, direction: Literal["next", "previous"]
+    tournament_id: TournamentId,
+    direction: Literal["next", "previous"],
+    level_id: LevelId | None = None,
 ) -> StageId | None:
     select_query = """
         SELECT id
@@ -177,6 +188,7 @@ async def get_next_stage_in_tournament(
                         SELECT id FROM stages
                         WHERE is_active IS TRUE
                         AND stages.tournament_id = :tournament_id
+                        AND stages.level_id IS NOT DISTINCT FROM :level_id
                         ORDER BY id ASC
                         LIMIT 1
                     ),
@@ -189,6 +201,7 @@ async def get_next_stage_in_tournament(
                         SELECT id FROM stages
                         WHERE is_active IS TRUE
                         AND stages.tournament_id = :tournament_id
+                        AND stages.level_id IS NOT DISTINCT FROM :level_id
                         ORDER BY id DESC
                         LIMIT 1
                     ),
@@ -197,6 +210,7 @@ async def get_next_stage_in_tournament(
             )
             END
         AND stages.tournament_id = :tournament_id
+        AND stages.level_id IS NOT DISTINCT FROM :level_id
         AND is_active IS FALSE
         ORDER BY
             CASE WHEN :direction='next' THEN id END ASC,
@@ -206,21 +220,31 @@ async def get_next_stage_in_tournament(
         "StageId | None",
         await database.execute(
             query=select_query,
-            values={"tournament_id": tournament_id, "direction": direction},
+            values={
+                "tournament_id": tournament_id,
+                "direction": direction,
+                "level_id": level_id,
+            },
         ),
     )
 
 
 async def sql_activate_next_stage(
-    new_active_stage_id: StageId, tournament_id: TournamentId
+    new_active_stage_id: StageId,
+    tournament_id: TournamentId,
+    level_id: LevelId | None = None,
 ) -> None:
     update_query = """
         UPDATE stages
         SET is_active = (stages.id = :new_active_stage_id)
         WHERE stages.tournament_id = :tournament_id
-
+        AND stages.level_id IS NOT DISTINCT FROM :level_id
     """
     await database.execute(
         query=update_query,
-        values={"tournament_id": tournament_id, "new_active_stage_id": new_active_stage_id},
+        values={
+            "tournament_id": tournament_id,
+            "new_active_stage_id": new_active_stage_id,
+            "level_id": level_id,
+        },
     )

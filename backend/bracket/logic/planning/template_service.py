@@ -10,7 +10,7 @@ from bracket.models.db.util import StageWithStageItems
 from bracket.sql.shared import sql_delete_stage_item_matches, sql_delete_stage_item_relations
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs, sql_delete_stage_item
 from bracket.sql.stages import get_full_tournament_details, sql_create_stage
-from bracket.utils.id_types import StageItemId, TournamentId
+from bracket.utils.id_types import LevelId, StageItemId, TournamentId
 
 
 def build_stage_item_inputs(
@@ -40,9 +40,15 @@ def build_stage_item_inputs(
 
 
 async def replace_stages_from_template(
-    tournament_id: TournamentId, blueprint: Blueprint
+    tournament_id: TournamentId,
+    blueprint: Blueprint,
+    level_id: LevelId | None = None,
 ) -> list[StageWithStageItems]:
-    existing_stages = await get_full_tournament_details(tournament_id)
+    existing_stages = [
+        s
+        for s in await get_full_tournament_details(tournament_id)
+        if s.level_id == level_id
+    ]
 
     async with database.transaction():
         # Matches may reference stage_item_inputs from other stage items (e.g. elimination
@@ -64,13 +70,16 @@ async def replace_stages_from_template(
             query="""
                 DELETE FROM stages
                 WHERE tournament_id = :tournament_id
+                AND level_id IS NOT DISTINCT FROM :level_id
             """,
-            values={"tournament_id": tournament_id},
+            values={"tournament_id": tournament_id, "level_id": level_id},
         )
 
         stage_item_ids_by_name: dict[str, StageItemId] = {}
         for blueprint_stage in blueprint.stages:
-            stage = await sql_create_stage(tournament_id, blueprint_stage.name)
+            stage = await sql_create_stage(
+                tournament_id, blueprint_stage.name, level_id=level_id
+            )
 
             for blueprint_stage_item in blueprint_stage.items:
                 stage_item = await sql_create_stage_item_with_inputs(
