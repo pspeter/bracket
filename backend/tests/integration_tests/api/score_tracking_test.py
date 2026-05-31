@@ -193,19 +193,25 @@ async def test_score_tracking_lists_only_matches_from_active_stage(
             .where(tournaments.c.id == auth_context.tournament.id)
             .values(score_tracking_enabled=True, score_tracking_token="score-token"),
         )
+        try:
+            authenticated_response = await send_tournament_request(
+                HTTPMethod.GET, "score-tracking", auth_context, {}
+            )
+            public_response = await send_request(HTTPMethod.GET, "score-tracking/score-token")
 
-        authenticated_response = await send_tournament_request(
-            HTTPMethod.GET, "score-tracking", auth_context, {}
-        )
-        public_response = await send_request(HTTPMethod.GET, "score-tracking/score-token")
-
-        assert authenticated_response["data"]["matches"] == public_response["data"]["matches"]
-        assert [match["id"] for match in authenticated_response["data"]["matches"]] == [
-            active_match_inserted.id
-        ]
-        assert inactive_match_inserted.id not in [
-            match["id"] for match in authenticated_response["data"]["matches"]
-        ]
+            assert authenticated_response["data"]["matches"] == public_response["data"]["matches"]
+            assert [match["id"] for match in authenticated_response["data"]["matches"]] == [
+                active_match_inserted.id
+            ]
+            assert inactive_match_inserted.id not in [
+                match["id"] for match in authenticated_response["data"]["matches"]
+            ]
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == auth_context.tournament.id)
+                .values(score_tracking_enabled=False, score_tracking_token=None),
+            )
 
 
 @pytest.mark.asyncio(loop_scope="session")
