@@ -6,6 +6,7 @@ import {
   Modal,
   NumberInput,
   Select,
+  Textarea,
   TextInput,
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
@@ -18,7 +19,7 @@ import { SWRResponse } from 'swr';
 
 import SaveButton from '@components/buttons/save';
 import { assert_not_none } from '@components/utils/assert';
-import { Club, TournamentWithLevels, TournamentsResponse } from '@openapi';
+import { Club, TournamentsResponse, TournamentWithLevels } from '@openapi';
 import { getBaseApiUrl, getClubs } from '@services/adapter';
 import { createTournament } from '@services/tournament';
 import dayjs from 'dayjs';
@@ -55,6 +56,7 @@ function GeneralTournamentForm({
       auto_assign_courts: true,
       duration_minutes: 10,
       margin_minutes: 5,
+      levels: '',
     },
 
     validate: {
@@ -71,6 +73,10 @@ function GeneralTournamentForm({
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
+        const levels = values.levels
+          .split('\n')
+          .map((level) => level.trim())
+          .filter((level) => level.length > 0);
         await createTournament(
           parseInt(assert_not_none(values.club_id as unknown as string), 10),
           values.name,
@@ -84,7 +90,8 @@ function GeneralTournamentForm({
           false,
           4,
           true,
-          false
+          false,
+          levels.length > 0 ? levels : null
         );
         await swrTournamentsResponse.mutate();
         setOpened(false);
@@ -152,6 +159,16 @@ function GeneralTournamentForm({
           />
         </Grid.Col>
       </Grid>
+
+      <Textarea
+        label={t('levels_input_label')}
+        description={t('levels_input_description')}
+        placeholder={t('levels_input_placeholder')}
+        autosize
+        minRows={2}
+        mt="lg"
+        {...form.getInputProps('levels')}
+      />
 
       <Checkbox
         mt="md"

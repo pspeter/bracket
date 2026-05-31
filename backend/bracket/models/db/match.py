@@ -8,7 +8,7 @@ from pydantic import BaseModel, field_validator
 from bracket.models.db.court import Court
 from bracket.models.db.shared import BaseModelORM
 from bracket.models.db.stage_item_inputs import StageItemInput
-from bracket.utils.id_types import CourtId, MatchId, RoundId, StageItemInputId
+from bracket.utils.id_types import CourtId, LevelId, MatchId, RoundId, StageItemInputId
 from bracket.utils.types import EnumAutoStr, assert_some
 
 
@@ -70,6 +70,7 @@ class MatchWithDetails(Match):
     """
 
     court: Court | None = None
+    level_id: LevelId | None = None
 
     @field_validator("stage_item_input1", "stage_item_input2", "court", mode="before")
     @staticmethod
@@ -86,6 +87,7 @@ def get_match_hash(
 
 
 class MatchWithDetailsDefinitive(Match):
+    level_id: LevelId | None = None
     stage_item_input1: StageItemInput  # pyrefly: ignore [bad-override]
     stage_item_input2: StageItemInput  # pyrefly: ignore [bad-override]
     court: Court | None = None

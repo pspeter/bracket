@@ -491,6 +491,10 @@ export type MatchWithDetails = {
    */
   id: number;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Margin Minutes
    */
   margin_minutes: number;
@@ -582,6 +586,10 @@ export type MatchWithDetailsDefinitive = {
    * Id
    */
   id: number;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
   /**
    * Margin Minutes
    */
@@ -916,6 +924,10 @@ export type ScoreTrackingInfo = {
    * Has Active Stage
    */
   has_active_stage: boolean;
+  /**
+   * Levels
+   */
+  levels: Array<LevelResponse>;
   /**
    * Matches
    */

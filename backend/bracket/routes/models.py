@@ -139,6 +139,7 @@ class ScoreTrackingInfo(BaseModel):
     tournament_name: str
     matches: list[MatchWithDetails]
     has_active_stage: bool
+    levels: list[LevelResponse] = []
 
 
 class ScoreTrackingInfoResponse(DataResponse[ScoreTrackingInfo]):

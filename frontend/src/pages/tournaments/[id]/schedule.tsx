@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
+import { LevelBadge } from '@components/levels/levels';
 import CourtModal from '@components/modals/create_court_modal';
 import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
@@ -33,9 +34,15 @@ import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
-import { Court, CourtsResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
+import {
+  Court,
+  CourtsResponse,
+  LevelResponse,
+  MatchWithDetails,
+  StageWithStageItems,
+} from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getCourts, getStages } from '@services/adapter';
+import { getCourts, getStages, getTournamentById } from '@services/adapter';
 import { deleteCourt } from '@services/court';
 import {
   MatchLookupEntry,
@@ -180,12 +187,14 @@ function ScheduleRow({
   openMatchModal,
   stageItemsLookup,
   matchesLookup,
+  levels,
 }: {
   index: number;
   match: MatchWithDetails;
   openMatchModal: (m: MatchWithDetails) => void;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
+  levels: LevelResponse[];
 }) {
   const { t } = useTranslation();
   return (
@@ -226,6 +235,7 @@ function ScheduleRow({
                   <Badge color={getMatchStateColor(match.state)} variant="light">
                     {t(`match_state_${String(match.state).toLowerCase()}`)}
                   </Badge>
+                  <LevelBadge levels={levels} levelId={matchesLookup[match.id].stage.level_id} />
                   <Badge
                     color={stringToColour(`${matchesLookup[match.id].stageItem.id}`)}
                     variant="outline"
@@ -256,11 +266,13 @@ function UnscheduledColumn({
   openMatchModal,
   stageItemsLookup,
   matchesLookup,
+  levels,
 }: {
   matches: MatchWithDetails[];
   openMatchModal: (m: MatchWithDetails) => void;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
+  levels: LevelResponse[];
 }) {
   const { t } = useTranslation();
   const theme = useMantineTheme();
@@ -279,6 +291,7 @@ function UnscheduledColumn({
       matchesLookup={matchesLookup}
       match={m}
       openMatchModal={openMatchModal}
+      levels={levels}
     />
   ));
 
@@ -340,6 +353,7 @@ function StackedScheduleView({
   schedule,
   unscheduledMatches,
   openMatchModal,
+  levels,
 }: {
   t: Translator;
   stages: StageWithStageItems[];
@@ -350,6 +364,7 @@ function StackedScheduleView({
   schedule: { court: Court; matches: MatchWithDetails[] }[];
   unscheduledMatches: MatchWithDetails[];
   openMatchModal: (m: MatchWithDetails) => void;
+  levels: LevelResponse[];
 }) {
   const { colorScheme } = useMantineColorScheme();
   const theme = useMantineTheme();
@@ -388,7 +403,12 @@ function StackedScheduleView({
             <Divider
               size="xs"
               my="md"
-              label={stage.name}
+              label={
+                <Group gap="xs">
+                  {stage.name}
+                  <LevelBadge levels={levels} levelId={stage.level_id} />
+                </Group>
+              }
               labelPosition="center"
               color="gray"
               c="dimmed"
@@ -513,6 +533,7 @@ function StackedScheduleView({
                             matchesLookup={matchesLookup}
                             match={m}
                             openMatchModal={openMatchModal}
+                            levels={levels}
                           />
                         ))}
                         {unschedForThisStage.length < 1 ? (
@@ -559,6 +580,7 @@ function StackedScheduleView({
                                 matchesLookup={matchesLookup}
                                 match={m}
                                 openMatchModal={openMatchModal}
+                                levels={levels}
                               />
                             ))}
                             {stage.id === firstStageId &&
@@ -599,6 +621,7 @@ function ScheduleColumn({
   stageItemsLookup,
   swrCourtsResponse,
   matchesLookup,
+  levels,
 }: {
   tournamentId: number;
   court: Court;
@@ -607,6 +630,7 @@ function ScheduleColumn({
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   swrCourtsResponse: SWRResponse<CourtsResponse>;
   matchesLookup: Record<number, MatchLookupEntry>;
+  levels: LevelResponse[];
 }) {
   const { t } = useTranslation();
   const rows = matches.map((m: MatchWithDetails, index: number) => (
@@ -617,6 +641,7 @@ function ScheduleColumn({
       matchesLookup={matchesLookup}
       match={m}
       openMatchModal={openMatchModal}
+      levels={levels}
     />
   ));
 
@@ -687,6 +712,7 @@ function Schedule({
   schedule,
   unscheduledMatches,
   openMatchModal,
+  levels,
 }: {
   t: Translator;
   stages: StageWithStageItems[] | null;
@@ -697,6 +723,7 @@ function Schedule({
   schedule: { court: Court; matches: MatchWithDetails[] }[];
   unscheduledMatches: MatchWithDetails[];
   openMatchModal: (m: MatchWithDetails) => void;
+  levels: LevelResponse[];
 }) {
   if (stages != null && stages.length > 1) {
     return (
@@ -710,6 +737,7 @@ function Schedule({
         schedule={schedule}
         unscheduledMatches={unscheduledMatches}
         openMatchModal={openMatchModal}
+        levels={levels}
       />
     );
   }
@@ -735,6 +763,7 @@ function Schedule({
         openMatchModal={openMatchModal}
         stageItemsLookup={stageItemsLookup}
         matchesLookup={matchesLookup}
+        levels={levels}
       />
       {schedule.map((item) => (
         <ScheduleColumn
@@ -746,6 +775,7 @@ function Schedule({
           court={item.court}
           matches={item.matches}
           openMatchModal={openMatchModal}
+          levels={levels}
         />
       ))}
       <div key="add-court" style={{ width: COL_WIDTH }}>
@@ -767,6 +797,8 @@ export default function SchedulePage() {
   const { tournamentData } = getTournamentIdFromRouter();
   const swrStagesResponse = getStages(tournamentData.id);
   const swrCourtsResponse = getCourts(tournamentData.id);
+  const swrTournamentResponse = getTournamentById(tournamentData.id);
+  const levels = swrTournamentResponse.data?.data.levels ?? [];
 
   const stageItemsLookup = responseIsValid(swrStagesResponse)
     ? getStageItemLookup(swrStagesResponse)
@@ -905,6 +937,7 @@ export default function SchedulePage() {
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
             openMatchModal={openMatchModal}
+            levels={levels}
           />
         </DragDropContext>
       </Group>

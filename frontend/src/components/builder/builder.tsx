@@ -23,6 +23,7 @@ import { BiSolidWrench } from 'react-icons/bi';
 import { SWRResponse } from 'swr';
 
 import CreateStageButton from '@components/buttons/create_stage';
+import { LevelBadge } from '@components/levels/levels';
 import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import { CreateStageItemModal } from '@components/modals/create_stage_item';
 import { UpdateStageModal } from '@components/modals/update_stage';
@@ -252,9 +253,11 @@ function StageItemRow({
   rankings,
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
+  levelId,
 }: {
   tournament: TournamentWithLevels;
   stageItem: StageItemWithRounds;
+  levelId: number | null;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   availableInputs: StageItemInputChoice[];
   rankings: Ranking[];
@@ -293,7 +296,10 @@ function StageItemRow({
     <Card withBorder shadow="sm" radius="md">
       <Card.Section withBorder inheritPadding py="xs" color="dimmed">
         <Group justify="space-between">
-          <Text fw={800}>{stageItem.name}</Text>
+          <Group gap="xs">
+            <Text fw={800}>{stageItem.name}</Text>
+            <LevelBadge levels={tournament.levels} levelId={levelId} />
+          </Group>
           <UpdateStageItemModal
             swrStagesResponse={swrStagesResponse}
             stageItem={stageItem}
@@ -409,6 +415,7 @@ function StageColumn({
         swrAvailableInputsResponse={swrAvailableInputsResponse}
         swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
         rankings={rankings}
+        levelId={stage.level_id}
       />
     ));
 
@@ -424,6 +431,7 @@ function StageColumn({
       <Group justify="space-between">
         <Group>
           {stage.name}
+          <LevelBadge levels={tournament.levels} levelId={stage.level_id} />
           {stage.is_active ? <Badge color="green">{t('active_badge_label')}</Badge> : null}
         </Group>
         <Menu withinPortal position="bottom-end" shadow="sm">
@@ -475,6 +483,7 @@ export default function Builder({
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
   rankings,
+  stages: filteredStages,
 }: {
   tournament: TournamentWithLevels;
   registeredTeamCount: number;
@@ -482,9 +491,10 @@ export default function Builder({
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
   swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
   rankings: Ranking[];
+  stages?: StageWithStageItems[];
 }) {
   const stages: StageWithStageItems[] =
-    swrStagesResponse.data != null ? swrStagesResponse.data.data : [];
+    filteredStages ?? (swrStagesResponse.data != null ? swrStagesResponse.data.data : []);
 
   if (swrStagesResponse.error) return <RequestErrorAlert error={swrStagesResponse.error} />;
   if (swrAvailableInputsResponse.error) {

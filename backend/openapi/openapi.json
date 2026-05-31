@@ -925,6 +925,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "margin_minutes": {
             "title": "Margin Minutes",
             "type": "integer"
@@ -1078,7 +1089,8 @@
           "id",
           "stage_item_input1",
           "stage_item_input2",
-          "court"
+          "court",
+          "level_id"
         ],
         "title": "MatchWithDetails",
         "type": "object"
@@ -1153,6 +1165,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "margin_minutes": {
             "title": "Margin Minutes",
             "type": "integer"
@@ -1300,6 +1323,7 @@
           "id",
           "stage_item_input1",
           "stage_item_input2",
+          "level_id",
           "court"
         ],
         "title": "MatchWithDetailsDefinitive",
@@ -1755,6 +1779,14 @@
             "title": "Has Active Stage",
             "type": "boolean"
           },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LevelResponse"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
           "matches": {
             "items": {
               "$ref": "#/components/schemas/MatchWithDetails"
@@ -1775,7 +1807,8 @@
           "tournament_id",
           "tournament_name",
           "matches",
-          "has_active_stage"
+          "has_active_stage",
+          "levels"
         ],
         "title": "ScoreTrackingInfo",
         "type": "object"

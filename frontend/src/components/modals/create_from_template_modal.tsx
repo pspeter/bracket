@@ -55,6 +55,7 @@ type TemplateFormValues = {
   total_teams: number;
   until_rank: 'all' | number;
   include_semi_final: boolean;
+  level_id: string | null;
 };
 
 export function CreateFromTemplateButton({
@@ -131,6 +132,7 @@ function CreateFromTemplateModal({
       total_teams: normalizeTotalTeams(registeredTeamCount, 2),
       until_rank: 'all',
       include_semi_final: defaultIncludeSemiFinal(normalizeTotalTeams(registeredTeamCount, 2), 2),
+      level_id: tournament.levels.length > 0 ? `${tournament.levels[0].id}` : null,
     },
     validate: {
       total_teams: (value) => {
@@ -139,6 +141,8 @@ function CreateFromTemplateModal({
         }
         return null;
       },
+      level_id: (value) =>
+        tournament.levels.length === 0 || value != null ? null : t('filter_level_placeholder'),
     },
   });
 
@@ -155,6 +159,7 @@ function CreateFromTemplateModal({
         total_teams: total,
         until_rank: 'all',
         include_semi_final: defaultIncludeSemiFinal(total, groups),
+        level_id: tournament.levels.length > 0 ? `${tournament.levels[0].id}` : null,
       });
       hasResetForOpen.current = true;
     }
@@ -240,6 +245,7 @@ function CreateFromTemplateModal({
         total_teams: values.total_teams,
         until_rank: values.until_rank,
         include_semi_final: includeSemiFinal,
+        level_id: values.level_id != null ? Number(values.level_id) : null,
       });
       await swrStagesResponse.mutate();
       await swrAvailableInputsResponse.mutate();
@@ -275,6 +281,18 @@ function CreateFromTemplateModal({
       <Modal opened={opened} onClose={onClose} title={t('create_from_template_modal_title')}>
         <form onSubmit={onPrimarySubmit}>
           <Stack gap="md" mt="xs">
+            {tournament.levels.length > 0 ? (
+              <Select
+                withAsterisk
+                label={t('filter_level_label')}
+                placeholder={t('filter_level_placeholder')}
+                data={tournament.levels.map((level) => ({
+                  value: `${level.id}`,
+                  label: level.name,
+                }))}
+                {...form.getInputProps('level_id')}
+              />
+            ) : null}
             <Radio.Group
               label={t('template_wizard_groups_label')}
               value={String(form.values.groups)}
@@ -286,6 +304,7 @@ function CreateFromTemplateModal({
                   total_teams: total,
                   until_rank: 'all',
                   include_semi_final: defaultIncludeSemiFinal(total, groups),
+                  level_id: form.values.level_id,
                 });
               }}
             >

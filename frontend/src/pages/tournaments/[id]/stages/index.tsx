@@ -1,8 +1,10 @@
 import { Group, Stack, Text } from '@mantine/core';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Builder from '@components/builder/builder';
 import { CreateStageButtonLarge } from '@components/buttons/create_stage';
+import { LevelFilterSelect } from '@components/levels/levels';
 import ActivateNextStageModal from '@components/modals/activate_next_stage_modal';
 import ActivatePreviousStageModal from '@components/modals/activate_previous_stage_modal';
 import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
@@ -23,6 +25,7 @@ import { getAssignedTeamIds } from '@services/lookups';
 
 export default function StagesPage() {
   const { t } = useTranslation();
+  const [filteredLevelId, setFilteredLevelId] = useState('all');
   const { tournamentData } = getTournamentIdFromRouter();
   const swrStagesResponse = getStages(tournamentData.id);
   const swrTeamsResponse = getTeams(tournamentData.id);
@@ -36,6 +39,11 @@ export default function StagesPage() {
 
   const stages: StageWithStageItems[] =
     swrStagesResponse.data != null ? swrStagesResponse.data.data : [];
+  const levels = tournamentDataFull?.levels ?? [];
+  const filteredStages =
+    filteredLevelId === 'all'
+      ? stages
+      : stages.filter((stage) => `${stage.level_id}` === filteredLevelId);
   const assignedTeamCount =
     swrStagesResponse.data != null ? getAssignedTeamIds(swrStagesResponse).length : 0;
   const totalTeamCount = swrTeamsResponse.data?.data.count ?? 0;
@@ -93,16 +101,27 @@ export default function StagesPage() {
             {t('stage_unassigned_teams_notice', { count: unassignedTeamCount })}
           </Text>
         </Stack>
-        <Group mt="1rem" align="top">
-          <Builder
-            tournament={tournamentDataFull}
-            registeredTeamCount={totalTeamCount}
-            swrStagesResponse={swrStagesResponse}
-            swrAvailableInputsResponse={swrAvailableInputsResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-            rankings={rankings}
+        <Stack mt="1rem" gap="md">
+          <LevelFilterSelect
+            levels={levels}
+            value={filteredLevelId}
+            onChange={setFilteredLevelId}
+            label={t('filter_level_label')}
+            placeholder={t('filter_level_placeholder')}
+            allLevelsLabel={t('all_levels_label')}
           />
-        </Group>
+          <Group align="top">
+            <Builder
+              tournament={tournamentDataFull}
+              registeredTeamCount={totalTeamCount}
+              swrStagesResponse={swrStagesResponse}
+              swrAvailableInputsResponse={swrAvailableInputsResponse}
+              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+              rankings={rankings}
+              stages={filteredStages}
+            />
+          </Group>
+        </Stack>
       </>
     );
   }

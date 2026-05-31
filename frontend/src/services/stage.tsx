@@ -5,6 +5,7 @@ export type StageTemplateCreateBody = {
   total_teams: number;
   until_rank: 'all' | number;
   include_semi_final?: boolean;
+  level_id?: number | null;
 };
 
 export async function createStagesFromTemplate(
@@ -14,9 +15,9 @@ export async function createStagesFromTemplate(
   return createAxios().post(`tournaments/${tournament_id}/stages/from-template`, body);
 }
 
-export async function createStage(tournament_id: number) {
+export async function createStage(tournament_id: number, level_id: number | null = null) {
   return createAxios()
-    .post(`tournaments/${tournament_id}/stages`)
+    .post(`tournaments/${tournament_id}/stages`, { level_id })
     .catch((response: any) => handleRequestError(response));
 }
 

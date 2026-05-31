@@ -2,6 +2,7 @@ import { Grid, Group, Select, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { LevelFilterSelect } from '@components/levels/levels';
 import TeamCreateModal from '@components/modals/team_create_modal';
 import { getTableState, tableStateToPagination } from '@components/tables/table';
 import TeamsTable from '@components/tables/teams';
@@ -40,10 +41,12 @@ export default function TeamsPage() {
   const tableState = getTableState('name');
   const { t } = useTranslation();
   const [filteredStageItemId, setFilteredStageItemId] = useState(null);
+  const [filteredLevelId, setFilteredLevelId] = useState('all');
   const { tournamentData } = getTournamentIdFromRouter();
   const swrTeamsResponse = getTeamsPaginated(tournamentData.id, tableStateToPagination(tableState));
   const swrStagesResponse = getStages(tournamentData.id);
   const swrTournament = getTournamentById(tournamentData.id);
+  const levels = swrTournament.data?.data.levels ?? [];
   const maxTeamSize = swrTournament.data?.data.max_team_size;
   const stageItemInputLookup = responseIsValid(swrStagesResponse)
     ? getStageItemList(swrStagesResponse)
@@ -62,6 +65,9 @@ export default function TeamsPage() {
         stageItemTeamLookup[filteredStageItemId].indexOf(team.id) !== -1
     );
   }
+  if (filteredLevelId !== 'all') {
+    teams = teams.filter((team) => `${team.level_id}` === filteredLevelId);
+  }
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
@@ -78,6 +84,16 @@ export default function TeamsPage() {
         </Grid.Col>
         <Grid.Col span="content">
           <Grid align="flex-end">
+            <Grid.Col span="auto">
+              <LevelFilterSelect
+                levels={levels}
+                value={filteredLevelId}
+                onChange={setFilteredLevelId}
+                label={t('filter_level_label')}
+                placeholder={t('filter_level_placeholder')}
+                allLevelsLabel={t('all_levels_label')}
+              />
+            </Grid.Col>
             <Grid.Col span="auto">
               <StageItemSelect
                 groupStageItems={Object.values(stageItemInputLookup)}
@@ -99,6 +115,7 @@ export default function TeamsPage() {
         teams={teams}
         tableState={tableState}
         teamCount={teamCount}
+        levels={levels}
       />
     </TournamentLayout>
   );

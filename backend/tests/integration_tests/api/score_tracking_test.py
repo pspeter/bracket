@@ -8,6 +8,7 @@ from bracket.utils.db import fetch_one_parsed_certain
 from bracket.utils.dummy_records import (
     DUMMY_COURT1,
     DUMMY_COURT2,
+    DUMMY_LEVEL1,
     DUMMY_MATCH1,
     DUMMY_ROUND1,
     DUMMY_STAGE1,
@@ -21,6 +22,7 @@ from tests.integration_tests.api.shared import send_request, send_tournament_req
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     inserted_court,
+    inserted_level,
     inserted_match,
     inserted_round,
     inserted_stage,
@@ -88,6 +90,74 @@ async def test_authenticated_score_tracking_list_works_when_public_link_disabled
         assert response["data"]["tournament_name"] == auth_context.tournament.name
         assert len(response["data"]["matches"]) == 1
         assert response["data"]["matches"][0]["id"] == match_inserted.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_authenticated_score_tracking_includes_levels_and_match_level(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_level(
+            DUMMY_LEVEL1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as level,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(
+                update={"tournament_id": auth_context.tournament.id, "level_id": level.id}
+            )
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(
+                update={"tournament_id": auth_context.tournament.id, "level_id": level.id}
+            )
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(
+                update={"tournament_id": auth_context.tournament.id, "level_id": level.id}
+            )
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input1_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input2_inserted,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": court_inserted.id,
+                }
+            )
+        ) as match_inserted,
+    ):
+        response = await send_tournament_request(HTTPMethod.GET, "score-tracking", auth_context, {})
+
+        assert response["data"]["levels"] == [{"id": level.id, "name": "Beginners", "position": 0}]
+        assert response["data"]["matches"][0]["id"] == match_inserted.id
+        assert response["data"]["matches"][0]["level_id"] == level.id
 
 
 @pytest.mark.asyncio(loop_scope="session")

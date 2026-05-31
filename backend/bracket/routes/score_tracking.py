@@ -7,7 +7,7 @@ from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
 from bracket.models.db.match import Match, MatchScoreTrackingBody
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.tournament import Tournament
+from bracket.models.db.tournament import LevelResponse, Tournament
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import (
     tournament_by_score_tracking_token,
@@ -25,6 +25,7 @@ from bracket.routes.models import (
     ScoreTrackingMatchResponse,
 )
 from bracket.routes.util import match_dependency
+from bracket.sql.levels import sql_get_levels_for_tournament
 from bracket.sql.matches import sql_get_scheduled_matches_with_details, sql_update_match
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
@@ -42,9 +43,10 @@ router = APIRouter(prefix=config.api_prefix)
 async def get_score_tracking_info(
     tournament: Tournament = Depends(tournament_by_score_tracking_token),
 ) -> ScoreTrackingInfoResponse:
-    matches, has_active_stage = await asyncio.gather(
+    matches, has_active_stage, levels = await asyncio.gather(
         sql_get_scheduled_matches_with_details(tournament.id),
         sql_has_active_stage(tournament.id),
+        sql_get_levels_for_tournament(tournament.id),
     )
     return ScoreTrackingInfoResponse(
         data=ScoreTrackingInfo(
@@ -52,6 +54,7 @@ async def get_score_tracking_info(
             tournament_name=tournament.name,
             matches=matches,
             has_active_stage=has_active_stage,
+            levels=[LevelResponse.model_validate(level) for level in levels],
         )
     )
 
@@ -84,10 +87,11 @@ async def get_authenticated_score_tracking_info(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
 ) -> ScoreTrackingInfoResponse:
-    tournament, matches, has_active_stage = await asyncio.gather(
+    tournament, matches, has_active_stage, levels = await asyncio.gather(
         sql_get_tournament(tournament_id),
         sql_get_scheduled_matches_with_details(tournament_id),
         sql_has_active_stage(tournament_id),
+        sql_get_levels_for_tournament(tournament_id),
     )
     return ScoreTrackingInfoResponse(
         data=ScoreTrackingInfo(
@@ -95,6 +99,7 @@ async def get_authenticated_score_tracking_info(
             tournament_name=tournament.name,
             matches=matches,
             has_active_stage=has_active_stage,
+            levels=[LevelResponse.model_validate(level) for level in levels],
         )
     )
 

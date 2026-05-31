@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
+import { LevelBadge, LevelFilterSelect } from '@components/levels/levels';
 import { Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
 import { formatMatchInput1, formatMatchInput2, getScoreColors } from '@components/utils/match';
@@ -60,6 +61,7 @@ export function ScoreTrackingListView({
   stagesHref?: string;
 }) {
   const { t } = useTranslation();
+  const [filteredLevelId, setFilteredLevelId] = useState('all');
 
   if (!responseIsValid(swrResponse)) {
     if (swrResponse.error != null) {
@@ -74,7 +76,10 @@ export function ScoreTrackingListView({
 
   const responseData = swrResponse.data!;
   const info = responseData.data;
-  const matches = info.matches || [];
+  const levels = info.levels ?? [];
+  const matches = (info.matches || []).filter(
+    (match) => filteredLevelId === 'all' || `${match.level_id}` === filteredLevelId
+  );
   const pseudoStagesResponse = getPseudoStagesResponse(matches);
   const stageItemsLookup = getStageItemLookup(pseudoStagesResponse as any);
   const matchesLookup = getMatchLookup(pseudoStagesResponse as any);
@@ -110,6 +115,14 @@ export function ScoreTrackingListView({
         <Title order={2}>
           {t('score_tracking_page_title', { tournamentName: info.tournament_name })}
         </Title>
+        <LevelFilterSelect
+          levels={levels}
+          value={filteredLevelId}
+          onChange={setFilteredLevelId}
+          label={t('filter_level_label')}
+          placeholder={t('filter_level_placeholder')}
+          allLevelsLabel={t('all_levels_label')}
+        />
         {renderEmptyState()}
         {matches.map((match) => (
           <Card key={match.id} withBorder radius="md">
@@ -120,6 +133,7 @@ export function ScoreTrackingListView({
                   <Badge color={getMatchStateColor(match.state)} variant="light">
                     {t(`match_state_${String(match.state).toLowerCase()}`)}
                   </Badge>
+                  <LevelBadge levels={levels} levelId={match.level_id} />
                 </Group>
                 <Group gap="xs">
                   {match.start_time != null ? (

@@ -271,7 +271,8 @@ async def sql_get_match_with_details(
             matches.*,
             to_json(sii1) AS stage_item_input1,
             to_json(sii2) AS stage_item_input2,
-            to_json(c) AS court
+            to_json(c) AS court,
+            stages.level_id AS level_id
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id
@@ -307,7 +308,8 @@ async def sql_get_scheduled_matches_with_details(
             matches.*,
             to_json(sii1) AS stage_item_input1,
             to_json(sii2) AS stage_item_input2,
-            to_json(c) AS court
+            to_json(c) AS court,
+            stages.level_id AS level_id
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id

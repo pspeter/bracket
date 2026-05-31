@@ -1,16 +1,17 @@
-import { Badge, Center, Pagination, Table } from '@mantine/core';
+import { Badge, Center, Group, Pagination, Table } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { mutate, SWRResponse } from 'swr';
 
 import DeleteButton from '@components/buttons/delete';
 import PlayerList from '@components/info/player_list';
+import { LevelBadge } from '@components/levels/levels';
 import TeamUpdateModal from '@components/modals/team_update_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { DateTime } from '@components/utils/datetime';
 import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { FullTeamWithPlayers, TeamsWithPlayersResponse } from '@openapi';
+import { FullTeamWithPlayers, LevelResponse, TeamsWithPlayersResponse } from '@openapi';
 import { getPlayersKey } from '@services/adapter';
 import { deleteTeam } from '@services/team';
 import TableLayout, { sortTableEntries, TableState, ThNotSortable, ThSortable } from './table';
@@ -21,12 +22,14 @@ export default function TeamsTable({
   teams,
   tableState,
   teamCount,
+  levels,
 }: {
   tournamentData: TournamentMinimal;
   swrTeamsResponse: SWRResponse<TeamsWithPlayersResponse>;
   teams: FullTeamWithPlayers[];
   tableState: TableState;
   teamCount: number;
+  levels: LevelResponse[];
 }) {
   const { t } = useTranslation();
   if (swrTeamsResponse.error) return <RequestErrorAlert error={swrTeamsResponse.error} />;
@@ -48,7 +51,12 @@ export default function TeamsTable({
             <Badge color="red">{t('inactive')}</Badge>
           )}
         </Table.Td>
-        <Table.Td>{team.name}</Table.Td>
+        <Table.Td>
+          <Group gap="xs">
+            {team.name}
+            <LevelBadge levels={levels} levelId={team.level_id} />
+          </Group>
+        </Table.Td>
         <Table.Td>
           <PlayerList team={team} />
         </Table.Td>

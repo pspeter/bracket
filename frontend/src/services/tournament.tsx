@@ -14,7 +14,8 @@ export async function createTournament(
   signup_enabled: boolean = false,
   max_team_size: number = 4,
   signup_team_choice_enabled: boolean = true,
-  score_tracking_enabled: boolean = false
+  score_tracking_enabled: boolean = false,
+  levels: string[] | null = null
 ) {
   return createAxios()
     .post('tournaments', {
@@ -31,6 +32,7 @@ export async function createTournament(
       max_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
+      levels,
     })
     .catch((response: any) => handleRequestError(response));
 }
