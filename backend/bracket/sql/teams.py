@@ -3,7 +3,7 @@ from typing import cast
 from bracket.database import database
 from bracket.logic.ranking.statistics import TeamStatistics
 from bracket.models.db.team import FullTeamWithPlayers, Team
-from bracket.utils.id_types import StageItemInputId, TeamId, TournamentId
+from bracket.utils.id_types import LevelId, StageItemInputId, TeamId, TournamentId
 from bracket.utils.pagination import PaginationTeams
 from bracket.utils.types import dict_without_none
 
@@ -35,9 +35,11 @@ async def get_teams_with_members(
     only_active_teams: bool = False,
     team_id: TeamId | None = None,
     pagination: PaginationTeams | None = None,
+    level_id: LevelId | None = None,
 ) -> list[FullTeamWithPlayers]:
     active_team_filter = "AND teams.active IS TRUE" if only_active_teams else ""
     team_id_filter = "AND teams.id = :team_id" if team_id is not None else ""
+    level_filter = "AND teams.level_id = :level_id" if level_id is not None else ""
     limit_filter = "LIMIT :limit" if pagination is not None and pagination.limit is not None else ""
     offset_filter = (
         "OFFSET :offset" if pagination is not None and pagination.offset is not None else ""
@@ -57,6 +59,7 @@ async def get_teams_with_members(
         WHERE teams.tournament_id = :tournament_id
         {active_team_filter}
         {team_id_filter}
+        {level_filter}
         GROUP BY teams.id
         ORDER BY {sort}
         {limit_filter}
@@ -66,6 +69,7 @@ async def get_teams_with_members(
         {
             "tournament_id": tournament_id,
             "team_id": team_id,
+            "level_id": level_id,
             "limit": pagination.limit if pagination is not None else None,
             "offset": pagination.offset if pagination is not None else None,
         }
@@ -78,15 +82,18 @@ async def get_team_count(
     tournament_id: TournamentId,
     *,
     only_active_teams: bool = False,
+    level_id: LevelId | None = None,
 ) -> int:
     active_team_filter = "AND teams.active IS TRUE" if only_active_teams else ""
+    level_filter = "AND teams.level_id = :level_id" if level_id is not None else ""
     query = f"""
         SELECT count(*)
         FROM teams
         WHERE teams.tournament_id = :tournament_id
         {active_team_filter}
+        {level_filter}
         """
-    values = dict_without_none({"tournament_id": tournament_id})
+    values = dict_without_none({"tournament_id": tournament_id, "level_id": level_id})
     return cast("int", await database.fetch_val(query=query, values=values))
 
 

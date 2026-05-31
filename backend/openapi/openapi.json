@@ -5216,6 +5216,22 @@
               "title": "Tournament Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "level_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level Id"
+            }
           }
         ],
         "responses": {
@@ -7016,6 +7032,22 @@
             "schema": {
               "title": "Tournament Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level Id"
             }
           },
           {

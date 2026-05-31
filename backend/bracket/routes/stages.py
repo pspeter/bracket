@@ -44,7 +44,7 @@ from bracket.sql.stages import (
     sql_delete_stage,
 )
 from bracket.sql.teams import get_teams_with_members
-from bracket.utils.id_types import StageId, TournamentId
+from bracket.utils.id_types import LevelId, StageId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -208,11 +208,7 @@ async def activate_next_stage(
 
     stages = await get_full_tournament_details(tournament_id)
     deactivated_stage = next(
-        (
-            stage
-            for stage in stages
-            if stage.is_active and stage.level_id == stage_body.level_id
-        ),
+        (stage for stage in stages if stage.is_active and stage.level_id == stage_body.level_id),
         None,
     )
 
@@ -250,12 +246,15 @@ async def get_available_inputs(
 async def get_next_stage_rankings(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
+    level_id: LevelId | None = None,
 ) -> StageRankingResponse:
     """
     Get the rankings for the stage items in this stage.
     """
+    await validate_level_id_for_tournament(tournament_id, level_id)
     stages = await get_full_tournament_details(tournament_id)
-    active_stage = next((stage for stage in stages if stage.is_active), None)
+    level_stages = [stage for stage in stages if stage.level_id == level_id]
+    active_stage = next((stage for stage in level_stages if stage.is_active), None)
     pending_match_count = (
         get_pending_match_count_in_stage(active_stage) if active_stage is not None else 0
     )
@@ -271,7 +270,7 @@ async def get_next_stage_rankings(
             pending_matches_message=pending_matches_message,
         )
 
-    next_stage_id = await get_next_stage_in_tournament(tournament_id, "next")
+    next_stage_id = await get_next_stage_in_tournament(tournament_id, "next", level_id)
 
     if next_stage_id is None:
         return StageRankingResponse(

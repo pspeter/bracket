@@ -55,7 +55,7 @@ from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
 from bracket.utils.db import fetch_one_parsed
 from bracket.utils.errors import ForeignKey, check_foreign_key_violation
-from bracket.utils.id_types import PlayerId, TeamId, TournamentId
+from bracket.utils.id_types import LevelId, PlayerId, TeamId, TournamentId
 from bracket.utils.logging import logger
 from bracket.utils.pagination import PaginationTeams
 from bracket.utils.types import assert_some
@@ -116,11 +116,14 @@ async def get_teams(
     tournament_id: TournamentId,
     pagination: PaginationTeams = Depends(),
     _: UserPublic = Depends(user_authenticated_or_public_dashboard),
+    level_id: LevelId | None = None,
 ) -> TeamsWithPlayersResponse:
     return TeamsWithPlayersResponse(
         data=PaginatedTeams(
-            teams=await get_teams_with_members(tournament_id, pagination=pagination),
-            count=await get_team_count(tournament_id),
+            teams=await get_teams_with_members(
+                tournament_id, pagination=pagination, level_id=level_id
+            ),
+            count=await get_team_count(tournament_id, level_id=level_id),
         )
     )
 

@@ -162,10 +162,12 @@ export function getTeams(tournament_id: number | undefined): SWRResponse<TeamsWi
 
 export function getTeamsPaginated(
   tournament_id: number,
-  pagination: Pagination
+  pagination: Pagination,
+  level_id: string = 'all'
 ): SWRResponse<TeamsWithPlayersResponse> {
+  const levelParam = level_id === 'all' ? '' : `&level_id=${level_id}`;
   return useSWR(
-    `tournaments/${tournament_id}/teams?limit=${pagination.limit}&offset=${pagination.offset}&sort_by=${pagination.sort_by}&sort_direction=${pagination.sort_direction}`,
+    `tournaments/${tournament_id}/teams?limit=${pagination.limit}&offset=${pagination.offset}&sort_by=${pagination.sort_by}&sort_direction=${pagination.sort_direction}${levelParam}`,
     fetcher
   );
 }
@@ -210,8 +212,12 @@ export function getRankings(tournament_id: number): SWRResponse<RankingsResponse
   return useSWR(`tournaments/${tournament_id}/rankings`, fetcher);
 }
 
-export function getRankingsPerStageItem(tournament_id: number): SWRResponse<StageRankingResponse> {
-  return useSWR(`tournaments/${tournament_id}/next_stage_rankings`, fetcher);
+export function getRankingsPerStageItem(
+  tournament_id: number,
+  level_id: string = 'all'
+): SWRResponse<StageRankingResponse> {
+  const levelParam = level_id === 'all' ? '' : `?level_id=${level_id}`;
+  return useSWR(`tournaments/${tournament_id}/next_stage_rankings${levelParam}`, fetcher);
 }
 
 export function getCourts(tournament_id: number): SWRResponse<CourtsResponse> {

@@ -96,7 +96,12 @@ function StageItemInputComboBox({
     .map((option: StageItemInputChoice, i: number) => (
       <Combobox.Option key={i} value={option.value}>
         <Group gap="xs" justify="space-between">
-          {option.label || <i>None</i>}
+          <Group gap="xs">
+            {option.label || <i>None</i>}
+            {option.team_id != null ? (
+              <LevelBadge levels={tournament.levels} levelId={option.team_level_id} />
+            ) : null}
+          </Group>
           {option.value === selectedInput?.value && <CheckIcon size={12} />}
         </Group>
       </Combobox.Option>
@@ -144,7 +149,12 @@ function StageItemInputComboBox({
           onClick={() => combobox.toggleDropdown()}
         >
           {selectedInput?.label ? (
-            selectedInput?.label
+            <Group gap="xs">
+              {selectedInput.label}
+              {selectedInput.team_id != null ? (
+                <LevelBadge levels={tournament.levels} levelId={selectedInput.team_level_id} />
+              ) : null}
+            </Group>
           ) : (
             <Group gap="xs">
               <AiFillWarning size={18} color={theme.colors.orange[4]} />
@@ -184,6 +194,7 @@ export function getAvailableInputs(
         winner_from_stage_item_id: option.winner_from_stage_item_id,
         winner_position: option.winner_position,
         already_taken: option.already_taken,
+        team_level_id: null,
       };
     }
 
@@ -196,6 +207,7 @@ export function getAvailableInputs(
       winner_from_stage_item_id: null,
       winner_position: null,
       already_taken: option.already_taken,
+      team_level_id: team.level_id,
     };
   };
   return swrAvailableInputsResponse.data != undefined
@@ -400,6 +412,7 @@ function StageColumn({
     winner_from_stage_item_id: null,
     winner_position: null,
     already_taken: false,
+    team_level_id: null,
   });
 
   const rows = stage.stage_items

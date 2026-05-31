@@ -32,14 +32,19 @@ export default function StagesPage() {
   const swrRankingsResponse = getRankings(tournamentData.id);
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const swrAvailableInputsResponse = getAvailableStageItemInputs(tournamentData.id);
-  const swrRankingsPerStageItemResponse = getRankingsPerStageItem(tournamentData.id);
   const tournamentDataFull =
     swrTournamentResponse.data != null ? swrTournamentResponse.data.data : null;
+  const levels = tournamentDataFull?.levels ?? [];
+  const effectiveActivationLevelId =
+    levels.length > 0 ? (filteredLevelId === 'all' ? `${levels[0].id}` : filteredLevelId) : 'all';
+  const swrRankingsPerStageItemResponse = getRankingsPerStageItem(
+    tournamentData.id,
+    effectiveActivationLevelId
+  );
   const rankings = swrRankingsResponse.data != null ? swrRankingsResponse.data.data : [];
 
   const stages: StageWithStageItems[] =
     swrStagesResponse.data != null ? swrStagesResponse.data.data : [];
-  const levels = tournamentDataFull?.levels ?? [];
   const filteredStages =
     filteredLevelId === 'all'
       ? stages
@@ -90,11 +95,17 @@ export default function StagesPage() {
               tournamentId={tournamentData.id}
               swrStagesResponse={swrStagesResponse}
               swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+              levels={levels}
+              levelId={effectiveActivationLevelId}
+              onLevelChange={setFilteredLevelId}
             />
             <ActivateNextStageModal
               tournamentId={tournamentData.id}
               swrStagesResponse={swrStagesResponse}
               swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
+              levels={levels}
+              levelId={effectiveActivationLevelId}
+              onLevelChange={setFilteredLevelId}
             />
           </Group>
           <Text c="dimmed" size="sm">

@@ -3014,7 +3014,12 @@ export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetData 
      */
     tournament_id: number;
   };
-  query?: never;
+  query?: {
+    /**
+     * Level Id
+     */
+    level_id?: number | null;
+  };
   url: '/tournaments/{tournament_id}/next_stage_rankings';
 };
 
@@ -4094,6 +4099,10 @@ export type GetTeamsTournamentsTournamentIdTeamsGetData = {
     tournament_id: number;
   };
   query?: {
+    /**
+     * Level Id
+     */
+    level_id?: number | null;
     /**
      * Limit
      *

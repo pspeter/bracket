@@ -43,7 +43,11 @@ export default function TeamsPage() {
   const [filteredStageItemId, setFilteredStageItemId] = useState(null);
   const [filteredLevelId, setFilteredLevelId] = useState('all');
   const { tournamentData } = getTournamentIdFromRouter();
-  const swrTeamsResponse = getTeamsPaginated(tournamentData.id, tableStateToPagination(tableState));
+  const swrTeamsResponse = getTeamsPaginated(
+    tournamentData.id,
+    tableStateToPagination(tableState),
+    filteredLevelId
+  );
   const swrStagesResponse = getStages(tournamentData.id);
   const swrTournament = getTournamentById(tournamentData.id);
   const levels = swrTournament.data?.data.levels ?? [];
@@ -64,9 +68,6 @@ export default function TeamsPage() {
       (team: FullTeamWithPlayers) =>
         stageItemTeamLookup[filteredStageItemId].indexOf(team.id) !== -1
     );
-  }
-  if (filteredLevelId !== 'all') {
-    teams = teams.filter((team) => `${team.level_id}` === filteredLevelId);
   }
 
   return (

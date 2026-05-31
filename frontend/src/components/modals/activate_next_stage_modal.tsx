@@ -1,4 +1,4 @@
-import { Alert, Button, Container, Grid, Modal, Title } from '@mantine/core';
+import { Alert, Button, Container, Grid, Modal, Select, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { FaArrowRight } from '@react-icons/all-files/fa/FaArrowRight';
 import { IconAlertCircle, IconSquareArrowRight } from '@tabler/icons-react';
@@ -9,7 +9,12 @@ import { SWRResponse } from 'swr';
 import RequestErrorAlert from '@components/utils/error_alert';
 import { GenericSkeleton } from '@components/utils/skeletons';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
-import { StageItemInputUpdate, StageRankingResponse, StagesWithStageItemsResponse } from '@openapi';
+import {
+  LevelResponse,
+  StageItemInputUpdate,
+  StageRankingResponse,
+  StagesWithStageItemsResponse,
+} from '@openapi';
 import { getStageItemLookup } from '@services/lookups';
 import { activateNextStage } from '@services/stage';
 
@@ -71,10 +76,16 @@ export default function ActivateNextStageModal({
   tournamentId,
   swrStagesResponse,
   swrRankingsPerStageItemResponse,
+  levels,
+  levelId,
+  onLevelChange,
 }: {
   tournamentId: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
+  levels: LevelResponse[];
+  levelId: string;
+  onLevelChange: (levelId: string) => void;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
@@ -98,7 +109,11 @@ export default function ActivateNextStageModal({
       >
         <form
           onSubmit={form.onSubmit(async () => {
-            const response = await activateNextStage(tournamentId, 'next');
+            const response = await activateNextStage(
+              tournamentId,
+              'next',
+              levelId === 'all' ? null : Number(levelId)
+            );
             if (response != null) {
               await swrStagesResponse.mutate();
               await swrRankingsPerStageItemResponse.mutate();
@@ -109,6 +124,18 @@ export default function ActivateNextStageModal({
           <Alert icon={<IconAlertCircle size={16} />} color="gray" radius="lg">
             {t('active_next_stage_modal_description')}
           </Alert>
+
+          {levels.length > 0 ? (
+            <Select
+              withAsterisk
+              label={t('filter_level_label')}
+              placeholder={t('filter_level_placeholder')}
+              data={levels.map((level) => ({ value: `${level.id}`, label: level.name }))}
+              value={levelId}
+              onChange={(value) => onLevelChange(value ?? `${levels[0].id}`)}
+              mt="md"
+            />
+          ) : null}
 
           {hasPendingMatches && pendingMatchesMessage != null ? (
             <Alert icon={<IconAlertCircle size={16} />} color="orange" radius="lg" mt="md">

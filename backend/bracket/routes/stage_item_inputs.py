@@ -26,7 +26,7 @@ from bracket.utils.errors import (
     check_foreign_key_violation,
     check_unique_constraint_violation,
 )
-from bracket.utils.id_types import StageItemId, StageItemInputId, TournamentId
+from bracket.utils.id_types import LevelId, StageItemId, StageItemInputId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -35,6 +35,7 @@ async def validate_stage_item_update(
     stage_item_input_db: StageItemInput | None,
     stage_item_input_body: StageItemInputUpdateBody,
     tournament_id: TournamentId,
+    target_level_id: LevelId | None,
 ) -> None:
     if stage_item_input_db is None:
         raise HTTPException(
@@ -47,20 +48,29 @@ async def validate_stage_item_update(
         winner_from_stage = await get_full_tournament_details(
             tournament_id, stage_item_ids={input_id}
         )
-        if winner_from_stage is None:
+        if len(winner_from_stage) < 1:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Could not find stage item with id {input_id}",
             )
+        if winner_from_stage[0].level_id != target_level_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stage item input must come from the same level",
+            )
 
-    if (
-        isinstance(stage_item_input_body, StageItemInputUpdateBodyFinal)
-        and await get_team_by_id(stage_item_input_body.team_id, tournament_id) is None
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Could not find team with id {stage_item_input_body.team_id}",
-        )
+    if isinstance(stage_item_input_body, StageItemInputUpdateBodyFinal):
+        team = await get_team_by_id(stage_item_input_body.team_id, tournament_id)
+        if team is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Could not find team with id {stage_item_input_body.team_id}",
+            )
+        if team.level_id != target_level_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Team must belong to the same level as the stage item",
+            )
 
 
 @router.put(
@@ -77,7 +87,12 @@ async def update_stage_item_input(
     ___: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
     stage_item_input = await get_stage_item_input_by_id(tournament_id, stage_item_input_id)
-    await validate_stage_item_update(stage_item_input, stage_item_body, tournament_id)
+    [target_stage] = await get_full_tournament_details(
+        tournament_id, stage_item_ids={stage_item_id}
+    )
+    await validate_stage_item_update(
+        stage_item_input, stage_item_body, tournament_id, target_stage.level_id
+    )
 
     query = """
         UPDATE stage_item_inputs

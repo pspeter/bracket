@@ -23,7 +23,12 @@ import { Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
 import { formatMatchInput1, formatMatchInput2, getScoreColors } from '@components/utils/match';
 import { responseIsValid } from '@components/utils/util';
-import { MatchWithDetails, ScoreTrackingInfoResponse, ScoreTrackingMatchResponse } from '@openapi';
+import {
+  LevelResponse,
+  MatchWithDetails,
+  ScoreTrackingInfoResponse,
+  ScoreTrackingMatchResponse,
+} from '@openapi';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 
 function getMatchStateColor(state: string) {
@@ -201,10 +206,12 @@ export function ScoreTrackingMatchView({
   backHref,
   storageKey,
   saveMatch,
+  levels = [],
 }: {
   swrResponse: SWRResponse<ScoreTrackingMatchResponse>;
   backHref: string;
   storageKey: string;
+  levels?: LevelResponse[];
   saveMatch: (next: {
     stage_item_input1_score: number;
     stage_item_input2_score: number;
@@ -284,7 +291,10 @@ export function ScoreTrackingMatchView({
     <Container size="sm" py="xl">
       <Stack gap="lg">
         <Group justify="space-between">
-          <Title order={2}>{t('score_tracking_match_title')}</Title>
+          <Group gap="xs">
+            <Title order={2}>{t('score_tracking_match_title')}</Title>
+            <LevelBadge levels={levels} levelId={match.level_id} />
+          </Group>
           <Button component={PreloadLink} href={backHref} variant="subtle">
             {t('back_to_matches_button')}
           </Button>

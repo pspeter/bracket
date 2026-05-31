@@ -1,21 +1,27 @@
-import { Alert, Button, Modal } from '@mantine/core';
+import { Alert, Button, Modal, Select } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconAlertCircle, IconSquareArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
-import { StageRankingResponse, StagesWithStageItemsResponse } from '@openapi';
+import { LevelResponse, StageRankingResponse, StagesWithStageItemsResponse } from '@openapi';
 import { activateNextStage } from '@services/stage';
 
 export default function ActivatePreviousStageModal({
   tournamentId,
   swrStagesResponse,
   swrRankingsPerStageItemResponse,
+  levels,
+  levelId,
+  onLevelChange,
 }: {
   tournamentId: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
+  levels: LevelResponse[];
+  levelId: string;
+  onLevelChange: (levelId: string) => void;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
@@ -39,7 +45,11 @@ export default function ActivatePreviousStageModal({
       >
         <form
           onSubmit={form.onSubmit(async () => {
-            await activateNextStage(tournamentId, 'previous');
+            await activateNextStage(
+              tournamentId,
+              'previous',
+              levelId === 'all' ? null : Number(levelId)
+            );
             swrStagesResponse.mutate();
             swrRankingsPerStageItemResponse.mutate();
             setOpened(false);
@@ -48,6 +58,18 @@ export default function ActivatePreviousStageModal({
           <Alert icon={<IconAlertCircle size={16} />} color="orange" radius="lg">
             {t('active_previous_stage_modal_description')}
           </Alert>
+
+          {levels.length > 0 ? (
+            <Select
+              withAsterisk
+              label={t('filter_level_label')}
+              placeholder={t('filter_level_placeholder')}
+              data={levels.map((level) => ({ value: `${level.id}`, label: level.name }))}
+              value={levelId}
+              onChange={(value) => onLevelChange(value ?? `${levels[0].id}`)}
+              mt="md"
+            />
+          ) : null}
 
           <Button
             fullWidth

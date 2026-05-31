@@ -84,6 +84,10 @@ def determine_available_inputs(
     all_team_options = {
         team.id: StageItemInputOptionFinal(team_id=team.id, already_taken=False) for team in teams
     }
+    team_level_by_id = {team.id: team.level_id for team in teams}
+    stage_level_by_stage_item_id = {
+        stage_item.id: stage.level_id for stage in stages for stage_item in stage.stage_items
+    }
     # Add inputs from stage items that can be used as outputs in the next phase.
     all_tentative_options = {
         (stage_item.id, winner_position): StageItemInputOptionTentative(
@@ -111,12 +115,21 @@ def determine_available_inputs(
     # Loop through stage items once more to assemble the final results and make sure
     # tentative inputs are only available after the stage item that they originate from.
     # We start with all teams but not tentative inputs.
-    results_teams = all_team_options.copy()
     results_tentative: dict[tuple[StageItemId, int], StageItemInputOptionTentative] = {}
     results = {}
 
     for stage in stages:
-        results[stage.id] = list(results_teams.values()) + list(results_tentative.values())
+        results_teams = [
+            option
+            for team_id, option in all_team_options.items()
+            if team_level_by_id[team_id] == stage.level_id
+        ]
+        same_level_tentative = [
+            option
+            for (stage_item_id, _), option in results_tentative.items()
+            if stage_level_by_stage_item_id[stage_item_id] == stage.level_id
+        ]
+        results[stage.id] = results_teams + same_level_tentative
 
         # Add options for subsequent stage items for the tentative "outputs" from this round
         for stage_item in stage.stage_items:

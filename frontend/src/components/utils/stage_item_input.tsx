@@ -17,6 +17,7 @@ export interface StageItemInputChoice {
   winner_from_stage_item_id: number | null;
   winner_position: number | null;
   already_taken: boolean;
+  team_level_id?: number | null;
 }
 
 export function getPositionName(position: number) {
