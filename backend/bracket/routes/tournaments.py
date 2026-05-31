@@ -205,12 +205,14 @@ async def create_tournament(
         with check_unique_constraint_violation({UniqueIndex.ix_tournaments_dashboard_endpoint}):
             tournament_id = await sql_create_tournament(tournament_to_insert)
 
-        ranking = RankingCreateBody()
-        await sql_create_ranking(tournament_id, ranking, position=0)
-
         if tournament_to_insert.levels:
             for position, level_name in enumerate(tournament_to_insert.levels):
-                await sql_create_level(tournament_id, level_name, position)
+                level = await sql_create_level(tournament_id, level_name, position)
+                await sql_create_ranking(
+                    tournament_id, RankingCreateBody(), position=0, level_id=level.id
+                )
+        else:
+            await sql_create_ranking(tournament_id, RankingCreateBody(), position=0)
 
     return SuccessResponse()
 

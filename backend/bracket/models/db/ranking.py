@@ -4,7 +4,7 @@ from heliclockter import datetime_utc
 from pydantic import BaseModel
 
 from bracket.models.db.shared import BaseModelORM
-from bracket.utils.id_types import RankingId, TournamentId
+from bracket.utils.id_types import LevelId, RankingId, TournamentId
 
 
 class RankingInsertable(BaseModel):
@@ -14,6 +14,7 @@ class RankingInsertable(BaseModel):
     loss_points: Decimal
     add_score_points: bool
     position: int
+    level_id: LevelId | None = None
 
 
 class Ranking(BaseModelORM, RankingInsertable):
