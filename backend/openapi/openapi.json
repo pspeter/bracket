@@ -288,6 +288,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "logo_path": {
             "anyOf": [
               {
@@ -342,6 +353,7 @@
           "draws",
           "losses",
           "logo_path",
+          "level_id",
           "id",
           "players"
         ],
@@ -2864,6 +2876,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "logo_path": {
             "anyOf": [
               {
@@ -2911,6 +2934,7 @@
           "draws",
           "losses",
           "logo_path",
+          "level_id",
           "id"
         ],
         "title": "Team",
@@ -2921,6 +2945,17 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
           },
           "name": {
             "maxLength": 30,
@@ -2940,7 +2975,8 @@
         "required": [
           "name",
           "active",
-          "player_ids"
+          "player_ids",
+          "level_id"
         ],
         "title": "TeamBody",
         "type": "object"
@@ -2951,6 +2987,17 @@
             "title": "Active",
             "type": "boolean"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "names": {
             "minLength": 1,
             "title": "Names",
@@ -2959,7 +3006,8 @@
         },
         "required": [
           "names",
-          "active"
+          "active",
+          "level_id"
         ],
         "title": "TeamMultiBody",
         "type": "object"

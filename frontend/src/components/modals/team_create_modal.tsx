@@ -1,4 +1,4 @@
-import { Button, Checkbox, Modal, MultiSelect, Tabs, TextInput } from '@mantine/core';
+import { Button, Checkbox, Modal, MultiSelect, Select, Tabs, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconUser, IconUsers, IconUsersPlus } from '@tabler/icons-react';
 import { AxiosError } from 'axios';
@@ -8,7 +8,7 @@ import { mutate, SWRResponse } from 'swr';
 
 import SaveButton from '@components/buttons/save';
 import { MultiTeamsInput } from '@components/forms/player_create_csv_input';
-import { Player, TeamsWithPlayersResponse } from '@openapi';
+import { LevelResponse, Player, TeamsWithPlayersResponse } from '@openapi';
 import {
   getPlayers,
   getPlayersKey,
@@ -17,12 +17,18 @@ import {
 } from '@services/adapter';
 import { createTeam, createTeams } from '@services/team';
 
+function levelSelectData(levels: LevelResponse[]) {
+  return levels.map((l) => ({ value: `${l.id}`, label: l.name }));
+}
+
 function MultiTeamTab({
   tournament_id,
+  levels,
   swrTeamsResponse,
   setOpened,
 }: {
   tournament_id: number;
+  levels: LevelResponse[];
   swrTeamsResponse: SWRResponse<TeamsWithPlayersResponse>;
   setOpened: any;
 }) {
@@ -31,17 +37,20 @@ function MultiTeamTab({
     initialValues: {
       names: '',
       active: true,
+      level_id: '' as string,
     },
 
     validate: {
       names: (value) => (value.length > 0 ? null : t('at_least_one_team_validation')),
+      level_id: (value) => (levels.length > 0 && !value ? t('too_short_name_validation') : null),
     },
   });
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
         try {
-          await createTeams(tournament_id, values.names, values.active);
+          const levelId = values.level_id ? Number(values.level_id) : null;
+          await createTeams(tournament_id, values.names, values.active, levelId);
           await swrTeamsResponse.mutate();
           setOpened(false);
         } catch (exc: unknown) {
@@ -54,6 +63,17 @@ function MultiTeamTab({
       })}
     >
       <MultiTeamsInput form={form} />
+
+      {levels.length > 0 && (
+        <Select
+          withAsterisk
+          mt="md"
+          label="Level"
+          placeholder="Select level"
+          data={levelSelectData(levels)}
+          {...form.getInputProps('level_id')}
+        />
+      )}
 
       <Checkbox
         mt="md"
@@ -69,10 +89,12 @@ function MultiTeamTab({
 
 function SingleTeamTab({
   tournament_id,
+  levels,
   swrTeamsResponse,
   setOpened,
 }: {
   tournament_id: number;
+  levels: LevelResponse[];
   swrTeamsResponse: SWRResponse<TeamsWithPlayersResponse>;
   setOpened: any;
 }) {
@@ -88,16 +110,19 @@ function SingleTeamTab({
       name: '',
       active: true,
       player_ids: [],
+      level_id: '' as string,
     },
     validate: {
       name: (value) => (value.length > 0 ? null : t('too_short_name_validation')),
+      level_id: (value) => (levels.length > 0 && !value ? t('too_short_name_validation') : null),
     },
   });
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
         try {
-          await createTeam(tournament_id, values.name, values.active, values.player_ids);
+          const levelId = values.level_id ? Number(values.level_id) : null;
+          await createTeam(tournament_id, values.name, values.active, values.player_ids, levelId);
           await swrTeamsResponse.mutate();
           await mutate(getPlayersKey(tournament_id, true));
           setOpened(false);
@@ -116,6 +141,17 @@ function SingleTeamTab({
         placeholder={t('team_name_input_placeholder')}
         {...form.getInputProps('name')}
       />
+
+      {levels.length > 0 && (
+        <Select
+          withAsterisk
+          mt="md"
+          label="Level"
+          placeholder="Select level"
+          data={levelSelectData(levels)}
+          {...form.getInputProps('level_id')}
+        />
+      )}
 
       <Checkbox
         mt="md"
@@ -151,6 +187,8 @@ export default function TeamCreateModal({
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
+  const swrTournament = getTournamentById(tournament_id);
+  const levels = swrTournament.data?.data.levels ?? [];
   return (
     <>
       <Modal opened={opened} onClose={() => setOpened(false)} title="Create Team">
@@ -168,6 +206,7 @@ export default function TeamCreateModal({
             <SingleTeamTab
               swrTeamsResponse={swrTeamsResponse}
               tournament_id={tournament_id}
+              levels={levels}
               setOpened={setOpened}
             />
           </Tabs.Panel>
@@ -176,6 +215,7 @@ export default function TeamCreateModal({
             <MultiTeamTab
               swrTeamsResponse={swrTeamsResponse}
               tournament_id={tournament_id}
+              levels={levels}
               setOpened={setOpened}
             />
           </Tabs.Panel>

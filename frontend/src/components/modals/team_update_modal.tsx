@@ -6,6 +6,7 @@ import {
   Image,
   Modal,
   MultiSelect,
+  Select,
   TextInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -60,6 +61,7 @@ export default function TeamUpdateModal({
   }
   const players = [...playersById.values()];
   const maxTeamSize = swrTournament.data?.data.max_team_size;
+  const levels = swrTournament.data?.data.levels ?? [];
   const [opened, setOpened] = useState(false);
 
   const form = useForm({
@@ -67,10 +69,12 @@ export default function TeamUpdateModal({
       name: team.name,
       active: team.active,
       player_ids: team.players.map((player) => `${player.id}`),
+      level_id: team.level_id != null ? `${team.level_id}` : '',
     },
 
     validate: {
       name: (value) => (value.length > 0 ? null : t('too_short_name_validation')),
+      level_id: (value) => (levels.length > 0 && !value ? t('too_short_name_validation') : null),
     },
   });
 
@@ -80,12 +84,14 @@ export default function TeamUpdateModal({
         <form
           onSubmit={form.onSubmit(async (values) => {
             try {
+              const levelId = values.level_id ? Number(values.level_id) : null;
               await updateTeam(
                 tournament_id,
                 team.id,
                 values.name,
                 values.active,
-                values.player_ids
+                values.player_ids,
+                levelId
               );
               await swrTeamsResponse.mutate();
               await mutate(getPlayersKey(tournament_id, true));
@@ -120,6 +126,17 @@ export default function TeamUpdateModal({
             placeholder={t('team_name_input_placeholder')}
             {...form.getInputProps('name')}
           />
+
+          {levels.length > 0 && (
+            <Select
+              withAsterisk
+              mt="md"
+              label="Level"
+              placeholder="Select level"
+              data={levels.map((l) => ({ value: `${l.id}`, label: l.name }))}
+              {...form.getInputProps('level_id')}
+            />
+          )}
 
           <Checkbox
             mt="md"
