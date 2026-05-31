@@ -771,6 +771,10 @@ export type Ranking = {
    */
   id: number;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Loss Points
    */
   loss_points: string;

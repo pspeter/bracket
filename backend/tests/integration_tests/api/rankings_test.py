@@ -36,6 +36,7 @@ async def test_rankings_endpoint(
                     "loss_points": "0.0",
                     "add_score_points": False,
                     "tournament_id": auth_context.tournament.id,
+                    "level_id": None,
                 }
             ],
         }

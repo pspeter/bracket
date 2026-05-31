@@ -1,6 +1,6 @@
 from bracket.database import database
 from bracket.models.db.ranking import Ranking, RankingBody, RankingCreateBody
-from bracket.utils.id_types import RankingId, StageItemId, TournamentId
+from bracket.utils.id_types import LevelId, RankingId, StageId, StageItemId, TournamentId
 
 
 async def get_all_rankings_in_tournament(tournament_id: TournamentId) -> list[Ranking]:
@@ -14,16 +14,20 @@ async def get_all_rankings_in_tournament(tournament_id: TournamentId) -> list[Ra
     return [Ranking.model_validate(dict(x._mapping)) for x in result]
 
 
-async def get_default_rankings_in_tournament(tournament_id: TournamentId) -> Ranking:
+async def get_default_ranking_for_stage(tournament_id: TournamentId, stage_id: StageId) -> Ranking:
     query = """
-        SELECT *
+        SELECT rankings.*
         FROM rankings
+        JOIN stages ON stages.id = :stage_id
         WHERE rankings.tournament_id = :tournament_id
-        ORDER BY position
+          AND rankings.level_id IS NOT DISTINCT FROM stages.level_id
+        ORDER BY rankings.position
         LIMIT 1
         """
-    result = await database.fetch_one(query=query, values={"tournament_id": tournament_id})
-    assert result is not None, "No default ranking found"
+    result = await database.fetch_one(
+        query=query, values={"tournament_id": tournament_id, "stage_id": stage_id}
+    )
+    assert result is not None, "No default ranking found for stage"
     return Ranking.model_validate(dict(result._mapping))
 
 
@@ -79,18 +83,23 @@ async def sql_delete_ranking(tournament_id: TournamentId, ranking_id: RankingId)
 
 
 async def sql_create_ranking(
-    tournament_id: TournamentId, ranking_body: RankingCreateBody, position: int
+    tournament_id: TournamentId,
+    ranking_body: RankingCreateBody,
+    position: int,
+    level_id: LevelId | None = None,
 ) -> None:
     query = """
         INSERT INTO rankings
-        (tournament_id, position, win_points, draw_points, loss_points, add_score_points)
+        (tournament_id, position, win_points, draw_points, loss_points, add_score_points,
+         level_id)
         VALUES (
             :tournament_id,
             :position,
             :win_points,
             :draw_points,
             :loss_points,
-            :add_score_points
+            :add_score_points,
+            :level_id
         )
         """
 
@@ -103,5 +112,6 @@ async def sql_create_ranking(
             "loss_points": float(ranking_body.loss_points),
             "add_score_points": ranking_body.add_score_points,
             "position": position,
+            "level_id": level_id,
         },
     )

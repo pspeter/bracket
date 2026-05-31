@@ -1484,6 +1484,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "loss_points": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Loss Points",
@@ -1510,6 +1521,7 @@
           "loss_points",
           "add_score_points",
           "position",
+          "level_id",
           "id",
           "created"
         ],
