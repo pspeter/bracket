@@ -118,6 +118,12 @@ async def update_team_stats(
     )
 
 
+async def sql_team_is_assigned_to_stage_item(team_id: TeamId) -> bool:
+    query = "SELECT 1 FROM stage_item_inputs WHERE team_id = :team_id LIMIT 1"
+    result = await database.fetch_one(query=query, values={"team_id": team_id})
+    return result is not None
+
+
 async def sql_delete_team(tournament_id: TournamentId, team_id: TeamId) -> None:
     query = "DELETE FROM teams WHERE id = :team_id AND tournament_id = :tournament_id"
     await database.fetch_one(

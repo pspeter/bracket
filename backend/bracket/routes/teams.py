@@ -9,6 +9,7 @@ from heliclockter import datetime_utc
 
 from bracket.config import config
 from bracket.database import database
+from bracket.logic.levels import validate_level_id_for_tournament
 from bracket.logic.subscriptions import check_requirement
 from bracket.logic.teams import get_team_logo_path
 from bracket.models.db.player import PlayerBody
@@ -48,6 +49,7 @@ from bracket.sql.teams import (
     get_team_count,
     get_teams_with_members,
     sql_delete_team,
+    sql_team_is_assigned_to_stage_item,
 )
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
@@ -132,6 +134,13 @@ async def update_team_by_id(
     team: Team = Depends(team_dependency),
 ) -> SingleTeamResponse:
     await check_foreign_keys_belong_to_tournament(team_body, tournament_id)
+    await validate_level_id_for_tournament(tournament_id, team_body.level_id)
+
+    if team_body.level_id != team.level_id and await sql_team_is_assigned_to_stage_item(team.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change level: team is assigned to a stage item",
+        )
 
     await database.execute(
         query=teams.update().where(
@@ -219,6 +228,7 @@ async def create_team(
     _: Tournament = Depends(disallow_archived_tournament),
 ) -> SingleTeamResponse:
     await check_foreign_keys_belong_to_tournament(team_to_insert, tournament_id)
+    await validate_level_id_for_tournament(tournament_id, team_to_insert.level_id)
 
     existing_teams = await get_teams_with_members(tournament_id)
     check_requirement(existing_teams, user, "max_teams")
@@ -247,6 +257,8 @@ async def create_multiple_teams(
     user: UserPublic = Depends(user_authenticated_for_tournament),
     _: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    await validate_level_id_for_tournament(tournament_id, team_body.level_id)
+
     reader = list(csv.reader(team_body.names.split("\n"), delimiter=","))
     teams_and_players = [
         (row[0], [p for p in row[1:] if len(p) > 0] if len(row) > 1 else [])
@@ -279,6 +291,7 @@ async def create_multiple_teams(
                         active=team_body.active,
                         created=datetime_utc.now(),
                         tournament_id=tournament_id,
+                        level_id=team_body.level_id,
                     ).model_dump(),
                 )
             )

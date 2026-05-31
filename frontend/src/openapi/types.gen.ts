@@ -186,6 +186,10 @@ export type FullTeamWithPlayers = {
    */
   id: number;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Logo Path
    */
   logo_path: string | null;
@@ -1586,6 +1590,10 @@ export type Team = {
    */
   id: number;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Logo Path
    */
   logo_path: string | null;
@@ -1620,6 +1628,10 @@ export type TeamBody = {
    */
   active: boolean;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Name
    */
   name: string;
@@ -1637,6 +1649,10 @@ export type TeamMultiBody = {
    * Active
    */
   active: boolean;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
   /**
    * Names
    */
