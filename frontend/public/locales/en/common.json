@@ -353,5 +353,7 @@
     "signup_description": "Enter your name, then join an existing team with free space, start a new team, or sign up without a team and an organizer can assign you later.",
     "signup_description_no_teams": "Enter your name to register for this tournament. An organizer will assign you to a team later.",
     "signup_redirecting": "Redirecting to the dashboard…",
-    "signup_qr_heading": "Signup QR code"
+    "signup_qr_heading": "Signup QR code",
+    "signup_level_label": "Level",
+    "signup_level_select_placeholder": "Select a level"
 }

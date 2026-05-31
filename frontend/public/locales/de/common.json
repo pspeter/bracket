@@ -304,6 +304,8 @@
     "signup_description": "Gib deinen Namen ein, dann wähle ein bestehendes Team, starte ein neues Team, oder melde dich ohne Team an (ein Organisator kann dich später zuweisen).",
     "signup_redirecting": "Weiterleitung zum Dashboard…",
     "signup_qr_heading": "QR-Code für die Anmeldung",
+    "signup_level_label": "Level",
+    "signup_level_select_placeholder": "Select a level",
     "teams_tab_max_team_size": "maximal {{count}} Spieler pro Team",
     "signup_team_choice_label": "Erlaube Spielern, Teams während der Anmeldung zu erstellen oder beizutreten",
     "signup_description_no_teams": "Gib deinen Namen ein, um dich für dieses Turnier zu registrieren. Ein Organisator wird dich später einem Team zuweisen.",

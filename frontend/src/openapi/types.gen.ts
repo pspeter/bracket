@@ -949,6 +949,10 @@ export type ScoreTrackingMatchResponse = {
  */
 export type SignupBody = {
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Player Name
    */
   player_name: string;
@@ -986,6 +990,10 @@ export type SignupTeamInfo = {
    */
   is_full: boolean;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Name
    */
   name: string;
@@ -1003,6 +1011,10 @@ export type SignupTournamentInfo = {
    * Dashboard Endpoint
    */
   dashboard_endpoint: string | null;
+  /**
+   * Levels
+   */
+  levels: Array<LevelResponse>;
   /**
    * Max Team Size
    */

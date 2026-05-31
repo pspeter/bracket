@@ -10,7 +10,7 @@ from bracket.logic.subscriptions import subscription_lookup
 from bracket.models.db.player import PlayerBody
 from bracket.models.db.shared import BaseModelORM
 from bracket.models.db.team import TeamInsertable
-from bracket.models.db.tournament import Tournament
+from bracket.models.db.tournament import LevelResponse, Tournament
 from bracket.routes.auth import tournament_by_signup_token
 from bracket.routes.models import (
     SignupInfoResponse,
@@ -19,6 +19,7 @@ from bracket.routes.models import (
     SuccessResponse,
 )
 from bracket.schema import players_x_teams, teams
+from bracket.sql.levels import sql_get_levels_for_tournament
 from bracket.sql.players import get_all_players_in_tournament, insert_player
 from bracket.sql.signup import (
     check_player_name_exists,
@@ -27,7 +28,7 @@ from bracket.sql.signup import (
 )
 from bracket.sql.teams import get_team_by_id, get_teams_with_members
 from bracket.sql.users import get_club_owner_user
-from bracket.utils.id_types import TeamId
+from bracket.utils.id_types import LevelId, TeamId
 from bracket.utils.types import assert_some
 
 router = APIRouter(prefix=config.api_prefix)
@@ -41,6 +42,7 @@ class SignupBody(BaseModelORM):
     team_action: Literal["join", "create", "none"]
     team_id: TeamId | None = None
     team_name: str | None = Field(None, max_length=30)
+    level_id: LevelId | None = None
 
     @model_validator(mode="after")
     def validate_team_fields(self) -> "SignupBody":
@@ -65,9 +67,11 @@ async def get_signup_info(
             name=r.name,
             player_count=r.player_count,
             is_full=r.player_count >= tournament.max_team_size,
+            level_id=r.level_id,
         )
         for r in rows
     ]
+    levels = await sql_get_levels_for_tournament(tournament.id)
     return SignupInfoResponse(
         data=SignupTournamentInfo(
             tournament_id=tournament.id,
@@ -76,6 +80,7 @@ async def get_signup_info(
             max_team_size=tournament.max_team_size,
             dashboard_endpoint=tournament.dashboard_endpoint,
             signup_team_choice_enabled=tournament.signup_team_choice_enabled,
+            levels=[LevelResponse.model_validate(level) for level in levels],
         )
     )
 
@@ -96,6 +101,20 @@ async def post_signup(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_TEAM_CHOICE_DISABLED,
         )
+
+    levels = await sql_get_levels_for_tournament(tournament.id)
+    level_ids = {level.id for level in levels}
+    if body.team_action == "create" and levels:
+        if body.level_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="level_id is required when creating a team",
+            )
+        if body.level_id not in level_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Level not found",
+            )
 
     if body.team_action == "join":
         assert body.team_id is not None
@@ -151,6 +170,7 @@ async def post_signup(
                     active=True,
                     created=datetime_utc.now(),
                     tournament_id=tournament.id,
+                    level_id=body.level_id if levels else None,
                 ).model_dump(),
             )
             await database.execute(

@@ -11,11 +11,11 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputOptionTentative,
 )
 from bracket.models.db.team import FullTeamWithPlayers, Team
-from bracket.models.db.tournament import TournamentWithLevels
+from bracket.models.db.tournament import LevelResponse, TournamentWithLevels
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
 from bracket.routes.auth import Token
-from bracket.utils.id_types import StageId, StageItemId, TeamId, TournamentId
+from bracket.utils.id_types import LevelId, StageId, StageItemId, TeamId, TournamentId
 
 
 class SuccessResponse(BaseModel):
@@ -117,6 +117,7 @@ class SignupTeamInfo(BaseModel):
     name: str
     player_count: int
     is_full: bool
+    level_id: LevelId | None = None
 
 
 class SignupTournamentInfo(BaseModel):
@@ -126,6 +127,7 @@ class SignupTournamentInfo(BaseModel):
     max_team_size: int
     dashboard_endpoint: str | None
     signup_team_choice_enabled: bool
+    levels: list[LevelResponse] = []
 
 
 class SignupInfoResponse(DataResponse[SignupTournamentInfo]):

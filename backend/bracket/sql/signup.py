@@ -1,6 +1,6 @@
 from bracket.database import database
 from bracket.models.db.tournament import Tournament
-from bracket.utils.id_types import TeamId, TournamentId
+from bracket.utils.id_types import LevelId, TeamId, TournamentId
 
 
 async def get_tournament_by_signup_token(signup_token: str) -> Tournament | None:
@@ -60,26 +60,32 @@ async def count_players_on_team(team_id: TeamId, tournament_id: TournamentId) ->
 
 
 class SignupTeamRow:
-    __slots__ = ("id", "name", "player_count")
+    __slots__ = ("id", "name", "player_count", "level_id")
 
-    def __init__(self, id_: int, name: str, player_count: int) -> None:
+    def __init__(self, id_: int, name: str, player_count: int, level_id: int | None) -> None:
         self.id = id_
         self.name = name
         self.player_count = player_count
+        self.level_id = LevelId(level_id) if level_id is not None else None
 
 
 async def get_signup_team_info_rows(tournament_id: TournamentId) -> list[SignupTeamRow]:
     """Fetch teams with their player counts for the signup page."""
     query = """
-        SELECT t.id, t.name, COUNT(pxt.player_id) AS player_count
+        SELECT t.id, t.name, t.level_id, COUNT(pxt.player_id) AS player_count
         FROM teams t
         LEFT JOIN players_x_teams pxt ON pxt.team_id = t.id
         WHERE t.tournament_id = :tournament_id AND t.active = true
-        GROUP BY t.id, t.name
+        GROUP BY t.id, t.name, t.level_id
         ORDER BY t.name
         """
     rows = await database.fetch_all(query=query, values={"tournament_id": tournament_id})
     return [
-        SignupTeamRow(id_=r["id"], name=r["name"], player_count=int(r["player_count"]))
+        SignupTeamRow(
+            id_=r["id"],
+            name=r["name"],
+            player_count=int(r["player_count"]),
+            level_id=r["level_id"],
+        )
         for r in rows
     ]

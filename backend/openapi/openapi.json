@@ -1806,6 +1806,17 @@
       },
       "SignupBody": {
         "properties": {
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "player_name": {
             "maxLength": 30,
             "minLength": 1,
@@ -1849,7 +1860,8 @@
           "player_name",
           "team_action",
           "team_id",
-          "team_name"
+          "team_name",
+          "level_id"
         ],
         "title": "SignupBody",
         "type": "object"
@@ -1876,6 +1888,17 @@
             "title": "Is Full",
             "type": "boolean"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1889,7 +1912,8 @@
           "id",
           "name",
           "player_count",
-          "is_full"
+          "is_full",
+          "level_id"
         ],
         "title": "SignupTeamInfo",
         "type": "object"
@@ -1906,6 +1930,14 @@
               }
             ],
             "title": "Dashboard Endpoint"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LevelResponse"
+            },
+            "title": "Levels",
+            "type": "array"
           },
           "max_team_size": {
             "title": "Max Team Size",
@@ -1937,7 +1969,8 @@
           "teams",
           "max_team_size",
           "dashboard_endpoint",
-          "signup_team_choice_enabled"
+          "signup_team_choice_enabled",
+          "levels"
         ],
         "title": "SignupTournamentInfo",
         "type": "object"

@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
 import { getBaseURL } from '@components/utils/util';
-import type { SignupBody, SignupInfoResponse } from '@openapi';
+import type { LevelResponse, SignupBody, SignupInfoResponse, SignupTeamInfo } from '@openapi';
 import { getSignupInfo, submitSignup } from '@services/signup';
 
 type PageState = 'loading' | 'load_error' | 'form' | 'success';
@@ -29,6 +29,30 @@ function detailFromAxiosError(err: unknown): string {
     if (typeof data.detail === 'string') return data.detail;
   }
   return '';
+}
+
+function levelSelectData(levels: LevelResponse[]) {
+  return levels.map((level) => ({ value: `${level.id}`, label: level.name }));
+}
+
+function teamSelectData(teams: SignupTeamInfo[], levels: LevelResponse[], maxTeamSize: number) {
+  const levelNameById = new Map(levels.map((level) => [level.id, level.name]));
+  if (levels.length === 0) {
+    return teams.map((team) => ({
+      value: `${team.id}`,
+      label: `${team.name} (${team.player_count}/${maxTeamSize})`,
+    }));
+  }
+
+  return levels.map((level) => ({
+    group: level.name,
+    items: teams
+      .filter((team) => team.level_id === level.id)
+      .map((team) => ({
+        value: `${team.id}`,
+        label: `${team.name} · ${levelNameById.get(level.id)} (${team.player_count}/${maxTeamSize})`,
+      })),
+  }));
 }
 
 export default function SignupPage() {
@@ -44,6 +68,7 @@ export default function SignupPage() {
       team_action: 'none' as SignupBody['team_action'],
       team_id: null as string | null,
       team_name: '',
+      level_id: null as string | null,
     },
     validate: {
       player_name: (v) =>
@@ -56,6 +81,13 @@ export default function SignupPage() {
       team_id: (_v, values) => {
         if (values.team_action !== 'join') return null;
         return values.team_id != null && values.team_id !== '' ? null : t('club_choose_title');
+      },
+      level_id: (_v, values) => {
+        if (values.team_action !== 'create') return null;
+        return (info?.data.levels ?? []).length === 0 ||
+          (values.level_id != null && values.level_id !== '')
+          ? null
+          : t('signup_level_select_placeholder');
       },
     },
   });
@@ -124,6 +156,8 @@ export default function SignupPage() {
 
   const teamChoiceEnabled = info.data.signup_team_choice_enabled ?? true;
   const maxTeamSize = info.data.max_team_size;
+  const levels = info.data.levels;
+  const hasLevels = levels.length > 0;
   const joinableTeams = info.data.teams.filter((team) => !team.is_full);
 
   const notifySubmitError = (detail: string) => {
@@ -164,6 +198,10 @@ export default function SignupPage() {
               team_id:
                 action === 'join' && values.team_id != null ? parseInt(values.team_id, 10) : null,
               team_name: action === 'create' ? values.team_name.trim() : null,
+              level_id:
+                action === 'create' && values.level_id != null && values.level_id !== ''
+                  ? parseInt(values.level_id, 10)
+                  : null,
             };
 
             try {
@@ -207,22 +245,30 @@ export default function SignupPage() {
                   <Select
                     label={t('teams_title')}
                     placeholder={t('signup_team_select_placeholder')}
-                    data={joinableTeams.map((team) => ({
-                      value: `${team.id}`,
-                      label: `${team.name} (${team.player_count}/${maxTeamSize})`,
-                    }))}
+                    data={teamSelectData(joinableTeams, levels, maxTeamSize)}
                     {...form.getInputProps('team_id')}
                   />
                 ) : null}
 
                 {form.values.team_action === 'create' ? (
-                  <TextInput
-                    withAsterisk
-                    label={t('signup_team_name_label')}
-                    placeholder={t('signup_team_name_placeholder')}
-                    maxLength={30}
-                    {...form.getInputProps('team_name')}
-                  />
+                  <>
+                    {hasLevels ? (
+                      <Select
+                        withAsterisk
+                        label={t('signup_level_label')}
+                        placeholder={t('signup_level_select_placeholder')}
+                        data={levelSelectData(levels)}
+                        {...form.getInputProps('level_id')}
+                      />
+                    ) : null}
+                    <TextInput
+                      withAsterisk
+                      label={t('signup_team_name_label')}
+                      placeholder={t('signup_team_name_placeholder')}
+                      maxLength={30}
+                      {...form.getInputProps('team_name')}
+                    />
+                  </>
                 ) : null}
               </>
             ) : null}
