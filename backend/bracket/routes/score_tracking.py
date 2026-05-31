@@ -26,9 +26,9 @@ from bracket.routes.models import (
 )
 from bracket.routes.util import match_dependency
 from bracket.sql.matches import sql_get_scheduled_matches_with_details, sql_update_match
-from bracket.sql.stages import sql_has_active_stage
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
+from bracket.sql.stages import sql_has_active_stage
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import MatchId, TournamentId
 

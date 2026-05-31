@@ -19,7 +19,7 @@ import {
   getTournamentIdFromRouter,
   responseIsValid,
 } from '@components/utils/util';
-import { RoundWithMatches, Tournament } from '@openapi';
+import { RoundWithMatches, TournamentWithLevels } from '@openapi';
 import NotFoundTitle from '@pages/404';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
@@ -31,7 +31,13 @@ import {
 } from '@services/adapter';
 import { getStageItemLookup } from '@services/lookups';
 
-function NoCourtsButton({ t, tournamentData }: { t: Translator; tournamentData: Tournament }) {
+function NoCourtsButton({
+  t,
+  tournamentData,
+}: {
+  t: Translator;
+  tournamentData: TournamentWithLevels;
+}) {
   return (
     <Stack align="center">
       <NoContent title={t('no_courts_title')} description={t('no_courts_description_swiss')} />

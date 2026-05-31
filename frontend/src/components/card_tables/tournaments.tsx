@@ -7,11 +7,11 @@ import { DateTime } from '@components/utils/datetime';
 import RequestErrorAlert from '@components/utils/error_alert';
 import PreloadLink from '@components/utils/link';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
-import { Tournament, TournamentsResponse } from '@openapi';
+import { TournamentWithLevels, TournamentsResponse } from '@openapi';
 import { getBaseApiUrl } from '@services/adapter';
 import classes from './tournaments.module.css';
 
-export function TournamentLogo({ tournament }: { tournament: Tournament }) {
+export function TournamentLogo({ tournament }: { tournament: TournamentWithLevels }) {
   return (
     <Image
       radius="md"
@@ -50,11 +50,11 @@ export default function TournamentsCardTable({
     return <TableSkeletonSingleColumn />;
   }
 
-  const tournaments: Tournament[] =
+  const tournaments: TournamentWithLevels[] =
     swrTournamentsResponse.data != null ? swrTournamentsResponse.data.data : [];
 
   const rows = tournaments
-    .sort((t1: Tournament, t2: Tournament) => t1.name.localeCompare(t2.name))
+    .sort((t1: TournamentWithLevels, t2: TournamentWithLevels) => t1.name.localeCompare(t2.name))
     .map((tournament) => (
       <Group key={tournament.id} className={classes.card}>
         <UnstyledButton

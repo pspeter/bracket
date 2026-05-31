@@ -159,7 +159,7 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
         )
         RETURNING id
         """
-    values = dict(tournament.model_dump(exclude_none=False))
+    values = dict(tournament.model_dump(exclude_none=False, exclude={"levels"}))
     values.setdefault("signup_token", None)
     values.setdefault("score_tracking_enabled", False)
     values.setdefault("score_tracking_token", None)

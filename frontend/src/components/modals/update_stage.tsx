@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
-import { StageWithStageItems, StagesWithStageItemsResponse, Tournament } from '@openapi';
+import { StageWithStageItems, StagesWithStageItemsResponse, TournamentWithLevels } from '@openapi';
 import { updateStage } from '@services/stage';
 
 export function UpdateStageModal({
@@ -13,7 +13,7 @@ export function UpdateStageModal({
   stage,
   swrStagesResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   opened: boolean;
   setOpened: any;
   stage: StageWithStageItems;

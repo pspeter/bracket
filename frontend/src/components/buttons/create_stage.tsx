@@ -7,7 +7,7 @@ import {
   StageItemInputOptionsResponse,
   StageRankingResponse,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
 } from '@openapi';
 import { createStage } from '@services/stage';
 
@@ -17,7 +17,7 @@ export default function CreateStageButton({
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
   swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
@@ -47,7 +47,7 @@ export function CreateStageButtonLarge({
   tournament,
   swrStagesResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
 }) {
   const { t } = useTranslation();

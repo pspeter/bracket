@@ -36,7 +36,7 @@ import { assert_not_none } from '@components/utils/assert';
 import { DropzoneButton } from '@components/utils/file_upload';
 import { GenericSkeletonThreeRows } from '@components/utils/skeletons';
 import { capitalize, getBaseURL, getTournamentIdFromRouter } from '@components/utils/util';
-import { Club, Tournament, TournamentResponse } from '@openapi';
+import { Club, TournamentResponse, TournamentWithLevels } from '@openapi';
 import NotFoundTitle from '@pages/404';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
@@ -55,7 +55,7 @@ import {
 import dayjs from 'dayjs';
 import { useId } from 'react';
 
-export function TournamentLogo({ tournament }: { tournament: Tournament | null }) {
+export function TournamentLogo({ tournament }: { tournament: TournamentWithLevels | null }) {
   if (tournament == null || tournament.logo_path == null) return null;
   return (
     <Image
@@ -72,7 +72,7 @@ function ArchiveTournamentButton({
   swrTournamentResponse,
 }: {
   t: any;
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrTournamentResponse: SWRResponse<TournamentResponse>;
 }) {
   return (
@@ -100,7 +100,7 @@ function UnarchiveTournamentButton({
   swrTournamentResponse,
 }: {
   t: any;
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrTournamentResponse: SWRResponse<TournamentResponse>;
 }) {
   return (
@@ -127,7 +127,7 @@ function GeneralTournamentForm({
   swrTournamentResponse,
   clubs,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrTournamentResponse: SWRResponse<TournamentResponse>;
   clubs: Club[];
 }) {

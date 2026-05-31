@@ -48,6 +48,7 @@ async def test_tournaments_endpoint(
                 "signup_team_choice_enabled": True,
                 "score_tracking_enabled": False,
                 "score_tracking_token": None,
+                "levels": [],
             }
         ],
     }
@@ -80,6 +81,7 @@ async def test_tournament_endpoint(
             "signup_team_choice_enabled": True,
             "score_tracking_enabled": False,
             "score_tracking_token": None,
+            "levels": [],
         },
     }
 

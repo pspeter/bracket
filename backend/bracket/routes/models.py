@@ -11,7 +11,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputOptionTentative,
 )
 from bracket.models.db.team import FullTeamWithPlayers, Team
-from bracket.models.db.tournament import Tournament
+from bracket.models.db.tournament import TournamentWithLevels
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
 from bracket.routes.auth import Token
@@ -34,11 +34,11 @@ class ClubResponse(DataResponse[Club | None]):
     pass
 
 
-class TournamentResponse(DataResponse[Tournament]):
+class TournamentResponse(DataResponse[TournamentWithLevels]):
     pass
 
 
-class TournamentsResponse(DataResponse[list[Tournament]]):
+class TournamentsResponse(DataResponse[list[TournamentWithLevels]]):
     pass
 
 

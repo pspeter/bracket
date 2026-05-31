@@ -18,12 +18,12 @@ import { SWRResponse } from 'swr';
 
 import SaveButton from '@components/buttons/save';
 import { assert_not_none } from '@components/utils/assert';
-import { Club, Tournament, TournamentsResponse } from '@openapi';
+import { Club, TournamentWithLevels, TournamentsResponse } from '@openapi';
 import { getBaseApiUrl, getClubs } from '@services/adapter';
 import { createTournament } from '@services/tournament';
 import dayjs from 'dayjs';
 
-export function TournamentLogo({ tournament }: { tournament: Tournament | null }) {
+export function TournamentLogo({ tournament }: { tournament: TournamentWithLevels | null }) {
   if (tournament == null || tournament.logo_path == null) return null;
   return (
     <Image
