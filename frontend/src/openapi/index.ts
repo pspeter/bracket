@@ -377,6 +377,7 @@ export type {
   SinglePlayerResponse,
   SingleTeamResponse,
   StageActivateBody,
+  StageCreateBody,
   StageItemActivateNextBody,
   StageItemCreateBody,
   StageItemInputEmpty,

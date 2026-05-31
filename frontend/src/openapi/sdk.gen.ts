@@ -1360,6 +1360,10 @@ export const createStageTournamentsTournamentIdStagesPost = <ThrowOnError extend
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/stages',
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

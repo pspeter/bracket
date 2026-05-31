@@ -1053,6 +1053,20 @@ export type StageActivateBody = {
    * Direction
    */
   direction: 'next' | 'previous';
+  /**
+   * Level Id
+   */
+  level_id: number | null;
+};
+
+/**
+ * StageCreateBody
+ */
+export type StageCreateBody = {
+  /**
+   * Level Id
+   */
+  level_id: number | null;
 };
 
 /**
@@ -1431,6 +1445,10 @@ export type StageTemplateCreateBody = {
    */
   include_semi_final: boolean;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Total Teams
    */
   total_teams: number;
@@ -1471,6 +1489,10 @@ export type StageWithStageItems = {
    * Is Active
    */
   is_active: boolean;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
   /**
    * Name
    */
@@ -3852,7 +3874,7 @@ export type GetStagesTournamentsTournamentIdStagesGetResponse =
   GetStagesTournamentsTournamentIdStagesGetResponses[keyof GetStagesTournamentsTournamentIdStagesGetResponses];
 
 export type CreateStageTournamentsTournamentIdStagesPostData = {
-  body?: never;
+  body?: StageCreateBody;
   path: {
     /**
      * Tournament Id

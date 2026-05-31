@@ -6,6 +6,7 @@ from heliclockter import datetime_utc
 from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubInsertable
 from bracket.models.db.court import CourtInsertable
+from bracket.models.db.level import LevelInsertable
 from bracket.models.db.match import MatchInsertable, MatchState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
@@ -52,6 +53,20 @@ DUMMY_TOURNAMENT = TournamentInsertable(
     auto_assign_courts=True,
     duration_minutes=10,
     margin_minutes=5,
+)
+
+DUMMY_LEVEL1 = LevelInsertable(
+    tournament_id=TournamentId(DB_PLACEHOLDER_ID),
+    name="Beginners",
+    position=0,
+    created=DUMMY_MOCK_TIME,
+)
+
+DUMMY_LEVEL2 = LevelInsertable(
+    tournament_id=TournamentId(DB_PLACEHOLDER_ID),
+    name="Advanced",
+    position=1,
+    created=DUMMY_MOCK_TIME,
 )
 
 DUMMY_STAGE1 = StageInsertable(

@@ -1976,12 +1976,44 @@
             ],
             "title": "Direction",
             "type": "string"
+          },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
           }
         },
         "required": [
-          "direction"
+          "direction",
+          "level_id"
         ],
         "title": "StageActivateBody",
+        "type": "object"
+      },
+      "StageCreateBody": {
+        "properties": {
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          }
+        },
+        "required": [
+          "level_id"
+        ],
+        "title": "StageCreateBody",
         "type": "object"
       },
       "StageItemActivateNextBody": {
@@ -2597,6 +2629,17 @@
             "title": "Include Semi Final",
             "type": "boolean"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "total_teams": {
             "title": "Total Teams",
             "type": "integer"
@@ -2618,7 +2661,8 @@
           "groups",
           "total_teams",
           "until_rank",
-          "include_semi_final"
+          "include_semi_final",
+          "level_id"
         ],
         "title": "StageTemplateCreateBody",
         "type": "object"
@@ -2660,6 +2704,17 @@
             "title": "Is Active",
             "type": "boolean"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2681,6 +2736,7 @@
           "name",
           "created",
           "is_active",
+          "level_id",
           "id",
           "stage_items"
         ],
@@ -6546,6 +6602,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageCreateBody",
+                "default": {}
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
