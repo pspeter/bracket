@@ -13,11 +13,15 @@ import { useLocation } from 'react-router';
 
 import PreloadLink from '@components/utils/link';
 import { getBaseURL } from '@components/utils/util';
-import { Tournament } from '@openapi';
+import { TournamentWithLevels } from '@openapi';
 import { getBaseApiUrl } from '@services/adapter';
 import classes from './layout.module.css';
 
-export function TournamentQRCode({ tournamentDataFull }: { tournamentDataFull: Tournament }) {
+export function TournamentQRCode({
+  tournamentDataFull,
+}: {
+  tournamentDataFull: TournamentWithLevels;
+}) {
   if (tournamentDataFull == null) {
     return null;
   }
@@ -45,7 +49,11 @@ export function TournamentQRCode({ tournamentDataFull }: { tournamentDataFull: T
   );
 }
 
-export function TournamentLogo({ tournamentDataFull }: { tournamentDataFull: Tournament }) {
+export function TournamentLogo({
+  tournamentDataFull,
+}: {
+  tournamentDataFull: TournamentWithLevels;
+}) {
   if (tournamentDataFull == null) {
     return <Skeleton height={150} radius="xl" mb="xl" />;
   }
@@ -62,11 +70,15 @@ export function TournamentLogo({ tournamentDataFull }: { tournamentDataFull: Tou
   ) : null;
 }
 
-export function getTournamentHeadTitle(tournamentDataFull: Tournament) {
+export function getTournamentHeadTitle(tournamentDataFull: TournamentWithLevels) {
   return tournamentDataFull !== null ? `Bracket | ${tournamentDataFull.name}` : 'Bracket';
 }
 
-export function TournamentTitle({ tournamentDataFull }: { tournamentDataFull: Tournament }) {
+export function TournamentTitle({
+  tournamentDataFull,
+}: {
+  tournamentDataFull: TournamentWithLevels;
+}) {
   return tournamentDataFull != null ? (
     <Title>{tournamentDataFull.name}</Title>
   ) : (
@@ -74,7 +86,7 @@ export function TournamentTitle({ tournamentDataFull }: { tournamentDataFull: To
   );
 }
 
-export function DoubleHeader({ tournamentData }: { tournamentData: Tournament }) {
+export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWithLevels }) {
   const navigate = useLocation();
   const endpoint = tournamentData.dashboard_endpoint || '';
   const pathName = navigate.pathname.replace('[id]', endpoint).replace(/\/+$/, '');

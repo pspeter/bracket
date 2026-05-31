@@ -1,28 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException
-from starlette import status
+from fastapi import APIRouter, Depends
 
 from bracket.config import config
-from bracket.models.db.level import LevelUpdateBody
+from bracket.models.db.level import Level, LevelUpdateBody
 from bracket.models.db.user import UserPublic
-from bracket.routes.auth import user_authenticated
+from bracket.routes.auth import user_authenticated_for_tournament
 from bracket.routes.models import SuccessResponse
-from bracket.sql.levels import sql_get_level, sql_update_level
-from bracket.utils.id_types import LevelId
+from bracket.routes.util import level_dependency
+from bracket.sql.levels import sql_update_level
+from bracket.utils.id_types import LevelId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
 
-@router.put("/levels/{level_id}", response_model=SuccessResponse)
+@router.put("/tournaments/{tournament_id}/levels/{level_id}", response_model=SuccessResponse)
 async def update_level(
+    tournament_id: TournamentId,
     level_id: LevelId,
     body: LevelUpdateBody,
-    user: UserPublic = Depends(user_authenticated),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    level: Level = Depends(level_dependency),
 ) -> SuccessResponse:
-    level = await sql_get_level(level_id)
-    if level is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Level not found",
-        )
     await sql_update_level(level_id, body)
     return SuccessResponse()

@@ -27,7 +27,7 @@ import {
   RoundWithMatches,
   StageItemWithRounds,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
   UpcomingMatchesResponse,
 } from '@openapi';
 import { createRound } from '@services/round';
@@ -74,7 +74,7 @@ export function RoundsGridCols({
   displaySettings,
 }: {
   stageItem: StageItemWithRounds;
-  tournamentData: Tournament;
+  tournamentData: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrUpcomingMatchesResponse: SWRResponse<UpcomingMatchesResponse>;
   readOnly: boolean;

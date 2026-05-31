@@ -21,7 +21,7 @@ import {
   StageItemInputOptionsResponse,
   StageRankingResponse,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
 } from '@openapi';
 import { handleRequestError } from '@services/adapter';
 import { createStagesFromTemplate } from '@services/stage';
@@ -65,7 +65,7 @@ export function CreateFromTemplateButton({
   swrRankingsPerStageItemResponse,
   buttonSize = 'xs',
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
@@ -108,7 +108,7 @@ function CreateFromTemplateModal({
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   opened: boolean;
   onClose: () => void;
   registeredTeamCount: number;

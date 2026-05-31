@@ -30,12 +30,16 @@ from bracket.routes.auth import (
 from bracket.routes.models import SuccessResponse, TournamentResponse, TournamentsResponse
 from bracket.routes.util import disallow_archived_tournament
 from bracket.schema import tournaments
+from bracket.sql.levels import (
+    sql_create_level,
+    sql_delete_levels_of_tournament,
+    sql_get_levels_for_tournament,
+)
 from bracket.sql.rankings import (
     get_all_rankings_in_tournament,
     sql_create_ranking,
     sql_delete_ranking,
 )
-from bracket.sql.levels import sql_create_level, sql_get_levels_for_tournament
 from bracket.sql.tournaments import (
     sql_create_tournament,
     sql_delete_tournament,
@@ -61,6 +65,7 @@ router = APIRouter(prefix=config.api_prefix)
 async def _tournament_with_levels(tournament: Tournament) -> TournamentWithLevels:
     levels = await sql_get_levels_for_tournament(tournament.id)
     return TournamentWithLevels(**tournament.model_dump(), levels=levels)
+
 
 unauthorized_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -143,6 +148,8 @@ async def delete_tournament(
 ) -> SuccessResponse:
     for ranking in await get_all_rankings_in_tournament(tournament_id):
         await sql_delete_ranking(tournament_id, ranking.id)
+
+    await sql_delete_levels_of_tournament(tournament_id)
 
     with check_foreign_key_violation(
         {

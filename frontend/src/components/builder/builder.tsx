@@ -43,7 +43,7 @@ import {
   StageRankingResponse,
   StageWithStageItems,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
 } from '@openapi';
 import { getStageItemLookup, getTeamsLookup } from '@services/lookups';
 import { deleteStage } from '@services/stage';
@@ -59,7 +59,7 @@ function StageItemInputComboBox({
   swrRankingsPerStageItemResponse,
   swrStagesResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   stageItemInput: StageItemInput;
   current_key: string | null;
   availableInputs: StageItemInputChoice[];
@@ -218,7 +218,7 @@ function StageItemInputSection({
   swrStagesResponse,
   swrRankingsPerStageItemResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   stageItemInput: StageItemInput;
   currentOptionValue: string | null;
   lastInList: boolean;
@@ -253,7 +253,7 @@ function StageItemRow({
   swrAvailableInputsResponse,
   swrRankingsPerStageItemResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   stageItem: StageItemWithRounds;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   availableInputs: StageItemInputChoice[];
@@ -369,7 +369,7 @@ function StageColumn({
   swrRankingsPerStageItemResponse,
   rankings,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   stage: StageWithStageItems;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
@@ -476,7 +476,7 @@ export default function Builder({
   swrRankingsPerStageItemResponse,
   rankings,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;

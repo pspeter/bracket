@@ -1,7 +1,7 @@
 from enum import auto
 
 from heliclockter import datetime_utc
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from bracket.models.db.shared import BaseModelORM
 from bracket.utils.id_types import ClubId, LevelId, TournamentId
@@ -64,6 +64,13 @@ class TournamentUpdateBody(BaseModelORM):
     signup_team_choice_enabled: bool
     score_tracking_enabled: bool = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_levels(cls, data: dict) -> dict:  # type: ignore[type-arg]
+        if isinstance(data, dict) and "levels" in data:
+            raise ValueError("Levels cannot be changed after tournament creation")
+        return data
+
 
 class TournamentChangeStatusBody(BaseModelORM):
     status: TournamentStatus
@@ -72,3 +79,8 @@ class TournamentChangeStatusBody(BaseModelORM):
 class TournamentBody(TournamentUpdateBody):
     club_id: ClubId
     levels: list[str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_levels(cls, data: dict) -> dict:  # type: ignore[override, type-arg]
+        return data

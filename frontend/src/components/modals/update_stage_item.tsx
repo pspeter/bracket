@@ -5,7 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
 import { RankingSelect } from '@components/select/ranking_select';
-import { Ranking, StageItemWithRounds, StagesWithStageItemsResponse, Tournament } from '@openapi';
+import {
+  Ranking,
+  StageItemWithRounds,
+  StagesWithStageItemsResponse,
+  TournamentWithLevels,
+} from '@openapi';
 import { updateStageItem } from '@services/stage_item';
 
 interface FormValues {
@@ -77,7 +82,7 @@ export function UpdateStageItemModal({
   swrStagesResponse,
   rankings,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   opened: boolean;
   setOpened: any;
   stageItem: StageItemWithRounds;

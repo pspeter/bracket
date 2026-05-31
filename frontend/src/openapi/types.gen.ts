@@ -226,6 +226,34 @@ export type HttpValidationError = {
 };
 
 /**
+ * LevelResponse
+ */
+export type LevelResponse = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Position
+   */
+  position: number;
+};
+
+/**
+ * LevelUpdateBody
+ */
+export type LevelUpdateBody = {
+  /**
+   * Name
+   */
+  name: string;
+};
+
+/**
  * Match
  */
 export type Match = {
@@ -1626,85 +1654,6 @@ export type TokenResponse = {
 };
 
 /**
- * Tournament
- */
-export type Tournament = {
-  /**
-   * Auto Assign Courts
-   */
-  auto_assign_courts: boolean;
-  /**
-   * Club Id
-   */
-  club_id: number;
-  /**
-   * Created
-   */
-  created: string;
-  /**
-   * Dashboard Endpoint
-   */
-  dashboard_endpoint: string | null;
-  /**
-   * Dashboard Public
-   */
-  dashboard_public: boolean;
-  /**
-   * Duration Minutes
-   */
-  duration_minutes: number;
-  /**
-   * Id
-   */
-  id: number;
-  /**
-   * Logo Path
-   */
-  logo_path: string | null;
-  /**
-   * Margin Minutes
-   */
-  margin_minutes: number;
-  /**
-   * Max Team Size
-   */
-  max_team_size: number;
-  /**
-   * Name
-   */
-  name: string;
-  /**
-   * Players Can Be In Multiple Teams
-   */
-  players_can_be_in_multiple_teams: boolean;
-  /**
-   * Score Tracking Enabled
-   */
-  score_tracking_enabled: boolean;
-  /**
-   * Score Tracking Token
-   */
-  score_tracking_token: string | null;
-  /**
-   * Signup Enabled
-   */
-  signup_enabled: boolean;
-  /**
-   * Signup Team Choice Enabled
-   */
-  signup_team_choice_enabled: boolean;
-  /**
-   * Signup Token
-   */
-  signup_token: string | null;
-  /**
-   * Start Time
-   */
-  start_time: string;
-  status: TournamentStatus;
-};
-
-/**
  * TournamentBody
  */
 export type TournamentBody = {
@@ -1728,6 +1677,10 @@ export type TournamentBody = {
    * Duration Minutes
    */
   duration_minutes: number;
+  /**
+   * Levels
+   */
+  levels: Array<string> | null;
   /**
    * Margin Minutes
    */
@@ -1773,7 +1726,7 @@ export type TournamentChangeStatusBody = {
  * TournamentResponse
  */
 export type TournamentResponse = {
-  data: Tournament;
+  data: TournamentWithLevels;
 };
 
 /**
@@ -1836,13 +1789,96 @@ export type TournamentUpdateBody = {
 };
 
 /**
+ * TournamentWithLevels
+ */
+export type TournamentWithLevels = {
+  /**
+   * Auto Assign Courts
+   */
+  auto_assign_courts: boolean;
+  /**
+   * Club Id
+   */
+  club_id: number;
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Dashboard Endpoint
+   */
+  dashboard_endpoint: string | null;
+  /**
+   * Dashboard Public
+   */
+  dashboard_public: boolean;
+  /**
+   * Duration Minutes
+   */
+  duration_minutes: number;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Levels
+   */
+  levels: Array<LevelResponse>;
+  /**
+   * Logo Path
+   */
+  logo_path: string | null;
+  /**
+   * Margin Minutes
+   */
+  margin_minutes: number;
+  /**
+   * Max Team Size
+   */
+  max_team_size: number;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Players Can Be In Multiple Teams
+   */
+  players_can_be_in_multiple_teams: boolean;
+  /**
+   * Score Tracking Enabled
+   */
+  score_tracking_enabled: boolean;
+  /**
+   * Score Tracking Token
+   */
+  score_tracking_token: string | null;
+  /**
+   * Signup Enabled
+   */
+  signup_enabled: boolean;
+  /**
+   * Signup Team Choice Enabled
+   */
+  signup_team_choice_enabled: boolean;
+  /**
+   * Signup Token
+   */
+  signup_token: string | null;
+  /**
+   * Start Time
+   */
+  start_time: string;
+  status: TournamentStatus;
+};
+
+/**
  * TournamentsResponse
  */
 export type TournamentsResponse = {
   /**
    * Data
    */
-  data: Array<Tournament>;
+  data: Array<TournamentWithLevels>;
 };
 
 /**
@@ -2659,6 +2695,42 @@ export type UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses = {
 
 export type UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponse =
   UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses[keyof UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses];
+
+export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutData = {
+  body: LevelUpdateBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Level Id
+     */
+    level_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/levels/{level_id}';
+};
+
+export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutError =
+  UpdateLevelTournamentsTournamentIdLevelsLevelIdPutErrors[keyof UpdateLevelTournamentsTournamentIdLevelsLevelIdPutErrors];
+
+export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponse =
+  UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponses[keyof UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponses];
 
 export type UploadLogoTournamentsTournamentIdLogoPostData = {
   body?: BodyUploadLogoTournamentsTournamentIdLogoPost;

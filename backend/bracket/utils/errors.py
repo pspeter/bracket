@@ -25,6 +25,7 @@ class ForeignKey(EnumAutoStr):
     stages_tournament_id_fkey = auto()
     teams_tournament_id_fkey = auto()
     tournaments_club_id_fkey = auto()
+    levels_tournament_id_fkey = auto()
     rankings_tournament_id_fkey = auto()
 
 
@@ -49,6 +50,7 @@ foreign_key_violation_error_lookup = {
     ForeignKey.stages_tournament_id_fkey: "This tournament still has stages, delete those first",
     ForeignKey.teams_tournament_id_fkey: "This tournament still has teams, delete those first",
     ForeignKey.tournaments_club_id_fkey: "This club still has tournaments, delete those first",
+    ForeignKey.levels_tournament_id_fkey: "This tournament still has levels, delete those first",
     ForeignKey.rankings_tournament_id_fkey: (
         "This tournament still has rankings, delete those first"
     ),

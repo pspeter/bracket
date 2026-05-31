@@ -3,19 +3,29 @@ from sqlalchemy import and_
 from starlette import status
 
 from bracket.database import database
+from bracket.models.db.level import Level
 from bracket.models.db.match import Match
 from bracket.models.db.round import Round
 from bracket.models.db.team import FullTeamWithPlayers, Team
 from bracket.models.db.tournament import Tournament, TournamentStatus
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
 from bracket.schema import matches, rounds, stage_items, stages, teams
+from bracket.sql.levels import sql_get_level_for_tournament
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.teams import get_teams_with_members
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.db import fetch_one_parsed
-from bracket.utils.id_types import MatchId, RoundId, StageId, StageItemId, TeamId, TournamentId
+from bracket.utils.id_types import (
+    LevelId,
+    MatchId,
+    RoundId,
+    StageId,
+    StageItemId,
+    TeamId,
+    TournamentId,
+)
 
 
 async def round_dependency(tournament_id: TournamentId, round_id: RoundId) -> Round:
@@ -111,6 +121,18 @@ async def team_with_players_dependency(
         )
 
     return teams_with_members[0]
+
+
+async def level_dependency(tournament_id: TournamentId, level_id: LevelId) -> Level:
+    level = await sql_get_level_for_tournament(tournament_id, level_id)
+
+    if level is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Could not find level with id {level_id}",
+        )
+
+    return level
 
 
 async def disallow_archived_tournament(tournament_id: TournamentId) -> Tournament:

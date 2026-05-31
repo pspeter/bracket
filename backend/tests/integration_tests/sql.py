@@ -28,7 +28,6 @@ from bracket.models.db.user_x_club import UserXClub, UserXClubInsertable, UserXC
 from bracket.schema import (
     clubs,
     courts,
-    levels,
     matches,
     players,
     players_x_teams,

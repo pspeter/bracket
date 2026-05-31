@@ -39,9 +39,7 @@ async def test_create_tournament_with_levels(
     )
 
     tournament = assert_some(await sql_get_tournament_by_endpoint_name(dashboard_endpoint))
-    response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
+    response = await send_auth_request(HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context)
 
     levels = response["data"]["levels"]
     assert len(levels) == 2
@@ -58,7 +56,7 @@ async def test_create_tournament_with_levels(
 async def test_cannot_add_levels_after_creation(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Levels on tournament update body are ignored — level count is frozen after creation."""
+    """Sending levels on tournament PUT is rejected with a validation error."""
     dashboard_endpoint = "immutable-levels-test"
     create_body = {
         "name": "Immutable Levels Tournament",
@@ -82,7 +80,6 @@ async def test_cannot_add_levels_after_creation(
 
     tournament = assert_some(await sql_get_tournament_by_endpoint_name(dashboard_endpoint))
 
-    # PUT tournament with levels field — should be ignored (not part of update body)
     update_body = {
         "name": "Immutable Levels Tournament",
         "start_time": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),
@@ -98,17 +95,10 @@ async def test_cannot_add_levels_after_creation(
         "levels": ["Beginners", "Advanced", "Expert"],
     }
     temp_context = auth_context.model_copy(update={"tournament": tournament})
-    assert (
-        await send_tournament_request(HTTPMethod.PUT, "", temp_context, json=update_body)
-        == SUCCESS_RESPONSE
-    )
-
-    response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
-    levels = response["data"]["levels"]
-    assert len(levels) == 1
-    assert levels[0]["name"] == "Beginners"
+    response = await send_tournament_request(HTTPMethod.PUT, "", temp_context, json=update_body)
+    assert "detail" in response
+    error_msg = response["detail"][0]["msg"]
+    assert "Levels cannot be changed after tournament creation" in error_msg
 
     await sql_delete_tournament_completely(tournament.id)
 
@@ -139,21 +129,21 @@ async def test_rename_level(
     )
 
     tournament = assert_some(await sql_get_tournament_by_endpoint_name(dashboard_endpoint))
-    response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
+    response = await send_auth_request(HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context)
     level_id = response["data"]["levels"][0]["id"]
 
+    temp_context = auth_context.model_copy(update={"tournament": tournament})
     assert (
-        await send_auth_request(
-            HTTPMethod.PUT, f"levels/{level_id}", auth_context, json={"name": "Intermediate"}
+        await send_tournament_request(
+            HTTPMethod.PUT,
+            f"levels/{level_id}",
+            temp_context,
+            json={"name": "Intermediate"},
         )
         == SUCCESS_RESPONSE
     )
 
-    response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
+    response = await send_auth_request(HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context)
     assert response["data"]["levels"][0]["name"] == "Intermediate"
     assert response["data"]["levels"][1]["name"] == "Advanced"
 

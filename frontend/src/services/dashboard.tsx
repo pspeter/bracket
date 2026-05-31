@@ -2,12 +2,12 @@ import React from 'react';
 
 import { TableSkeletonTwoColumns } from '@components/utils/skeletons';
 import { getTournamentEndpointFromRouter } from '@components/utils/util';
-import { Tournament } from '@openapi';
+import { TournamentWithLevels } from '@openapi';
 import DashboardNotFoundTitle from '@pages/tournaments/[id]/dashboard/dashboard_404';
 import GenericErrorPage from '@pages/tournaments/[id]/dashboard/generic_dashboard_error';
 import { getTournamentByEndpointName } from './adapter';
 
-export function getTournamentResponseByEndpointName(): Tournament | React.ReactElement {
+export function getTournamentResponseByEndpointName(): TournamentWithLevels | React.ReactElement {
   const endpointName = getTournamentEndpointFromRouter();
   const swrTournamentsResponse = getTournamentByEndpointName(endpointName);
 

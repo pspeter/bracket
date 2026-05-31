@@ -11,7 +11,7 @@ import {
   RoundWithMatches,
   StagesWithStageItemsResponse,
   SuggestedMatch,
-  Tournament,
+  TournamentWithLevels,
   UpcomingMatchesResponse,
 } from '@openapi';
 import { createMatch } from '@services/match';
@@ -25,7 +25,7 @@ export default function UpcomingMatchesTable({
   swrUpcomingMatchesResponse,
 }: {
   draftRound: RoundWithMatches;
-  tournamentData: Tournament;
+  tournamentData: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrUpcomingMatchesResponse: SWRResponse<UpcomingMatchesResponse>;
 }) {

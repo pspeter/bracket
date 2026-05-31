@@ -21,7 +21,7 @@ import {
   StageItemInputOptionsResponse,
   StageWithStageItems,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
 } from '@openapi';
 import { getStageItemLookup, getTeamsLookup } from '@services/lookups';
 import { createStageItem } from '@services/stage_item';
@@ -180,7 +180,7 @@ export function CreateStageItemModal({
   swrStagesResponse,
   swrAvailableInputsResponse,
 }: {
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   stage: StageWithStageItems;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;

@@ -9,8 +9,8 @@ import { SWRResponse } from 'swr';
 import {
   FullTeamWithPlayers,
   TeamsWithPlayersResponse,
-  Tournament,
   TournamentResponse,
+  TournamentWithLevels,
 } from '@openapi';
 import { handleRequestError, uploadTeamLogo, uploadTournamentLogo } from '@services/adapter';
 
@@ -20,7 +20,7 @@ export function DropzoneButton({
   variant,
   teamId,
 }: {
-  tournamentId: Tournament['id'];
+  tournamentId: TournamentWithLevels['id'];
   swrResponse: SWRResponse<TeamsWithPlayersResponse> | SWRResponse<TournamentResponse>;
   variant: 'tournament' | 'team';
   teamId?: FullTeamWithPlayers['id'];

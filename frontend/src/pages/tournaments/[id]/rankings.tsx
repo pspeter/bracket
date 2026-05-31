@@ -9,7 +9,7 @@ import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter } from '@components/utils/util';
-import { Ranking, RankingsResponse, Tournament } from '@openapi';
+import { Ranking, RankingsResponse, TournamentWithLevels } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getRankings, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
@@ -21,7 +21,7 @@ function RankingDeleteButton({
   swrRankingsResponse,
 }: {
   t: Translator;
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   ranking: Ranking;
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
@@ -53,7 +53,7 @@ function EditRankingForm({
   swrRankingsResponse,
 }: {
   t: Translator;
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   ranking: Ranking;
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
@@ -134,7 +134,7 @@ function RankingForm({
   swrRankingsResponse,
 }: {
   t: Translator;
-  tournament: Tournament;
+  tournament: TournamentWithLevels;
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
   const rankings: Ranking[] = swrRankingsResponse.data != null ? swrRankingsResponse.data.data : [];

@@ -8,7 +8,7 @@ import {
   RoundWithMatches,
   StageWithStageItems,
   StagesWithStageItemsResponse,
-  Tournament,
+  TournamentWithLevels,
   UpcomingMatchesResponse,
 } from '@openapi';
 import SwissSettings, { getSwissRoundSchedulingProgress } from './settings/ladder_fixed';
@@ -24,7 +24,7 @@ export default function Scheduler({
 }: {
   activeStage: StageWithStageItems;
   draftRound: RoundWithMatches;
-  tournamentData: Tournament;
+  tournamentData: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrUpcomingMatchesResponse: SWRResponse<UpcomingMatchesResponse>;
   swrCourtsResponse: SWRResponse<CourtsResponse>;

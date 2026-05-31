@@ -176,6 +176,9 @@ import type {
   UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutData,
   UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutErrors,
   UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses,
+  UpdateLevelTournamentsTournamentIdLevelsLevelIdPutData,
+  UpdateLevelTournamentsTournamentIdLevelsLevelIdPutErrors,
+  UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponses,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutData,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutErrors,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses,
@@ -662,6 +665,29 @@ export const updateCourtByIdTournamentsTournamentIdCourtsCourtIdPut = <
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/courts/{court_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Update Level
+ */
+export const updateLevelTournamentsTournamentIdLevelsLevelIdPut = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateLevelTournamentsTournamentIdLevelsLevelIdPutData, ThrowOnError>
+) =>
+  (options.client ?? client).put<
+    UpdateLevelTournamentsTournamentIdLevelsLevelIdPutResponses,
+    UpdateLevelTournamentsTournamentIdLevelsLevelIdPutErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/levels/{level_id}',
     ...options,
     headers: {
       'Content-Type': 'application/json',
