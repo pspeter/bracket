@@ -7,7 +7,7 @@ from bracket.logic.planning.conflicts import handle_conflicts
 from bracket.logic.planning.matches import (
     get_scheduled_matches,
     handle_match_reschedule,
-    reorder_all_matches_with_stage_boundaries,
+    reorder_all_matches,
     schedule_all_unscheduled_matches,
 )
 from bracket.logic.ranking.calculation import (
@@ -262,7 +262,7 @@ async def unschedule_match(
     if old_court_id is not None:
         stages = await get_full_tournament_details(tournament_id)
         scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches_with_stage_boundaries(tournament, stages, scheduled_matches)
+        await reorder_all_matches(tournament, scheduled_matches)
 
     await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
@@ -311,7 +311,7 @@ async def update_match_by_id(
         tournament = await sql_get_tournament(tournament_id)
         stages = await get_full_tournament_details(tournament_id)
         scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches_with_stage_boundaries(tournament, stages, scheduled_matches)
+        await reorder_all_matches(tournament, scheduled_matches)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})

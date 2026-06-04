@@ -351,7 +351,7 @@ async def test_schedule_match_from_unscheduled(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_reschedule_match_preserves_stage_boundaries_across_courts(
+async def test_reschedule_match_honours_positions_across_courts(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tournament = auth_context.tournament
@@ -518,32 +518,46 @@ async def test_reschedule_match_preserves_stage_boundaries_across_courts(
             == SUCCESS_RESPONSE
         )
         stages = await get_full_tournament_details(tournament.id)
+        moved = await sql_get_match(moved_match.id)
         await assert_row_count_and_clear(matches, 0)
 
-    stage1 = next(stage for stage in stages if stage.id == stage1_inserted.id)
-    stage2 = next(stage for stage in stages if stage.id == stage2_inserted.id)
-    latest_stage1_end = max(
-        match.end_time
-        for stage_item in stage1.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
-    )
-    stage2_start_times = [
-        match.start_time
-        for stage_item in stage2.stage_items
+    all_matches = [
+        match
+        for stage in stages
+        for stage_item in stage.stage_items
         for round_ in stage_item.rounds
         for match in round_.matches
         if match.start_time is not None
     ]
+    court1_matches = sorted(
+        (m for m in all_matches if m.court_id == court1_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
+    court2_matches = sorted(
+        (m for m in all_matches if m.court_id == court2_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
 
-    assert stage2_start_times
-    for start_time in stage2_start_times:
-        assert start_time >= latest_stage1_end
+    # Court 1 now holds all 3 stage-1 matches plus the stage-2 match in position order
+    assert len(court1_matches) == 4
+    for index, match in enumerate(court1_matches):
+        assert match.position_in_schedule == index
+        assert match.start_time == tournament.start_time + timedelta(minutes=15 * index)
+
+    # Court 2 only has the remaining stage-2 match, starting at tournament start time
+    # (no global stage barrier — cross-level interleaving is allowed)
+    assert len(court2_matches) == 1
+    assert court2_matches[0].position_in_schedule == 0
+    assert court2_matches[0].start_time == tournament.start_time
+
+    # The moved match landed at the user's requested position on court 1
+    assert moved.court_id == court1_inserted.id
+    assert moved.position_in_schedule == 2
+    assert moved.start_time == tournament.start_time + timedelta(minutes=30)
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_unschedule_match_preserves_stage_boundaries_across_courts(
+async def test_unschedule_match_reorders_remaining_positions(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tournament = auth_context.tournament
@@ -703,25 +717,39 @@ async def test_unschedule_match_preserves_stage_boundaries_across_courts(
             == SUCCESS_RESPONSE
         )
         stages = await get_full_tournament_details(tournament.id)
+        unscheduled = await sql_get_match(unscheduled_match.id)
         await assert_row_count_and_clear(matches, 0)
 
-    stage1 = next(stage for stage in stages if stage.id == stage1_inserted.id)
-    stage2 = next(stage for stage in stages if stage.id == stage2_inserted.id)
-    latest_stage1_end = max(
-        match.end_time
-        for stage_item in stage1.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
-    )
-    stage2_start_times = [
-        match.start_time
-        for stage_item in stage2.stage_items
+    all_matches = [
+        match
+        for stage in stages
+        for stage_item in stage.stage_items
         for round_ in stage_item.rounds
         for match in round_.matches
         if match.start_time is not None
     ]
+    court1_matches = sorted(
+        (m for m in all_matches if m.court_id == court1_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
+    court2_matches = sorted(
+        (m for m in all_matches if m.court_id == court2_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
 
-    assert stage2_start_times
-    for start_time in stage2_start_times:
-        assert start_time >= latest_stage1_end
+    # The unscheduled match is gone from any court
+    assert unscheduled.court_id is None
+    assert unscheduled.start_time is None
+    assert unscheduled.position_in_schedule is None
+
+    # Remaining court-1 matches keep their relative order and start sequentially
+    assert len(court1_matches) == 3
+    for index, match in enumerate(court1_matches):
+        assert match.position_in_schedule == index
+        assert match.start_time == tournament.start_time + timedelta(minutes=15 * index)
+
+    # Court 2 only has the stage-2 match left, starting at tournament start time
+    # (no global stage barrier — cross-level interleaving is allowed)
+    assert len(court2_matches) == 1
+    assert court2_matches[0].position_in_schedule == 0
+    assert court2_matches[0].start_time == tournament.start_time

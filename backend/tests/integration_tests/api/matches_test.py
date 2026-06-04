@@ -480,7 +480,7 @@ async def test_update_endpoint_custom_duration_margin_unscheduled_match(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_update_endpoint_custom_duration_margin_preserves_stage_boundaries_across_courts(
+async def test_update_endpoint_custom_duration_margin_honours_positions_across_courts(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tournament = auth_context.tournament
@@ -649,26 +649,36 @@ async def test_update_endpoint_custom_duration_margin_preserves_stage_boundaries
         stages = await get_full_tournament_details(tournament.id)
         await assert_row_count_and_clear(matches, 0)
 
-    stage1 = next(stage for stage in stages if stage.id == stage1_inserted.id)
-    stage2 = next(stage for stage in stages if stage.id == stage2_inserted.id)
-    latest_stage1_end = max(
-        match.end_time
-        for stage_item in stage1.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
-    )
-    stage2_start_times = [
-        match.start_time
-        for stage_item in stage2.stage_items
+    all_matches = [
+        match
+        for stage in stages
+        for stage_item in stage.stage_items
         for round_ in stage_item.rounds
         for match in round_.matches
         if match.start_time is not None
     ]
+    court1_matches = sorted(
+        (m for m in all_matches if m.court_id == court1_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
+    court2_matches = sorted(
+        (m for m in all_matches if m.court_id == court2_inserted.id),
+        key=lambda m: m.position_in_schedule,
+    )
 
-    assert stage2_start_times
-    for start_time in stage2_start_times:
-        assert start_time >= latest_stage1_end
+    # Court 1 keeps its 3 matches in position order; the updated match now
+    # consumes 30 minutes (20 duration + 10 margin) instead of the default 15.
+    assert len(court1_matches) == 3
+    assert court1_matches[0].id == updated_match.id
+    assert court1_matches[0].start_time == tournament.start_time
+    assert court1_matches[1].start_time == tournament.start_time + timedelta(minutes=30)
+    assert court1_matches[2].start_time == tournament.start_time + timedelta(minutes=45)
+
+    # Court 2 is unaffected: its own two matches run back-to-back from start time
+    # (no global stage barrier across courts).
+    assert len(court2_matches) == 2
+    assert court2_matches[0].start_time == tournament.start_time
+    assert court2_matches[1].start_time == tournament.start_time + timedelta(minutes=15)
 
 
 @pytest.mark.asyncio(loop_scope="session")

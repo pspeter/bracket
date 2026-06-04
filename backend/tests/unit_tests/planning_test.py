@@ -1,7 +1,14 @@
 from collections import defaultdict
 from datetime import timedelta
 
-from bracket.logic.planning.matches import build_schedule_plan
+import pytest
+
+from bracket.logic.planning import matches as planning_matches
+from bracket.logic.planning.matches import (
+    MatchPosition,
+    build_schedule_plan,
+    reorder_all_matches,
+)
 from bracket.models.db.court import Court
 from bracket.models.db.match import MatchWithDetails
 from bracket.models.db.stage_item import StageType
@@ -273,3 +280,104 @@ def test_already_scheduled_matches_are_skipped() -> None:
 
     assert len(ops) == 1
     assert ops[0].match.id == unscheduled.id
+
+
+# ── reorder_all_matches ──────────────────────────────────────────────────────
+
+
+def _on_court(match: MatchWithDetails, court_id: int) -> MatchWithDetails:
+    return match.model_copy(update={"court_id": CourtId(court_id)})
+
+
+@pytest.fixture
+def capture_sql_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
+    """Replace the DB-writing helper with a list recorder."""
+    calls: list[tuple] = []
+
+    async def fake_reschedule(court_id, start_time, position, match, tournament):  # type: ignore[no-untyped-def]
+        calls.append((court_id, start_time, position, match.id))
+
+    monkeypatch.setattr(
+        planning_matches,
+        "sql_reschedule_match_and_determine_duration_and_margin",
+        fake_reschedule,
+    )
+    return calls
+
+
+async def test_reorder_respects_cross_level_position_ordering(
+    capture_sql_calls: list[tuple],
+) -> None:
+    """A match dragged to position 0 stays before others on the same court, regardless of level."""
+    level_a = _on_court(_match(1), 1)
+    level_b = _on_court(_match(2), 1)
+    # Level B was dragged before Level A (fractional position from handle_match_reschedule)
+    positions = [
+        MatchPosition(match=level_a, position=1.0),
+        MatchPosition(match=level_b, position=0.5),
+    ]
+
+    await reorder_all_matches(_tournament(), positions)
+
+    assert capture_sql_calls == [
+        (CourtId(1), T0, 0, level_b.id),
+        (CourtId(1), T0 + timedelta(minutes=SLOT), 1, level_a.id),
+    ]
+
+
+async def test_reorder_keeps_same_level_matches_sequential(
+    capture_sql_calls: list[tuple],
+) -> None:
+    """Two matches on the same court are scheduled back-to-back from tournament start."""
+    m1 = _on_court(_match(1), 1)
+    m2 = _on_court(_match(2), 1)
+    positions = [
+        MatchPosition(match=m1, position=0.0),
+        MatchPosition(match=m2, position=1.0),
+    ]
+
+    await reorder_all_matches(_tournament(), positions)
+
+    assert capture_sql_calls == [
+        (CourtId(1), T0, 0, m1.id),
+        (CourtId(1), T0 + timedelta(minutes=SLOT), 1, m2.id),
+    ]
+
+
+async def test_reorder_courts_are_independent(
+    capture_sql_calls: list[tuple],
+) -> None:
+    """Each court starts at tournament.start_time — no court waits for another."""
+    c1_match = _on_court(_match(1), 1)
+    c2_match = _on_court(_match(2), 2)
+    positions = [
+        MatchPosition(match=c1_match, position=0.0),
+        MatchPosition(match=c2_match, position=0.0),
+    ]
+
+    await reorder_all_matches(_tournament(), positions)
+
+    by_court = {call[0]: call for call in capture_sql_calls}
+    assert by_court[CourtId(1)] == (CourtId(1), T0, 0, c1_match.id)
+    assert by_court[CourtId(2)] == (CourtId(2), T0, 0, c2_match.id)
+
+
+async def test_reorder_empty_input_is_noop(capture_sql_calls: list[tuple]) -> None:
+    await reorder_all_matches(_tournament(), [])
+    assert capture_sql_calls == []
+
+
+async def test_reorder_skips_matches_without_court(
+    capture_sql_calls: list[tuple],
+) -> None:
+    """Matches with court_id=None (unscheduled) are ignored."""
+    with_court = _on_court(_match(1), 1)
+    no_court = _match(2)  # court_id is None
+    positions = [
+        MatchPosition(match=with_court, position=0.0),
+        MatchPosition(match=no_court, position=1.0),
+    ]
+
+    await reorder_all_matches(_tournament(), positions)
+
+    assert capture_sql_calls == [(CourtId(1), T0, 0, with_court.id)]
