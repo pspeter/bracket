@@ -46,7 +46,7 @@ from bracket.schema import (
 from bracket.sql.teams import get_teams_by_id
 from bracket.utils.db import insert_generic
 from bracket.utils.dummy_records import DUMMY_CLUB, DUMMY_RANKING1, DUMMY_TOURNAMENT
-from bracket.utils.id_types import TeamId
+from bracket.utils.id_types import TeamId, TournamentId
 from tests.integration_tests.mocks import get_mock_token, get_mock_user
 from tests.integration_tests.models import AuthContext
 
@@ -177,6 +177,23 @@ async def inserted_match(match: MatchInsertable) -> AsyncIterator[Match]:
 async def inserted_user_x_club(user_x_club: UserXClubInsertable) -> AsyncIterator[UserXClub]:
     async with inserted_generic(user_x_club, users_x_clubs, UserXClub) as row_inserted:
         yield cast("UserXClub", row_inserted)
+
+
+@asynccontextmanager
+async def enabled_signup(tournament_id: TournamentId, signup_token: str) -> AsyncIterator[None]:
+    await database.execute(
+        query=tournaments.update()
+        .where(tournaments.c.id == tournament_id)
+        .values(signup_enabled=True, signup_token=signup_token),
+    )
+    try:
+        yield
+    finally:
+        await database.execute(
+            query=tournaments.update()
+            .where(tournaments.c.id == tournament_id)
+            .values(signup_enabled=False, signup_token=None),
+        )
 
 
 @asynccontextmanager

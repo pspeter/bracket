@@ -1,13 +1,13 @@
 import pytest
 
 from bracket.database import database
-from bracket.schema import players, teams, tournaments
+from bracket.schema import players, teams
 from bracket.utils.dummy_records import DUMMY_LEVEL1, DUMMY_LEVEL2, DUMMY_TEAM1, DUMMY_TEAM2
 from bracket.utils.http import HTTPMethod
 from bracket.utils.types import JsonDict
 from tests.integration_tests.api.shared import send_request
 from tests.integration_tests.models import AuthContext
-from tests.integration_tests.sql import inserted_level, inserted_team
+from tests.integration_tests.sql import enabled_signup, inserted_level, inserted_team
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -27,13 +27,9 @@ async def test_signup_info_includes_levels_and_team_levels(
 ) -> None:
     signup_token = "leveled-signup-info-token"
     tournament_id = auth_context.tournament.id
-    await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tournament_id)
-        .values(signup_enabled=True, signup_token=signup_token),
-    )
 
     async with (
+        enabled_signup(tournament_id, signup_token),
         inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level_a,
         inserted_level(DUMMY_LEVEL2.model_copy(update={"tournament_id": tournament_id})) as level_b,
         inserted_team(
@@ -73,13 +69,11 @@ async def test_signup_create_team_requires_level_for_leveled_tournament(
 ) -> None:
     signup_token = "leveled-signup-create-requires-level-token"
     tournament_id = auth_context.tournament.id
-    await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tournament_id)
-        .values(signup_enabled=True, signup_token=signup_token),
-    )
 
-    async with inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})):
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})),
+    ):
         response: JsonDict = await send_request(
             HTTPMethod.POST,
             f"signup/{signup_token}",
@@ -100,15 +94,11 @@ async def test_signup_create_team_assigns_selected_level(
 ) -> None:
     signup_token = "leveled-signup-create-team-token"
     tournament_id = auth_context.tournament.id
-    await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tournament_id)
-        .values(signup_enabled=True, signup_token=signup_token),
-    )
 
-    async with inserted_level(
-        DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})
-    ) as level:
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level,
+    ):
         response: JsonDict = await send_request(
             HTTPMethod.POST,
             f"signup/{signup_token}",
@@ -144,13 +134,9 @@ async def test_signup_join_existing_leveled_team_does_not_require_level_selectio
 ) -> None:
     signup_token = "leveled-signup-join-team-token"
     tournament_id = auth_context.tournament.id
-    await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tournament_id)
-        .values(signup_enabled=True, signup_token=signup_token),
-    )
 
     async with (
+        enabled_signup(tournament_id, signup_token),
         inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level,
         inserted_team(
             DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id, "level_id": level.id})
