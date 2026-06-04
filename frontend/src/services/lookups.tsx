@@ -163,6 +163,44 @@ export function getUnscheduledMatches(swrStagesResponse: SWRResponse): MatchWith
   return matches;
 }
 
+/**
+ * Per court, per level: flag any match placed before a match from an earlier stage on that court.
+ * Returns the set of violating match IDs.
+ */
+export function getStageOrderViolations(
+  courtMatches: MatchWithDetails[],
+  matchLookup: Record<number, MatchLookupEntry>,
+  stageOrder: StageWithStageItems[]
+): Set<number> {
+  const violations = new Set<number>();
+  const stageIdx = (stageId: number) => stageOrder.findIndex((s) => s.id === stageId);
+
+  const byLevel = new Map<number | null, MatchWithDetails[]>();
+  for (const m of courtMatches) {
+    const levelId = matchLookup[m.id]?.stage.level_id ?? null;
+    if (!byLevel.has(levelId)) byLevel.set(levelId, []);
+    byLevel.get(levelId)!.push(m);
+  }
+
+  for (const levelMatches of byLevel.values()) {
+    for (let i = 0; i < levelMatches.length; i++) {
+      const entryI = matchLookup[levelMatches[i].id];
+      if (entryI == null) continue;
+      const sIdxI = stageIdx(entryI.stage.id);
+      for (let j = i + 1; j < levelMatches.length; j++) {
+        const entryJ = matchLookup[levelMatches[j].id];
+        if (entryJ == null) continue;
+        if (stageIdx(entryJ.stage.id) < sIdxI) {
+          violations.add(levelMatches[i].id);
+          break;
+        }
+      }
+    }
+  }
+
+  return violations;
+}
+
 export function getScheduleData(
   swrCourtsResponse: SWRResponse<CourtsResponse>,
   matchesByCourtId: any
