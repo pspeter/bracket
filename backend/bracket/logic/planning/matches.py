@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from heliclockter import datetime_utc, timedelta
@@ -28,6 +29,104 @@ class ScheduleOperation(NamedTuple):
     match: MatchWithDetails | MatchWithDetailsDefinitive
 
 
+ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
+TaggedMatch = tuple[LevelId | None, ScheduleMatch]
+StageItemMatches = tuple[LevelId | None, list[ScheduleMatch]]
+
+
+@dataclass
+class _InterleaveState:
+    level_id: LevelId | None
+    remaining: list[ScheduleMatch]
+    picks: int
+    size: int
+    rot_idx: int
+
+
+def _assignment_load(stage_items: list[StageItemMatches]) -> int:
+    return sum(len(matches) for _, matches in stage_items)
+
+
+def _assign_stage_items_to_courts(
+    stage_items: list[StageItemMatches], courts: list[Court]
+) -> dict[CourtId, list[StageItemMatches]]:
+    """Assign whole stage items to courts, splitting only to fix single-level imbalance."""
+    court_ids = [court.id for court in courts]
+    assignments: dict[CourtId, list[StageItemMatches]] = {court_id: [] for court_id in court_ids}
+    if not court_ids:
+        return assignments
+
+    for stage_item in stage_items:
+        court_id = min(court_ids, key=lambda candidate: _assignment_load(assignments[candidate]))
+        assignments[court_id].append(stage_item)
+
+    loads = [_assignment_load(assignments[court_id]) for court_id in court_ids]
+    unique_levels = {level_id for level_id, _ in stage_items}
+    if len(unique_levels) != 1 or max(loads, default=0) - min(loads, default=0) <= 1:
+        return assignments
+
+    total_matches = sum(len(matches) for _, matches in stage_items)
+    base_target, extra = divmod(total_matches, len(court_ids))
+    targets = {
+        court_id: base_target + (1 if idx < extra else 0) for idx, court_id in enumerate(court_ids)
+    }
+    split_assignments: dict[CourtId, list[StageItemMatches]] = {
+        court_id: [] for court_id in court_ids
+    }
+    split_loads = {court_id: 0 for court_id in court_ids}
+
+    for level_id, matches in stage_items:
+        remaining = list(matches)
+        while remaining:
+            under_target = [
+                court_id for court_id in court_ids if split_loads[court_id] < targets[court_id]
+            ]
+            court_id = min(
+                under_target or court_ids,
+                key=lambda candidate: split_loads[candidate],
+            )
+            capacity = max(targets[court_id] - split_loads[court_id], 1)
+            chunk = remaining[:capacity]
+            split_assignments[court_id].append((level_id, chunk))
+            split_loads[court_id] += len(chunk)
+            remaining = remaining[capacity:]
+
+    return split_assignments
+
+
+def _weighted_interleave(
+    stage_items: list[StageItemMatches], tiebreak_offset: int = 0
+) -> list[TaggedMatch]:
+    """
+    Proportional-fair round-robin: at each step, pick the stage item with the smallest
+    "progress" (picks_so_far / total_size). Larger SIs are picked more often because
+    their target progress grows faster.
+
+    Tiebreak: larger initial size first, then input order (rotated by `tiebreak_offset`
+    so different courts can start with different SIs).
+
+    Match order within each stage item is preserved, so round-dependencies are honored.
+    """
+    n = len(stage_items)
+    state = [
+        _InterleaveState(
+            level_id=level_id,
+            remaining=list(matches),
+            picks=0,
+            size=len(matches),
+            rot_idx=(idx + tiebreak_offset) % n if n else 0,
+        )
+        for idx, (level_id, matches) in enumerate(stage_items)
+    ]
+    result: list[TaggedMatch] = []
+    while any(s.remaining for s in state):
+        active = [s for s in state if s.remaining]
+        best = min(active, key=lambda s: (s.picks / s.size, -s.size, s.rot_idx))
+        result.append((best.level_id, best.remaining.pop(0)))
+        best.picks += 1
+    return result
+
+
 def build_schedule_plan(
     stages: list[StageWithStageItems],
     courts: list[Court],
@@ -40,6 +139,10 @@ def build_schedule_plan(
     Courts are shared across all levels; matches from different levels are interleaved.
     Stage boundaries are per-level: Level N's Stage K+1 only waits for its own Stage K to
     finish, not for any other level.
+
+    Within each court, matches from different stage items are weighted-round-robin'd so
+    larger stage items are picked more often, keeping all assigned stage items finishing
+    around the same time.
     """
     if not stages or not courts:
         return []
@@ -69,46 +172,34 @@ def build_schedule_plan(
         if not active_levels:
             break
 
-        # Collect (level_id, stage_item) pairs from all active levels' current stage
-        all_stage_items: list[tuple[LevelId | None, object]] = []
+        # Collect (level_id, ordered_matches) for each SI in active levels' current stage
+        all_sis: list[StageItemMatches] = []
         for level_id in active_levels:
             stage = stages_by_level[level_id][level_stage_idx[level_id]]
             for stage_item in sorted(stage.stage_items, key=lambda si: si.name):
-                all_stage_items.append((level_id, stage_item))
+                matches = [
+                    match
+                    for round_ in sorted(stage_item.rounds, key=lambda r: r.id)
+                    for match in round_.matches
+                    if match.start_time is None and match.position_in_schedule is None
+                ]
+                if matches:
+                    all_sis.append((level_id, matches))
 
-        # Assign stage_items to courts round-robin, collecting (level_id, match) pairs
-        TaggedMatch = tuple[LevelId | None, MatchWithDetails | MatchWithDetailsDefinitive]
-        court_matches: dict[CourtId, list[TaggedMatch]] = {c: [] for c in court_ids}
-        for i, (level_id, stage_item) in enumerate(all_stage_items):
-            court = courts[i % len(courts)]
-            for round_ in sorted(stage_item.rounds, key=lambda r: r.id):
-                for match in round_.matches:
-                    if match.start_time is None and match.position_in_schedule is None:
-                        court_matches[court.id].append((level_id, match))
-
-        # Rebalance: move matches from most-loaded to least-loaded court
-        while True:
-            max_court = max(court_ids, key=lambda c: len(court_matches[c]))
-            min_court = min(court_ids, key=lambda c: len(court_matches[c]))
-            if len(court_matches[max_court]) - len(court_matches[min_court]) <= 1:
-                break
-            court_matches[min_court].append(court_matches[max_court].pop())
+        court_to_sis = _assign_stage_items_to_courts(all_sis, courts)
 
         # Track max end time per level across all courts for this scheduling round
         level_end_times: dict[LevelId | None, datetime_utc] = {}
 
-        for court_id in court_ids:
-            tagged = court_matches[court_id]
-            if not tagged:
+        for court_idx, court_id in enumerate(court_ids):
+            sequence = _weighted_interleave(court_to_sis[court_id], tiebreak_offset=court_idx)
+            if not sequence:
                 continue
-
-            # Matches from earlier-starting levels go first on the court
-            tagged.sort(key=lambda x: level_stage_start[x[0]])
 
             current_time = court_next_time[court_id]
             position = court_next_position[court_id]
 
-            for level_id, match in tagged:
+            for level_id, match in sequence:
                 start_time = max(current_time, level_stage_start[level_id])
                 operations.append(ScheduleOperation(court_id, start_time, position, match))
                 end_time = start_time + timedelta(
