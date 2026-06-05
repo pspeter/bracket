@@ -224,6 +224,7 @@ players = Table(
     Column("draws", Integer, nullable=False),
     Column("losses", Integer, nullable=False),
     Column("active", Boolean, nullable=False, index=True, server_default="t"),
+    Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
 )
 
 users = Table(

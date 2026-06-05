@@ -5,9 +5,140 @@ from bracket.schema import players, teams
 from bracket.utils.dummy_records import DUMMY_LEVEL1, DUMMY_LEVEL2, DUMMY_TEAM1, DUMMY_TEAM2
 from bracket.utils.http import HTTPMethod
 from bracket.utils.types import JsonDict
-from tests.integration_tests.api.shared import send_request
+from tests.integration_tests.api.shared import send_request, send_tournament_request
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import enabled_signup, inserted_level, inserted_team
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_none_team_action_without_levels_creates_player_with_no_level(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "teamless-no-levels-token"
+    tournament_id = auth_context.tournament.id
+
+    async with enabled_signup(tournament_id, signup_token):
+        response: JsonDict = await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={"player_name": "Teamless Player", "team_action": "none"},
+        )
+        players_response: JsonDict = await send_tournament_request(
+            HTTPMethod.GET, "players", auth_context
+        )
+        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+
+    assert response == {"success": True}
+    player = next(
+        p for p in players_response["data"]["players"] if p["name"] == "Teamless Player"
+    )
+    assert player["level_id"] is None
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_none_team_action_with_levels_requires_level_id(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "teamless-levels-no-level-id-token"
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})),
+    ):
+        response: JsonDict = await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={"player_name": "Teamless Player", "team_action": "none"},
+        )
+
+    assert response["detail"] == "level_id is required when not joining or creating a team"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_none_team_action_with_level_id_sets_player_level(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "teamless-with-level-id-token"
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level,
+    ):
+        await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={"player_name": "Leveled Teamless", "team_action": "none", "level_id": level.id},
+        )
+        players_response: JsonDict = await send_tournament_request(
+            HTTPMethod.GET, "players", auth_context
+        )
+        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+
+    player = next(
+        p for p in players_response["data"]["players"] if p["name"] == "Leveled Teamless"
+    )
+    assert player["level_id"] == level.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_create_team_copies_level_to_player(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "create-team-copies-level-token"
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level,
+    ):
+        await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={
+                "player_name": "Team Creator",
+                "team_action": "create",
+                "team_name": "New Team",
+                "level_id": level.id,
+            },
+        )
+        players_response: JsonDict = await send_tournament_request(
+            HTTPMethod.GET, "players", auth_context
+        )
+        await database.execute(query=teams.delete().where(teams.c.tournament_id == tournament_id))
+        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+
+    player = next(p for p in players_response["data"]["players"] if p["name"] == "Team Creator")
+    assert player["level_id"] == level.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_join_team_copies_level_to_player(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "join-team-copies-level-token"
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id, "level_id": level.id})
+        ) as team,
+    ):
+        await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={"player_name": "Team Joiner", "team_action": "join", "team_id": team.id},
+        )
+        players_response: JsonDict = await send_tournament_request(
+            HTTPMethod.GET, "players", auth_context
+        )
+        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+
+    player = next(p for p in players_response["data"]["players"] if p["name"] == "Team Joiner")
+    assert player["level_id"] == level.id
 
 
 @pytest.mark.asyncio(loop_scope="session")

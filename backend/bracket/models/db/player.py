@@ -20,6 +20,7 @@ class PlayerInsertable(BaseModelORM):
     wins: int = 0
     draws: int = 0
     losses: int = 0
+    level_id: LevelId | None = None
 
 
 class Player(PlayerInsertable):
@@ -67,3 +68,4 @@ class PlayerToInsert(PlayerBody):
     wins: int = 0
     draws: int = 0
     losses: int = 0
+    level_id: LevelId | None = None

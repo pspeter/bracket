@@ -6,7 +6,7 @@ import PlayersTable from '@components/tables/players';
 import { getTableState, tableStateToPagination } from '@components/tables/table';
 import { capitalize, getTournamentIdFromRouter } from '@components/utils/util';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getPlayersPaginated } from '@services/adapter';
+import { getPlayersPaginated, getTournamentById } from '@services/adapter';
 
 export default function PlayersPage() {
   const tableState = getTableState('name');
@@ -15,6 +15,8 @@ export default function PlayersPage() {
     tournamentData.id,
     tableStateToPagination(tableState)
   );
+  const swrTournament = getTournamentById(tournamentData.id);
+  const levels = swrTournament.data?.data.levels ?? [];
   const playerCount = swrPlayersResponse.data != null ? swrPlayersResponse.data.data.count : 1;
   const { t } = useTranslation();
   return (
@@ -35,6 +37,7 @@ export default function PlayersPage() {
         swrPlayersResponse={swrPlayersResponse}
         tournamentData={tournamentData}
         tableState={tableState}
+        levels={levels}
       />
     </TournamentLayout>
   );

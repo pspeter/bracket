@@ -6,7 +6,7 @@ from bracket.database import database
 from bracket.logic.ranking.statistics import START_ELO
 from bracket.models.db.player import Player, PlayerBody, PlayerToInsert, PlayerWithTeams
 from bracket.schema import players
-from bracket.utils.id_types import PlayerId, TeamId, TournamentId
+from bracket.utils.id_types import LevelId, PlayerId, TeamId, TournamentId
 from bracket.utils.pagination import PaginationPlayers
 from bracket.utils.types import dict_without_none
 
@@ -121,7 +121,12 @@ async def sql_delete_players_of_tournament(tournament_id: TournamentId) -> None:
     await database.fetch_one(query=query, values={"tournament_id": tournament_id})
 
 
-async def insert_player(player_body: PlayerBody, tournament_id: TournamentId) -> PlayerId:
+async def insert_player(
+    player_body: PlayerBody,
+    tournament_id: TournamentId,
+    *,
+    level_id: LevelId | None = None,
+) -> PlayerId:
     return PlayerId(
         await database.execute(
             query=players.insert(),
@@ -131,6 +136,7 @@ async def insert_player(player_body: PlayerBody, tournament_id: TournamentId) ->
                 tournament_id=tournament_id,
                 elo_score=START_ELO,
                 swiss_score=Decimal("0.0"),
+                level_id=level_id,
             ).model_dump(),
         )
     )

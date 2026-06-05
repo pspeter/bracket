@@ -83,7 +83,10 @@ export default function SignupPage() {
         return values.team_id != null && values.team_id !== '' ? null : t('club_choose_title');
       },
       level_id: (_v, values) => {
-        if (values.team_action !== 'create') return null;
+        const teamChoiceEnabled = info?.data.signup_team_choice_enabled ?? true;
+        const effectivelyTeamless = !teamChoiceEnabled || values.team_action === 'none';
+        const needsLevel = values.team_action === 'create' || effectivelyTeamless;
+        if (!needsLevel) return null;
         return (info?.data.levels ?? []).length === 0 ||
           (values.level_id != null && values.level_id !== '')
           ? null
@@ -199,7 +202,9 @@ export default function SignupPage() {
                 action === 'join' && values.team_id != null ? parseInt(values.team_id, 10) : null,
               team_name: action === 'create' ? values.team_name.trim() : null,
               level_id:
-                action === 'create' && values.level_id != null && values.level_id !== ''
+                (action === 'create' || action === 'none') &&
+                values.level_id != null &&
+                values.level_id !== ''
                   ? parseInt(values.level_id, 10)
                   : null,
             };
@@ -270,8 +275,30 @@ export default function SignupPage() {
                     />
                   </>
                 ) : null}
+
+                {form.values.team_action === 'none' && hasLevels ? (
+                  <Select
+                    withAsterisk
+                    label={t('signup_level_label')}
+                    placeholder={t('signup_level_select_placeholder')}
+                    data={levelSelectData(levels)}
+                    {...form.getInputProps('level_id')}
+                  />
+                ) : null}
               </>
-            ) : null}
+            ) : (
+              <>
+                {hasLevels ? (
+                  <Select
+                    withAsterisk
+                    label={t('signup_level_label')}
+                    placeholder={t('signup_level_select_placeholder')}
+                    data={levelSelectData(levels)}
+                    {...form.getInputProps('level_id')}
+                  />
+                ) : null}
+              </>
+            )}
 
             <Button type="submit">{t('signup_submit_button')}</Button>
           </Stack>

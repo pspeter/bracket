@@ -35,6 +35,8 @@ async def test_players_endpoint(
                             "losses": 0,
                             "name": "Player 01",
                             "tournament_id": auth_context.tournament.id,
+                            "level_id": None,
+                            "teams": [],
                         }
                     ],
                     "count": 1,

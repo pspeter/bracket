@@ -104,22 +104,35 @@ async def post_signup(
 
     levels = await sql_get_levels_for_tournament(tournament.id)
     level_ids = {level.id for level in levels}
-    if body.team_action == "create" and levels:
-        if body.level_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="level_id is required when creating a team",
-            )
-        if body.level_id not in level_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Level not found",
-            )
+    if levels:
+        if body.team_action == "create":
+            if body.level_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="level_id is required when creating a team",
+                )
+            if body.level_id not in level_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Level not found",
+                )
+        elif body.team_action == "none":
+            if body.level_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="level_id is required when not joining or creating a team",
+                )
+            if body.level_id not in level_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Level not found",
+                )
 
+    joined_team = None
     if body.team_action == "join":
         assert body.team_id is not None
-        team = await get_team_by_id(body.team_id, tournament.id)
-        if team is None:
+        joined_team = await get_team_by_id(body.team_id, tournament.id)
+        if joined_team is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=_TEAM_NOT_FOUND,
@@ -151,9 +164,16 @@ async def post_signup(
                 detail="Tournament is full",
             )
 
+    if body.team_action == "join" and joined_team is not None:
+        player_level_id = joined_team.level_id
+    elif body.team_action in ("none", "create") and levels:
+        player_level_id = body.level_id
+    else:
+        player_level_id = None
+
     async with database.transaction():
         player_id = await insert_player(
-            PlayerBody(name=body.player_name, active=True), tournament.id
+            PlayerBody(name=body.player_name, active=True), tournament.id, level_id=player_level_id
         )
 
         if body.team_action == "join":

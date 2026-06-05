@@ -702,6 +702,10 @@ export type Player = {
    */
   id: number;
   /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
    * Losses
    */
   losses: number;
@@ -793,6 +797,10 @@ export type PlayerWithTeams = {
    * Id
    */
   id: number;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
   /**
    * Losses
    */

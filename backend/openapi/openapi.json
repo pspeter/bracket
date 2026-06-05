@@ -1397,6 +1397,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "losses": {
             "default": 0,
             "title": "Losses",
@@ -1432,6 +1443,7 @@
           "wins",
           "draws",
           "losses",
+          "level_id",
           "id"
         ],
         "title": "Player",
@@ -1532,6 +1544,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
           "losses": {
             "default": 0,
             "title": "Losses",
@@ -1575,6 +1598,7 @@
           "wins",
           "draws",
           "losses",
+          "level_id",
           "id",
           "teams"
         ],

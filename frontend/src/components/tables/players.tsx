@@ -9,9 +9,9 @@ import { DateTime } from '@components/utils/datetime';
 import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { PlayerWithTeams, PlayersResponse } from '@openapi';
-import { deletePlayer } from '@services/player';
+import { LevelResponse, PlayerWithTeams, PlayersResponse } from '@openapi';
 import { stringToColour } from '@services/lookups';
+import { deletePlayer } from '@services/player';
 import TableLayout, { TableState, ThNotSortable, ThSortable, sortTableEntries } from './table';
 
 export function WinDistributionTitle() {
@@ -38,12 +38,15 @@ export default function PlayersTable({
   tournamentData,
   tableState,
   playerCount,
+  levels = [],
 }: {
   swrPlayersResponse: SWRResponse<PlayersResponse>;
   tournamentData: TournamentMinimal;
   tableState: TableState;
   playerCount: number;
+  levels?: LevelResponse[];
 }) {
+  const levelNameById = new Map(levels.map((l) => [l.id, l.name]));
   const { t } = useTranslation();
   const players: PlayerWithTeams[] =
     swrPlayersResponse.data != null ? swrPlayersResponse.data.data.players : [];
@@ -92,6 +95,17 @@ export default function PlayersTable({
           )}
         </Table.Td>
         <Table.Td>
+          {player.level_id != null ? (
+            <Badge color={stringToColour(`level-${player.level_id}`)} variant="light">
+              {levelNameById.get(player.level_id) ?? `Level ${player.level_id}`}
+            </Badge>
+          ) : (
+            <Text c="dimmed" fz="sm">
+              —
+            </Text>
+          )}
+        </Table.Td>
+        <Table.Td>
           <DateTime datetime={player.created} />
         </Table.Td>
         <Table.Td>
@@ -125,6 +139,7 @@ export default function PlayersTable({
               {t('title')}
             </ThSortable>
             <ThNotSortable>{t('teams_title')}</ThNotSortable>
+            <ThNotSortable>{t('signup_level_label')}</ThNotSortable>
             <ThSortable state={tableState} field="created">
               {t('created')}
             </ThSortable>
