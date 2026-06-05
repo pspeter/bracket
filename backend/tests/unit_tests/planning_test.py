@@ -265,6 +265,32 @@ def test_two_courts_imbalanced_sis_split_to_tight_loads() -> None:
     assert large_courts == {CourtId(1), CourtId(2)}
 
 
+def test_two_courts_multi_level_imbalanced_sis_split_to_tight_loads() -> None:
+    """Smart split still applies when active levels have uneven current-stage SI sizes."""
+    level_a = LevelId(1)
+    level_b = LevelId(2)
+    large = [_match(10 + i) for i in range(8)]
+    small_a = [_match(20 + i) for i in range(2)]
+    small_b = [_match(30 + i) for i in range(2)]
+    stages = [
+        _stage(1, [large], level_id=level_a),
+        _stage(2, [small_a, small_b], level_id=level_b),
+    ]
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    assert len(ops) == 12
+    by_court: dict[CourtId, int] = defaultdict(int)
+    large_courts: set[CourtId] = set()
+    large_ids = {match.id for match in large}
+    for op in ops:
+        by_court[op.court_id] += 1
+        if op.match.id in large_ids:
+            large_courts.add(op.court_id)
+
+    assert max(by_court.values()) - min(by_court.values()) <= 1
+    assert large_courts == {CourtId(1), CourtId(2)}
+
+
 def test_round_order_preserved_within_interleaved_stage_item() -> None:
     """An SI's round 1 matches stay before its round 2 matches while interleaving."""
     a_r1 = [_match(10), _match(11)]

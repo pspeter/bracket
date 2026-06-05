@@ -47,10 +47,23 @@ def _assignment_load(stage_items: list[StageItemMatches]) -> int:
     return sum(len(matches) for _, matches in stage_items)
 
 
+def _split_from_largest_stage_item(
+    stage_items: list[StageItemMatches], match_count: int
+) -> StageItemMatches:
+    source_idx = max(range(len(stage_items)), key=lambda idx: len(stage_items[idx][1]))
+    level_id, matches = stage_items[source_idx]
+    if len(matches) <= match_count:
+        return stage_items.pop(source_idx)
+
+    split_at = len(matches) - match_count
+    stage_items[source_idx] = (level_id, matches[:split_at])
+    return level_id, matches[split_at:]
+
+
 def _assign_stage_items_to_courts(
     stage_items: list[StageItemMatches], courts: list[Court]
 ) -> dict[CourtId, list[StageItemMatches]]:
-    """Assign whole stage items to courts, splitting only to fix single-level imbalance."""
+    """Assign whole stage items to courts, splitting only to reach tight court loads."""
     court_ids = [court.id for court in courts]
     assignments: dict[CourtId, list[StageItemMatches]] = {court_id: [] for court_id in court_ids}
     if not court_ids:
@@ -60,38 +73,18 @@ def _assign_stage_items_to_courts(
         court_id = min(court_ids, key=lambda candidate: _assignment_load(assignments[candidate]))
         assignments[court_id].append(stage_item)
 
-    loads = [_assignment_load(assignments[court_id]) for court_id in court_ids]
-    unique_levels = {level_id for level_id, _ in stage_items}
-    if len(unique_levels) != 1 or max(loads, default=0) - min(loads, default=0) <= 1:
-        return assignments
+    while True:
+        max_court = max(court_ids, key=lambda court_id: _assignment_load(assignments[court_id]))
+        min_court = min(court_ids, key=lambda court_id: _assignment_load(assignments[court_id]))
+        max_load = _assignment_load(assignments[max_court])
+        min_load = _assignment_load(assignments[min_court])
+        if max_load - min_load <= 1:
+            return assignments
 
-    total_matches = sum(len(matches) for _, matches in stage_items)
-    base_target, extra = divmod(total_matches, len(court_ids))
-    targets = {
-        court_id: base_target + (1 if idx < extra else 0) for idx, court_id in enumerate(court_ids)
-    }
-    split_assignments: dict[CourtId, list[StageItemMatches]] = {
-        court_id: [] for court_id in court_ids
-    }
-    split_loads = {court_id: 0 for court_id in court_ids}
-
-    for level_id, matches in stage_items:
-        remaining = list(matches)
-        while remaining:
-            under_target = [
-                court_id for court_id in court_ids if split_loads[court_id] < targets[court_id]
-            ]
-            court_id = min(
-                under_target or court_ids,
-                key=lambda candidate: split_loads[candidate],
-            )
-            capacity = max(targets[court_id] - split_loads[court_id], 1)
-            chunk = remaining[:capacity]
-            split_assignments[court_id].append((level_id, chunk))
-            split_loads[court_id] += len(chunk)
-            remaining = remaining[capacity:]
-
-    return split_assignments
+        split_count = (max_load - min_load) // 2
+        assignments[min_court].append(
+            _split_from_largest_stage_item(assignments[max_court], split_count)
+        )
 
 
 def _weighted_interleave(
