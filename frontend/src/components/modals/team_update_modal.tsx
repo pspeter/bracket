@@ -1,12 +1,15 @@
 import {
+  Badge,
   Button,
   Center,
   Checkbox,
   Fieldset,
+  Group,
   Image,
   Modal,
   MultiSelect,
   Select,
+  Text,
   TextInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -18,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { mutate, SWRResponse } from 'swr';
 
 import { DropzoneButton } from '@components/utils/file_upload';
-import { FullTeamWithPlayers, Player, TeamsWithPlayersResponse } from '@openapi';
+import { FullTeamWithPlayers, LevelResponse, Player, TeamsWithPlayersResponse } from '@openapi';
 import {
   getBaseApiUrl,
   getPlayers,
@@ -27,7 +30,32 @@ import {
   handleRequestError,
   removeTeamLogo,
 } from '@services/adapter';
+import { stringToColour } from '@services/lookups';
 import { updateTeam } from '@services/team';
+
+function playerSelectData(players: Player[], levelNameById: Map<number, string>) {
+  return players.map((p) => ({
+    value: `${p.id}`,
+    label: p.name,
+    level_id: p.level_id,
+    level_name: p.level_id != null ? (levelNameById.get(p.level_id) ?? null) : null,
+  }));
+}
+
+type PlayerOption = ReturnType<typeof playerSelectData>[number];
+
+function PlayerSelectOption({ option }: { option: PlayerOption }) {
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <Text size="sm">{option.label}</Text>
+      {option.level_id != null && (
+        <Badge size="xs" color={stringToColour(`level-${option.level_id}`)} variant="light">
+          {option.level_name ?? `Level ${option.level_id}`}
+        </Badge>
+      )}
+    </Group>
+  );
+}
 
 function TeamLogo({ team }: { team: FullTeamWithPlayers | null }) {
   if (team == null || team.logo_path == null) return null;
@@ -61,7 +89,9 @@ export default function TeamUpdateModal({
   }
   const players = [...playersById.values()];
   const maxTeamSize = swrTournament.data?.data.max_team_size;
-  const levels = swrTournament.data?.data.levels ?? [];
+  const levels: LevelResponse[] = swrTournament.data?.data.levels ?? [];
+  const levelNameById = new Map(levels.map((l) => [l.id, l.name]));
+  const playerOptions = playerSelectData(players, levelNameById);
   const [opened, setOpened] = useState(false);
 
   const form = useForm({
@@ -145,7 +175,8 @@ export default function TeamUpdateModal({
           />
 
           <MultiSelect
-            data={players.map((p) => ({ value: `${p.id}`, label: p.name }))}
+            data={playerOptions}
+            renderOption={({ option }) => <PlayerSelectOption option={option as PlayerOption} />}
             label={t('team_member_select_title')}
             placeholder={t('team_member_select_placeholder')}
             maxDropdownHeight={160}

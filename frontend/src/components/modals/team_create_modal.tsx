@@ -1,4 +1,15 @@
-import { Button, Checkbox, Modal, MultiSelect, Select, Tabs, TextInput } from '@mantine/core';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Modal,
+  MultiSelect,
+  Select,
+  Tabs,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconUser, IconUsers, IconUsersPlus } from '@tabler/icons-react';
 import { AxiosError } from 'axios';
@@ -15,7 +26,37 @@ import {
   getTournamentById,
   handleRequestError,
 } from '@services/adapter';
+import { stringToColour } from '@services/lookups';
 import { createTeam, createTeams } from '@services/team';
+
+type PlayerOption = {
+  value: string;
+  label: string;
+  level_id: number | null;
+  level_name: string | null;
+};
+
+function playerSelectData(players: Player[], levelNameById: Map<number, string>): PlayerOption[] {
+  return players.map((p) => ({
+    value: `${p.id}`,
+    label: p.name,
+    level_id: p.level_id,
+    level_name: p.level_id != null ? (levelNameById.get(p.level_id) ?? null) : null,
+  }));
+}
+
+function PlayerSelectOption({ option }: { option: PlayerOption }) {
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <Text size="sm">{option.label}</Text>
+      {option.level_id != null && (
+        <Badge size="xs" color={stringToColour(`level-${option.level_id}`)} variant="light">
+          {option.level_name ?? `Level ${option.level_id}`}
+        </Badge>
+      )}
+    </Group>
+  );
+}
 
 function levelSelectData(levels: LevelResponse[]) {
   return levels.map((l) => ({ value: `${l.id}`, label: l.name }));
@@ -104,6 +145,8 @@ function SingleTeamTab({
     swrTournament.data?.data.players_can_be_in_multiple_teams ?? false;
   const { data } = getPlayers(tournament_id, !allowPlayersInMultipleTeams);
   const players: Player[] = data != null ? data.data.players : [];
+  const levelNameById = new Map(levels.map((l) => [l.id, l.name]));
+  const playerOptions = playerSelectData(players, levelNameById);
   const maxTeamSize = swrTournament.data?.data.max_team_size;
   const form = useForm({
     initialValues: {
@@ -160,7 +203,8 @@ function SingleTeamTab({
       />
 
       <MultiSelect
-        data={players.map((p) => ({ value: `${p.id}`, label: p.name }))}
+        data={playerOptions}
+        renderOption={({ option }) => <PlayerSelectOption option={option as PlayerOption} />}
         label={t('team_member_select_title')}
         placeholder={t('team_member_select_placeholder')}
         maxDropdownHeight={160}
