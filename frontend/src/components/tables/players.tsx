@@ -1,4 +1,4 @@
-import { Badge, Center, Pagination, Table, Text } from '@mantine/core';
+import { Badge, Center, Group, Pagination, Table, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
@@ -9,8 +9,9 @@ import { DateTime } from '@components/utils/datetime';
 import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { Player, PlayersResponse } from '@openapi';
+import { PlayerWithTeams, PlayersResponse } from '@openapi';
 import { deletePlayer } from '@services/player';
+import { stringToColour } from '@services/lookups';
 import TableLayout, { TableState, ThNotSortable, ThSortable, sortTableEntries } from './table';
 
 export function WinDistributionTitle() {
@@ -44,7 +45,7 @@ export default function PlayersTable({
   playerCount: number;
 }) {
   const { t } = useTranslation();
-  const players: Player[] =
+  const players: PlayerWithTeams[] =
     swrPlayersResponse.data != null ? swrPlayersResponse.data.data.players : [];
 
   // const minELOScore = Math.min(...players.map((player) => Number(player.elo_score)));
@@ -58,7 +59,7 @@ export default function PlayersTable({
   }
 
   const rows = players
-    .sort((p1: Player, p2: Player) => sortTableEntries(p1, p2, tableState))
+    .sort((p1: PlayerWithTeams, p2: PlayerWithTeams) => sortTableEntries(p1, p2, tableState))
     .map((player) => (
       <Table.Tr key={player.id}>
         <Table.Td>
@@ -70,6 +71,25 @@ export default function PlayersTable({
         </Table.Td>
         <Table.Td>
           <Text>{player.name}</Text>
+        </Table.Td>
+        <Table.Td>
+          {player.teams.length > 0 ? (
+            <Group gap="xs">
+              {player.teams.map((team) => (
+                <Badge
+                  key={team.id}
+                  color={team.level_id != null ? stringToColour(`level-${team.level_id}`) : 'blue'}
+                  variant="light"
+                >
+                  {team.name}
+                </Badge>
+              ))}
+            </Group>
+          ) : (
+            <Text c="dimmed" fz="sm">
+              —
+            </Text>
+          )}
         </Table.Td>
         <Table.Td>
           <DateTime datetime={player.created} />
@@ -104,6 +124,7 @@ export default function PlayersTable({
             <ThSortable state={tableState} field="name">
               {t('title')}
             </ThSortable>
+            <ThNotSortable>{t('teams_title')}</ThNotSortable>
             <ThSortable state={tableState} field="created">
               {t('created')}
             </ThSortable>

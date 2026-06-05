@@ -327,6 +327,8 @@ export type {
   Player,
   PlayerBody,
   PlayerMultiBody,
+  PlayerTeam,
+  PlayerWithTeams,
   PlayersResponse,
   PostSignupSignupSignupTokenPostData,
   PostSignupSignupSignupTokenPostError,

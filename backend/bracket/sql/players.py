@@ -4,7 +4,7 @@ from heliclockter import datetime_utc
 
 from bracket.database import database
 from bracket.logic.ranking.statistics import START_ELO
-from bracket.models.db.player import Player, PlayerBody, PlayerToInsert
+from bracket.models.db.player import Player, PlayerBody, PlayerToInsert, PlayerWithTeams
 from bracket.schema import players
 from bracket.utils.id_types import PlayerId, TeamId, TournamentId
 from bracket.utils.pagination import PaginationPlayers
@@ -16,15 +16,15 @@ async def get_all_players_in_tournament(
     *,
     not_in_team: bool = False,
     pagination: PaginationPlayers | None = None,
-) -> list[Player]:
+) -> list[PlayerWithTeams]:
     not_in_team_filter = (
         """
         AND NOT EXISTS (
             SELECT 1
-            FROM players_x_teams pxt
-            INNER JOIN teams t ON t.id = pxt.team_id
-            WHERE pxt.player_id = players.id
-            AND t.tournament_id = :tournament_id
+            FROM players_x_teams pxt2
+            INNER JOIN teams t2 ON t2.id = pxt2.team_id
+            WHERE pxt2.player_id = players.id
+            AND t2.tournament_id = :tournament_id
         )
         """
         if not_in_team
@@ -37,10 +37,19 @@ async def get_all_players_in_tournament(
     sort_by = pagination.sort_by if pagination is not None else "name"
     sort_direction = pagination.sort_direction if pagination is not None else ""
     query = f"""
-        SELECT *
+        SELECT
+            players.*,
+            COALESCE(
+                json_agg(json_build_object('id', t.id, 'name', t.name, 'level_id', t.level_id))
+                FILTER (WHERE t.id IS NOT NULL),
+                '[]'::json
+            ) AS teams
         FROM players
+        LEFT JOIN players_x_teams pxt ON pxt.player_id = players.id
+        LEFT JOIN teams t ON t.id = pxt.team_id AND t.tournament_id = :tournament_id
         WHERE players.tournament_id = :tournament_id
         {not_in_team_filter}
+        GROUP BY players.id
         ORDER BY {sort_by} {sort_direction}
         {limit_filter}
         {offset_filter}
@@ -57,7 +66,7 @@ async def get_all_players_in_tournament(
         ),
     )
 
-    return [Player.model_validate(x) for x in result]
+    return [PlayerWithTeams.model_validate(x) for x in result]
 
 
 async def get_player_by_id(player_id: PlayerId, tournament_id: TournamentId) -> Player | None:

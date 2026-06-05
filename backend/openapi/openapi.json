@@ -1337,7 +1337,7 @@
           },
           "players": {
             "items": {
-              "$ref": "#/components/schemas/Player"
+              "$ref": "#/components/schemas/PlayerWithTeams"
             },
             "title": "Players",
             "type": "array"
@@ -1474,6 +1474,111 @@
           "active"
         ],
         "title": "PlayerMultiBody",
+        "type": "object"
+      },
+      "PlayerTeam": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level_id"
+        ],
+        "title": "PlayerTeam",
+        "type": "object"
+      },
+      "PlayerWithTeams": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "draws": {
+            "default": 0,
+            "title": "Draws",
+            "type": "integer"
+          },
+          "elo_score": {
+            "default": "0.0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Elo Score",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "losses": {
+            "default": 0,
+            "title": "Losses",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "swiss_score": {
+            "default": "0.0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Swiss Score",
+            "type": "string"
+          },
+          "teams": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PlayerTeam"
+            },
+            "title": "Teams",
+            "type": "array"
+          },
+          "tournament_id": {
+            "title": "Tournament Id",
+            "type": "integer"
+          },
+          "wins": {
+            "default": 0,
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active",
+          "name",
+          "created",
+          "tournament_id",
+          "elo_score",
+          "swiss_score",
+          "wins",
+          "draws",
+          "losses",
+          "id",
+          "teams"
+        ],
+        "title": "PlayerWithTeams",
         "type": "object"
       },
       "PlayersResponse": {

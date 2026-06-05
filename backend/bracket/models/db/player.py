@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+import json
 from decimal import Decimal
 
 from heliclockter import datetime_utc
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from bracket.models.db.shared import BaseModelORM
-from bracket.utils.id_types import PlayerId, TournamentId
+from bracket.utils.id_types import LevelId, PlayerId, TeamId, TournamentId
 
 
 class PlayerInsertable(BaseModelORM):
@@ -24,6 +27,26 @@ class Player(PlayerInsertable):
 
     def __hash__(self) -> int:
         return self.id
+
+
+class PlayerTeam(BaseModelORM):
+    id: TeamId
+    name: str
+    level_id: LevelId | None = None
+
+
+class PlayerWithTeams(Player):
+    teams: list[PlayerTeam] = []
+
+    @field_validator("teams", mode="before")
+    @staticmethod
+    def handle_teams(values: list[PlayerTeam] | str) -> list[PlayerTeam]:
+        if isinstance(values, str):
+            values_json: list[PlayerTeam] = json.loads(values)
+            if values_json == [None]:
+                return []
+            return values_json
+        return values
 
 
 class PlayerBody(BaseModelORM):

@@ -660,7 +660,7 @@ export type PaginatedPlayers = {
   /**
    * Players
    */
-  players: Array<Player>;
+  players: Array<PlayerWithTeams>;
 };
 
 /**
@@ -749,6 +749,74 @@ export type PlayerMultiBody = {
    * Names
    */
   names: string;
+};
+
+/**
+ * PlayerTeam
+ */
+export type PlayerTeam = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
+   * Name
+   */
+  name: string;
+};
+
+/**
+ * PlayerWithTeams
+ */
+export type PlayerWithTeams = {
+  /**
+   * Active
+   */
+  active: boolean;
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Draws
+   */
+  draws: number;
+  /**
+   * Elo Score
+   */
+  elo_score: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Losses
+   */
+  losses: number;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Swiss Score
+   */
+  swiss_score: string;
+  /**
+   * Teams
+   */
+  teams: Array<PlayerTeam>;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
+  /**
+   * Wins
+   */
+  wins: number;
 };
 
 /**
