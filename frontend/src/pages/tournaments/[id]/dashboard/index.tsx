@@ -1,5 +1,6 @@
 import { Badge, Card, Center, Flex, Grid, Group, Stack, Text } from '@mantine/core';
 import { AiOutlineHourglass } from '@react-icons/all-files/ai/AiOutlineHourglass';
+import { parseAsInteger, useQueryState } from 'nuqs';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -163,6 +164,7 @@ export default function DashboardSchedulePage() {
   const { t } = useTranslation();
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
+  const [levelId] = useQueryState('level', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
   if (!tournamentValid) {
@@ -176,6 +178,13 @@ export default function DashboardSchedulePage() {
     : [];
   const matchesLookup = responseIsValid(swrStagesResponse) ? getMatchLookup(swrStagesResponse) : [];
 
+  const filteredMatchesLookup =
+    levelId != null
+      ? Object.fromEntries(
+          Object.entries(matchesLookup).filter(([, entry]: any) => entry.stage.level_id === levelId)
+        )
+      : matchesLookup;
+
   // TODO: show loading icon.
   if (!responseIsValid(swrStagesResponse)) return null;
 
@@ -184,7 +193,11 @@ export default function DashboardSchedulePage() {
       <DoubleHeader tournamentData={tournamentDataFull} />
       <Center>
         <Group style={{ maxWidth: '48rem', width: '100%' }} px="1rem">
-          <Schedule t={t} matchesLookup={matchesLookup} stageItemsLookup={stageItemsLookup} />
+          <Schedule
+            t={t}
+            matchesLookup={filteredMatchesLookup}
+            stageItemsLookup={stageItemsLookup}
+          />
         </Group>
       </Center>
       <DashboardFooter />

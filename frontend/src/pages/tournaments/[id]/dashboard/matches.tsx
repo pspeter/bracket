@@ -1,5 +1,6 @@
 import { Center, Group, Text } from '@mantine/core';
 import { AiOutlineHourglass } from '@react-icons/all-files/ai/AiOutlineHourglass';
+import { parseAsInteger, useQueryState } from 'nuqs';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +18,7 @@ export default function DashboardMatchesPage() {
   const { t } = useTranslation();
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
+  const [levelId] = useQueryState('level', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
 
@@ -32,6 +34,7 @@ export default function DashboardMatchesPage() {
   const matchesLookup = getMatchLookup(swrStagesResponse);
   const sortedMatches = Object.values(matchesLookup)
     .filter((item: any) => item.match.start_time != null)
+    .filter((item: any) => levelId == null || item.stage.level_id === levelId)
     .sort(
       (m1: any, m2: any) =>
         compareDateTime(m1.match.start_time, m2.match.start_time) ||

@@ -1,5 +1,6 @@
 import { Container, Text } from '@mantine/core';
 import { AiOutlineHourglass } from '@react-icons/all-files/ai/AiOutlineHourglass';
+import { parseAsInteger, useQueryState } from 'nuqs';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
@@ -13,16 +14,22 @@ import { responseIsValid, setTitle } from '@components/utils/util';
 import { StagesWithStageItemsResponse } from '@openapi';
 import { getStagesLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';
-import { getStageItemLookup, getStageItemTeamsLookup } from '@services/lookups';
+import {
+  getStageItemLevelLookup,
+  getStageItemLookup,
+  getStageItemTeamsLookup,
+} from '@services/lookups';
 
 export function StandingsContent({
   swrStagesResponse,
   fontSizeInPixels,
   maxTeamsToDisplay,
+  levelId = null,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   fontSizeInPixels: number;
   maxTeamsToDisplay: number;
+  levelId?: number | null;
 }) {
   const { t } = useTranslation();
 
@@ -30,9 +37,15 @@ export function StandingsContent({
   const stageItemTeamLookup = responseIsValid(swrStagesResponse)
     ? getStageItemTeamsLookup(swrStagesResponse)
     : {};
+  const stageItemLevelLookup = responseIsValid(swrStagesResponse)
+    ? getStageItemLevelLookup(swrStagesResponse)
+    : {};
 
   const rows = Object.keys(stageItemTeamLookup)
     .filter((stageItemId) => stageItemsLookup[stageItemId] != null)
+    .filter(
+      (stageItemId) => levelId == null || stageItemLevelLookup[parseInt(stageItemId)] === levelId
+    )
     .sort((si1: any, si2: any) =>
       stageItemsLookup[si1].name > stageItemsLookup[si2].name ? 1 : -1
     )
@@ -66,6 +79,7 @@ export function StandingsContent({
 export default function DashboardStandingsPage() {
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
+  const [levelId] = useQueryState('level', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
 
@@ -88,6 +102,7 @@ export default function DashboardStandingsPage() {
             swrStagesResponse={swrStagesResponse}
             fontSizeInPixels={16}
             maxTeamsToDisplay={100}
+            levelId={levelId}
           />
         </Container>
       </Container>

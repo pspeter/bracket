@@ -163,6 +163,19 @@ export function getUnscheduledMatches(swrStagesResponse: SWRResponse): MatchWith
   return matches;
 }
 
+export function getStageItemLevelLookup(
+  swrStagesResponse: SWRResponse
+): Record<number, number | null> {
+  if (swrStagesResponse?.data == null) return {};
+  const result: [number, number | null][] = [];
+  for (const stage of swrStagesResponse.data.data as StageWithStageItems[]) {
+    for (const stageItem of stage.stage_items) {
+      result.push([stageItem.id, stage.level_id]);
+    }
+  }
+  return Object.fromEntries(result);
+}
+
 /**
  * Per court, per level: flag any match placed before a match from an earlier stage on that court.
  * Returns the set of violating match IDs.

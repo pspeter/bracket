@@ -4,13 +4,17 @@ import {
   Container,
   Group,
   Image,
+  Select,
   Skeleton,
   Title,
   UnstyledButton,
 } from '@mantine/core';
+import { parseAsInteger, useQueryState } from 'nuqs';
+import { useTranslation } from 'react-i18next';
 import QRCode from 'react-qr-code';
 import { useLocation } from 'react-router';
 
+import { levelSelectData } from '@components/levels/levels';
 import PreloadLink from '@components/utils/link';
 import { getBaseURL } from '@components/utils/util';
 import { TournamentWithLevels } from '@openapi';
@@ -87,14 +91,17 @@ export function TournamentTitle({
 }
 
 export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWithLevels }) {
+  const { t } = useTranslation();
   const navigate = useLocation();
   const endpoint = tournamentData.dashboard_endpoint || '';
   const pathName = navigate.pathname.replace('[id]', endpoint).replace(/\/+$/, '');
+  const [levelId, setLevelId] = useQueryState('level', parseAsInteger);
 
+  const levelParam = levelId != null ? `?level=${levelId}` : '';
   const mainLinks = [
-    { link: `/tournaments/${endpoint}/dashboard`, label: 'Live' },
-    { link: `/tournaments/${endpoint}/dashboard/matches`, label: 'Matches' },
-    { link: `/tournaments/${endpoint}/dashboard/standings`, label: 'Standings' },
+    { link: `/tournaments/${endpoint}/dashboard${levelParam}`, label: 'Live' },
+    { link: `/tournaments/${endpoint}/dashboard/matches${levelParam}`, label: 'Matches' },
+    { link: `/tournaments/${endpoint}/dashboard/standings${levelParam}`, label: 'Standings' },
   ];
 
   const mainItems = mainLinks.map((item) => (
@@ -102,7 +109,7 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
       href={item.link}
       key={item.label}
       className={classes.mainLink}
-      data-active={item.link === pathName || undefined}
+      data-active={item.link.split('?')[0] === pathName || undefined}
     >
       {item.label}
     </PreloadLink>
@@ -117,8 +124,22 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
           </Title>
         </UnstyledButton>
         <Box className={classes.links}>
-          <Group gap={0} className={classes.mainLinks}>
-            {mainItems}
+          <Group gap="md" align="center" wrap="nowrap">
+            <Group gap={0} className={classes.mainLinks}>
+              {mainItems}
+            </Group>
+            {tournamentData.levels.length > 0 && (
+              <Select
+                size="xs"
+                w={140}
+                data={levelSelectData(tournamentData.levels, t('all_levels_label'))}
+                value={levelId != null ? `${levelId}` : 'all'}
+                onChange={(val) =>
+                  setLevelId(val === 'all' || val === null ? null : parseInt(val, 10))
+                }
+                placeholder={t('filter_level_placeholder')}
+              />
+            )}
           </Group>
         </Box>
       </Container>

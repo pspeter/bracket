@@ -6,6 +6,7 @@ import {
   Flex,
   Grid,
   Group,
+  Select,
   Stack,
   Text,
   Title,
@@ -13,9 +14,11 @@ import {
 } from '@mantine/core';
 import { AiOutlineHourglass } from '@react-icons/all-files/ai/AiOutlineHourglass';
 import { IconAlertCircle } from '@tabler/icons-react';
+import { parseAsInteger, useQueryState } from 'nuqs';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { levelSelectData } from '@components/levels/levels';
 import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { Time, formatTime } from '@components/utils/datetime';
@@ -24,7 +27,7 @@ import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { MatchWithDetails } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getCourts, getStages } from '@services/adapter';
+import { getCourts, getStages, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup, stringToColour } from '@services/lookups';
 
 function ScheduleRow({
@@ -232,11 +235,21 @@ export default function ResultsPage() {
   const { tournamentData } = getTournamentIdFromRouter();
   const swrStagesResponse = getStages(tournamentData.id);
   const swrCourtsResponse = getCourts(tournamentData.id);
+  const swrTournamentResponse = getTournamentById(tournamentData.id);
+  const levels = swrTournamentResponse.data?.data.levels ?? [];
+  const [levelId, setLevelId] = useQueryState('level', parseAsInteger);
 
   const stageItemsLookup = responseIsValid(swrStagesResponse)
     ? getStageItemLookup(swrStagesResponse)
     : [];
   const matchesLookup = responseIsValid(swrStagesResponse) ? getMatchLookup(swrStagesResponse) : [];
+
+  const filteredMatchesLookup =
+    levelId != null
+      ? Object.fromEntries(
+          Object.entries(matchesLookup).filter(([, entry]: any) => entry.stage.level_id === levelId)
+        )
+      : matchesLookup;
 
   if (!responseIsValid(swrStagesResponse)) return null;
   if (!responseIsValid(swrCourtsResponse)) return null;
@@ -264,11 +277,22 @@ export default function ResultsPage() {
         setOpened={modalSetOpenedAndUpdateMatch}
         round={null}
       />
-      <Title>{t('results_title')}</Title>
+      <Group justify="space-between" align="center">
+        <Title>{t('results_title')}</Title>
+        {levels.length > 0 && (
+          <Select
+            size="sm"
+            w={160}
+            data={levelSelectData(levels, t('all_levels_label'))}
+            value={levelId != null ? `${levelId}` : 'all'}
+            onChange={(val) => setLevelId(val === 'all' || val === null ? null : parseInt(val, 10))}
+          />
+        )}
+      </Group>
       <Center mt="1rem">
         <Schedule
           t={t}
-          matchesLookup={matchesLookup}
+          matchesLookup={filteredMatchesLookup}
           stageItemsLookup={stageItemsLookup}
           openMatchModal={openMatchModal}
         />
