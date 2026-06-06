@@ -341,6 +341,20 @@ function GeneralTournamentForm({
               {t('signup_view_dashboard')}
             </Button>
           )}
+          {tournament.dashboard_endpoint != null &&
+          tournament.dashboard_endpoint !== '' &&
+          tournament.dashboard_public ? (
+            <Button
+              component="a"
+              href={`${getBaseURL()}/dashboard-qr/${tournament.dashboard_endpoint}`}
+              target="_blank"
+              rel="noreferrer"
+              leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
+              variant="light"
+            >
+              {t('dashboard_show_qr_button')}
+            </Button>
+          ) : null}
         </Group>
 
         <Checkbox

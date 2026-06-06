@@ -23,6 +23,7 @@ import PasswordResetPage from './pages/password_reset';
 import ScoreTrackingPage from './pages/score_tracking';
 import ScoreTrackingMatchPage from './pages/score_tracking_match';
 import ScoreTrackingQrPage from './pages/score_tracking_qr';
+import DashboardQrPage from './pages/dashboard_qr';
 import SignupPage from './pages/signup';
 import SignupQrPage from './pages/signup_qr';
 import DashboardSchedulePage from './pages/tournaments/[id]/dashboard';
@@ -97,6 +98,7 @@ createRoot(document.getElementById('root')!).render(
                 element={<ScoreTrackingMatchPage />}
               />
               <Route path="/score-tracking-qr/:token" element={<ScoreTrackingQrPage />} />
+              <Route path="/dashboard-qr/:endpoint" element={<DashboardQrPage />} />
 
               <Route path="/tournaments">
                 <Route path=":id">

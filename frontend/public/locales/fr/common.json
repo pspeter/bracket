@@ -339,5 +339,8 @@
     "match_state_not_started": "Not started",
     "match_state_in_progress": "In progress",
     "match_state_completed": "Completed",
-    "no_live_matches_title": "No live matches right now"
+    "no_live_matches_title": "No live matches right now",
+    "dashboard_show_qr_button": "Show QR code",
+    "dashboard_qr_heading": "Dashboard QR code",
+    "dashboard_qr_invalid_link": "Invalid dashboard link"
 }

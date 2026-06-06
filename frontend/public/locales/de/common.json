@@ -340,5 +340,8 @@
     "match_state_not_started": "Nicht gestartet",
     "match_state_in_progress": "Läuft",
     "match_state_completed": "Abgeschlossen",
-    "no_live_matches_title": "Zurzeit keine Live-Spiele"
+    "no_live_matches_title": "Zurzeit keine Live-Spiele",
+    "dashboard_show_qr_button": "QR-Code anzeigen",
+    "dashboard_qr_heading": "QR-Code für das Dashboard",
+    "dashboard_qr_invalid_link": "Ungültiger Dashboard-Link"
 }

@@ -366,5 +366,8 @@
     "signup_redirecting": "Redirecting to the dashboard…",
     "signup_qr_heading": "Signup QR code",
     "signup_level_label": "Level",
-    "signup_level_select_placeholder": "Select a level"
+    "signup_level_select_placeholder": "Select a level",
+    "dashboard_show_qr_button": "Show QR code",
+    "dashboard_qr_heading": "Dashboard QR code",
+    "dashboard_qr_invalid_link": "Invalid dashboard link"
 }
