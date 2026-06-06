@@ -1848,6 +1848,10 @@ export type TournamentBody = {
    */
   players_can_be_in_multiple_teams: boolean;
   /**
+   * Rules
+   */
+  rules: string | null;
+  /**
    * Score Tracking Enabled
    */
   score_tracking_enabled: boolean;
@@ -1920,6 +1924,10 @@ export type TournamentUpdateBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Rules
+   */
+  rules: string | null;
   /**
    * Score Tracking Enabled
    */
@@ -1994,6 +2002,10 @@ export type TournamentWithLevels = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Rules
+   */
+  rules: string | null;
   /**
    * Score Tracking Enabled
    */
