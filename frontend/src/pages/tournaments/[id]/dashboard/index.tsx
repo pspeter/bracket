@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { DashboardFooter } from '@components/dashboard/footer';
 import { DoubleHeader, getTournamentHeadTitle } from '@components/dashboard/layout';
+import { LevelBadge } from '@components/levels/levels';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { Time } from '@components/utils/datetime';
 import {
@@ -16,6 +17,7 @@ import {
 } from '@components/utils/match';
 import { Translator } from '@components/utils/types';
 import { responseIsValid, setTitle } from '@components/utils/util';
+import { LevelResponse } from '@openapi';
 import { getStagesLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';
 import { getMatchLookup, getStageItemLookup, stringToColour } from '@services/lookups';
@@ -24,10 +26,12 @@ export function ScheduleRow({
   data,
   stageItemsLookup,
   matchesLookup,
+  levels,
 }: {
   data: any;
   stageItemsLookup: any;
   matchesLookup: any;
+  levels: LevelResponse[];
 }) {
   const { t } = useTranslation();
   const colors = getScoreColors(data.match);
@@ -49,12 +53,11 @@ export function ScheduleRow({
             </Center>
           </Grid.Col>
           <Grid.Col mb="0rem" span={4}>
-            <Flex justify="right">
+            <Flex justify="right" align="center" gap="xs" mr="md" mt="0.8rem">
+              <LevelBadge levels={levels} levelId={data.stage.level_id} />
               <Badge
                 color={stringToColour(`${data.stageItem.id}`)}
                 variant="outline"
-                mr="md"
-                mt="0.8rem"
                 size="md"
               >
                 {data.stageItem.name}
@@ -113,10 +116,12 @@ export function Schedule({
   t,
   stageItemsLookup,
   matchesLookup,
+  levels,
 }: {
   t: Translator;
   stageItemsLookup: any;
   matchesLookup: any;
+  levels: LevelResponse[];
 }) {
   const matches: any[] = Object.values(matchesLookup)
     .map((item: any) => item)
@@ -144,6 +149,7 @@ export function Schedule({
         data={data}
         stageItemsLookup={stageItemsLookup}
         matchesLookup={matchesLookup}
+        levels={levels}
       />
     );
   }
@@ -197,6 +203,7 @@ export default function DashboardSchedulePage() {
             t={t}
             matchesLookup={filteredMatchesLookup}
             stageItemsLookup={stageItemsLookup}
+            levels={tournamentDataFull.levels}
           />
         </Group>
       </Center>

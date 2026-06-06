@@ -70,6 +70,7 @@ export default function DashboardMatchesPage() {
         data={data}
         stageItemsLookup={stageItemsLookup}
         matchesLookup={matchesLookup}
+        levels={tournamentDataFull.levels}
       />
     );
   }
