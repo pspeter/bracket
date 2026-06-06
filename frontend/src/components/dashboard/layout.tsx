@@ -99,9 +99,23 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
 
   const levelParam = levelId != null ? `?level=${levelId}` : '';
   const mainLinks = [
-    { link: `/tournaments/${endpoint}/dashboard${levelParam}`, label: 'Live' },
-    { link: `/tournaments/${endpoint}/dashboard/matches${levelParam}`, label: 'Matches' },
-    { link: `/tournaments/${endpoint}/dashboard/standings${levelParam}`, label: 'Standings' },
+    { link: `/tournaments/${endpoint}/dashboard${levelParam}`, label: t('dashboard_tab_live') },
+    {
+      link: `/tournaments/${endpoint}/dashboard/matches${levelParam}`,
+      label: t('dashboard_tab_matches'),
+    },
+    {
+      link: `/tournaments/${endpoint}/dashboard/standings${levelParam}`,
+      label: t('dashboard_tab_standings'),
+    },
+    ...(tournamentData.rules?.trim()
+      ? [
+          {
+            link: `/tournaments/${endpoint}/dashboard/rules`,
+            label: t('dashboard_tab_rules'),
+          },
+        ]
+      : []),
   ];
 
   const mainItems = mainLinks.map((item) => (

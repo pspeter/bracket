@@ -342,5 +342,9 @@
     "no_live_matches_title": "No live matches right now",
     "dashboard_show_qr_button": "Show QR code",
     "dashboard_qr_heading": "Dashboard QR code",
-    "dashboard_qr_invalid_link": "Invalid dashboard link"
+    "dashboard_qr_invalid_link": "Invalid dashboard link",
+    "dashboard_tab_live": "Ao vivo",
+    "dashboard_tab_matches": "Partidas",
+    "dashboard_tab_standings": "Classificação",
+    "dashboard_tab_rules": "Regras"
 }

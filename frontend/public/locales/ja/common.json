@@ -342,5 +342,9 @@
     "no_live_matches_title": "No live matches right now",
     "dashboard_show_qr_button": "Show QR code",
     "dashboard_qr_heading": "Dashboard QR code",
-    "dashboard_qr_invalid_link": "Invalid dashboard link"
+    "dashboard_qr_invalid_link": "Invalid dashboard link",
+    "dashboard_tab_live": "ライブ",
+    "dashboard_tab_matches": "試合",
+    "dashboard_tab_standings": "順位表",
+    "dashboard_tab_rules": "ルール"
 }

@@ -40,8 +40,10 @@
     "react-dom": "19.2.0",
     "react-i18next": "16.6.2",
     "react-icons": "5.6.0",
+    "react-markdown": "^10.1.0",
     "react-qr-code": "2.0.18",
     "react-router": "7.14.0",
+    "remark-gfm": "^4.0.1",
     "swr": "2.4.1",
     "vite-tsconfig-paths": "^6.1.1"
   },

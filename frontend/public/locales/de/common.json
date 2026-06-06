@@ -344,5 +344,9 @@
     "no_live_matches_title": "Zurzeit keine Live-Spiele",
     "dashboard_show_qr_button": "QR-Code anzeigen",
     "dashboard_qr_heading": "QR-Code für das Dashboard",
-    "dashboard_qr_invalid_link": "Ungültiger Dashboard-Link"
+    "dashboard_qr_invalid_link": "Ungültiger Dashboard-Link",
+    "dashboard_tab_live": "Live",
+    "dashboard_tab_matches": "Spiele",
+    "dashboard_tab_standings": "Tabelle",
+    "dashboard_tab_rules": "Regeln"
 }

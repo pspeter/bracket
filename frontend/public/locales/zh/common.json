@@ -342,5 +342,9 @@
     "no_live_matches_title": "No live matches right now",
     "dashboard_show_qr_button": "Show QR code",
     "dashboard_qr_heading": "Dashboard QR code",
-    "dashboard_qr_invalid_link": "Invalid dashboard link"
+    "dashboard_qr_invalid_link": "Invalid dashboard link",
+    "dashboard_tab_live": "直播",
+    "dashboard_tab_matches": "赛程",
+    "dashboard_tab_standings": "积分榜",
+    "dashboard_tab_rules": "规则"
 }

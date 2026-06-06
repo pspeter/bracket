@@ -370,5 +370,9 @@
     "signup_level_select_placeholder": "Select a level",
     "dashboard_show_qr_button": "Show QR code",
     "dashboard_qr_heading": "Dashboard QR code",
-    "dashboard_qr_invalid_link": "Invalid dashboard link"
+    "dashboard_qr_invalid_link": "Invalid dashboard link",
+    "dashboard_tab_live": "Live",
+    "dashboard_tab_matches": "Matches",
+    "dashboard_tab_standings": "Standings",
+    "dashboard_tab_rules": "Rules"
 }
