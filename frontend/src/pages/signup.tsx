@@ -2,6 +2,7 @@ import {
   Alert,
   Button,
   Container,
+  Image,
   Loader,
   Radio,
   Select,
@@ -19,6 +20,7 @@ import { useNavigate, useParams } from 'react-router';
 
 import { getBaseURL } from '@components/utils/util';
 import type { LevelResponse, SignupBody, SignupInfoResponse, SignupTeamInfo } from '@openapi';
+import { getBaseApiUrl } from '@services/adapter';
 import { getSignupInfo, submitSignup } from '@services/signup';
 
 type PageState = 'loading' | 'load_error' | 'form' | 'success';
@@ -218,6 +220,14 @@ export default function SignupPage() {
           })}
         >
           <Stack gap="md">
+            {info.data.logo_path != null && (
+              <Image
+                radius="lg"
+                alt="Logo of the tournament"
+                src={`${getBaseApiUrl()}/static/tournament-logos/${info.data.logo_path}`}
+                style={{ maxWidth: '200px', margin: '0 auto' }}
+              />
+            )}
             <Title order={2}>
               {t('signup_page_title', { tournamentName: info.data.tournament_name })}
             </Title>

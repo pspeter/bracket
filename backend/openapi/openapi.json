@@ -2110,6 +2110,17 @@
             "title": "Levels",
             "type": "array"
           },
+          "logo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Path"
+          },
           "max_team_size": {
             "title": "Max Team Size",
             "type": "integer"
@@ -2141,7 +2152,8 @@
           "max_team_size",
           "dashboard_endpoint",
           "signup_team_choice_enabled",
-          "levels"
+          "levels",
+          "logo_path"
         ],
         "title": "SignupTournamentInfo",
         "type": "object"

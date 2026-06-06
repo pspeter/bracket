@@ -1108,6 +1108,10 @@ export type SignupTournamentInfo = {
    */
   levels: Array<LevelResponse>;
   /**
+   * Logo Path
+   */
+  logo_path: string | null;
+  /**
    * Max Team Size
    */
   max_team_size: number;

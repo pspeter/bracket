@@ -81,6 +81,7 @@ async def get_signup_info(
             dashboard_endpoint=tournament.dashboard_endpoint,
             signup_team_choice_enabled=tournament.signup_team_choice_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
+            logo_path=tournament.logo_path,
         )
     )
 
