@@ -286,3 +286,49 @@ async def test_non_public_tournament_endpoints_blocked_for_unauthenticated_users
                 f"Expected 401 for unauthenticated access to non-public endpoint {endpoint!r}, "
                 f"got: {response}"
             )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_archived_tournament_endpoints_blocked_for_unauthenticated_users(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    Archiving a tournament must auto-unpublish its public dashboard: anonymous requests against
+    tournament endpoints (by id or by endpoint name) must be rejected even when dashboard_public
+    is True. The privacy notice commits to this behavior (auto-unpublish on close).
+    """
+    async with inserted_tournament(
+        DUMMY_TOURNAMENT.model_copy(
+            update={
+                "club_id": auth_context.club.id,
+                "dashboard_public": True,
+                "dashboard_endpoint": "archived-endpoint",
+                "status": TournamentStatus.ARCHIVED,
+            }
+        )
+    ) as archived_tournament:
+        tournament_id = archived_tournament.id
+        for endpoint in (
+            f"tournaments/{tournament_id}",
+            f"tournaments/{tournament_id}/courts",
+            f"tournaments/{tournament_id}/teams",
+            f"tournaments/{tournament_id}/rankings",
+            f"tournaments/{tournament_id}/stages?no_draft_rounds=true",
+        ):
+            response = await send_request(HTTPMethod.GET, endpoint)
+            assert response == UNAUTHORIZED_RESPONSE, (
+                f"Expected 401 for unauthenticated access to archived endpoint {endpoint!r}, "
+                f"got: {response}"
+            )
+
+        # Frontend always sends an Authorization header (with empty token when not logged in),
+        # so we mirror that here to exercise the dependency body rather than FastAPI's
+        # OAuth2PasswordBearer auto-rejection.
+        response = await send_request(
+            HTTPMethod.GET,
+            "tournaments?endpoint_name=archived-endpoint",
+            headers={"Authorization": "bearer "},
+        )
+        assert response == {"detail": "Could not validate credentials"}, (
+            f"Expected 401 for endpoint-name lookup of archived tournament, got: {response}"
+        )

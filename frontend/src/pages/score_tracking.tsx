@@ -1,6 +1,7 @@
 import { useParams, useSearchParams } from 'react-router';
 
 import { ScoreTrackingListView } from '@components/score_tracking/views';
+import { PublicFooter } from '@components/utils/public_footer';
 import { getScoreTrackingInfo } from '@services/score_tracking';
 
 export default function ScoreTrackingPage() {
@@ -11,19 +12,22 @@ export default function ScoreTrackingPage() {
   const swrResponse = getScoreTrackingInfo(score_tracking_token ?? null, courtId);
 
   return (
-    <ScoreTrackingListView
-      swrResponse={swrResponse}
-      courtId={courtId}
-      onCourtIdChange={(nextCourtId) => {
-        const next = new URLSearchParams(searchParams);
-        if (nextCourtId == null) {
-          next.delete('court_id');
-        } else {
-          next.set('court_id', `${nextCourtId}`);
-        }
-        setSearchParams(next);
-      }}
-      getMatchHref={(matchId) => `/score-tracking/${score_tracking_token}/matches/${matchId}`}
-    />
+    <>
+      <ScoreTrackingListView
+        swrResponse={swrResponse}
+        courtId={courtId}
+        onCourtIdChange={(nextCourtId) => {
+          const next = new URLSearchParams(searchParams);
+          if (nextCourtId == null) {
+            next.delete('court_id');
+          } else {
+            next.set('court_id', `${nextCourtId}`);
+          }
+          setSearchParams(next);
+        }}
+        getMatchHref={(matchId) => `/score-tracking/${score_tracking_token}/matches/${matchId}`}
+      />
+      <PublicFooter />
+    </>
   );
 }

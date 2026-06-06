@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
+import { PublicFooter } from '@components/utils/public_footer';
 import { getBaseURL } from '@components/utils/util';
 import type { LevelResponse, SignupBody, SignupInfoResponse, SignupTeamInfo } from '@openapi';
 import { getBaseApiUrl } from '@services/adapter';
@@ -314,6 +315,7 @@ export default function SignupPage() {
           </Stack>
         </form>
       )}
+      <PublicFooter />
     </Container>
   );
 }

@@ -21,6 +21,7 @@ import DashboardQrPage from './pages/dashboard_qr';
 import CreateDemoAccountPage from './pages/demo';
 import LoginPage from './pages/login';
 import PasswordResetPage from './pages/password_reset';
+import PrivacyPage from './pages/privacy';
 import ScoreTrackingPage from './pages/score_tracking';
 import ScoreTrackingMatchPage from './pages/score_tracking_match';
 import ScoreTrackingQrPage from './pages/score_tracking_qr';
@@ -90,6 +91,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/user" element={<UserPage />} />
               <Route path="/password-reset" element={<PasswordResetPage />} />
               <Route path="/create-account" element={<CreateAccountPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/signup/:signup_token" element={<SignupPage />} />
               <Route path="/signup-qr/:token" element={<SignupQrPage />} />
               <Route path="/score-tracking/:score_tracking_token" element={<ScoreTrackingPage />} />

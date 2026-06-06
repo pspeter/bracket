@@ -10,7 +10,7 @@ from starlette.requests import Request
 
 from bracket.config import config
 from bracket.database import database
-from bracket.models.db.tournament import Tournament
+from bracket.models.db.tournament import Tournament, TournamentStatus
 from bracket.models.db.user import UserInDB, UserPublic
 from bracket.schema import tournaments
 from bracket.sql.signup import (
@@ -146,7 +146,11 @@ async def user_authenticated_or_public_dashboard(
     tournaments_fetched = await fetch_all_parsed(
         database, Tournament, tournaments.select().where(tournaments.c.id == tournament_id)
     )
-    if len(tournaments_fetched) < 1 or not tournaments_fetched[0].dashboard_public:
+    if (
+        len(tournaments_fetched) < 1
+        or not tournaments_fetched[0].dashboard_public
+        or tournaments_fetched[0].status != TournamentStatus.OPEN
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials or page is not publicly available",
@@ -182,7 +186,8 @@ async def user_authenticated_or_public_dashboard_by_endpoint_name(
     token: str = Depends(oauth2_scheme), endpoint_name: str | None = None
 ) -> UserPublic | None:
     if endpoint_name is not None:
-        if await sql_get_tournament_by_endpoint_name(endpoint_name) is None:
+        tournament = await sql_get_tournament_by_endpoint_name(endpoint_name)
+        if tournament is None or tournament.status != TournamentStatus.OPEN:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
