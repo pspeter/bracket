@@ -3347,6 +3347,18 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "rules": {
+            "anyOf": [
+              {
+                "maxLength": 50000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
           "score_tracking_enabled": {
             "default": false,
             "title": "Score Tracking Enabled",
@@ -3379,6 +3391,7 @@
           "max_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
+          "rules",
           "club_id",
           "levels"
         ],
@@ -3459,6 +3472,18 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "rules": {
+            "anyOf": [
+              {
+                "maxLength": 50000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
           "score_tracking_enabled": {
             "default": false,
             "title": "Score Tracking Enabled",
@@ -3490,7 +3515,8 @@
           "signup_enabled",
           "max_team_size",
           "signup_team_choice_enabled",
-          "score_tracking_enabled"
+          "score_tracking_enabled",
+          "rules"
         ],
         "title": "TournamentUpdateBody",
         "type": "object"
@@ -3572,6 +3598,17 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "rules": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
           "score_tracking_enabled": {
             "default": false,
             "title": "Score Tracking Enabled",
@@ -3638,6 +3675,7 @@
           "signup_team_choice_enabled",
           "score_tracking_enabled",
           "score_tracking_token",
+          "rules",
           "id",
           "levels"
         ],

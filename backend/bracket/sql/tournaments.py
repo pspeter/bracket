@@ -95,7 +95,8 @@ async def sql_update_tournament(
             signup_enabled = :signup_enabled,
             max_team_size = :max_team_size,
             signup_team_choice_enabled = :signup_team_choice_enabled,
-            score_tracking_enabled = :score_tracking_enabled
+            score_tracking_enabled = :score_tracking_enabled,
+            rules = :rules
             {token_clause}
         WHERE tournaments.id = :tournament_id
         """

@@ -56,6 +56,7 @@ tournaments = Table(
     Column("signup_team_choice_enabled", Boolean, nullable=False, server_default="true"),
     Column("score_tracking_enabled", Boolean, nullable=False, server_default="false"),
     Column("score_tracking_token", String, nullable=True),
+    Column("rules", Text, nullable=True),
 )
 
 levels = Table(
