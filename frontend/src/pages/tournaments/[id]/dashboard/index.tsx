@@ -55,11 +55,7 @@ export function ScheduleRow({
           <Grid.Col mb="0rem" span={4}>
             <Flex justify="right" align="center" gap="xs" mr="md" mt="0.8rem">
               <LevelBadge levels={levels} levelId={data.stage.level_id} />
-              <Badge
-                color={stringToColour(`${data.stageItem.id}`)}
-                variant="outline"
-                size="md"
-              >
+              <Badge color={stringToColour(`${data.stageItem.id}`)} variant="outline" size="md">
                 {data.stageItem.name}
               </Badge>
             </Flex>

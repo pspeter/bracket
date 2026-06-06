@@ -997,6 +997,10 @@ export type RoundWithMatches = {
  */
 export type ScoreTrackingInfo = {
   /**
+   * Courts
+   */
+  courts: Array<Court>;
+  /**
    * Has Active Stage
    */
   has_active_stage: boolean;
@@ -2292,7 +2296,12 @@ export type GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetData = {
      */
     score_tracking_token: string;
   };
-  query?: never;
+  query?: {
+    /**
+     * Court Id
+     */
+    court_id?: number | null;
+  };
   url: '/score-tracking/{score_tracking_token}';
 };
 
@@ -3600,7 +3609,12 @@ export type GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackin
      */
     tournament_id: number;
   };
-  query?: never;
+  query?: {
+    /**
+     * Court Id
+     */
+    court_id?: number | null;
+  };
   url: '/tournaments/{tournament_id}/score-tracking';
 };
 

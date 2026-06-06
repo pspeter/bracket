@@ -291,8 +291,10 @@ async def sql_get_match_with_details(
 
 async def sql_get_scheduled_matches_with_details(
     tournament_id: TournamentId,
+    court_id: CourtId | None = None,
 ) -> list[MatchWithDetails]:
-    query = """
+    court_filter = "AND matches.court_id = :court_id" if court_id is not None else ""
+    query = f"""
         WITH inputs_with_teams AS (
             SELECT DISTINCT ON (stage_item_inputs.id)
                 stage_item_inputs.*,
@@ -321,9 +323,13 @@ async def sql_get_scheduled_matches_with_details(
         AND stages.is_active IS TRUE
         AND rounds.is_draft IS FALSE
         AND matches.start_time IS NOT NULL
+        {court_filter}
         ORDER BY matches.id, matches.start_time, c.name, matches.id
         """
-    result = await database.fetch_all(query=query, values={"tournament_id": tournament_id})
+    values: dict[str, object] = {"tournament_id": tournament_id}
+    if court_id is not None:
+        values["court_id"] = court_id
+    result = await database.fetch_all(query=query, values=values)
     matches = [MatchWithDetails.model_validate(dict(row._mapping)) for row in result]
     return sorted(
         matches,

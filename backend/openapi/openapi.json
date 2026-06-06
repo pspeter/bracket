@@ -1904,6 +1904,14 @@
       },
       "ScoreTrackingInfo": {
         "properties": {
+          "courts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Court"
+            },
+            "title": "Courts",
+            "type": "array"
+          },
           "has_active_stage": {
             "title": "Has Active Stage",
             "type": "boolean"
@@ -1937,7 +1945,8 @@
           "tournament_name",
           "matches",
           "has_active_stage",
-          "levels"
+          "levels",
+          "courts"
         ],
         "title": "ScoreTrackingInfo",
         "type": "object"
@@ -4060,6 +4069,22 @@
             "schema": {
               "title": "Score Tracking Token",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "court_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Court Id"
             }
           }
         ],
@@ -6198,6 +6223,22 @@
             "schema": {
               "title": "Tournament Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "court_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Court Id"
             }
           }
         ],

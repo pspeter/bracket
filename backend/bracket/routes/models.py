@@ -140,6 +140,7 @@ class ScoreTrackingInfo(BaseModel):
     matches: list[MatchWithDetails]
     has_active_stage: bool
     levels: list[LevelResponse] = []
+    courts: list[Court] = []
 
 
 class ScoreTrackingInfoResponse(DataResponse[ScoreTrackingInfo]):

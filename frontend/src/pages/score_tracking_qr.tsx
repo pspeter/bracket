@@ -1,12 +1,13 @@
 import { Alert, Center, Container, Stack, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-qr-code';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 
 import { getBaseURL } from '@components/utils/util';
 
 export default function ScoreTrackingQrPage() {
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation();
 
   if (token == null || token.trim() === '') {
@@ -17,7 +18,12 @@ export default function ScoreTrackingQrPage() {
     );
   }
 
-  const url = `${getBaseURL()}/score-tracking/${token}`;
+  const courtIdParam = searchParams.get('court_id');
+  const courtQuery =
+    courtIdParam != null && courtIdParam !== ''
+      ? `?court_id=${encodeURIComponent(courtIdParam)}`
+      : '';
+  const url = `${getBaseURL()}/score-tracking/${token}${courtQuery}`;
 
   return (
     <Container size="sm" py="xl">

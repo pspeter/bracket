@@ -9,6 +9,7 @@ import {
   Flex,
   Grid,
   Group,
+  Select,
   Stack,
   Text,
   Title,
@@ -60,10 +61,14 @@ export function ScoreTrackingListView({
   swrResponse,
   getMatchHref,
   stagesHref,
+  courtId,
+  onCourtIdChange,
 }: {
   swrResponse: SWRResponse<ScoreTrackingInfoResponse>;
   getMatchHref: (matchId: number) => string;
   stagesHref?: string;
+  courtId?: number | null;
+  onCourtIdChange?: (next: number | null) => void;
 }) {
   const { t } = useTranslation();
   const [filteredLevelId, setFilteredLevelId] = useState('all');
@@ -82,9 +87,11 @@ export function ScoreTrackingListView({
   const responseData = swrResponse.data!;
   const info = responseData.data;
   const levels = info.levels ?? [];
+  const courts = info.courts ?? [];
   const matches = (info.matches || []).filter(
     (match) => filteredLevelId === 'all' || `${match.level_id}` === filteredLevelId
   );
+  const courtSelectValue = courtId == null ? 'all' : `${courtId}`;
   const pseudoStagesResponse = getPseudoStagesResponse(matches);
   const stageItemsLookup = getStageItemLookup(pseudoStagesResponse as any);
   const matchesLookup = getMatchLookup(pseudoStagesResponse as any);
@@ -128,6 +135,24 @@ export function ScoreTrackingListView({
           placeholder={t('filter_level_placeholder')}
           allLevelsLabel={t('all_levels_label')}
         />
+        {onCourtIdChange != null && courts.length > 0 ? (
+          <Select
+            label={t('filter_court_label')}
+            placeholder={t('filter_court_placeholder')}
+            value={courtSelectValue}
+            data={[
+              { value: 'all', label: t('all_courts_label') },
+              ...courts.map((court) => ({ value: `${court.id}`, label: court.name })),
+            ]}
+            onChange={(next) => {
+              if (next == null || next === 'all') {
+                onCourtIdChange(null);
+              } else {
+                onCourtIdChange(Number(next));
+              }
+            }}
+          />
+        ) : null}
         {renderEmptyState()}
         {matches.map((match) => (
           <Card key={match.id} withBorder radius="md">

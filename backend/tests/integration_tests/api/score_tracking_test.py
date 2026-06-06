@@ -360,3 +360,103 @@ async def test_authenticated_score_tracking_update_works_when_public_link_disabl
         assert updated_match.stage_item_input1_score == 7
         assert updated_match.stage_item_input2_score == 5
         assert updated_match.state.name == "IN_PROGRESS"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_score_tracking_filters_matches_by_court_id(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input1_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input2_inserted,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court1_inserted,
+        inserted_court(
+            DUMMY_COURT2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court2_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": court1_inserted.id,
+                }
+            )
+        ) as match_on_court1,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": court2_inserted.id,
+                }
+            )
+        ) as match_on_court2,
+    ):
+        await database.execute(
+            query=tournaments.update()
+            .where(tournaments.c.id == auth_context.tournament.id)
+            .values(score_tracking_enabled=True, score_tracking_token="court-filter-token"),
+        )
+        try:
+            authed_filtered = await send_tournament_request(
+                HTTPMethod.GET,
+                f"score-tracking?court_id={court1_inserted.id}",
+                auth_context,
+                {},
+            )
+            public_filtered = await send_request(
+                HTTPMethod.GET,
+                f"score-tracking/court-filter-token?court_id={court1_inserted.id}",
+            )
+            authed_unfiltered = await send_tournament_request(
+                HTTPMethod.GET, "score-tracking", auth_context, {}
+            )
+
+            authed_filtered_ids = {m["id"] for m in authed_filtered["data"]["matches"]}
+            public_filtered_ids = {m["id"] for m in public_filtered["data"]["matches"]}
+            authed_unfiltered_ids = {m["id"] for m in authed_unfiltered["data"]["matches"]}
+
+            assert authed_filtered_ids == {match_on_court1.id}
+            assert public_filtered_ids == {match_on_court1.id}
+            assert authed_unfiltered_ids == {match_on_court1.id, match_on_court2.id}
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == auth_context.tournament.id)
+                .values(score_tracking_enabled=False, score_tracking_token=None),
+            )

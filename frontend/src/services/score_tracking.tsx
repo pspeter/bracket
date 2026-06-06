@@ -8,11 +8,18 @@ const fetcher = (url: string) =>
     .get(url)
     .then((res: { data: any }) => res.data);
 
+function buildCourtFilterQuery(courtId: number | null): string {
+  return courtId == null ? '' : `?court_id=${courtId}`;
+}
+
 export function getScoreTrackingInfo(
-  scoreTrackingToken: string | null
+  scoreTrackingToken: string | null,
+  courtId: number | null = null
 ): SWRResponse<ScoreTrackingInfoResponse> {
   return useSWR(
-    scoreTrackingToken == null ? null : `score-tracking/${scoreTrackingToken}`,
+    scoreTrackingToken == null
+      ? null
+      : `score-tracking/${scoreTrackingToken}${buildCourtFilterQuery(courtId)}`,
     fetcher,
     {
       refreshInterval: 5_000,
@@ -34,10 +41,13 @@ export function getScoreTrackingMatch(
 }
 
 export function getTournamentScoreTrackingInfo(
-  tournamentId: number | null
+  tournamentId: number | null,
+  courtId: number | null = null
 ): SWRResponse<ScoreTrackingInfoResponse> {
   return useSWR(
-    tournamentId == null ? null : `tournaments/${tournamentId}/score-tracking`,
+    tournamentId == null
+      ? null
+      : `tournaments/${tournamentId}/score-tracking${buildCourtFilterQuery(courtId)}`,
     fetcher,
     {
       refreshInterval: 5_000,

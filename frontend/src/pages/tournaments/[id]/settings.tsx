@@ -42,6 +42,7 @@ import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
   getBaseApiUrl,
   getClubs,
+  getCourts,
   getTournamentById,
   handleRequestError,
   removeTournamentLogo,
@@ -53,7 +54,7 @@ import {
   updateTournament,
 } from '@services/tournament';
 import dayjs from 'dayjs';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
 export function TournamentLogo({ tournament }: { tournament: TournamentWithLevels | null }) {
   if (tournament == null || tournament.logo_path == null) return null;
@@ -119,6 +120,51 @@ function UnarchiveTournamentButton({
     >
       {t('unarchive_tournament_button')}
     </Button>
+  );
+}
+
+function ScoreTrackingQrSection({
+  tournamentId,
+  scoreTrackingToken,
+}: {
+  tournamentId: number;
+  scoreTrackingToken: string;
+}) {
+  const { t } = useTranslation();
+  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
+  const swrCourtsResponse = getCourts(tournamentId);
+  const courts = swrCourtsResponse.data?.data ?? [];
+  const courtQuery =
+    selectedCourtId == null || selectedCourtId === ''
+      ? ''
+      : `?court_id=${encodeURIComponent(selectedCourtId)}`;
+  const qrHref = `${getBaseURL()}/score-tracking-qr/${scoreTrackingToken}${courtQuery}`;
+
+  return (
+    <Stack mt="md" gap="sm">
+      {courts.length > 0 ? (
+        <Select
+          label={t('select_court_label')}
+          placeholder={t('select_court_placeholder')}
+          value={selectedCourtId}
+          clearable
+          data={courts.map((court) => ({ value: `${court.id}`, label: court.name }))}
+          onChange={(next) => setSelectedCourtId(next)}
+        />
+      ) : null}
+      <Group gap="sm" wrap="wrap">
+        <Button
+          component="a"
+          href={qrHref}
+          target="_blank"
+          rel="noreferrer"
+          leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
+          variant="light"
+        >
+          {t('score_tracking_show_qr_button')}
+        </Button>
+      </Group>
+    </Stack>
   );
 }
 
@@ -414,18 +460,10 @@ function GeneralTournamentForm({
                 </CopyButton>
               </Grid.Col>
             </Grid>
-            <Group mt="md" gap="sm" wrap="wrap">
-              <Button
-                component="a"
-                href={`${getBaseURL()}/score-tracking-qr/${tournament.score_tracking_token}`}
-                target="_blank"
-                rel="noreferrer"
-                leftSection={<IconQrcode size="1.1rem" stroke={1.5} />}
-                variant="light"
-              >
-                {t('score_tracking_show_qr_button')}
-              </Button>
-            </Group>
+            <ScoreTrackingQrSection
+              tournamentId={tournament.id}
+              scoreTrackingToken={tournament.score_tracking_token}
+            />
           </Stack>
         ) : null}
       </Fieldset>
