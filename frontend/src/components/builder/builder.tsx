@@ -16,7 +16,7 @@ import {
 import { useColorScheme } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { BiCheck } from '@react-icons/all-files/bi/BiCheck';
-import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconArrowsShuffle, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BiSolidWrench } from 'react-icons/bi';
@@ -415,6 +415,34 @@ function StageColumn({
     team_level_id: null,
   });
 
+  async function autoAssignTeams() {
+    const emptyInputs: { stageItemId: number; inputId: number }[] = [];
+    for (const stageItem of stage.stage_items) {
+      for (const input of stageItem.inputs) {
+        if (input.team_id == null && input.winner_from_stage_item_id == null) {
+          emptyInputs.push({ stageItemId: stageItem.id, inputId: input.id });
+        }
+      }
+    }
+
+    const candidates = availableInputs.filter(
+      (opt: StageItemInputChoice) =>
+        opt.team_id != null &&
+        !opt.already_taken &&
+        (stage.level_id == null || opt.team_level_id === stage.level_id)
+    );
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+
+    await Promise.all(
+      emptyInputs.slice(0, shuffled.length).map(({ stageItemId, inputId }, i) =>
+        updateStageItemInput(tournament.id, stageItemId, inputId, shuffled[i].team_id, null, null)
+      )
+    );
+
+    await swrStagesResponse.mutate();
+    await swrAvailableInputsResponse.mutate();
+  }
+
   const rows = stage.stage_items
     .sort((i1: StageItemWithRounds, i2: StageItemWithRounds) => (i1.id > i2.id ? 1 : -1))
     .sort((i1: StageItemWithRounds, i2: StageItemWithRounds) => (i1.name > i2.name ? 1 : -1))
@@ -462,6 +490,12 @@ function StageColumn({
               }}
             >
               {t('edit_stage_label')}
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<IconArrowsShuffle size="1.5rem" />}
+              onClick={autoAssignTeams}
+            >
+              {t('auto_assign_teams_label')}
             </Menu.Item>
             <Menu.Item
               leftSection={<IconTrash size="1.5rem" />}

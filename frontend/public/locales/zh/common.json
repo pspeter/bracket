@@ -38,6 +38,7 @@
     "at_least_one_team_validation": "输入至少一个队伍",
     "at_least_two_team_validation": "需要至少两个队伍",
     "auto_assign_courts_label": "自动为比赛分配场地",
+    "auto_assign_teams_label": "自动分配队伍",
     "auto_create_matches_button": "Plan new round automatically",
     "back_home_nav": "回到主页",
     "back_to_login_nav": "返回登录页面",

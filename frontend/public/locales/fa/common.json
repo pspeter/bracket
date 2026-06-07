@@ -38,6 +38,7 @@
     "at_least_one_team_validation": "حداقل یک تیم باید انتخاب شود",
     "at_least_two_team_validation": "حداقل دو تیم نیاز است",
     "auto_assign_courts_label": "تخصیص خودکار زمین‌ها",
+    "auto_assign_teams_label": "تخصیص خودکار تیم‌ها",
     "auto_create_matches_button": "ایجاد خودکار بازی‌ها",
     "back_home_nav": "بازگشت به صفحه اصلی",
     "back_to_login_nav": "بازگشت به صفحه ورود",
