@@ -45,15 +45,15 @@ export function ScheduleRow({
               {data.match.court.name}
             </Text>
           </Grid.Col>
-          <Grid.Col mb="0rem" span={4}>
+          <Grid.Col mb="0rem" span={3}>
             <Center>
               <Text mt="sm" fw={800}>
                 {data.match.start_time != null ? <Time datetime={data.match.start_time} /> : null}
               </Text>
             </Center>
           </Grid.Col>
-          <Grid.Col mb="0rem" span={4}>
-            <Flex justify="right" align="center" gap="xs" mr="md" mt="0.8rem">
+          <Grid.Col mb="0rem" span={5}>
+            <Flex justify="right" align="center" gap="xs" mr="xs" mt="0.8rem">
               <LevelBadge levels={levels} levelId={data.stage.level_id} />
               <Badge color={stringToColour(`${data.stageItem.id}`)} variant="outline" size="md">
                 {data.stageItem.name}
