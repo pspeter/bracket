@@ -335,12 +335,12 @@ async def test_create_stages_from_template_replaces_existing_stages(
     [
         (
             {
-                "groups": 3,
-                "total_teams": 8,
+                "groups": 5,
+                "total_teams": 10,
                 "until_rank": 2,
                 "include_semi_final": True,
             },
-            "groups must be 2 or 4",
+            "groups must be 2, 3, or 4",
         ),
         (
             {

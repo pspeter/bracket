@@ -50,10 +50,10 @@ router = APIRouter(prefix=config.api_prefix)
 
 
 def validate_stage_template_body(stage_body: StageTemplateCreateBody) -> None:
-    if stage_body.groups not in {2, 4}:
+    if stage_body.groups not in {2, 3, 4}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="groups must be 2 or 4",
+            detail="groups must be 2, 3, or 4",
         )
 
     if stage_body.total_teams < 4:
