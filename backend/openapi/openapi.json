@@ -2125,6 +2125,17 @@
             "title": "Max Team Size",
             "type": "integer"
           },
+          "rules": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
           "signup_team_choice_enabled": {
             "title": "Signup Team Choice Enabled",
             "type": "boolean"
@@ -2153,7 +2164,8 @@
           "dashboard_endpoint",
           "signup_team_choice_enabled",
           "levels",
-          "logo_path"
+          "logo_path",
+          "rules"
         ],
         "title": "SignupTournamentInfo",
         "type": "object"

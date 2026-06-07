@@ -1116,6 +1116,10 @@ export type SignupTournamentInfo = {
    */
   max_team_size: number;
   /**
+   * Rules
+   */
+  rules: string | null;
+  /**
    * Signup Team Choice Enabled
    */
   signup_team_choice_enabled: boolean;

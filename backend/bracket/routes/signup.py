@@ -82,6 +82,7 @@ async def get_signup_info(
             signup_team_choice_enabled=tournament.signup_team_choice_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
             logo_path=tournament.logo_path,
+            rules=tournament.rules,
         )
     )
 

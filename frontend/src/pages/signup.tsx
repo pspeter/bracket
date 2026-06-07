@@ -2,8 +2,10 @@ import {
   Alert,
   Button,
   Container,
+  Divider,
   Image,
   Loader,
+  Paper,
   Radio,
   Select,
   Stack,
@@ -17,6 +19,8 @@ import { AxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import { PublicFooter } from '@components/utils/public_footer';
 import { getBaseURL } from '@components/utils/util';
@@ -235,6 +239,27 @@ export default function SignupPage() {
             <Text size="sm">
               {teamChoiceEnabled ? t('signup_description') : t('signup_description_no_teams')}
             </Text>
+
+            {info.data.rules != null && info.data.rules !== '' && (
+              <Paper withBorder p="md" radius="md">
+                <Text fw={600} mb="xs">
+                  {t('tournament_rules_title')}
+                </Text>
+                <Divider mb="md" />
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer">
+                        {children}
+                      </a>
+                    ),
+                  }}
+                >
+                  {info.data.rules}
+                </ReactMarkdown>
+              </Paper>
+            )}
 
             <TextInput
               withAsterisk

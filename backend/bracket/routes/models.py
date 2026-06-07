@@ -129,6 +129,7 @@ class SignupTournamentInfo(BaseModel):
     signup_team_choice_enabled: bool
     levels: list[LevelResponse] = []
     logo_path: str | None = None
+    rules: str | None = None
 
 
 class SignupInfoResponse(DataResponse[SignupTournamentInfo]):
