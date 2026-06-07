@@ -133,9 +133,20 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
     <header className={classes.header}>
       <Container className={classes.inner}>
         <UnstyledButton component={PreloadLink} href={`/tournaments/${endpoint}/dashboard`}>
-          <Title size="lg" lineClamp={1}>
-            {tournamentData.name}
-          </Title>
+          <Group gap="sm" wrap="nowrap">
+            {tournamentData.logo_path && (
+              <Image
+                radius="sm"
+                h={36}
+                w="auto"
+                alt="Tournament logo"
+                src={`${getBaseApiUrl()}/static/tournament-logos/${tournamentData.logo_path}`}
+              />
+            )}
+            <Title size="lg" lineClamp={1}>
+              {tournamentData.name}
+            </Title>
+          </Group>
         </UnstyledButton>
         <Box className={classes.links}>
           <Group gap="md" align="center" wrap="nowrap">
