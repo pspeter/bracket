@@ -18,8 +18,8 @@ import { showNotification } from '@mantine/notifications';
 import { AxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate, useParams } from 'react-router';
 import remarkGfm from 'remark-gfm';
 
 import { PublicFooter } from '@components/utils/public_footer';
