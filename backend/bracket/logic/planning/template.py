@@ -34,7 +34,7 @@ class Blueprint:
 
 @dataclass
 class TemplateConfig:
-    groups: Literal[2, 4]
+    groups: Literal[2, 3, 4]
     total_teams: int
     until_rank: int | Literal["all"]
     include_semi_final: bool
@@ -60,6 +60,8 @@ def max_until_rank_for_template(groups: int, total_teams: int) -> int:
     """Largest even until_rank allowed (matches how until_rank='all' is resolved)."""
     if groups == 4:
         return 8
+    if groups == 3:
+        return 4
     return (total_teams // groups) * 2
 
 
@@ -181,6 +183,31 @@ def _build_2group_sf_stages(
     )
 
 
+def _build_3group_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintStage]:
+    # Semi-final A: Group A winner vs best runner-up (empty slot — assigned by admin after groups)
+    # Semi-final B: Group B winner vs Group C winner
+    semis_items = [
+        BlueprintStageItem(
+            name="Semi-final A",
+            type=StageType.SINGLE_ELIMINATION,
+            team_count=2,
+            inputs=[
+                _t(1, "Group A", 1),
+                BlueprintInput(slot=2, winner_from=None, winner_position=None),
+            ],
+        ),
+        _item("Semi-final B", [_t(1, "Group B", 1), _t(2, "Group C", 1)]),
+    ]
+    finals_items = [
+        _item("Final", [_t(1, "Semi-final A", 1), _t(2, "Semi-final B", 1)]),
+    ]
+    if until_rank >= 4:
+        finals_items.append(
+            _item("3rd Place", [_t(1, "Semi-final A", 2), _t(2, "Semi-final B", 2)])
+        )
+    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
+
+
 def _build_2group_nosf_finals(until_rank: int, teams_per_group: int) -> BlueprintStage:
     place_names = ["Final", "3rd Place", "5th Place", "7th Place"]
     items = []
@@ -197,6 +224,10 @@ def build_template_blueprint(config: TemplateConfig) -> Blueprint:
     _validate(config)
     until_rank = _resolve_until_rank(config)
     group_stage = _build_group_stage(config)
+
+    if config.groups == 3:
+        semis_stage, finals_stage = _build_3group_stages(until_rank)
+        return Blueprint(stages=[group_stage, semis_stage, finals_stage])
 
     if config.groups == 4 or config.include_semi_final:
         if config.groups == 4:

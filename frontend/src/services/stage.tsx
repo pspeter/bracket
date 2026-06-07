@@ -1,7 +1,7 @@
 import { createAxios, handleRequestError } from './adapter';
 
 export type StageTemplateCreateBody = {
-  groups: 2 | 4;
+  groups: 2 | 3 | 4;
   total_teams: number;
   until_rank: 'all' | number;
   include_semi_final?: boolean;

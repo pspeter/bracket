@@ -34,7 +34,7 @@ import {
   resolveUntilRank,
 } from '@utils/template_wizard_preview';
 
-function normalizeTotalTeams(raw: number, groups: 2 | 4): number {
+function normalizeTotalTeams(raw: number, groups: 2 | 3 | 4): number {
   let n = Math.max(4, raw);
   while (n % groups !== 0) {
     n += 1;
@@ -42,7 +42,7 @@ function normalizeTotalTeams(raw: number, groups: 2 | 4): number {
   return n;
 }
 
-function defaultIncludeSemiFinal(totalTeams: number, groups: 2 | 4): boolean {
+function defaultIncludeSemiFinal(totalTeams: number, groups: 2 | 3 | 4): boolean {
   if (groups !== 2) {
     return true;
   }
@@ -51,7 +51,7 @@ function defaultIncludeSemiFinal(totalTeams: number, groups: 2 | 4): boolean {
 }
 
 type TemplateFormValues = {
-  groups: 2 | 4;
+  groups: 2 | 3 | 4;
   total_teams: number;
   until_rank: 'all' | number;
   include_semi_final: boolean;
@@ -174,7 +174,7 @@ function CreateFromTemplateModal({
     Math.floor(form.values.total_teams / 2) >= 3;
 
   const effectiveIncludeSemiFinal =
-    form.values.groups === 4 ? true : showSemiToggle ? form.values.include_semi_final : false;
+    form.values.groups !== 2 ? true : showSemiToggle ? form.values.include_semi_final : false;
 
   useEffect(() => {
     if (!opened) {
@@ -239,7 +239,7 @@ function CreateFromTemplateModal({
       const semiToggleVisible =
         values.groups === 2 && values.total_teams >= 5 && Math.floor(values.total_teams / 2) >= 3;
       const includeSemiFinal =
-        values.groups === 4 ? true : semiToggleVisible ? values.include_semi_final : false;
+        values.groups !== 2 ? true : semiToggleVisible ? values.include_semi_final : false;
       await createStagesFromTemplate(tournament.id, {
         groups: values.groups,
         total_teams: values.total_teams,
@@ -266,7 +266,7 @@ function CreateFromTemplateModal({
 
   const onPrimarySubmit = form.onSubmit(async (values) => {
     const includeSemiFinal =
-      values.groups === 4 ? true : showSemiToggle ? values.include_semi_final : false;
+      values.groups !== 2 ? true : showSemiToggle ? values.include_semi_final : false;
     const payload: TemplateFormValues = { ...values, include_semi_final: includeSemiFinal };
     if (hasExistingStages) {
       setPendingSubmit(payload);
@@ -297,7 +297,7 @@ function CreateFromTemplateModal({
               label={t('template_wizard_groups_label')}
               value={String(form.values.groups)}
               onChange={(v) => {
-                const groups = Number(v) as 2 | 4;
+                const groups = Number(v) as 2 | 3 | 4;
                 const total = normalizeTotalTeams(form.values.total_teams, groups);
                 form.setValues({
                   groups,
@@ -314,6 +314,14 @@ function CreateFromTemplateModal({
                   label={t('template_wizard_groups_option_2')}
                   description={t('template_wizard_groups_hint_2', {
                     tpg: Math.floor(form.values.total_teams / 2),
+                    total: form.values.total_teams,
+                  })}
+                />
+                <Radio
+                  value="3"
+                  label={t('template_wizard_groups_option_3')}
+                  description={t('template_wizard_groups_hint_3', {
+                    tpg: Math.floor(form.values.total_teams / 3),
                     total: form.values.total_teams,
                   })}
                 />
@@ -355,6 +363,11 @@ function CreateFromTemplateModal({
                 checked={form.values.include_semi_final}
                 onChange={(e) => form.setFieldValue('include_semi_final', e.currentTarget.checked)}
               />
+            ) : null}
+            {form.values.groups === 3 ? (
+              <Text size="sm" c="dimmed">
+                {t('template_wizard_groups_3_best_runner_up_note')}
+              </Text>
             ) : null}
 
             <Paper withBorder p="sm" radius="md">

@@ -403,3 +403,81 @@ def test_4_groups_ignores_include_semi_final_false() -> None:
     )
     assert stage_names(bp_true) == stage_names(bp_false)
     assert item_names_in(bp_true, "Semi-finals") == item_names_in(bp_false, "Semi-finals")
+
+
+# ---------------------------------------------------------------------------
+# 3 groups + best runner-up
+# ---------------------------------------------------------------------------
+
+
+def make_3g(**kwargs):  # type: ignore[no-untyped-def]
+    return make_config(groups=3, total_teams=12, include_semi_final=True, **kwargs)
+
+
+def test_3_groups_stage_names() -> None:
+    bp = build_template_blueprint(make_3g(until_rank=2))
+    assert stage_names(bp) == ["Group Phase", "Semi-finals", "Finals"]
+
+
+def test_3_groups_group_items() -> None:
+    bp = build_template_blueprint(make_3g(until_rank=2))
+    group_items = items_in(bp, "Group Phase")
+    assert [item.name for item in group_items] == ["Group A", "Group B", "Group C"]
+    assert all(item.type == StageType.ROUND_ROBIN for item in group_items)
+    assert all(item.team_count == 4 for item in group_items)
+
+
+def test_3_groups_semis_seeding() -> None:
+    bp = build_template_blueprint(make_3g(until_rank=2))
+    semi_a, semi_b = items_in(bp, "Semi-finals")
+
+    # Semi-final A: Group A winner vs best runner-up (empty slot)
+    assert semi_a.inputs == [
+        BlueprintInput(slot=1, winner_from="Group A", winner_position=1),
+        BlueprintInput(slot=2, winner_from=None, winner_position=None),
+    ]
+    # Semi-final B: Group B winner vs Group C winner
+    assert semi_b.inputs == [
+        BlueprintInput(slot=1, winner_from="Group B", winner_position=1),
+        BlueprintInput(slot=2, winner_from="Group C", winner_position=1),
+    ]
+
+
+def test_3_groups_until_rank_2_finals() -> None:
+    bp = build_template_blueprint(make_3g(until_rank=2))
+    assert item_names_in(bp, "Finals") == ["Final"]
+    (final,) = items_in(bp, "Finals")
+    assert final.inputs == [
+        BlueprintInput(slot=1, winner_from="Semi-final A", winner_position=1),
+        BlueprintInput(slot=2, winner_from="Semi-final B", winner_position=1),
+    ]
+
+
+def test_3_groups_until_rank_4() -> None:
+    bp = build_template_blueprint(make_3g(until_rank=4))
+    assert item_names_in(bp, "Finals") == ["Final", "3rd Place"]
+    third = items_in(bp, "Finals")[1]
+    assert third.inputs == [
+        BlueprintInput(slot=1, winner_from="Semi-final A", winner_position=2),
+        BlueprintInput(slot=2, winner_from="Semi-final B", winner_position=2),
+    ]
+
+
+def test_3_groups_all_resolves_to_rank_4() -> None:
+    bp_all = build_template_blueprint(make_3g(until_rank="all"))
+    bp_4 = build_template_blueprint(make_3g(until_rank=4))
+    assert item_names_in(bp_all, "Finals") == item_names_in(bp_4, "Finals")
+
+
+def test_3_groups_until_rank_exceeds_4_raises() -> None:
+    with pytest.raises(ValueError, match="until_rank.*exceeds maximum"):
+        build_template_blueprint(make_3g(until_rank=6))
+
+
+def test_3_groups_uneven_sizes() -> None:
+    # 10 teams, 3 groups → Group A: 4, Groups B+C: 3
+    bp = build_template_blueprint(make_config(groups=3, total_teams=10, until_rank=2))
+    group_items = items_in(bp, "Group Phase")
+    assert group_items[0].team_count == 4
+    assert group_items[1].team_count == 3
+    assert group_items[2].team_count == 3

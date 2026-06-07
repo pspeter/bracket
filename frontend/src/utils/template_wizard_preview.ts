@@ -1,14 +1,17 @@
 /** Mirrors backend `max_until_rank_for_template` / template `_max_rank`. */
-export function maxUntilRankForTemplate(groups: 2 | 4, totalTeams: number): number {
+export function maxUntilRankForTemplate(groups: 2 | 3 | 4, totalTeams: number): number {
   if (groups === 4) {
     return 8;
+  }
+  if (groups === 3) {
+    return 4;
   }
   return Math.floor(totalTeams / groups) * 2;
 }
 
 export function resolveUntilRank(
   untilRank: 'all' | number,
-  groups: 2 | 4,
+  groups: 2 | 3 | 4,
   totalTeams: number
 ): number {
   const maxRank = maxUntilRankForTemplate(groups, totalTeams);
@@ -16,19 +19,27 @@ export function resolveUntilRank(
 }
 
 /** Group sizes for display (Group A gets remainder first), same as backend ordering. */
-export function groupTeamCounts(totalTeams: number, groups: 2 | 4): number[] {
+export function groupTeamCounts(totalTeams: number, groups: 2 | 3 | 4): number[] {
   const base = Math.floor(totalTeams / groups);
   const remainder = totalTeams % groups;
   return Array.from({ length: groups }, (_, i) => base + (i < remainder ? 1 : 0));
 }
 
 export function knockoutMatchLabels(
-  groups: 2 | 4,
+  groups: 2 | 3 | 4,
   totalTeams: number,
   includeSemiFinal: boolean,
   resolvedUntilRank: number
 ): string[] {
   const tpg = Math.floor(totalTeams / groups);
+
+  if (groups === 3) {
+    const out = ['Semi-final A', 'Semi-final B', 'Final'];
+    if (resolvedUntilRank >= 4) {
+      out.push('3rd Place');
+    }
+    return out;
+  }
 
   if (groups === 4) {
     const out = ['Semi-final A', 'Semi-final B', 'Final'];
