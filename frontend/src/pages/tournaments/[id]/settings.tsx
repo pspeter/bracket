@@ -15,6 +15,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Textarea,
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
@@ -196,6 +197,7 @@ function GeneralTournamentForm({
       max_team_size: tournament.max_team_size,
       signup_team_choice_enabled: tournament.signup_team_choice_enabled ?? true,
       score_tracking_enabled: tournament.score_tracking_enabled ?? false,
+      rules: tournament.rules ?? '',
     },
 
     validate: {
@@ -232,7 +234,8 @@ function GeneralTournamentForm({
           values.signup_enabled ?? tournament.signup_enabled,
           maxTeamSize,
           values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true,
-          values.score_tracking_enabled ?? tournament.score_tracking_enabled ?? false
+          values.score_tracking_enabled ?? tournament.score_tracking_enabled ?? false,
+          values.rules.trim() === '' ? null : values.rules
         );
 
         await swrTournamentResponse.mutate();
@@ -384,6 +387,15 @@ function GeneralTournamentForm({
         >
           {t('remove_logo')}
         </Button>
+      </Fieldset>
+      <Fieldset legend={t('tournament_rules_title')} mt="lg" radius="md">
+        <Textarea
+          autosize
+          minRows={4}
+          placeholder={t('tournament_rules_placeholder')}
+          description={t('markdown_supported_helper')}
+          {...form.getInputProps('rules')}
+        />
       </Fieldset>
       <Fieldset legend={t('self_signup_title')} mt="lg" radius="md">
         <Checkbox

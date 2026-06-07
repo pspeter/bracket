@@ -62,7 +62,8 @@ export async function updateTournament(
   signup_enabled: boolean,
   max_team_size: number,
   signup_team_choice_enabled: boolean,
-  score_tracking_enabled: boolean
+  score_tracking_enabled: boolean,
+  rules: string | null
 ) {
   return createAxios()
     .put(`tournaments/${tournament_id}`, {
@@ -78,6 +79,7 @@ export async function updateTournament(
       max_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
+      rules,
     })
     .catch((response: any) => handleRequestError(response));
 }
