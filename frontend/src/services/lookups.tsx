@@ -1,10 +1,7 @@
 import { SWRResponse } from 'swr';
 
-import { assert_not_none } from '@components/utils/assert';
 import { groupBy, responseIsValid } from '@components/utils/util';
 import {
-  Court,
-  CourtsResponse,
   FullTeamWithPlayers,
   MatchWithDetails,
   StageItemWithRounds,
@@ -212,20 +209,4 @@ export function getStageOrderViolations(
   }
 
   return violations;
-}
-
-export function getScheduleData(
-  swrCourtsResponse: SWRResponse<CourtsResponse>,
-  matchesByCourtId: any
-): { court: Court; matches: MatchWithDetails[] }[] {
-  return (swrCourtsResponse.data?.data || []).map((court: Court) => ({
-    matches: (matchesByCourtId[court.id] || [])
-      .filter((match: MatchWithDetails) => match.start_time != null)
-      .sort((m1: MatchWithDetails, m2: MatchWithDetails) => {
-        return assert_not_none(m1.position_in_schedule) > assert_not_none(m2.position_in_schedule)
-          ? 1
-          : -1 || [];
-      }),
-    court,
-  }));
 }

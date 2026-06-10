@@ -149,6 +149,7 @@
     "match_filter_option_current": "Current matches",
     "match_filter_option_past": "Hide past matches",
     "max_results_input_label": "Max results",
+    "match_scheduled_before_previous_stage_label": "Scheduled before a match of an earlier stage on this court",
     "members_table_header": "Members",
     "minutes": "minutes",
     "miscellaneous_label": "Allow players to be in multiple teams",
