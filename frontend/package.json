@@ -13,13 +13,13 @@
     "export": "vite build && vite export",
     "prettier:check": "prettier  --check \"**/*.{ts,tsx}\"",
     "prettier:write": "prettier --list-different --write \"**/*.{ts,tsx}\"",
-    "test": "tsc && pnpm run prettier:write"
+    "test": "tsc && pnpm run prettier:write && vitest run",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
     "@emotion/server": "11.11.0",
     "@hcaptcha/react-hcaptcha": "2.0.2",
-    "@hello-pangea/dnd": "18.0.1",
     "@mantine/core": "8.3.7",
     "@mantine/dates": "8.3.7",
     "@mantine/dropzone": "8.3.7",
@@ -72,6 +72,7 @@
     "prettier": "3.8.0",
     "typescript": "5.9.3",
     "vite": "8.0.8",
-    "vite-plugin-i18next-loader": "3.1.3"
+    "vite-plugin-i18next-loader": "3.1.3",
+    "vitest": "^4.1.8"
   }
 }
