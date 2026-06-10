@@ -32,17 +32,39 @@ function MatchCard({
   const entry = matchesLookup[match.id];
   const color = entry != null ? stringToColour(`${entry.stageItem.id}`) : 'gray';
 
+  const cardHeightPx = (block.endMinutes - block.startMinutes) * PX_PER_MINUTE;
+  // Pick the densest layout that still fits: three rows (time / team 1 / team 2),
+  // two rows (time + team 1 / team 2), or a single "time team 1 – team 2" row.
+  const rows = cardHeightPx >= 52 ? 3 : cardHeightPx >= 34 ? 2 : 1;
+
+  const input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
+  const input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+
+  const timeLabel = (
+    <Text size="xs" c="dimmed" lh={1.3} style={{ whiteSpace: 'nowrap' }}>
+      {format(block.startTime, 'HH:mm')}
+    </Text>
+  );
+  const violationIcon = isViolation ? (
+    <Tooltip label={t('match_scheduled_before_previous_stage_label')}>
+      <Box
+        component="span"
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+      >
+        <AiFillWarning color="orange" />
+      </Box>
+    </Tooltip>
+  ) : null;
+
   return (
     <Box
       onClick={() => openMatchModal(match)}
       style={{
         position: 'absolute',
         top: block.startMinutes * PX_PER_MINUTE,
-        height: (block.endMinutes - block.startMinutes) * PX_PER_MINUTE,
+        height: cardHeightPx,
         left: 3,
         right: 3,
-        display: 'flex',
-        flexDirection: 'column',
         overflow: 'hidden',
         cursor: 'pointer',
         borderRadius: 6,
@@ -51,47 +73,58 @@ function MatchCard({
         backgroundColor: `var(--mantine-color-${color}-light)`,
       }}
     >
-      <Box px={6} pt={2} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
-          <Text size="xs" c="dimmed" lh={1.3} style={{ whiteSpace: 'nowrap' }}>
-            {format(block.startTime, 'HH:mm')}
-          </Text>
-          {isViolation && (
-            <Tooltip label={t('match_scheduled_before_previous_stage_label')}>
-              <Box
-                component="span"
-                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
-              >
-                <AiFillWarning color="orange" />
-              </Box>
-            </Tooltip>
-          )}
-        </Flex>
-        <Flex gap={4} align="center" wrap="nowrap">
-          {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
-          <Text size="xs" fw={600} lh={1.3} truncate>
-            {formatMatchInput1(t, stageItemsLookup, matchesLookup, match)}
-          </Text>
-        </Flex>
-        <Flex gap={4} align="center" wrap="nowrap">
-          {match.stage_item_input2_conflict && <AiFillWarning color="red" />}
-          <Text size="xs" fw={600} lh={1.3} truncate>
-            {formatMatchInput2(t, stageItemsLookup, matchesLookup, match)}
-          </Text>
-        </Flex>
-      </Box>
       {block.marginMinutes > 0 && (
         <Box
           style={{
-            flex: '0 0 auto',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
             height: block.marginMinutes * PX_PER_MINUTE,
             borderTop: '1px dashed var(--mantine-color-default-border)',
             background:
               'repeating-linear-gradient(-45deg, transparent 0 5px, var(--mantine-color-default-border) 5px 7px)',
             opacity: 0.35,
+            pointerEvents: 'none',
           }}
         />
       )}
+      <Box
+        px={6}
+        pt={rows === 3 ? 2 : 0}
+        style={{
+          position: 'relative',
+          height: '100%',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: rows === 3 ? 'flex-start' : 'center',
+        }}
+      >
+        {rows === 3 && (
+          <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
+            {timeLabel}
+            {violationIcon}
+          </Flex>
+        )}
+        <Flex gap={6} align="center" wrap="nowrap">
+          {rows < 3 && timeLabel}
+          {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
+          {rows === 1 && match.stage_item_input2_conflict && <AiFillWarning color="red" />}
+          <Text size="xs" fw={600} lh={1.3} truncate style={{ flex: 1 }}>
+            {rows === 1 ? `${input1} – ${input2}` : input1}
+          </Text>
+          {rows < 3 && violationIcon}
+        </Flex>
+        {rows > 1 && (
+          <Flex gap={4} align="center" wrap="nowrap">
+            {match.stage_item_input2_conflict && <AiFillWarning color="red" />}
+            <Text size="xs" fw={600} lh={1.3} truncate>
+              {input2}
+            </Text>
+          </Flex>
+        )}
+      </Box>
     </Box>
   );
 }
