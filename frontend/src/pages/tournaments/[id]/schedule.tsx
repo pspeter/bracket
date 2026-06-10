@@ -145,7 +145,7 @@ export default function SchedulePage() {
           />
         </Stack>
       ) : (
-        <Box mt="1rem" pb="4rem">
+        <Box mt="1rem" pb={selection.kind === 'match-selected' ? '14rem' : '4rem'}>
           <ScheduleGrid
             layout={layout}
             violations={violations}

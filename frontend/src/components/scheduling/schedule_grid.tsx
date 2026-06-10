@@ -142,10 +142,14 @@ function InsertionLineTarget({
   isNoop: boolean;
   onTap: () => void;
 }) {
+  const lineY = line.offsetMinutes * PX_PER_MINUTE;
   const top = Math.min(
-    Math.max(0, line.offsetMinutes * PX_PER_MINUTE - INSERTION_HIT_AREA_PX / 2),
+    Math.max(0, lineY - INSERTION_HIT_AREA_PX / 2),
     gridHeight - INSERTION_HIT_AREA_PX
   );
+  // Keep the visible line on the true boundary even when the hit area is clamped
+  // at the grid's edges.
+  const lineTop = Math.min(Math.max(0, lineY - top - 2), INSERTION_HIT_AREA_PX - 4);
 
   return (
     <Box
@@ -159,8 +163,6 @@ function InsertionLineTarget({
         left: 0,
         right: 0,
         height: INSERTION_HIT_AREA_PX,
-        display: 'flex',
-        alignItems: 'center',
         cursor: 'pointer',
         zIndex: 1,
         opacity: isNoop ? 0.35 : 1,
@@ -168,9 +170,11 @@ function InsertionLineTarget({
     >
       <Box
         style={{
-          flex: 1,
+          position: 'absolute',
+          top: lineTop,
+          left: 4,
+          right: 4,
           height: 4,
-          margin: '0 4px',
           borderRadius: 2,
           backgroundColor: 'var(--mantine-color-indigo-filled)',
           boxShadow: '0 0 0 1px var(--mantine-color-body)',
@@ -345,6 +349,9 @@ export default function ScheduleGrid({
           </Box>
         ))}
       </Flex>
+      {/* While placing, add scroll slack so insertion lines near the viewport
+          bottom can always be scrolled out from under the floating cancel bar. */}
+      {selectedMatch != null && <Box style={{ height: '10rem' }} />}
     </Box>
   );
 }
