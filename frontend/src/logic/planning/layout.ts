@@ -27,7 +27,7 @@ export interface MatchBlock<M extends LayoutMatch = LayoutMatch> {
   startMinutes: number;
   /** Playing time (the backend already folds custom durations into this). */
   durationMinutes: number;
-  /** Pause after the match, rendered as a distinct tail on the card. */
+  /** Pause after the match, rendered as a gap between this card and the next. */
   marginMinutes: number;
   /** `startMinutes + durationMinutes + marginMinutes`. */
   endMinutes: number;

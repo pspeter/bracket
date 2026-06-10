@@ -32,7 +32,9 @@ function MatchCard({
   const entry = matchesLookup[match.id];
   const color = entry != null ? stringToColour(`${entry.stageItem.id}`) : 'gray';
 
-  const cardHeightPx = (block.endMinutes - block.startMinutes) * PX_PER_MINUTE;
+  // The card covers only the playing time; the margin after the match shows as a
+  // calendar-style gap before the next card.
+  const cardHeightPx = block.durationMinutes * PX_PER_MINUTE;
   // Pick the densest layout that still fits: three rows (time / team 1 / team 2),
   // two rows (time + team 1 / team 2), or a single "time team 1 – team 2" row.
   const rows = cardHeightPx >= 52 ? 3 : cardHeightPx >= 34 ? 2 : 1;
@@ -73,27 +75,10 @@ function MatchCard({
         backgroundColor: `var(--mantine-color-${color}-light)`,
       }}
     >
-      {block.marginMinutes > 0 && (
-        <Box
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: block.marginMinutes * PX_PER_MINUTE,
-            borderTop: '1px dashed var(--mantine-color-default-border)',
-            background:
-              'repeating-linear-gradient(-45deg, transparent 0 5px, var(--mantine-color-default-border) 5px 7px)',
-            opacity: 0.35,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
       <Box
         px={6}
         pt={rows === 3 ? 2 : 0}
         style={{
-          position: 'relative',
           height: '100%',
           overflow: 'hidden',
           display: 'flex',
@@ -132,7 +117,8 @@ function MatchCard({
 /**
  * Read-only, time-proportional schedule: court columns against a shared vertical time
  * ruler. Card positions and heights are proportional to computed start times and
- * durations; the pause after a match renders as a striped tail on its card.
+ * playing durations; the pause after a match shows as a calendar-style gap before
+ * the next card.
  */
 export default function ScheduleGrid({
   layout,
