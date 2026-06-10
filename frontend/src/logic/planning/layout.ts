@@ -66,6 +66,32 @@ export interface ScheduleLayoutInput<C extends LayoutCourt, M extends LayoutMatc
   minTotalMinutes?: number;
 }
 
+export interface InsertionLine {
+  /** Insertion index: place before the match currently at this index (count = at the end). */
+  index: number;
+  /** Vertical position of the line, in minutes from the tournament start. */
+  offsetMinutes: number;
+}
+
+/**
+ * Tap targets for placing a match on a court: one line above the first match,
+ * one centered in each margin gap between consecutive matches, and one in the
+ * gap after the last match. An empty court gets a single line at the top.
+ */
+export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
+  if (blocks.length === 0) {
+    return [{ index: 0, offsetMinutes: 0 }];
+  }
+
+  const lines: InsertionLine[] = [{ index: 0, offsetMinutes: blocks[0].startMinutes }];
+  for (let i = 1; i <= blocks.length; i += 1) {
+    const previous = blocks[i - 1];
+    const gapStart = previous.startMinutes + previous.durationMinutes;
+    lines.push({ index: i, offsetMinutes: (gapStart + previous.endMinutes) / 2 });
+  }
+  return lines;
+}
+
 const DEFAULT_TICK_INTERVAL_MINUTES = 30;
 const DEFAULT_MIN_TOTAL_MINUTES = 60;
 
