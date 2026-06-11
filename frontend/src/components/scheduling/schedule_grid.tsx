@@ -21,6 +21,13 @@ const RULER_WIDTH = '3.25rem';
 const HEADER_HEIGHT = '2.5rem';
 /** Height of an insertion line's tap target; the visible line is centered inside it. */
 const INSERTION_HIT_AREA_PX = 32;
+/**
+ * Breathing space between the header and minute 0, applied to the ruler and all
+ * court columns alike so time alignment is preserved. Gives the topmost insertion
+ * line room above the first match, so moving a match to the front of a court is
+ * an easy tap.
+ */
+const GRID_TOP_INSET_PX = 32;
 
 function MatchCard({
   block,
@@ -143,10 +150,9 @@ function InsertionLineTarget({
   onTap: () => void;
 }) {
   const lineY = line.offsetMinutes * PX_PER_MINUTE;
-  const top = Math.min(
-    Math.max(0, lineY - INSERTION_HIT_AREA_PX / 2),
-    gridHeight - INSERTION_HIT_AREA_PX
-  );
+  // The top inset guarantees room above minute 0, so the hit area may extend
+  // above the grid; only the bottom edge needs clamping.
+  const top = Math.min(lineY - INSERTION_HIT_AREA_PX / 2, gridHeight - INSERTION_HIT_AREA_PX);
   // Keep the visible line on the true boundary even when the hit area is clamped
   // at the grid's edges.
   const lineTop = Math.min(Math.max(0, lineY - top - 2), INSERTION_HIT_AREA_PX - 4);
@@ -243,7 +249,7 @@ export default function ScheduleGrid({
               borderBottom: '1px solid var(--mantine-color-default-border)',
             }}
           />
-          <Box style={{ position: 'relative', height: gridHeight }}>
+          <Box style={{ position: 'relative', height: gridHeight, marginTop: GRID_TOP_INSET_PX }}>
             {layout.ticks.map((tick) => (
               <Text
                 key={tick.offsetMinutes}
@@ -291,7 +297,7 @@ export default function ScheduleGrid({
                 {court.name}
               </Text>
             </Box>
-            <Box style={{ position: 'relative', height: gridHeight }}>
+            <Box style={{ position: 'relative', height: gridHeight, marginTop: GRID_TOP_INSET_PX }}>
               {layout.ticks.map((tick) =>
                 tick.offsetMinutes === 0 ? null : (
                   <Box
