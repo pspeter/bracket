@@ -164,6 +164,9 @@ import type {
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostData,
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors,
   StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses,
+  SwapMatchesTournamentsTournamentIdMatchesSwapPostData,
+  SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors,
+  SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
@@ -731,6 +734,29 @@ export const createMatchTournamentsTournamentIdMatchesPost = <ThrowOnError exten
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/matches',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Swap Matches
+ */
+export const swapMatchesTournamentsTournamentIdMatchesSwapPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<SwapMatchesTournamentsTournamentIdMatchesSwapPostData, ThrowOnError>
+) =>
+  (options.client ?? client).post<
+    SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses,
+    SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/swap',
     ...options,
     headers: {
       'Content-Type': 'application/json',

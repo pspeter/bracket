@@ -147,6 +147,11 @@ class MatchRescheduleBody(BaseModelORM):
     new_position: int
 
 
+class MatchSwapBody(BaseModelORM):
+    match1_id: MatchId
+    match2_id: MatchId
+
+
 class MatchFilter(BaseModel):
     elo_diff_threshold: int
     only_recommended: bool

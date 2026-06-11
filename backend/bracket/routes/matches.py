@@ -3,10 +3,12 @@ from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.config import config
+from bracket.database import database
 from bracket.logic.planning.conflicts import handle_conflicts
 from bracket.logic.planning.matches import (
     get_scheduled_matches,
     handle_match_reschedule,
+    handle_match_swap,
     reorder_all_matches,
     schedule_all_unscheduled_matches,
 )
@@ -27,6 +29,7 @@ from bracket.models.db.match import (
     MatchRescheduleBody,
     MatchScoreTrackingBody,
     MatchState,
+    MatchSwapBody,
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
@@ -281,6 +284,20 @@ async def reschedule_match(
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     await handle_match_reschedule(tournament, body, match_id)
     await handle_conflicts(await get_full_tournament_details(tournament_id))
+    return SuccessResponse()
+
+
+@router.post("/tournaments/{tournament_id}/matches/swap", response_model=SuccessResponse)
+async def swap_matches(
+    tournament_id: TournamentId,
+    body: MatchSwapBody,
+    tournament: Tournament = Depends(disallow_archived_tournament),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+) -> SuccessResponse:
+    await check_foreign_keys_belong_to_tournament(body, tournament_id)
+    async with database.transaction():
+        await handle_match_swap(tournament, body)
+        await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
 
 

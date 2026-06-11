@@ -2,11 +2,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from fastapi import HTTPException
 from heliclockter import datetime_utc, timedelta
+from starlette import status
 
 from bracket.models.db.court import Court
 from bracket.models.db.match import (
     MatchRescheduleBody,
+    MatchSwapBody,
     MatchWithDetails,
     MatchWithDetailsDefinitive,
 )
@@ -346,6 +349,47 @@ async def handle_match_reschedule(
             scheduled_matches.append(match_pos)
 
     await reorder_all_matches(tournament, scheduled_matches)
+
+
+async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None:
+    """
+    Swap the schedule slots (court + position) of two scheduled matches atomically.
+
+    Matches are identified by id, so the operation is robust against a stale client
+    view: "swap A and B" means the same thing regardless of where A and B currently
+    sit in the schedule.
+    """
+    if body.match1_id == body.match2_id:
+        return
+
+    stages = await get_full_tournament_details(tournament.id)
+    scheduled_matches = get_scheduled_matches(stages)
+    matches_by_id = {match_pos.match.id: match_pos for match_pos in scheduled_matches}
+
+    match1 = matches_by_id.get(body.match1_id)
+    match2 = matches_by_id.get(body.match2_id)
+    if match1 is None or match2 is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both matches must be scheduled to swap them",
+        )
+
+    def swapped_position(match_pos: MatchPosition) -> MatchPosition:
+        other = match2 if match_pos.match.id == body.match1_id else match1
+        return MatchPosition(
+            match=match_pos.match.model_copy(update={"court_id": other.match.court_id}),
+            position=other.position,
+        )
+
+    await reorder_all_matches(
+        tournament,
+        [
+            swapped_position(match_pos)
+            if match_pos.match.id in (body.match1_id, body.match2_id)
+            else match_pos
+            for match_pos in scheduled_matches
+        ],
+    )
 
 
 async def update_start_times_of_matches(tournament_id: TournamentId) -> None:

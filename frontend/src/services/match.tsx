@@ -1,6 +1,6 @@
 import { showNotification } from '@mantine/notifications';
 
-import { MatchBody, MatchCreateBodyFrontend, MatchRescheduleBody } from '@openapi';
+import { MatchBody, MatchCreateBodyFrontend, MatchRescheduleBody, MatchSwapBody } from '@openapi';
 import { createAxios, handleRequestError } from './adapter';
 
 export async function createMatch(tournament_id: number, match: MatchCreateBodyFrontend) {
@@ -81,6 +81,12 @@ export async function rescheduleMatch(
         });
       }
     });
+}
+
+export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
+  return createAxios()
+    .post(`tournaments/${tournament_id}/matches/swap`, body)
+    .catch((response: any) => handleRequestError(response));
 }
 
 export async function scheduleMatches(tournament_id: number) {

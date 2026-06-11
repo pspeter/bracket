@@ -1,7 +1,7 @@
 import pytest
 from heliclockter import timedelta
 
-from bracket.models.db.match import MatchRescheduleBody, MatchState
+from bracket.models.db.match import MatchRescheduleBody, MatchState, MatchSwapBody
 from bracket.models.db.stage_item_inputs import StageItemInputInsertable
 from bracket.schema import matches
 from bracket.sql.matches import sql_get_match
@@ -554,6 +554,346 @@ async def test_reschedule_match_honours_positions_across_courts(
     assert moved.court_id == court1_inserted.id
     assert moved.position_in_schedule == 2
     assert moved.start_time == tournament.start_time + timedelta(minutes=30)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_swap_matches_across_courts(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament = auth_context.tournament
+    second_slot_start = tournament.start_time + timedelta(minutes=15)
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_court(
+            DUMMY_COURT2.model_copy(update={"tournament_id": tournament.id})
+        ) as court2_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "position_in_schedule": 0,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as court1_first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_slot_start,
+                    "position_in_schedule": 1,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as swapped_match1,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court2_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "position_in_schedule": 0,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as swapped_match2,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court2_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_slot_start,
+                    "position_in_schedule": 1,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as court2_second_match,
+    ):
+        body = MatchSwapBody(match1_id=swapped_match1.id, match2_id=swapped_match2.id)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                "matches/swap",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        match1 = await sql_get_match(swapped_match1.id)
+        match2 = await sql_get_match(swapped_match2.id)
+        untouched1 = await sql_get_match(court1_first_match.id)
+        untouched2 = await sql_get_match(court2_second_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    # The two matches traded court and position; start times follow the new slots
+    assert match1.court_id == court2_inserted.id
+    assert match1.position_in_schedule == 0
+    assert match1.start_time == tournament.start_time
+    assert match2.court_id == court1_inserted.id
+    assert match2.position_in_schedule == 1
+    assert match2.start_time == second_slot_start
+
+    # The other matches stayed where they were
+    assert untouched1.court_id == court1_inserted.id
+    assert untouched1.position_in_schedule == 0
+    assert untouched1.start_time == tournament.start_time
+    assert untouched2.court_id == court2_inserted.id
+    assert untouched2.position_in_schedule == 1
+    assert untouched2.start_time == second_slot_start
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_swap_matches_same_court(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament = auth_context.tournament
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "position_in_schedule": 0,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time + timedelta(minutes=15),
+                    "position_in_schedule": 1,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as middle_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time + timedelta(minutes=30),
+                    "position_in_schedule": 2,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as last_match,
+    ):
+        body = MatchSwapBody(match1_id=first_match.id, match2_id=last_match.id)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                "matches/swap",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        first = await sql_get_match(first_match.id)
+        middle = await sql_get_match(middle_match.id)
+        last = await sql_get_match(last_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    assert first.position_in_schedule == 2
+    assert first.start_time == tournament.start_time + timedelta(minutes=30)
+    assert middle.position_in_schedule == 1
+    assert middle.start_time == tournament.start_time + timedelta(minutes=15)
+    assert last.position_in_schedule == 0
+    assert last.start_time == tournament.start_time
+    assert first.court_id == middle.court_id == last.court_id == court1_inserted.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_swap_with_unscheduled_match_fails(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament = auth_context.tournament
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "position_in_schedule": 0,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as scheduled_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": None,
+                    "start_time": None,
+                    "position_in_schedule": None,
+                    "state": MatchState.NOT_STARTED,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as unscheduled_match,
+    ):
+        body = MatchSwapBody(match1_id=scheduled_match.id, match2_id=unscheduled_match.id)
+        response = await send_tournament_request(
+            HTTPMethod.POST,
+            "matches/swap",
+            auth_context,
+            json=body.model_dump(mode="json"),
+        )
+        scheduled = await sql_get_match(scheduled_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    assert response["detail"] == "Both matches must be scheduled to swap them"
+    assert scheduled.court_id == court1_inserted.id
+    assert scheduled.position_in_schedule == 0
 
 
 @pytest.mark.asyncio(loop_scope="session")

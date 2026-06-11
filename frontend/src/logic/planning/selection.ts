@@ -3,9 +3,8 @@
  *
  * The UI dispatches events (tap on a match card, tap on a tray match, tap on an
  * insertion line, unschedule, cancel) and the reducer returns the next selection
- * state plus the ordered list of backend actions the tap triggers (zero, one, or —
- * for a swap — two). Later slices (zoom gating, action sheet) extend this same
- * reducer.
+ * state plus the backend action the tap triggers (zero or one). Later slices
+ * (zoom gating, action sheet) extend this same reducer.
  *
  * Positions are `position_in_schedule` values, which the backend keeps contiguous
  * (0..n-1) per court. An insertion line with index `k` on a court means "insert
@@ -43,6 +42,7 @@ export type PlanningAction =
         new_position: number;
       };
     }
+  | { type: 'swap'; matchId1: number; matchId2: number }
   | { type: 'unschedule'; matchId: number };
 
 export interface SelectionTransition {
@@ -104,43 +104,14 @@ function placeFromTray(matchId: number, courtId: number, index: number): Selecti
 }
 
 /**
- * Swap two scheduled matches via two reschedule operations. The first move puts
- * the selected match exactly in the target's slot (the backend inserts before the
- * target across courts and when moving earlier on the same court, and after it
- * when moving later on the same court — landing on the target's position either
- * way). That repack shifts the target by one, so the second move's old position
- * is adjusted accordingly. For adjacent same-court matches the first move already
- * completes the swap and the second degenerates into a backend no-op.
+ * Swap two scheduled matches as a single atomic backend operation. The backend
+ * identifies both matches by id and trades their slots, so the action stays valid
+ * even if the grid the user tapped on was slightly stale.
  */
 function swap(selected: GridMatchRef, target: GridMatchRef): SelectionTransition {
-  const sameCourt = selected.courtId === target.courtId;
-  const targetPositionAfterFirstMove =
-    sameCourt && selected.position < target.position ? target.position - 1 : target.position + 1;
-
   return {
     state: IDLE_SELECTION,
-    actions: [
-      {
-        type: 'reschedule',
-        matchId: selected.matchId,
-        body: {
-          old_court_id: selected.courtId,
-          old_position: selected.position,
-          new_court_id: target.courtId,
-          new_position: target.position,
-        },
-      },
-      {
-        type: 'reschedule',
-        matchId: target.matchId,
-        body: {
-          old_court_id: target.courtId,
-          old_position: targetPositionAfterFirstMove,
-          new_court_id: selected.courtId,
-          new_position: selected.position,
-        },
-      },
-    ],
+    actions: [{ type: 'swap', matchId1: selected.matchId, matchId2: target.matchId }],
   };
 }
 

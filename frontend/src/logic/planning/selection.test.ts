@@ -192,94 +192,23 @@ describe('selectionReducer', () => {
   });
 
   describe('swapping two scheduled matches', () => {
-    it('tapping a match on another court swaps the two', () => {
-      // After the first move, the target gets pushed one position down on its
-      // court (the selected match is inserted before it), so the second move's
-      // old_position is the target's original position + 1.
+    it('tapping a match on another court emits a single id-based swap action', () => {
       const { state, actions } = selectionReducer(selected(ref(10, 1, 2)), {
         type: 'tap-match',
         match: ref(20, 2, 1),
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(actions).toEqual([
-        {
-          type: 'reschedule',
-          matchId: 10,
-          body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
-        },
-        {
-          type: 'reschedule',
-          matchId: 20,
-          body: { old_court_id: 2, old_position: 2, new_court_id: 1, new_position: 2 },
-        },
-      ]);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
     });
 
-    it('swaps with a later match on the same court', () => {
-      // Moving the selected match (position 1) after the target (position 3)
-      // shifts the target up to position 2 before the second move.
-      const { actions } = selectionReducer(selected(ref(10, 1, 1)), {
-        type: 'tap-match',
-        match: ref(20, 1, 3),
-      });
-
-      expect(actions).toEqual([
-        {
-          type: 'reschedule',
-          matchId: 10,
-          body: { old_court_id: 1, old_position: 1, new_court_id: 1, new_position: 3 },
-        },
-        {
-          type: 'reschedule',
-          matchId: 20,
-          body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 1 },
-        },
-      ]);
-    });
-
-    it('swaps with an earlier match on the same court', () => {
-      // Inserting the selected match before the target pushes the target one
-      // position down before the second move.
+    it('swaps with a match on the same court regardless of relative position', () => {
       const { actions } = selectionReducer(selected(ref(10, 1, 3)), {
         type: 'tap-match',
         match: ref(20, 1, 1),
       });
 
-      expect(actions).toEqual([
-        {
-          type: 'reschedule',
-          matchId: 10,
-          body: { old_court_id: 1, old_position: 3, new_court_id: 1, new_position: 1 },
-        },
-        {
-          type: 'reschedule',
-          matchId: 20,
-          body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 3 },
-        },
-      ]);
-    });
-
-    it('swaps adjacent matches on the same court', () => {
-      // The first move alone already swaps adjacent matches; the second move
-      // degenerates into a same-position request the backend treats as a no-op.
-      const { actions } = selectionReducer(selected(ref(10, 1, 1)), {
-        type: 'tap-match',
-        match: ref(20, 1, 2),
-      });
-
-      expect(actions).toEqual([
-        {
-          type: 'reschedule',
-          matchId: 10,
-          body: { old_court_id: 1, old_position: 1, new_court_id: 1, new_position: 2 },
-        },
-        {
-          type: 'reschedule',
-          matchId: 20,
-          body: { old_court_id: 1, old_position: 1, new_court_id: 1, new_position: 1 },
-        },
-      ]);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
     });
   });
 

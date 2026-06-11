@@ -8,8 +8,10 @@ import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { computeScheduleLayout } from '@logic/planning/layout';
+import { applyPlanningActions } from '@logic/planning/optimistic';
 import {
   IDLE_SELECTION,
+  PlanningAction,
   SelectionEvent,
   SelectionState,
   selectionReducer,
@@ -25,7 +27,7 @@ import {
   getStageOrderViolations,
   getUnscheduledMatches,
 } from '@services/lookups';
-import { rescheduleMatch, scheduleMatches, unscheduleMatch } from '@services/match';
+import { rescheduleMatch, scheduleMatches, swapMatches, unscheduleMatch } from '@services/match';
 
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
@@ -79,6 +81,25 @@ export default function SchedulePage() {
     }
   }
 
+  async function performAction(action: PlanningAction) {
+    switch (action.type) {
+      case 'swap':
+        await swapMatches(tournamentData.id, {
+          match1_id: action.matchId1,
+          match2_id: action.matchId2,
+        });
+        break;
+      case 'reschedule':
+        await rescheduleMatch(tournamentData.id, action.matchId, action.body);
+        break;
+      case 'unschedule':
+        await unscheduleMatch(tournamentData.id, action.matchId);
+        break;
+      default:
+        break;
+    }
+  }
+
   async function handleSelectionEvent(event: SelectionEvent) {
     const wasTraySelection = selection.kind === 'tray-match-selected';
     const { state, actions } = selectionReducer(selection, event);
@@ -90,20 +111,33 @@ export default function SchedulePage() {
     }
 
     if (actions.length > 0) {
-      for (const action of actions) {
-        if (action.type === 'reschedule') {
-          await rescheduleMatch(tournamentData.id, action.matchId, action.body);
-        } else {
-          await unscheduleMatch(tournamentData.id, action.matchId);
-        }
-      }
-      await swrStagesResponse.mutate();
-
       // After placing a tray match, reopen the tray so scheduling many matches
       // in a row flows without extra taps.
       if (wasTraySelection && event.type === 'tap-insertion-line') {
         setTrayOpened(true);
       }
+
+      // Show the predicted outcome immediately; the revalidation that follows the
+      // request replaces it with the backend's authoritative schedule.
+      await swrStagesResponse.mutate(
+        async (current) => {
+          for (const action of actions) {
+            await performAction(action);
+          }
+          return current;
+        },
+        {
+          optimisticData: (current) =>
+            current == null
+              ? current!
+              : {
+                  ...current,
+                  data: applyPlanningActions(current.data, actions, tournament.start_time),
+                },
+          populateCache: false,
+          revalidate: true,
+        }
+      );
     }
   }
 
