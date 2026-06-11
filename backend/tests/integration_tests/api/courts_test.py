@@ -54,6 +54,27 @@ async def test_courts_endpoint(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_courts_sorted_naturally(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_court(
+            DUMMY_COURT1.model_copy(
+                update={"tournament_id": auth_context.tournament.id, "name": "Court 10"}
+            )
+        ),
+        inserted_court(
+            DUMMY_COURT1.model_copy(
+                update={"tournament_id": auth_context.tournament.id, "name": "Court 2"}
+            )
+        ),
+    ):
+        response = await send_tournament_request(HTTPMethod.GET, "courts", auth_context, {})
+        # Numbered names sort numerically, not as plain strings ("10" < "2").
+        assert [court["name"] for court in response["data"]] == ["Court 2", "Court 10"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_create_court(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

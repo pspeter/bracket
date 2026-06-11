@@ -1,6 +1,7 @@
 from bracket.database import database
 from bracket.models.db.court import Court, CourtBody
 from bracket.utils.id_types import CourtId, TournamentId
+from bracket.utils.sorting import natural_sort_key
 
 
 async def get_all_courts_in_tournament(tournament_id: TournamentId) -> list[Court]:
@@ -8,10 +9,12 @@ async def get_all_courts_in_tournament(tournament_id: TournamentId) -> list[Cour
         SELECT *
         FROM courts
         WHERE courts.tournament_id = :tournament_id
-        ORDER BY name
         """
     result = await database.fetch_all(query=query, values={"tournament_id": tournament_id})
-    return [Court.model_validate(dict(x._mapping)) for x in result]
+    courts_ = [Court.model_validate(dict(x._mapping)) for x in result]
+    # Natural sort so numbered courts ("c2" < "c10") order as expected; ties
+    # (identical names) fall back to creation order.
+    return sorted(courts_, key=lambda court: (natural_sort_key(court.name), court.id))
 
 
 async def update_court(
