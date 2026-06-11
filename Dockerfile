@@ -5,29 +5,35 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+RUN apk add pnpm
+
+# Install dependencies before copying the source so this layer is only
+# rebuilt when the lockfile changes
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN CI=true pnpm install
+
 COPY frontend .
 
 ARG VITE_API_BASE_URL=/api
-RUN apk add pnpm && \
-    CI=true pnpm install && \
-    VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build
+RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build
 
 # Build backend image that also serves frontend (stored in `/app/frontend-dist`)
 FROM python:3.14-alpine3.22
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN rm -rf /var/cache/apk/*
-
-COPY backend /app
 WORKDIR /app
 
-# -- Install dependencies:
 RUN addgroup --system bracket && \
     adduser --system bracket --ingroup bracket && \
-    chown -R bracket:bracket /app
+    chown bracket:bracket /app
 USER bracket
 
+# Install dependencies before copying the source so this layer is only
+# rebuilt when the lockfile changes
+COPY --chown=bracket:bracket backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --locked
+
+COPY --chown=bracket:bracket backend /app
 
 COPY --from=builder /app/dist /app/frontend-dist
 

@@ -5,11 +5,16 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+RUN apk add pnpm
+
+# Install dependencies before copying the source so this layer is only
+# rebuilt when the lockfile changes
+COPY package.json pnpm-lock.yaml ./
+RUN CI=true pnpm install
+
 COPY . .
 
-RUN apk add pnpm && \
-    CI=true pnpm install && \
-    pnpm build
+RUN pnpm build
 
 # Production image, copy all the static files and run next
 FROM caddy:2-alpine AS runner

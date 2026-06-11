@@ -1,18 +1,19 @@
 FROM python:3.14-alpine3.22
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN rm -rf /var/cache/apk/*
-
-COPY . /app
 WORKDIR /app
 
-# -- Install dependencies:
 RUN addgroup --system bracket && \
     adduser --system bracket --ingroup bracket && \
-    chown -R bracket:bracket /app
+    chown bracket:bracket /app
 USER bracket
 
+# Install dependencies before copying the source so this layer is only
+# rebuilt when the lockfile changes
+COPY --chown=bracket:bracket pyproject.toml uv.lock ./
 RUN uv sync --no-dev --locked
+
+COPY --chown=bracket:bracket . /app
 
 EXPOSE 8400
 
