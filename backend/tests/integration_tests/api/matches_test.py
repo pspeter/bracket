@@ -674,11 +674,11 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
     assert court1_matches[1].start_time == tournament.start_time + timedelta(minutes=30)
     assert court1_matches[2].start_time == tournament.start_time + timedelta(minutes=45)
 
-    # Court 2 is unaffected: its own two matches run back-to-back from start time
-    # (no global stage barrier across courts).
+    # Court 2 is not touched at all: the re-pack is scoped to the updated match's
+    # court, so its matches keep the start times they were inserted with.
     assert len(court2_matches) == 2
     assert court2_matches[0].start_time == tournament.start_time
-    assert court2_matches[1].start_time == tournament.start_time + timedelta(minutes=15)
+    assert court2_matches[1].start_time == stage2_start
 
 
 @pytest.mark.asyncio(loop_scope="session")

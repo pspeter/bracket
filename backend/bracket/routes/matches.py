@@ -3,12 +3,15 @@ from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.config import config
+from bracket.database import database
 from bracket.logic.planning.conflicts import handle_conflicts
 from bracket.logic.planning.matches import (
     get_scheduled_matches,
     handle_match_reschedule,
+    handle_match_swap,
     reorder_all_matches,
     schedule_all_unscheduled_matches,
+    validate_match_can_be_unscheduled,
 )
 from bracket.logic.ranking.calculation import (
     recalculate_ranking_for_stage_item,
@@ -27,6 +30,7 @@ from bracket.models.db.match import (
     MatchRescheduleBody,
     MatchScoreTrackingBody,
     MatchState,
+    MatchSwapBody,
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
@@ -82,20 +86,6 @@ async def validate_match_can_be_started(
         raise ValueError(
             f"Could not find stage for match {existing_match.id} in tournament {tournament_id}"
         )
-
-
-def validate_match_can_be_unscheduled(match: Match) -> None:
-    if match.state is MatchState.NOT_STARTED:
-        return
-
-    state_label = "in progress" if match.state is MatchState.IN_PROGRESS else "completed"
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            f"Cannot move a {state_label} match back to Unscheduled. "
-            "Only not started matches can be unscheduled."
-        ),
-    )
 
 
 def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBody) -> MatchBody:
@@ -260,9 +250,14 @@ async def unschedule_match(
     await sql_unschedule_match(match_row.id)
 
     if old_court_id is not None:
+        # Only the vacated court needs re-packing; other courts keep their packing.
         stages = await get_full_tournament_details(tournament_id)
-        scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches(tournament, scheduled_matches)
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == old_court_id
+        ]
+        await reorder_all_matches(tournament, court_matches)
 
     await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
@@ -281,6 +276,20 @@ async def reschedule_match(
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     await handle_match_reschedule(tournament, body, match_id)
     await handle_conflicts(await get_full_tournament_details(tournament_id))
+    return SuccessResponse()
+
+
+@router.post("/tournaments/{tournament_id}/matches/swap", response_model=SuccessResponse)
+async def swap_matches(
+    tournament_id: TournamentId,
+    body: MatchSwapBody,
+    tournament: Tournament = Depends(disallow_archived_tournament),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+) -> SuccessResponse:
+    await check_foreign_keys_belong_to_tournament(body, tournament_id)
+    async with database.transaction():
+        await handle_match_swap(tournament, body)
+        await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
 
 
@@ -308,10 +317,15 @@ async def update_match_by_id(
         match_body.custom_duration_minutes != match.custom_duration_minutes
         or match_body.custom_margin_minutes != match.custom_margin_minutes
     ) and match.court_id is not None:
+        # A duration change only shifts start times on the match's own court.
         tournament = await sql_get_tournament(tournament_id)
         stages = await get_full_tournament_details(tournament_id)
-        scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches(tournament, scheduled_matches)
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == match.court_id
+        ]
+        await reorder_all_matches(tournament, court_matches)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
