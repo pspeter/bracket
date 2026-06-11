@@ -260,13 +260,15 @@ describe('selectionReducer', () => {
       expect(state).toEqual(traySelected(77));
     });
 
-    it('tapping a grid match switches to match-selected', () => {
+    it('tapping a grid match is a no-op (stays in tray placement mode)', () => {
       const { state, reschedule, swap } = selectionReducer(selection, {
         type: 'tap-match',
         match: ref(20, 1, 0),
       });
 
-      expect(state).toEqual(selected(ref(20, 1, 0)));
+      // Tapping a match card during tray placement mode keeps the tray match
+      // selected so an accidental card tap doesn't discard the placement.
+      expect(state).toEqual(traySelected(99));
       expect(reschedule).toBeNull();
       expect(swap).toBeNull();
     });

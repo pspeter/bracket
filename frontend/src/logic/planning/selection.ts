@@ -186,7 +186,9 @@ export function selectionReducer(
           }
           return noOp({ kind: 'tray-match-selected', matchId: event.matchId });
         case 'tap-match':
-          return noOp({ kind: 'match-selected', match: event.match });
+          // Tapping a grid match during tray placement is a no-op: the user
+          // is in placement mode and should tap an insertion line, not a card.
+          return noOp(state);
         case 'tap-insertion-line':
           return placeTray(state.matchId, event.courtId, event.index);
         default:
