@@ -39,7 +39,7 @@ COPY --from=builder /app/dist /app/frontend-dist
 
 EXPOSE 8400
 
-HEALTHCHECK --interval=3s --timeout=5s --retries=10 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
     CMD ["wget", "-O", "/dev/null", "http://0.0.0.0:8400/ping"]
 
 CMD [ \
