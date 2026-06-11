@@ -1,4 +1,4 @@
-import { Affix, Box, Button, Grid, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { Affix, Badge, Box, Button, Grid, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconCalendarPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +10,14 @@ import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { computeScheduleLayout } from '@logic/planning/layout';
 import {
-  IDLE_SELECTION,
-  SelectionEvent,
-  SelectionState,
-  selectionReducer,
+  FocusTarget,
+  PlannerEvent,
+  PlannerState,
+  initialPlannerState,
+  plannerReducer,
 } from '@logic/planning/selection';
-import { Court, MatchWithDetails, StageWithStageItems } from '@openapi';
+import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel, levelColour } from '@logic/planning/zoom';
+import { Court, LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getCourts, getStages, getTournamentById } from '@services/adapter';
 import {
@@ -31,11 +33,15 @@ import { rescheduleMatch, scheduleMatches } from '@services/match';
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
+import ZoomControls from '@components/scheduling/zoom_controls';
 
 export default function SchedulePage() {
   const [modalOpened, modalSetOpened] = useState(false);
   const [match, setMatch] = useState<MatchWithDetails | null>(null);
-  const [selection, setSelection] = useState<SelectionState>(IDLE_SELECTION);
+  const [planner, setPlanner] = useState<PlannerState>(() =>
+    initialPlannerState(defaultZoomLevel(window.innerWidth))
+  );
+  const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
@@ -64,11 +70,13 @@ export default function SchedulePage() {
   const tournament = swrTournamentResponse.data!.data;
   const courts: Court[] = swrCourtsResponse.data?.data ?? [];
   const rawStages: StageWithStageItems[] = swrStagesResponse.data?.data ?? [];
+  const levels: LevelResponse[] = tournament.levels ?? [];
 
   const layout = computeScheduleLayout({
     courts,
     matchesByCourtId,
     tournamentStartTime: tournament.start_time,
+    tickIntervalMinutes: ZOOM_TICK_INTERVAL_MINUTES[planner.zoom],
   });
 
   const violations = new Set<number>();
@@ -87,9 +95,12 @@ export default function SchedulePage() {
     modalSetOpened(true);
   }
 
-  async function handleSelectionEvent(event: SelectionEvent) {
-    const { state, reschedule } = selectionReducer(selection, event);
-    setSelection(state);
+  async function handlePlannerEvent(event: PlannerEvent) {
+    const { state, reschedule, focus: focusTarget } = plannerReducer(planner, event);
+    setPlanner(state);
+    if (focusTarget != null) {
+      setFocus((previous) => ({ ...focusTarget, nonce: (previous?.nonce ?? 0) + 1 }));
+    }
     if (reschedule != null) {
       await rescheduleMatch(tournamentData.id, reschedule.matchId, reschedule.body);
       await swrStagesResponse.mutate();
@@ -97,7 +108,10 @@ export default function SchedulePage() {
   }
 
   const selectedEntry =
-    selection.kind === 'match-selected' ? matchesLookup[selection.match.matchId] : null;
+    planner.selection.kind === 'match-selected'
+      ? matchesLookup[planner.selection.match.matchId]
+      : null;
+  const isOverview = planner.zoom === 'overview';
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
@@ -152,14 +166,28 @@ export default function SchedulePage() {
           />
         </Stack>
       ) : (
-        <Box mt="1rem" pb={selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+        <Box mt="1rem" pb={planner.selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+          {isOverview && levels.length > 0 && (
+            <Group gap="xs" mb="xs">
+              {[...levels]
+                .sort((a, b) => a.position - b.position)
+                .map((level) => (
+                  <Badge key={level.id} color={levelColour(level.id, levels)} variant="filled">
+                    {level.name}
+                  </Badge>
+                ))}
+            </Group>
+          )}
           <ScheduleGrid
             layout={layout}
             violations={violations}
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
-            selection={selection}
-            onSelectionEvent={handleSelectionEvent}
+            levels={levels}
+            selection={planner.selection}
+            zoom={planner.zoom}
+            focus={focus}
+            onSelectionEvent={handlePlannerEvent}
           />
           <UnscheduledSheet
             unscheduledMatches={unscheduledMatches}
@@ -167,6 +195,9 @@ export default function SchedulePage() {
             matchesLookup={matchesLookup}
             openMatchModal={openMatchModal}
           />
+          <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
+            <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
+          </Affix>
           {selectedEntry != null ? (
             <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
               <Paper
@@ -189,14 +220,14 @@ export default function SchedulePage() {
                     {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    {t('tap_to_place_hint')}
+                    {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
                   </Text>
                 </Box>
                 <Button
                   size="compact-sm"
                   variant="light"
                   color="red"
-                  onClick={() => handleSelectionEvent({ type: 'cancel' })}
+                  onClick={() => handlePlannerEvent({ type: 'cancel' })}
                 >
                   {t('cancel_button')}
                 </Button>

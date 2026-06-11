@@ -1,6 +1,7 @@
 import { Box, Flex, Text, Tooltip } from '@mantine/core';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
@@ -10,15 +11,20 @@ import {
   ScheduleGridLayout,
   computeInsertionLines,
 } from '@logic/planning/layout';
-import { GridMatchRef, SelectionEvent, SelectionState } from '@logic/planning/selection';
-import { Court, MatchWithDetails } from '@openapi';
+import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
+import {
+  ZOOM_PX_PER_MINUTE,
+  ZoomLevel,
+  abbreviateTeamName,
+  levelColour,
+  shortCourtLabel,
+} from '@logic/planning/zoom';
+import { Court, LevelResponse, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/lookups';
 
-/** Vertical scale of the grid: one minute of schedule time takes this many pixels. */
-const PX_PER_MINUTE = 5;
-const COURT_COLUMN_WIDTH = '14rem';
 const RULER_WIDTH = '3.25rem';
 const HEADER_HEIGHT = '2.5rem';
+const HEADER_HEIGHT_PX = 40;
 /** Height of an insertion line's tap target; the visible line is centered inside it. */
 const INSERTION_HIT_AREA_PX = 32;
 /**
@@ -29,8 +35,37 @@ const INSERTION_HIT_AREA_PX = 32;
  */
 const GRID_TOP_INSET_PX = 32;
 
+/**
+ * Court column width per zoom level. Agenda fills a phone screen with a single
+ * court; compact fits 3–4 courts on a phone and widens on larger screens;
+ * overview divides the viewport among all courts (flex, no fixed width).
+ */
+const COURT_COLUMN_WIDTH: Record<Exclude<ZoomLevel, 'overview'>, string> = {
+  agenda: 'min(calc(100vw - 6.5rem), 20rem)',
+  compact: 'clamp(5.5rem, 27vw, 9rem)',
+};
+
+/** How much a pinch must scale before the grid snaps one zoom level. */
+const PINCH_SNAP_RATIO = 1.3;
+/** Accumulated ctrl+wheel delta that snaps one zoom level on desktop. */
+const WHEEL_SNAP_DELTA = 80;
+
+function matchColour(
+  match: MatchWithDetails,
+  entry: MatchLookupEntry | undefined,
+  levels: LevelResponse[]
+) {
+  // Colored by level when the tournament has levels; tournaments without
+  // levels degrade to the stage-item colours used by the detailed cards.
+  // The level is assigned on the stage; match.level_id is not populated.
+  if (levels.length > 0) return levelColour(entry?.stage.level_id ?? match.level_id, levels);
+  return entry != null ? stringToColour(`${entry.stageItem.id}`) : 'gray';
+}
+
 function MatchCard({
   block,
+  zoom,
+  pxPerMinute,
   isViolation,
   isSelected,
   stageItemsLookup,
@@ -38,6 +73,8 @@ function MatchCard({
   onTap,
 }: {
   block: MatchBlock<MatchWithDetails>;
+  zoom: 'agenda' | 'compact';
+  pxPerMinute: number;
   isViolation: boolean;
   isSelected: boolean;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
@@ -51,16 +88,25 @@ function MatchCard({
 
   // The card covers only the playing time; the margin after the match shows as a
   // calendar-style gap before the next card.
-  const cardHeightPx = block.durationMinutes * PX_PER_MINUTE;
+  const cardHeightPx = block.durationMinutes * pxPerMinute;
   // Pick the densest layout that still fits: three rows (time / team 1 / team 2),
   // two rows (time + team 1 / team 2), or a single "time team 1 – team 2" row.
   const rows = cardHeightPx >= 52 ? 3 : cardHeightPx >= 34 ? 2 : 1;
+  const fontSize = zoom === 'compact' ? 11 : undefined;
+  // A one-row compact card is too narrow for time plus names plus icons; the
+  // names win, and both conflict flags collapse into a single icon.
+  const showTime = !(zoom === 'compact' && rows === 1);
+  const mergeConflictIcons = zoom === 'compact' && rows === 1;
 
-  const input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
-  const input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+  let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
+  let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+  if (zoom === 'compact') {
+    input1 = abbreviateTeamName(input1);
+    input2 = abbreviateTeamName(input2);
+  }
 
   const timeLabel = (
-    <Text size="xs" c="dimmed" lh={1.3} style={{ whiteSpace: 'nowrap' }}>
+    <Text size="xs" fz={fontSize} c="dimmed" lh={1.3} style={{ whiteSpace: 'nowrap' }}>
       {format(block.startTime, 'HH:mm')}
     </Text>
   );
@@ -77,13 +123,14 @@ function MatchCard({
 
   return (
     <Box
+      data-match-id={match.id}
       onClick={(event) => {
         event.stopPropagation();
         onTap();
       }}
       style={{
         position: 'absolute',
-        top: block.startMinutes * PX_PER_MINUTE,
+        top: block.startMinutes * pxPerMinute,
         height: cardHeightPx,
         left: 3,
         right: 3,
@@ -117,10 +164,14 @@ function MatchCard({
           </Flex>
         )}
         <Flex gap={6} align="center" wrap="nowrap">
-          {rows < 3 && timeLabel}
+          {rows < 3 && showTime && timeLabel}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
-          {rows === 1 && match.stage_item_input2_conflict && <AiFillWarning color="red" />}
-          <Text size="xs" fw={600} lh={1.3} truncate style={{ flex: 1 }}>
+          {rows === 1 &&
+            match.stage_item_input2_conflict &&
+            !(mergeConflictIcons && match.stage_item_input1_conflict) && (
+              <AiFillWarning color="red" />
+            )}
+          <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
             {rows === 1 ? `${input1} – ${input2}` : input1}
           </Text>
           {rows < 3 && violationIcon}
@@ -128,7 +179,7 @@ function MatchCard({
         {rows > 1 && (
           <Flex gap={4} align="center" wrap="nowrap">
             {match.stage_item_input2_conflict && <AiFillWarning color="red" />}
-            <Text size="xs" fw={600} lh={1.3} truncate>
+            <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>
           </Flex>
@@ -138,18 +189,68 @@ function MatchCard({
   );
 }
 
+/**
+ * Overview rendering of a match: a colored block without text. Colour carries
+ * the level, opacity (plus a check) carries the status. Pointer events pass
+ * through to the column, whose taps navigate instead of selecting.
+ */
+function OverviewBlock({
+  block,
+  pxPerMinute,
+  colour,
+  isSelected,
+}: {
+  block: MatchBlock<MatchWithDetails>;
+  pxPerMinute: number;
+  colour: string;
+  isSelected: boolean;
+}) {
+  const blockHeightPx = block.durationMinutes * pxPerMinute;
+  const isCompleted = block.match.state === 'COMPLETED';
+  const opacity = isCompleted ? 0.35 : block.match.state === 'IN_PROGRESS' ? 1 : 0.85;
+
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        top: block.startMinutes * pxPerMinute,
+        height: blockHeightPx,
+        left: 1,
+        right: 1,
+        borderRadius: 2,
+        backgroundColor: `var(--mantine-color-${colour}-filled)`,
+        opacity,
+        boxShadow: isSelected ? '0 0 0 2px var(--mantine-color-indigo-filled)' : undefined,
+        zIndex: isSelected ? 1 : undefined,
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {isCompleted && blockHeightPx >= 12 && (
+        <Text c="white" fz={Math.min(blockHeightPx - 2, 12)} lh={1}>
+          ✓
+        </Text>
+      )}
+    </Box>
+  );
+}
+
 function InsertionLineTarget({
   line,
   gridHeight,
+  pxPerMinute,
   isNoop,
   onTap,
 }: {
   line: InsertionLine;
   gridHeight: number;
+  pxPerMinute: number;
   isNoop: boolean;
   onTap: () => void;
 }) {
-  const lineY = line.offsetMinutes * PX_PER_MINUTE;
+  const lineY = line.offsetMinutes * pxPerMinute;
   // The top line sits above minute 0; its hit area may extend into the top
   // inset, but no further (the header would cover it).
   const top = Math.min(
@@ -162,6 +263,7 @@ function InsertionLineTarget({
 
   return (
     <Box
+      data-insertion-index={line.index}
       onClick={(event) => {
         event.stopPropagation();
         onTap();
@@ -197,40 +299,136 @@ function InsertionLineTarget({
  * Time-proportional schedule: court columns against a shared vertical time ruler.
  * Card positions and heights are proportional to computed start times and playing
  * durations; the pause after a match shows as a calendar-style gap before the next
- * card. Tapping a card selects it for placement; while a match is selected,
- * insertion lines render between matches and taps on them dispatch placement events.
+ * card.
+ *
+ * The grid renders at one of three semantic zoom levels: agenda (one court, full
+ * cards), compact (3–4 courts, abbreviated cards) or overview (all courts, colored
+ * blocks). Tapping a card selects it for placement and insertion lines render at
+ * agenda/compact; at overview, taps navigate (zoom in toward the tapped region).
+ * Pinch gestures and ctrl+scroll snap between the levels.
  */
 export default function ScheduleGrid({
   layout,
   violations,
   stageItemsLookup,
   matchesLookup,
+  levels,
   selection,
+  zoom,
+  focus,
   onSelectionEvent,
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
   violations: Set<number>;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
+  levels: LevelResponse[];
   selection: SelectionState;
-  onSelectionEvent: (event: SelectionEvent) => void;
+  zoom: ZoomLevel;
+  focus: (FocusTarget & { nonce: number }) | null;
+  onSelectionEvent: (event: PlannerEvent) => void;
 }) {
-  const gridHeight = layout.totalMinutes * PX_PER_MINUTE;
+  const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
+  const gridHeight = layout.totalMinutes * pxPerMinute;
   const selectedMatch = selection.kind === 'match-selected' ? selection.match : null;
+  const isOverview = zoom === 'overview';
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const onSelectionEventRef = useRef(onSelectionEvent);
+  onSelectionEventRef.current = onSelectionEvent;
+
+  // Pinch (two fingers) and ctrl+wheel (desktop trackpad pinch / mouse wheel)
+  // snap between zoom levels. Native listeners because preventDefault is needed
+  // to keep the browser from zooming the page instead.
+  useEffect(() => {
+    const element = containerRef.current;
+    if (element == null) return undefined;
+
+    let pinchBaseline: number | null = null;
+    let wheelAccumulated = 0;
+    const distance = (touches: TouchList) =>
+      Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 2) pinchBaseline = distance(event.touches);
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 2 || pinchBaseline == null) return;
+      event.preventDefault();
+      const ratio = distance(event.touches) / pinchBaseline;
+      if (ratio >= PINCH_SNAP_RATIO) {
+        onSelectionEventRef.current({ type: 'zoom-in' });
+        pinchBaseline = distance(event.touches);
+      } else if (ratio <= 1 / PINCH_SNAP_RATIO) {
+        onSelectionEventRef.current({ type: 'zoom-out' });
+        pinchBaseline = distance(event.touches);
+      }
+    };
+    const onTouchEnd = () => {
+      pinchBaseline = null;
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      wheelAccumulated += event.deltaY;
+      if (wheelAccumulated <= -WHEEL_SNAP_DELTA) {
+        onSelectionEventRef.current({ type: 'zoom-in' });
+        wheelAccumulated = 0;
+      } else if (wheelAccumulated >= WHEEL_SNAP_DELTA) {
+        onSelectionEventRef.current({ type: 'zoom-out' });
+        wheelAccumulated = 0;
+      }
+    };
+
+    element.addEventListener('touchstart', onTouchStart, { passive: true });
+    element.addEventListener('touchmove', onTouchMove, { passive: false });
+    element.addEventListener('touchend', onTouchEnd);
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      element.removeEventListener('touchstart', onTouchStart);
+      element.removeEventListener('touchmove', onTouchMove);
+      element.removeEventListener('touchend', onTouchEnd);
+      element.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+
+  // After an overview tap zooms in, center the tapped court/time region. Runs
+  // after the re-render at the new zoom level, so measurements are up to date.
+  useEffect(() => {
+    if (focus == null) return;
+    const container = containerRef.current;
+    const column = container?.querySelector<HTMLElement>(`[data-court-id="${focus.courtId}"]`);
+    if (container == null || column == null) return;
+
+    const columnLeft =
+      column.getBoundingClientRect().left -
+      container.getBoundingClientRect().left +
+      container.scrollLeft;
+    const targetY = HEADER_HEIGHT_PX + GRID_TOP_INSET_PX + focus.offsetMinutes * pxPerMinute;
+    container.scrollTo({
+      left: columnLeft - (container.clientWidth - column.clientWidth) / 2,
+      top: targetY - container.clientHeight / 2,
+      behavior: 'smooth',
+    });
+    // Only re-run per navigation tap; pxPerMinute is already the post-zoom scale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce]);
 
   return (
     <Box
+      ref={containerRef}
       onClick={() => onSelectionEvent({ type: 'cancel' })}
       style={{
         overflow: 'auto',
         maxHeight: 'calc(100dvh - 14rem)',
         maxWidth: '100%',
-        width: 'fit-content',
+        width: isOverview ? '100%' : 'fit-content',
         border: '1px solid var(--mantine-color-default-border)',
         borderRadius: 8,
+        touchAction: 'pan-x pan-y',
       }}
     >
-      <Flex wrap="nowrap" style={{ minWidth: 'fit-content' }}>
+      <Flex wrap="nowrap" style={{ minWidth: isOverview ? '100%' : 'fit-content' }}>
         <Box
           style={{
             position: 'sticky',
@@ -262,7 +460,7 @@ export default function ScheduleGrid({
                 pr={6}
                 style={{
                   position: 'absolute',
-                  top: tick.offsetMinutes * PX_PER_MINUTE,
+                  top: tick.offsetMinutes * pxPerMinute,
                   right: 0,
                   transform: tick.offsetMinutes === 0 ? undefined : 'translateY(-50%)',
                   backgroundColor: 'var(--mantine-color-body)',
@@ -276,14 +474,16 @@ export default function ScheduleGrid({
         {layout.courts.map(({ court, blocks }) => (
           <Box
             key={court.id}
+            data-court-id={court.id}
             style={{
-              flex: '0 0 auto',
-              width: COURT_COLUMN_WIDTH,
+              flex: isOverview ? '1 1 0' : '0 0 auto',
+              width: isOverview ? undefined : COURT_COLUMN_WIDTH[zoom],
+              minWidth: isOverview ? 14 : undefined,
               borderRight: '1px solid var(--mantine-color-default-border)',
             }}
           >
             <Box
-              px="xs"
+              px={isOverview ? 2 : 'xs'}
               style={{
                 position: 'sticky',
                 top: 0,
@@ -296,18 +496,38 @@ export default function ScheduleGrid({
                 borderBottom: '1px solid var(--mantine-color-default-border)',
               }}
             >
-              <Text fw={600} truncate>
-                {court.name}
+              <Text fw={600} fz={isOverview ? 11 : undefined} truncate>
+                {isOverview ? shortCourtLabel(court.name) : court.name}
               </Text>
             </Box>
-            <Box style={{ position: 'relative', height: gridHeight, marginTop: GRID_TOP_INSET_PX }}>
+            <Box
+              onClick={
+                isOverview
+                  ? (event) => {
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const offsetMinutes = Math.min(
+                        Math.max((event.clientY - rect.top) / pxPerMinute, 0),
+                        layout.totalMinutes
+                      );
+                      onSelectionEvent({ type: 'tap-overview', courtId: court.id, offsetMinutes });
+                    }
+                  : undefined
+              }
+              style={{
+                position: 'relative',
+                height: gridHeight,
+                marginTop: GRID_TOP_INSET_PX,
+                cursor: isOverview ? 'zoom-in' : undefined,
+              }}
+            >
               {layout.ticks.map((tick) =>
                 tick.offsetMinutes === 0 ? null : (
                   <Box
                     key={tick.offsetMinutes}
                     style={{
                       position: 'absolute',
-                      top: tick.offsetMinutes * PX_PER_MINUTE,
+                      top: tick.offsetMinutes * pxPerMinute,
                       left: 0,
                       right: 0,
                       borderTop: '1px dashed var(--mantine-color-default-border)',
@@ -317,6 +537,17 @@ export default function ScheduleGrid({
                 )
               )}
               {blocks.map((block, blockIndex) => {
+                if (isOverview) {
+                  return (
+                    <OverviewBlock
+                      key={block.match.id}
+                      block={block}
+                      pxPerMinute={pxPerMinute}
+                      colour={matchColour(block.match, matchesLookup[block.match.id], levels)}
+                      isSelected={selectedMatch?.matchId === block.match.id}
+                    />
+                  );
+                }
                 const matchRef: GridMatchRef = {
                   matchId: block.match.id,
                   courtId: court.id,
@@ -326,6 +557,8 @@ export default function ScheduleGrid({
                   <MatchCard
                     key={block.match.id}
                     block={block}
+                    zoom={zoom}
+                    pxPerMinute={pxPerMinute}
                     isViolation={violations.has(block.match.id)}
                     isSelected={selectedMatch?.matchId === block.match.id}
                     stageItemsLookup={stageItemsLookup}
@@ -335,11 +568,13 @@ export default function ScheduleGrid({
                 );
               })}
               {selectedMatch != null &&
+                !isOverview &&
                 computeInsertionLines(blocks).map((line) => (
                   <InsertionLineTarget
                     key={line.index}
                     line={line}
                     gridHeight={gridHeight}
+                    pxPerMinute={pxPerMinute}
                     isNoop={
                       selectedMatch.courtId === court.id &&
                       (line.index === selectedMatch.position ||

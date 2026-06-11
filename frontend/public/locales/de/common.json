@@ -353,5 +353,8 @@
     "dashboard_tab_live": "Live",
     "dashboard_tab_matches": "Spiele",
     "dashboard_tab_standings": "Tabelle",
-    "dashboard_tab_rules": "Regeln"
+    "dashboard_tab_rules": "Regeln",
+    "zoom_in_label": "Vergrößern",
+    "zoom_out_label": "Verkleinern",
+    "zoom_in_to_place_hint": "Zoomen Sie hinein, um das Spiel zu platzieren"
 }

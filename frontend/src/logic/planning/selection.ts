@@ -4,12 +4,19 @@
  * The UI dispatches events (tap on a match card, tap on an insertion line, cancel)
  * and the reducer returns the next selection state plus, when a tap completes a
  * placement, the reschedule request to send to the backend. Later slices (swap,
- * tray placement, zoom gating, action sheet) extend this same reducer.
+ * tray placement, action sheet) extend this same reducer.
  *
  * Positions are `position_in_schedule` values, which the backend keeps contiguous
  * (0..n-1) per court. An insertion line with index `k` on a court means "insert
  * before the match currently at position `k`"; `k === count` means "at the end".
+ *
+ * `plannerReducer` wraps the selection machine with the semantic zoom level:
+ * selection and placement are only active at agenda/compact zoom, while taps at
+ * overview zoom navigate (zoom in toward the tapped court/time region). An
+ * active selection survives zoom changes.
  */
+
+import { ZoomLevel, zoomIn, zoomOut } from './zoom';
 
 export interface GridMatchRef {
   matchId: number;
@@ -97,5 +104,69 @@ export function selectionReducer(
       }
     default:
       return { state, reschedule: null };
+  }
+}
+
+export interface PlannerState {
+  zoom: ZoomLevel;
+  selection: SelectionState;
+}
+
+export function initialPlannerState(zoom: ZoomLevel): PlannerState {
+  return { zoom, selection: IDLE_SELECTION };
+}
+
+export type PlannerEvent =
+  | SelectionEvent
+  | { type: 'zoom-in' }
+  | { type: 'zoom-out' }
+  | { type: 'set-zoom'; zoom: ZoomLevel }
+  | { type: 'tap-overview'; courtId: number; offsetMinutes: number };
+
+/** Where to scroll the grid after an overview tap zooms in. */
+export interface FocusTarget {
+  courtId: number;
+  offsetMinutes: number;
+}
+
+export interface PlannerTransition {
+  state: PlannerState;
+  reschedule: RescheduleRequest | null;
+  focus: FocusTarget | null;
+}
+
+function noEffect(state: PlannerState): PlannerTransition {
+  return { state, reschedule: null, focus: null };
+}
+
+export function plannerReducer(state: PlannerState, event: PlannerEvent): PlannerTransition {
+  switch (event.type) {
+    case 'zoom-in':
+      return noEffect({ ...state, zoom: zoomIn(state.zoom) });
+    case 'zoom-out':
+      return noEffect({ ...state, zoom: zoomOut(state.zoom) });
+    case 'set-zoom':
+      return noEffect({ ...state, zoom: event.zoom });
+    case 'tap-overview':
+      // Overview taps navigate toward the tapped region; they never select or
+      // place, and a selection in progress rides along to the next level.
+      if (state.zoom !== 'overview') return noEffect(state);
+      return {
+        state: { ...state, zoom: zoomIn(state.zoom) },
+        reschedule: null,
+        focus: { courtId: event.courtId, offsetMinutes: event.offsetMinutes },
+      };
+    case 'cancel': {
+      const { state: selection } = selectionReducer(state.selection, event);
+      return noEffect({ ...state, selection });
+    }
+    default: {
+      // Targets at overview zoom are a few pixels wide; even if a stale UI
+      // still dispatches a card or line tap there, it must never select or
+      // place anything.
+      if (state.zoom === 'overview') return noEffect(state);
+      const { state: selection, reschedule } = selectionReducer(state.selection, event);
+      return { state: { ...state, selection }, reschedule, focus: null };
+    }
   }
 }
