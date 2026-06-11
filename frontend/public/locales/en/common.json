@@ -270,7 +270,7 @@
     "swiss_label": "Swiss",
     "swiss_description": "Teams play against equal teams, based on the results of previous matches.",
     "swiss_score": "Swiss score",
-    "tap_to_place_hint": "Tap a line to place the match",
+    "tap_to_place_hint": "Tap a line to place the match, or another match to swap",
     "team_count_input_round_robin_label": "Number of teams advancing from the previous stage",
     "team_count_select_elimination_label": "Number of teams advancing from the previous stage",
     "team_count_select_elimination_placeholder": "2, 4, 8 etc.",

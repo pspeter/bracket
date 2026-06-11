@@ -180,14 +180,14 @@ describe('selectionReducer', () => {
       expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
     });
 
-    it('tapping a tray match switches the selection to the tray match', () => {
+    it('tapping a tray match swaps it into the selected slot', () => {
       const { state, actions } = selectionReducer(selection, {
         type: 'tap-tray-match',
         matchId: 30,
       });
 
-      expect(state).toEqual(traySelected(30));
-      expect(actions).toEqual([]);
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 30 }]);
     });
   });
 
@@ -242,14 +242,14 @@ describe('selectionReducer', () => {
       expect(actions).toEqual([]);
     });
 
-    it('tapping a scheduled match switches the selection to the grid match', () => {
+    it('tapping a scheduled match swaps the tray match into its slot', () => {
       const { state, actions } = selectionReducer(selection, {
         type: 'tap-match',
         match: ref(10, 1, 2),
       });
 
-      expect(state).toEqual(selected(ref(10, 1, 2)));
-      expect(actions).toEqual([]);
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 30, matchId2: 10 }]);
     });
 
     it('placing on an insertion line schedules the tray match there', () => {

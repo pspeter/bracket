@@ -241,7 +241,7 @@
     "swiss_label": "Schweiz",
     "swiss_description": "Teams spielen gegen ebenbürtige Teams, aufgrund der Ergebnisse der vorherigen Partien.",
     "swiss_score": "Schweizer Punktestand",
-    "tap_to_place_hint": "Tippen Sie auf eine Linie, um das Spiel zu platzieren",
+    "tap_to_place_hint": "Tippen Sie auf eine Linie, um das Spiel zu platzieren, oder auf ein anderes Spiel, um zu tauschen",
     "team_count_input_round_robin_label": "Anzahl der Teams, die aus der vorherigen Stufe weiterkommen.",
     "team_count_select_elimination_label": "Anzahl der Teams, die aus der vorherigen Stufe weiterkommen.",
     "team_count_select_elimination_placeholder": "2, 4, 8 usw.",

@@ -104,14 +104,16 @@ function placeFromTray(matchId: number, courtId: number, index: number): Selecti
 }
 
 /**
- * Swap two scheduled matches as a single atomic backend operation. The backend
- * identifies both matches by id and trades their slots, so the action stays valid
- * even if the grid the user tapped on was slightly stale.
+ * Swap two matches as a single atomic backend operation. The backend identifies
+ * both matches by id and trades their slots, so the action stays valid even if
+ * the grid the user tapped on was slightly stale. The tray counts as "no slot":
+ * swapping a scheduled match with a tray match puts the tray match in its slot
+ * and sends the scheduled match back to the tray.
  */
-function swap(selected: GridMatchRef, target: GridMatchRef): SelectionTransition {
+function swap(selectedMatchId: number, targetMatchId: number): SelectionTransition {
   return {
     state: IDLE_SELECTION,
-    actions: [{ type: 'swap', matchId1: selected.matchId, matchId2: target.matchId }],
+    actions: [{ type: 'swap', matchId1: selectedMatchId, matchId2: targetMatchId }],
   };
 }
 
@@ -135,13 +137,13 @@ export function selectionReducer(
           return stay(IDLE_SELECTION);
         case 'tap-match':
           // Tapping the selected match again deselects; tapping another
-          // scheduled match swaps the two.
+          // match — scheduled or in the tray — swaps the two.
           if (event.match.matchId === state.match.matchId) {
             return stay(IDLE_SELECTION);
           }
-          return swap(state.match, event.match);
+          return swap(state.match.matchId, event.match.matchId);
         case 'tap-tray-match':
-          return stay({ kind: 'tray-match-selected', matchId: event.matchId });
+          return swap(state.match.matchId, event.matchId);
         case 'tap-insertion-line':
           return place(state.match, event.courtId, event.index);
         case 'unschedule':
@@ -158,8 +160,10 @@ export function selectionReducer(
           // The match was never scheduled; cancelling simply leaves it in the tray.
           return stay(IDLE_SELECTION);
         case 'tap-match':
-          return stay({ kind: 'match-selected', match: event.match });
+          return swap(state.matchId, event.match.matchId);
         case 'tap-tray-match':
+          // Swapping two tray matches is meaningless, so taps inside the tray
+          // keep switching the selection instead.
           if (event.matchId === state.matchId) {
             return stay(IDLE_SELECTION);
           }

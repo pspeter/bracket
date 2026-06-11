@@ -11,6 +11,7 @@ from bracket.logic.planning.matches import (
     handle_match_swap,
     reorder_all_matches,
     schedule_all_unscheduled_matches,
+    validate_match_can_be_unscheduled,
 )
 from bracket.logic.ranking.calculation import (
     recalculate_ranking_for_stage_item,
@@ -85,20 +86,6 @@ async def validate_match_can_be_started(
         raise ValueError(
             f"Could not find stage for match {existing_match.id} in tournament {tournament_id}"
         )
-
-
-def validate_match_can_be_unscheduled(match: Match) -> None:
-    if match.state is MatchState.NOT_STARTED:
-        return
-
-    state_label = "in progress" if match.state is MatchState.IN_PROGRESS else "completed"
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            f"Cannot move a {state_label} match back to Unscheduled. "
-            "Only not started matches can be unscheduled."
-        ),
-    )
 
 
 def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBody) -> MatchBody:

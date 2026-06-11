@@ -46,20 +46,30 @@ export function applyPlanningActions<S extends OptimisticStage>(
       case 'swap': {
         const match1 = matchesById.get(action.matchId1);
         const match2 = matchesById.get(action.matchId2);
-        if (
-          match1 == null ||
-          match2 == null ||
-          !sortPositions.has(match1.id) ||
-          !sortPositions.has(match2.id)
-        ) {
+        if (match1 == null || match2 == null) {
           break;
         }
-        const position1 = sortPositions.get(match1.id)!;
-        sortPositions.set(match1.id, sortPositions.get(match2.id)!);
-        sortPositions.set(match2.id, position1);
-        const courtId = match1.court_id;
-        match1.court_id = match2.court_id;
-        match2.court_id = courtId;
+        const scheduled1 = sortPositions.has(match1.id);
+        const scheduled2 = sortPositions.has(match2.id);
+        if (scheduled1 && scheduled2) {
+          const position1 = sortPositions.get(match1.id)!;
+          sortPositions.set(match1.id, sortPositions.get(match2.id)!);
+          sortPositions.set(match2.id, position1);
+          const courtId = match1.court_id;
+          match1.court_id = match2.court_id;
+          match2.court_id = courtId;
+        } else if (scheduled1 !== scheduled2) {
+          // Mixed swap: the tray match takes over the scheduled match's slot,
+          // and the scheduled match goes back to the tray.
+          const vacating = scheduled1 ? match1 : match2;
+          const incoming = scheduled1 ? match2 : match1;
+          incoming.court_id = vacating.court_id;
+          sortPositions.set(incoming.id, sortPositions.get(vacating.id)!);
+          vacating.court_id = null;
+          vacating.start_time = null;
+          vacating.position_in_schedule = null;
+          sortPositions.delete(vacating.id);
+        }
         break;
       }
       case 'reschedule': {

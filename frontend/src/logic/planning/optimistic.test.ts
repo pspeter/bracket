@@ -109,17 +109,46 @@ describe('applyPlanningActions', () => {
     });
   });
 
-  it('ignores a swap involving an unscheduled match', () => {
+  it('swaps a scheduled match with a tray match, trading slot for tray', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, null, null, null)],
-      [{ type: 'swap', matchId1: 1, matchId2: 2 }]
+      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, null, null, null)],
+      [{ type: 'swap', matchId1: 1, matchId2: 3 }]
     );
 
-    expect(slot(byId.get(1))).toEqual({
+    expect(slot(byId.get(3))).toEqual({
       court_id: 1,
       position: 0,
       start_time: minutesAfterStart(0),
     });
+    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
+    expect(slot(byId.get(2))).toEqual({
+      court_id: 1,
+      position: 1,
+      start_time: minutesAfterStart(15),
+    });
+  });
+
+  it('swaps a tray match with a scheduled match regardless of argument order', () => {
+    const byId = apply(
+      [match(1, 1, 0, 0), match(2, null, null, null)],
+      [{ type: 'swap', matchId1: 2, matchId2: 1 }]
+    );
+
+    expect(slot(byId.get(2))).toEqual({
+      court_id: 1,
+      position: 0,
+      start_time: minutesAfterStart(0),
+    });
+    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
+  });
+
+  it('ignores a swap of two unscheduled matches', () => {
+    const byId = apply(
+      [match(1, null, null, null), match(2, null, null, null)],
+      [{ type: 'swap', matchId1: 1, matchId2: 2 }]
+    );
+
+    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
     expect(slot(byId.get(2))).toEqual({ court_id: null, position: null, start_time: null });
   });
 
