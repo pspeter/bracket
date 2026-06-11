@@ -26,7 +26,7 @@ import {
   getStageOrderViolations,
   getUnscheduledMatches,
 } from '@services/lookups';
-import { rescheduleMatch, scheduleMatches } from '@services/match';
+import { rescheduleMatch, scheduleMatches, unscheduleMatch } from '@services/match';
 
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
@@ -87,16 +87,32 @@ export default function SchedulePage() {
   }
 
   async function handleSelectionEvent(event: SelectionEvent) {
-    const { state, reschedule } = selectionReducer(selection, event);
+    const { state, reschedule, swap, unschedule } = selectionReducer(selection, event);
     setSelection(state);
     if (reschedule != null) {
       await rescheduleMatch(tournamentData.id, reschedule.matchId, reschedule.body);
       await swrStagesResponse.mutate();
     }
+    if (swap != null) {
+      await rescheduleMatch(tournamentData.id, swap.first.matchId, swap.first.body);
+      await rescheduleMatch(tournamentData.id, swap.second.matchId, swap.second.body);
+      await swrStagesResponse.mutate();
+    }
+    if (unschedule != null) {
+      await unscheduleMatch(tournamentData.id, unschedule.matchId);
+      await swrStagesResponse.mutate();
+    }
   }
 
-  const selectedEntry =
-    selection.kind === 'match-selected' ? matchesLookup[selection.match.matchId] : null;
+  const selectedMatchId =
+    selection.kind === 'match-selected'
+      ? selection.match.matchId
+      : selection.kind === 'tray-match-selected'
+        ? selection.matchId
+        : null;
+  const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
+
+  const isPlacing = selection.kind !== 'idle';
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
@@ -145,7 +161,7 @@ export default function SchedulePage() {
           />
         </Stack>
       ) : (
-        <Box mt="1rem" pb={selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+        <Box mt="1rem" pb={isPlacing ? '14rem' : '4rem'}>
           <ScheduleGrid
             layout={layout}
             violations={violations}
@@ -158,7 +174,12 @@ export default function SchedulePage() {
             unscheduledMatches={unscheduledMatches}
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
-            openMatchModal={openMatchModal}
+            selectedTrayMatchId={
+              selection.kind === 'tray-match-selected' ? selection.matchId : null
+            }
+            onTrayMatchSelect={(matchId) =>
+              handleSelectionEvent({ type: 'tap-tray-match', matchId })
+            }
           />
           {selectedEntry != null ? (
             <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
@@ -185,14 +206,26 @@ export default function SchedulePage() {
                     {t('tap_to_place_hint')}
                   </Text>
                 </Box>
-                <Button
-                  size="compact-sm"
-                  variant="light"
-                  color="red"
-                  onClick={() => handleSelectionEvent({ type: 'cancel' })}
-                >
-                  {t('cancel_button')}
-                </Button>
+                <Group gap="xs" wrap="nowrap">
+                  {selection.kind === 'match-selected' && (
+                    <Button
+                      size="compact-sm"
+                      variant="light"
+                      color="orange"
+                      onClick={() => handleSelectionEvent({ type: 'unschedule' })}
+                    >
+                      {t('unschedule_button')}
+                    </Button>
+                  )}
+                  <Button
+                    size="compact-sm"
+                    variant="light"
+                    color="red"
+                    onClick={() => handleSelectionEvent({ type: 'cancel' })}
+                  >
+                    {t('cancel_button')}
+                  </Button>
+                </Group>
               </Paper>
             </Affix>
           ) : null}

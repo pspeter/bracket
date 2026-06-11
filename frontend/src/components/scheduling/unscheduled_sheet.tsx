@@ -21,21 +21,27 @@ import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/
 
 /**
  * Collapsible bottom sheet listing matches that are not on the schedule yet.
- * Read-only flat list; grouping and the tap-to-place flow come in later slices.
+ * Tapping a match selects it for placement (tray collapses, insertion lines appear).
+ * `forceCollapsed` is true while placement mode is active to keep the grid clear.
  */
 export default function UnscheduledSheet({
   unscheduledMatches,
   stageItemsLookup,
   matchesLookup,
-  openMatchModal,
+  selectedTrayMatchId,
+  onTrayMatchSelect,
 }: {
   unscheduledMatches: MatchWithDetails[];
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
-  openMatchModal: (m: MatchWithDetails) => void;
+  selectedTrayMatchId: number | null;
+  onTrayMatchSelect: (matchId: number) => void;
 }) {
   const { t } = useTranslation();
   const [opened, { toggle }] = useDisclosure(false);
+
+  // Collapse the sheet while a tray match is selected for placement.
+  const isOpen = opened && selectedTrayMatchId == null;
 
   return (
     <Paper
@@ -54,7 +60,7 @@ export default function UnscheduledSheet({
         borderBottom: 'none',
       }}
     >
-      <UnstyledButton onClick={toggle} w="100%" p="sm" aria-expanded={opened}>
+      <UnstyledButton onClick={toggle} w="100%" p="sm" aria-expanded={isOpen}>
         <Group justify="space-between" wrap="nowrap">
           <Group gap="xs" wrap="nowrap">
             <Text fw={600}>{t('unscheduled_title')}</Text>
@@ -62,10 +68,10 @@ export default function UnscheduledSheet({
               {unscheduledMatches.length}
             </Badge>
           </Group>
-          {opened ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
+          {isOpen ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
         </Group>
       </UnstyledButton>
-      <Collapse in={opened}>
+      <Collapse in={isOpen}>
         <ScrollArea.Autosize mah="45dvh">
           <Box px="sm" pb="sm">
             {unscheduledMatches.length === 0 && (
@@ -75,10 +81,23 @@ export default function UnscheduledSheet({
             )}
             {unscheduledMatches.map((match, index) => {
               const entry = matchesLookup[match.id];
+              const isSelected = match.id === selectedTrayMatchId;
               return (
                 <Fragment key={match.id}>
                   {index > 0 && <Divider />}
-                  <UnstyledButton onClick={() => openMatchModal(match)} w="100%" py="xs">
+                  <UnstyledButton
+                    onClick={() => onTrayMatchSelect(match.id)}
+                    w="100%"
+                    py="xs"
+                    style={
+                      isSelected
+                        ? {
+                            borderRadius: 6,
+                            outline: '2px solid var(--mantine-color-indigo-filled)',
+                          }
+                        : undefined
+                    }
+                  >
                     <Flex justify="space-between" align="center" gap="xs" wrap="nowrap">
                       <Box style={{ minWidth: 0 }}>
                         <Text size="sm" fw={500} truncate>
