@@ -28,6 +28,7 @@ import {
 } from '@services/lookups';
 import { rescheduleMatch, scheduleMatches } from '@services/match';
 
+import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 
@@ -116,8 +117,14 @@ export default function SchedulePage() {
           <Title>{t('planning_title')}</Title>
         </Grid.Col>
         <Grid.Col span={6}>
-          {courts.length < 1 ? null : (
-            <Group justify="right">
+          <Group justify="right">
+            <CourtsToolbar
+              tournamentId={tournamentData.id}
+              swrCourtsResponse={swrCourtsResponse}
+              courts={courts}
+              matchesByCourtId={matchesByCourtId}
+            />
+            {courts.length < 1 ? null : (
               <Button
                 color="indigo"
                 size="md"
@@ -131,8 +138,8 @@ export default function SchedulePage() {
               >
                 {t('schedule_description')}
               </Button>
-            </Group>
-          )}
+            )}
+          </Group>
         </Grid.Col>
       </Grid>
       {courts.length < 1 ? (

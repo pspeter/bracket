@@ -12,13 +12,22 @@ export default function CourtModal({
   tournamentId,
   swrCourtsResponse,
   buttonSize,
+  opened: controlledOpened,
+  setOpened: controlledSetOpened,
 }: {
-  buttonSize: 'xs' | 'lg';
+  buttonSize?: 'xs' | 'lg';
   tournamentId: number;
   swrCourtsResponse: SWRResponse<CourtsResponse>;
+  // When provided, the modal is controlled from outside (e.g. a toolbar menu)
+  // and no trigger button is rendered.
+  opened?: boolean;
+  setOpened?: (opened: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const [opened, setOpened] = useState(false);
+  const [uncontrolledOpened, setUncontrolledOpened] = useState(false);
+  const isControlled = controlledSetOpened != null;
+  const opened = isControlled ? (controlledOpened ?? false) : uncontrolledOpened;
+  const setOpened = isControlled ? controlledSetOpened : setUncontrolledOpened;
   const form = useForm({
     initialValues: {
       name: '',
@@ -36,6 +45,7 @@ export default function CourtModal({
           onSubmit={form.onSubmit(async (values) => {
             await createCourt(tournamentId, values.name);
             await swrCourtsResponse.mutate();
+            form.reset();
             setOpened(false);
           })}
         >
@@ -51,16 +61,18 @@ export default function CourtModal({
           </Button>
         </form>
       </Modal>
-      <Button
-        variant="outline"
-        color="green"
-        size={buttonSize}
-        style={{ marginRight: 10 }}
-        onClick={() => setOpened(true)}
-        leftSection={<GoPlus size={24} />}
-      >
-        {t('add_court_title')}
-      </Button>
+      {!isControlled && (
+        <Button
+          variant="outline"
+          color="green"
+          size={buttonSize}
+          style={{ marginRight: 10 }}
+          onClick={() => setOpened(true)}
+          leftSection={<GoPlus size={24} />}
+        >
+          {t('add_court_title')}
+        </Button>
+      )}
     </>
   );
 }
