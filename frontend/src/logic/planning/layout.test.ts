@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LayoutCourt, LayoutMatch, computeScheduleLayout } from './layout';
+import { LayoutCourt, LayoutMatch, computeInsertionLines, computeScheduleLayout } from './layout';
 
 const TOURNAMENT_START = '2026-06-10T09:00:00Z';
 
@@ -152,5 +152,42 @@ describe('computeScheduleLayout', () => {
     expect(blocks[0].endMinutes - blocks[0].startMinutes).toBe(92);
     expect(blocks[1].startMinutes).toBe(92);
     expect(blocks[1].endMinutes).toBe(97);
+  });
+});
+
+describe('computeInsertionLines', () => {
+  it('returns a single line at the top for an empty court', () => {
+    expect(computeInsertionLines([])).toEqual([{ index: 0, offsetMinutes: 0 }]);
+  });
+
+  it('puts lines half a margin above the first match, centered in each margin gap, and after the last match', () => {
+    const layout = computeScheduleLayout({
+      courts: [court(1)],
+      matchesByCourtId: { 1: [match(10, 0, 15, 5), match(11, 1, 30, 10)] },
+      tournamentStartTime: TOURNAMENT_START,
+    });
+
+    expect(computeInsertionLines(layout.courts[0].blocks)).toEqual([
+      // Half the first match's 5-minute margin above its start.
+      { index: 0, offsetMinutes: -2.5 },
+      // Centered in the 15..20 gap between the two cards.
+      { index: 1, offsetMinutes: 17.5 },
+      // Centered in the 50..60 gap after the last card.
+      { index: 2, offsetMinutes: 55 },
+    ]);
+  });
+
+  it('places lines on the card boundary when there is no margin', () => {
+    const layout = computeScheduleLayout({
+      courts: [court(1)],
+      matchesByCourtId: { 1: [match(10, 0, 20, 0), match(11, 1, 20, 0)] },
+      tournamentStartTime: TOURNAMENT_START,
+    });
+
+    expect(computeInsertionLines(layout.courts[0].blocks)).toEqual([
+      { index: 0, offsetMinutes: 0 },
+      { index: 1, offsetMinutes: 20 },
+      { index: 2, offsetMinutes: 40 },
+    ]);
   });
 });

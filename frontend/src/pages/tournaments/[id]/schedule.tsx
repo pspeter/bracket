@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Group, Stack, Title } from '@mantine/core';
+import { Affix, Box, Button, Grid, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconCalendarPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,8 +6,15 @@ import { useTranslation } from 'react-i18next';
 import CourtModal from '@components/modals/create_court_modal';
 import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
+import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { computeScheduleLayout } from '@logic/planning/layout';
+import {
+  IDLE_SELECTION,
+  SelectionEvent,
+  SelectionState,
+  selectionReducer,
+} from '@logic/planning/selection';
 import { Court, MatchWithDetails, StageWithStageItems } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getCourts, getStages, getTournamentById } from '@services/adapter';
@@ -19,7 +26,7 @@ import {
   getStageOrderViolations,
   getUnscheduledMatches,
 } from '@services/lookups';
-import { scheduleMatches } from '@services/match';
+import { rescheduleMatch, scheduleMatches } from '@services/match';
 
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
@@ -27,6 +34,7 @@ import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 export default function SchedulePage() {
   const [modalOpened, modalSetOpened] = useState(false);
   const [match, setMatch] = useState<MatchWithDetails | null>(null);
+  const [selection, setSelection] = useState<SelectionState>(IDLE_SELECTION);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
@@ -78,6 +86,18 @@ export default function SchedulePage() {
     modalSetOpened(true);
   }
 
+  async function handleSelectionEvent(event: SelectionEvent) {
+    const { state, reschedule } = selectionReducer(selection, event);
+    setSelection(state);
+    if (reschedule != null) {
+      await rescheduleMatch(tournamentData.id, reschedule.matchId, reschedule.body);
+      await swrStagesResponse.mutate();
+    }
+  }
+
+  const selectedEntry =
+    selection.kind === 'match-selected' ? matchesLookup[selection.match.matchId] : null;
+
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
       {match != null ? (
@@ -125,13 +145,14 @@ export default function SchedulePage() {
           />
         </Stack>
       ) : (
-        <Box mt="1rem" pb="4rem">
+        <Box mt="1rem" pb={selection.kind === 'match-selected' ? '14rem' : '4rem'}>
           <ScheduleGrid
             layout={layout}
             violations={violations}
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
-            openMatchModal={openMatchModal}
+            selection={selection}
+            onSelectionEvent={handleSelectionEvent}
           />
           <UnscheduledSheet
             unscheduledMatches={unscheduledMatches}
@@ -139,6 +160,42 @@ export default function SchedulePage() {
             matchesLookup={matchesLookup}
             openMatchModal={openMatchModal}
           />
+          {selectedEntry != null ? (
+            <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
+              <Paper
+                shadow="md"
+                radius="xl"
+                withBorder
+                px="md"
+                py={6}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  maxWidth: 'calc(100vw - 1rem)',
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="sm" fw={600} truncate>
+                    {formatMatchInput1(t, stageItemsLookup, matchesLookup, selectedEntry.match)} –{' '}
+                    {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {t('tap_to_place_hint')}
+                  </Text>
+                </Box>
+                <Button
+                  size="compact-sm"
+                  variant="light"
+                  color="red"
+                  onClick={() => handleSelectionEvent({ type: 'cancel' })}
+                >
+                  {t('cancel_button')}
+                </Button>
+              </Paper>
+            </Affix>
+          ) : null}
         </Box>
       )}
     </TournamentLayout>
