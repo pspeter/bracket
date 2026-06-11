@@ -107,23 +107,35 @@ function MatchCard({
       {format(block.startTime, 'HH:mm')}
     </Text>
   );
-  // Agenda is the full-detail level: a three-row card has room for the match's
-  // level, stage and stage item next to the time.
+  // Agenda is the full-detail level: cards also carry the match's level, stage
+  // and stage item. The tallest cards spread that over two rows of their own
+  // (level · stage, then stage item), shorter ones get a single combined row,
+  // and below that the badge squeezes in next to the time.
   const levelName = levels.find((level) => level.id === entry?.stage.level_id)?.name;
-  const contextLabel =
+  const contextParts =
     zoom === 'agenda' && rows === 3 && entry != null
-      ? [levelName, entry.stage.name, entry.stageItem.name].filter(Boolean).join(' · ')
-      : null;
-  const contextBadge = contextLabel ? (
+      ? [levelName, entry.stage.name, entry.stageItem.name].filter(
+          (part): part is string => part != null
+        )
+      : [];
+  const contextRows: string[] =
+    contextParts.length === 0
+      ? []
+      : cardHeightPx >= 96 && contextParts.length > 1
+        ? [contextParts.slice(0, -1).join(' · '), contextParts[contextParts.length - 1]]
+        : cardHeightPx >= 72
+          ? [contextParts.join(' · ')]
+          : [];
+  const contextBadge = (label: string) => (
     <Badge
       color={color}
       variant="outline"
       size="sm"
       style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}
     >
-      {contextLabel}
+      {label}
     </Badge>
-  ) : null;
+  );
   const violationIcon = isViolation ? (
     <Tooltip label={t('match_scheduled_before_previous_stage_label')}>
       <Box
@@ -174,10 +186,17 @@ function MatchCard({
         {rows === 3 && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
             {timeLabel}
-            {contextBadge}
+            {contextRows.length === 0 && contextParts.length > 0
+              ? contextBadge(contextParts.join(' · '))
+              : null}
             {violationIcon}
           </Flex>
         )}
+        {contextRows.map((label) => (
+          <Flex key={label} mt={2} wrap="nowrap">
+            {contextBadge(label)}
+          </Flex>
+        ))}
         <Flex gap={6} align="center" wrap="nowrap">
           {rows < 3 && showTime && timeLabel}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
