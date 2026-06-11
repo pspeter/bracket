@@ -263,9 +263,14 @@ async def unschedule_match(
     await sql_unschedule_match(match_row.id)
 
     if old_court_id is not None:
+        # Only the vacated court needs re-packing; other courts keep their packing.
         stages = await get_full_tournament_details(tournament_id)
-        scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches(tournament, scheduled_matches)
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == old_court_id
+        ]
+        await reorder_all_matches(tournament, court_matches)
 
     await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
@@ -325,10 +330,15 @@ async def update_match_by_id(
         match_body.custom_duration_minutes != match.custom_duration_minutes
         or match_body.custom_margin_minutes != match.custom_margin_minutes
     ) and match.court_id is not None:
+        # A duration change only shifts start times on the match's own court.
         tournament = await sql_get_tournament(tournament_id)
         stages = await get_full_tournament_details(tournament_id)
-        scheduled_matches = get_scheduled_matches(stages)
-        await reorder_all_matches(tournament, scheduled_matches)
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == match.court_id
+        ]
+        await reorder_all_matches(tournament, court_matches)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})

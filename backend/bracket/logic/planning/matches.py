@@ -293,14 +293,6 @@ async def handle_match_reschedule(
     stages = await get_full_tournament_details(tournament.id)
 
     if body.old_court_id is None:
-        all_matches = [
-            MatchPosition(match=match, position=float(assert_some(match.position_in_schedule)))
-            for stage in stages
-            for stage_item in stage.stage_items
-            for round_ in stage_item.rounds
-            for match in round_.matches
-            if match.start_time is not None and match.id != match_id
-        ]
         target_match = next(
             match
             for stage in stages
@@ -312,41 +304,52 @@ async def handle_match_reschedule(
         if target_match.court_id is not None or target_match.start_time is not None:
             raise ValueError("match_id doesn't match unscheduled match state")
 
+        # Only the destination court changes; other courts keep their packing.
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == body.new_court_id
+        ]
         offset = -0.5
-        all_matches.append(
+        court_matches.append(
             MatchPosition(
                 match=target_match.model_copy(update={"court_id": body.new_court_id}),
                 position=body.new_position + offset,
             )
         )
-        await reorder_all_matches(tournament, all_matches)
+        await reorder_all_matches(tournament, court_matches)
         return
 
     scheduled_matches_old = get_scheduled_matches(stages)
 
-    # For match in prev position: set new position
-    scheduled_matches = []
-    for match_pos in scheduled_matches_old:
-        if match_pos.match.id == match_id:
-            if (
-                match_pos.position != body.old_position
-                or match_pos.match.court_id != body.old_court_id
-            ):
-                raise ValueError("match_id doesn't match court id or position in schedule")
+    target = next(
+        (match_pos for match_pos in scheduled_matches_old if match_pos.match.id == match_id), None
+    )
+    if (
+        target is None
+        or target.position != body.old_position
+        or target.match.court_id != body.old_court_id
+    ):
+        raise ValueError("match_id doesn't match court id or position in schedule")
 
-            offset = (
-                -0.5
-                if body.new_position < body.old_position or body.new_court_id != body.old_court_id
-                else +0.5
-            )
-            scheduled_matches.append(
-                MatchPosition(
-                    match=match_pos.match.model_copy(update={"court_id": body.new_court_id}),
-                    position=body.new_position + offset,
-                )
-            )
-        else:
-            scheduled_matches.append(match_pos)
+    offset = (
+        -0.5
+        if body.new_position < body.old_position or body.new_court_id != body.old_court_id
+        else +0.5
+    )
+
+    # Only the source and destination courts change; other courts keep their packing.
+    affected_court_ids = {body.old_court_id, body.new_court_id}
+    scheduled_matches = [
+        MatchPosition(
+            match=match_pos.match.model_copy(update={"court_id": body.new_court_id}),
+            position=body.new_position + offset,
+        )
+        if match_pos.match.id == match_id
+        else match_pos
+        for match_pos in scheduled_matches_old
+        if match_pos.match.court_id in affected_court_ids
+    ]
 
     await reorder_all_matches(tournament, scheduled_matches)
 
@@ -381,6 +384,8 @@ async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None
             position=other.position,
         )
 
+    # Only the two slots' courts change; other courts keep their packing.
+    affected_court_ids = {match1.match.court_id, match2.match.court_id}
     await reorder_all_matches(
         tournament,
         [
@@ -388,6 +393,7 @@ async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None
             if match_pos.match.id in (body.match1_id, body.match2_id)
             else match_pos
             for match_pos in scheduled_matches
+            if match_pos.match.court_id in affected_court_ids
         ],
     )
 

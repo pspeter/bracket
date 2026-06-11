@@ -663,6 +663,27 @@ async def test_swap_matches_across_courts(
                 }
             )
         ) as court2_second_match,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id, "name": "Court 3"})
+        ) as court3_inserted,
+        # Deliberately gappy packing on an uninvolved court: a swap elsewhere must
+        # not re-pack it (position stays 3, start time stays offset).
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court3_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time + timedelta(minutes=45),
+                    "position_in_schedule": 3,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as court3_match,
     ):
         body = MatchSwapBody(match1_id=swapped_match1.id, match2_id=swapped_match2.id)
         assert (
@@ -678,6 +699,7 @@ async def test_swap_matches_across_courts(
         match2 = await sql_get_match(swapped_match2.id)
         untouched1 = await sql_get_match(court1_first_match.id)
         untouched2 = await sql_get_match(court2_second_match.id)
+        uninvolved_court_match = await sql_get_match(court3_match.id)
         await assert_row_count_and_clear(matches, 0)
 
     # The two matches traded court and position; start times follow the new slots
@@ -695,6 +717,11 @@ async def test_swap_matches_across_courts(
     assert untouched2.court_id == court2_inserted.id
     assert untouched2.position_in_schedule == 1
     assert untouched2.start_time == second_slot_start
+
+    # The uninvolved court was not re-packed at all
+    assert uninvolved_court_match.court_id == court3_inserted.id
+    assert uninvolved_court_match.position_in_schedule == 3
+    assert uninvolved_court_match.start_time == tournament.start_time + timedelta(minutes=45)
 
 
 @pytest.mark.asyncio(loop_scope="session")

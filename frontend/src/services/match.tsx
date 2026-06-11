@@ -1,5 +1,3 @@
-import { showNotification } from '@mantine/notifications';
-
 import { MatchBody, MatchCreateBodyFrontend, MatchRescheduleBody, MatchSwapBody } from '@openapi';
 import { createAxios, handleRequestError } from './adapter';
 
@@ -52,16 +50,7 @@ export async function updateTournamentScoreTrackingMatch(
 export async function unscheduleMatch(tournament_id: number, match_id: number) {
   return createAxios()
     .post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`)
-    .catch((response: any) => handleRequestError(response))
-    .then((response: any) => {
-      if (response != null && response.status === 200) {
-        showNotification({
-          color: 'green',
-          title: 'Successfully unscheduled match',
-          message: '',
-        });
-      }
-    });
+    .catch((response: any) => handleRequestError(response));
 }
 
 export async function rescheduleMatch(
@@ -71,16 +60,7 @@ export async function rescheduleMatch(
 ) {
   return createAxios()
     .post(`tournaments/${tournament_id}/matches/${match_id}/reschedule`, match)
-    .catch((response: any) => handleRequestError(response))
-    .then((response: any) => {
-      if (response != null && response.status === 200) {
-        showNotification({
-          color: 'green',
-          title: 'Successfully rescheduled match',
-          message: '',
-        });
-      }
-    });
+    .catch((response: any) => handleRequestError(response));
 }
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
