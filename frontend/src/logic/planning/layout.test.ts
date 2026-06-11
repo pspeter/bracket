@@ -160,7 +160,7 @@ describe('computeInsertionLines', () => {
     expect(computeInsertionLines([])).toEqual([{ index: 0, offsetMinutes: 0 }]);
   });
 
-  it('puts lines at the top, centered in each margin gap, and after the last match', () => {
+  it('puts lines half a margin above the first match, centered in each margin gap, and after the last match', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
       matchesByCourtId: { 1: [match(10, 0, 15, 5), match(11, 1, 30, 10)] },
@@ -168,7 +168,8 @@ describe('computeInsertionLines', () => {
     });
 
     expect(computeInsertionLines(layout.courts[0].blocks)).toEqual([
-      { index: 0, offsetMinutes: 0 },
+      // Half the first match's 5-minute margin above its start.
+      { index: 0, offsetMinutes: -2.5 },
       // Centered in the 15..20 gap between the two cards.
       { index: 1, offsetMinutes: 17.5 },
       // Centered in the 50..60 gap after the last card.

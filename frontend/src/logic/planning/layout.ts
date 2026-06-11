@@ -74,16 +74,20 @@ export interface InsertionLine {
 }
 
 /**
- * Tap targets for placing a match on a court: one line above the first match,
- * one centered in each margin gap between consecutive matches, and one in the
- * gap after the last match. An empty court gets a single line at the top.
+ * Tap targets for placing a match on a court: one line half a margin above the
+ * first match (mirroring the end-of-court line below the last one), one centered
+ * in each margin gap between consecutive matches, and one in the gap after the
+ * last match. An empty court gets a single line at the top.
  */
 export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
   if (blocks.length === 0) {
     return [{ index: 0, offsetMinutes: 0 }];
   }
 
-  const lines: InsertionLine[] = [{ index: 0, offsetMinutes: blocks[0].startMinutes }];
+  const first = blocks[0];
+  const lines: InsertionLine[] = [
+    { index: 0, offsetMinutes: first.startMinutes - first.marginMinutes / 2 },
+  ];
   for (let i = 1; i <= blocks.length; i += 1) {
     const previous = blocks[i - 1];
     const gapStart = previous.startMinutes + previous.durationMinutes;

@@ -150,9 +150,12 @@ function InsertionLineTarget({
   onTap: () => void;
 }) {
   const lineY = line.offsetMinutes * PX_PER_MINUTE;
-  // The top inset guarantees room above minute 0, so the hit area may extend
-  // above the grid; only the bottom edge needs clamping.
-  const top = Math.min(lineY - INSERTION_HIT_AREA_PX / 2, gridHeight - INSERTION_HIT_AREA_PX);
+  // The top line sits above minute 0; its hit area may extend into the top
+  // inset, but no further (the header would cover it).
+  const top = Math.min(
+    Math.max(lineY - INSERTION_HIT_AREA_PX / 2, -GRID_TOP_INSET_PX),
+    gridHeight - INSERTION_HIT_AREA_PX
+  );
   // Keep the visible line on the true boundary even when the hit area is clamped
   // at the grid's edges.
   const lineTop = Math.min(Math.max(0, lineY - top - 2), INSERTION_HIT_AREA_PX - 4);
