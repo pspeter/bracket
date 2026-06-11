@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import CourtModal from '@components/modals/create_court_modal';
-import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
@@ -26,15 +25,14 @@ import {
   getStageOrderViolations,
   getUnscheduledMatches,
 } from '@services/lookups';
-import { rescheduleMatch, scheduleMatches } from '@services/match';
+import { rescheduleMatch, scheduleMatches, unscheduleMatch } from '@services/match';
 
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 
 export default function SchedulePage() {
-  const [modalOpened, modalSetOpened] = useState(false);
-  const [match, setMatch] = useState<MatchWithDetails | null>(null);
   const [selection, setSelection] = useState<SelectionState>(IDLE_SELECTION);
+  const [trayOpened, setTrayOpened] = useState(false);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
@@ -81,36 +79,44 @@ export default function SchedulePage() {
     }
   }
 
-  function openMatchModal(matchToOpen: MatchWithDetails) {
-    setMatch(matchToOpen);
-    modalSetOpened(true);
-  }
-
   async function handleSelectionEvent(event: SelectionEvent) {
-    const { state, reschedule } = selectionReducer(selection, event);
+    const wasTraySelection = selection.kind === 'tray-match-selected';
+    const { state, actions } = selectionReducer(selection, event);
     setSelection(state);
-    if (reschedule != null) {
-      await rescheduleMatch(tournamentData.id, reschedule.matchId, reschedule.body);
+
+    // Picking a match from the tray collapses it so the grid is free for placing.
+    if (state.kind === 'tray-match-selected') {
+      setTrayOpened(false);
+    }
+
+    if (actions.length > 0) {
+      for (const action of actions) {
+        if (action.type === 'reschedule') {
+          await rescheduleMatch(tournamentData.id, action.matchId, action.body);
+        } else {
+          await unscheduleMatch(tournamentData.id, action.matchId);
+        }
+      }
       await swrStagesResponse.mutate();
+
+      // After placing a tray match, reopen the tray so scheduling many matches
+      // in a row flows without extra taps.
+      if (wasTraySelection && event.type === 'tap-insertion-line') {
+        setTrayOpened(true);
+      }
     }
   }
 
-  const selectedEntry =
-    selection.kind === 'match-selected' ? matchesLookup[selection.match.matchId] : null;
+  const selectedMatchId =
+    selection.kind === 'match-selected'
+      ? selection.match.matchId
+      : selection.kind === 'tray-match-selected'
+        ? selection.matchId
+        : null;
+  const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
-      {match != null ? (
-        <MatchModal
-          swrStagesResponse={swrStagesResponse}
-          swrUpcomingMatchesResponse={null}
-          tournamentData={tournamentData}
-          match={match}
-          opened={modalOpened}
-          setOpened={modalSetOpened}
-          round={null}
-        />
-      ) : null}
       <Grid grow>
         <Grid.Col span={6}>
           <Title>{t('planning_title')}</Title>
@@ -145,7 +151,7 @@ export default function SchedulePage() {
           />
         </Stack>
       ) : (
-        <Box mt="1rem" pb={selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+        <Box mt="1rem" pb={selection.kind !== 'idle' ? '14rem' : '4rem'}>
           <ScheduleGrid
             layout={layout}
             violations={violations}
@@ -158,7 +164,9 @@ export default function SchedulePage() {
             unscheduledMatches={unscheduledMatches}
             stageItemsLookup={stageItemsLookup}
             matchesLookup={matchesLookup}
-            openMatchModal={openMatchModal}
+            opened={trayOpened}
+            onToggle={() => setTrayOpened(!trayOpened)}
+            onSelectMatch={(m) => handleSelectionEvent({ type: 'tap-tray-match', matchId: m.id })}
           />
           {selectedEntry != null ? (
             <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
@@ -185,6 +193,16 @@ export default function SchedulePage() {
                     {t('tap_to_place_hint')}
                   </Text>
                 </Box>
+                {selection.kind === 'match-selected' && (
+                  <Button
+                    size="compact-sm"
+                    variant="light"
+                    color="orange"
+                    onClick={() => handleSelectionEvent({ type: 'unschedule' })}
+                  >
+                    {t('unschedule_button')}
+                  </Button>
+                )}
                 <Button
                   size="compact-sm"
                   variant="light"

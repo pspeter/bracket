@@ -217,6 +217,7 @@ export default function ScheduleGrid({
 }) {
   const gridHeight = layout.totalMinutes * PX_PER_MINUTE;
   const selectedMatch = selection.kind === 'match-selected' ? selection.match : null;
+  const placing = selection.kind !== 'idle';
 
   return (
     <Box
@@ -334,13 +335,14 @@ export default function ScheduleGrid({
                   />
                 );
               })}
-              {selectedMatch != null &&
+              {placing &&
                 computeInsertionLines(blocks).map((line) => (
                   <InsertionLineTarget
                     key={line.index}
                     line={line}
                     gridHeight={gridHeight}
                     isNoop={
+                      selectedMatch != null &&
                       selectedMatch.courtId === court.id &&
                       (line.index === selectedMatch.position ||
                         line.index === selectedMatch.position + 1)
@@ -360,7 +362,7 @@ export default function ScheduleGrid({
       </Flex>
       {/* While placing, add scroll slack so insertion lines near the viewport
           bottom can always be scrolled out from under the floating cancel bar. */}
-      {selectedMatch != null && <Box style={{ height: '10rem' }} />}
+      {placing && <Box style={{ height: '10rem' }} />}
     </Box>
   );
 }
