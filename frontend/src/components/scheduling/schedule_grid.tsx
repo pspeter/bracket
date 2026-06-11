@@ -22,6 +22,8 @@ import {
 import { Court, LevelResponse, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/lookups';
 
+import classes from './schedule_grid.module.css';
+
 const RULER_WIDTH = '3.25rem';
 const HEADER_HEIGHT = '2.5rem';
 const HEADER_HEIGHT_PX = 40;
@@ -368,6 +370,19 @@ export default function ScheduleGrid({
   const isOverview = zoom === 'overview';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Soften the otherwise hard cut when the zoom level snaps: restart a short
+  // fade/scale-in animation on every level change (but not on first paint).
+  const lastAnimatedZoom = useRef(zoom);
+  useEffect(() => {
+    const element = containerRef.current;
+    if (lastAnimatedZoom.current === zoom || element == null) return;
+    lastAnimatedZoom.current = zoom;
+    element.classList.remove(classes.zoomSnap);
+    // Force a reflow so re-adding the class restarts the animation.
+    void element.offsetWidth;
+    element.classList.add(classes.zoomSnap);
+  }, [zoom]);
 
   // After an overview tap zooms in, center the tapped court/time region. Runs
   // after the re-render at the new zoom level, so measurements are up to date.

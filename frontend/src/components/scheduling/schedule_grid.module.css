@@ -1,0 +1,22 @@
+/* Softens the hard cut between semantic zoom levels: the grid quickly
+   fades/scales in whenever the level snaps. */
+@keyframes zoom-snap {
+  from {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.zoomSnap {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .zoomSnap {
+    animation: zoom-snap 120ms ease-out;
+  }
+}
