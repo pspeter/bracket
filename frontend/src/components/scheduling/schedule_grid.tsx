@@ -1,4 +1,4 @@
-import { Box, Flex, Text, Tooltip } from '@mantine/core';
+import { Badge, Box, Flex, Text, Tooltip } from '@mantine/core';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
 import { useEffect, useRef } from 'react';
@@ -45,11 +45,6 @@ const COURT_COLUMN_WIDTH: Record<Exclude<ZoomLevel, 'overview'>, string> = {
   compact: 'clamp(5.5rem, 27vw, 9rem)',
 };
 
-/** How much a pinch must scale before the grid snaps one zoom level. */
-const PINCH_SNAP_RATIO = 1.3;
-/** Accumulated ctrl+wheel delta that snaps one zoom level on desktop. */
-const WHEEL_SNAP_DELTA = 80;
-
 function matchColour(
   match: MatchWithDetails,
   entry: MatchLookupEntry | undefined,
@@ -70,6 +65,7 @@ function MatchCard({
   isSelected,
   stageItemsLookup,
   matchesLookup,
+  levels,
   onTap,
 }: {
   block: MatchBlock<MatchWithDetails>;
@@ -79,6 +75,7 @@ function MatchCard({
   isSelected: boolean;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
+  levels: LevelResponse[];
   onTap: () => void;
 }) {
   const { t } = useTranslation();
@@ -110,6 +107,23 @@ function MatchCard({
       {format(block.startTime, 'HH:mm')}
     </Text>
   );
+  // Agenda is the full-detail level: a three-row card has room for the match's
+  // level, stage and stage item next to the time.
+  const levelName = levels.find((level) => level.id === entry?.stage.level_id)?.name;
+  const contextLabel =
+    zoom === 'agenda' && rows === 3 && entry != null
+      ? [levelName, entry.stage.name, entry.stageItem.name].filter(Boolean).join(' · ')
+      : null;
+  const contextBadge = contextLabel ? (
+    <Badge
+      color={color}
+      variant="outline"
+      size="sm"
+      style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}
+    >
+      {contextLabel}
+    </Badge>
+  ) : null;
   const violationIcon = isViolation ? (
     <Tooltip label={t('match_scheduled_before_previous_stage_label')}>
       <Box
@@ -160,6 +174,7 @@ function MatchCard({
         {rows === 3 && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
             {timeLabel}
+            {contextBadge}
             {violationIcon}
           </Flex>
         )}
@@ -334,63 +349,6 @@ export default function ScheduleGrid({
   const isOverview = zoom === 'overview';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const onSelectionEventRef = useRef(onSelectionEvent);
-  onSelectionEventRef.current = onSelectionEvent;
-
-  // Pinch (two fingers) and ctrl+wheel (desktop trackpad pinch / mouse wheel)
-  // snap between zoom levels. Native listeners because preventDefault is needed
-  // to keep the browser from zooming the page instead.
-  useEffect(() => {
-    const element = containerRef.current;
-    if (element == null) return undefined;
-
-    let pinchBaseline: number | null = null;
-    let wheelAccumulated = 0;
-    const distance = (touches: TouchList) =>
-      Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
-
-    const onTouchStart = (event: TouchEvent) => {
-      if (event.touches.length === 2) pinchBaseline = distance(event.touches);
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      if (event.touches.length !== 2 || pinchBaseline == null) return;
-      event.preventDefault();
-      const ratio = distance(event.touches) / pinchBaseline;
-      if (ratio >= PINCH_SNAP_RATIO) {
-        onSelectionEventRef.current({ type: 'zoom-in' });
-        pinchBaseline = distance(event.touches);
-      } else if (ratio <= 1 / PINCH_SNAP_RATIO) {
-        onSelectionEventRef.current({ type: 'zoom-out' });
-        pinchBaseline = distance(event.touches);
-      }
-    };
-    const onTouchEnd = () => {
-      pinchBaseline = null;
-    };
-    const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      wheelAccumulated += event.deltaY;
-      if (wheelAccumulated <= -WHEEL_SNAP_DELTA) {
-        onSelectionEventRef.current({ type: 'zoom-in' });
-        wheelAccumulated = 0;
-      } else if (wheelAccumulated >= WHEEL_SNAP_DELTA) {
-        onSelectionEventRef.current({ type: 'zoom-out' });
-        wheelAccumulated = 0;
-      }
-    };
-
-    element.addEventListener('touchstart', onTouchStart, { passive: true });
-    element.addEventListener('touchmove', onTouchMove, { passive: false });
-    element.addEventListener('touchend', onTouchEnd);
-    element.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      element.removeEventListener('touchstart', onTouchStart);
-      element.removeEventListener('touchmove', onTouchMove);
-      element.removeEventListener('touchend', onTouchEnd);
-      element.removeEventListener('wheel', onWheel);
-    };
-  }, []);
 
   // After an overview tap zooms in, center the tapped court/time region. Runs
   // after the re-render at the new zoom level, so measurements are up to date.
@@ -563,6 +521,7 @@ export default function ScheduleGrid({
                     isSelected={selectedMatch?.matchId === block.match.id}
                     stageItemsLookup={stageItemsLookup}
                     matchesLookup={matchesLookup}
+                    levels={levels}
                     onTap={() => onSelectionEvent({ type: 'tap-match', match: matchRef })}
                   />
                 );

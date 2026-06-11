@@ -33,6 +33,7 @@ import { rescheduleMatch, scheduleMatches } from '@services/match';
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
+import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
 import ZoomControls from '@components/scheduling/zoom_controls';
 
 export default function SchedulePage() {
@@ -42,6 +43,9 @@ export default function SchedulePage() {
     initialPlannerState(defaultZoomLevel(window.innerWidth))
   );
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
+  // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
+  // that starts next to the grid zooms the schedule instead of the page.
+  const pinchRef = usePinchZoom(handlePlannerEvent);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
@@ -126,116 +130,118 @@ export default function SchedulePage() {
           round={null}
         />
       ) : null}
-      <Grid grow>
-        <Grid.Col span={6}>
-          <Title>{t('planning_title')}</Title>
-        </Grid.Col>
-        <Grid.Col span={6}>
-          <Group justify="right">
-            <CourtsToolbar
-              tournamentId={tournamentData.id}
-              swrCourtsResponse={swrCourtsResponse}
-              courts={courts}
-              matchesByCourtId={matchesByCourtId}
-            />
-            {courts.length < 1 ? null : (
-              <Button
-                color="indigo"
-                size="md"
-                variant="filled"
-                style={{ marginBottom: 10 }}
-                leftSection={<IconCalendarPlus size={24} />}
-                onClick={async () => {
-                  await scheduleMatches(tournamentData.id);
-                  await swrStagesResponse.mutate();
-                }}
-              >
-                {t('schedule_description')}
-              </Button>
-            )}
-          </Group>
-        </Grid.Col>
-      </Grid>
-      {courts.length < 1 ? (
-        <Stack align="center" mt="1rem">
-          <NoContent title={t('no_courts_title')} description={t('no_courts_description')} />
-          <CourtModal
-            swrCourtsResponse={swrCourtsResponse}
-            tournamentId={tournamentData.id}
-            buttonSize="lg"
-          />
-        </Stack>
-      ) : (
-        <Box mt="1rem" pb={planner.selection.kind === 'match-selected' ? '14rem' : '4rem'}>
-          {isOverview && levels.length > 0 && (
-            <Group gap="xs" mb="xs">
-              {[...levels]
-                .sort((a, b) => a.position - b.position)
-                .map((level) => (
-                  <Badge key={level.id} color={levelColour(level.id, levels)} variant="filled">
-                    {level.name}
-                  </Badge>
-                ))}
-            </Group>
-          )}
-          <ScheduleGrid
-            layout={layout}
-            violations={violations}
-            stageItemsLookup={stageItemsLookup}
-            matchesLookup={matchesLookup}
-            levels={levels}
-            selection={planner.selection}
-            zoom={planner.zoom}
-            focus={focus}
-            onSelectionEvent={handlePlannerEvent}
-          />
-          <UnscheduledSheet
-            unscheduledMatches={unscheduledMatches}
-            stageItemsLookup={stageItemsLookup}
-            matchesLookup={matchesLookup}
-            openMatchModal={openMatchModal}
-          />
-          <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
-            <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
-          </Affix>
-          {selectedEntry != null ? (
-            <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
-              <Paper
-                shadow="md"
-                radius="xl"
-                withBorder
-                px="md"
-                py={6}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  maxWidth: 'calc(100vw - 1rem)',
-                  transform: 'translateX(-50%)',
-                }}
-              >
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Text size="sm" fw={600} truncate>
-                    {formatMatchInput1(t, stageItemsLookup, matchesLookup, selectedEntry.match)} –{' '}
-                    {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
-                  </Text>
-                </Box>
+      <Box ref={pinchRef} style={{ touchAction: 'pan-x pan-y' }}>
+        <Grid grow>
+          <Grid.Col span={6}>
+            <Title>{t('planning_title')}</Title>
+          </Grid.Col>
+          <Grid.Col span={6}>
+            <Group justify="right">
+              <CourtsToolbar
+                tournamentId={tournamentData.id}
+                swrCourtsResponse={swrCourtsResponse}
+                courts={courts}
+                matchesByCourtId={matchesByCourtId}
+              />
+              {courts.length < 1 ? null : (
                 <Button
-                  size="compact-sm"
-                  variant="light"
-                  color="red"
-                  onClick={() => handlePlannerEvent({ type: 'cancel' })}
+                  color="indigo"
+                  size="md"
+                  variant="filled"
+                  style={{ marginBottom: 10 }}
+                  leftSection={<IconCalendarPlus size={24} />}
+                  onClick={async () => {
+                    await scheduleMatches(tournamentData.id);
+                    await swrStagesResponse.mutate();
+                  }}
                 >
-                  {t('cancel_button')}
+                  {t('schedule_description')}
                 </Button>
-              </Paper>
+              )}
+            </Group>
+          </Grid.Col>
+        </Grid>
+        {courts.length < 1 ? (
+          <Stack align="center" mt="1rem">
+            <NoContent title={t('no_courts_title')} description={t('no_courts_description')} />
+            <CourtModal
+              swrCourtsResponse={swrCourtsResponse}
+              tournamentId={tournamentData.id}
+              buttonSize="lg"
+            />
+          </Stack>
+        ) : (
+          <Box mt="1rem" pb={planner.selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+            {isOverview && levels.length > 0 && (
+              <Group gap="xs" mb="xs">
+                {[...levels]
+                  .sort((a, b) => a.position - b.position)
+                  .map((level) => (
+                    <Badge key={level.id} color={levelColour(level.id, levels)} variant="filled">
+                      {level.name}
+                    </Badge>
+                  ))}
+              </Group>
+            )}
+            <ScheduleGrid
+              layout={layout}
+              violations={violations}
+              stageItemsLookup={stageItemsLookup}
+              matchesLookup={matchesLookup}
+              levels={levels}
+              selection={planner.selection}
+              zoom={planner.zoom}
+              focus={focus}
+              onSelectionEvent={handlePlannerEvent}
+            />
+            <UnscheduledSheet
+              unscheduledMatches={unscheduledMatches}
+              stageItemsLookup={stageItemsLookup}
+              matchesLookup={matchesLookup}
+              openMatchModal={openMatchModal}
+            />
+            <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
+              <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
             </Affix>
-          ) : null}
-        </Box>
-      )}
+            {selectedEntry != null ? (
+              <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
+                <Paper
+                  shadow="md"
+                  radius="xl"
+                  withBorder
+                  px="md"
+                  py={6}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    maxWidth: 'calc(100vw - 1rem)',
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text size="sm" fw={600} truncate>
+                      {formatMatchInput1(t, stageItemsLookup, matchesLookup, selectedEntry.match)} –{' '}
+                      {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
+                    </Text>
+                  </Box>
+                  <Button
+                    size="compact-sm"
+                    variant="light"
+                    color="red"
+                    onClick={() => handlePlannerEvent({ type: 'cancel' })}
+                  >
+                    {t('cancel_button')}
+                  </Button>
+                </Paper>
+              </Affix>
+            ) : null}
+          </Box>
+        )}
+      </Box>
     </TournamentLayout>
   );
 }
