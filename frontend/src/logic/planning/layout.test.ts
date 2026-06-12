@@ -16,35 +16,36 @@ function court(id: number): LayoutCourt {
 
 function match(
   id: number,
-  position: number | null,
+  startMinutes: number | null = 0,
   durationMinutes = 15,
-  marginMinutes = 5,
-  startTime: string | null = TOURNAMENT_START
+  startTime: string | null = minutesAfterStart(startMinutes)
 ): LayoutMatch {
   return {
     id,
-    position_in_schedule: position,
     duration_minutes: durationMinutes,
-    margin_minutes: marginMinutes,
     start_time: startTime,
   };
 }
 
+function minutesAfterStart(minutes: number | null): string | null {
+  if (minutes == null) return null;
+  return new Date(new Date(TOURNAMENT_START).getTime() + minutes * 60_000).toISOString();
+}
+
 function playedMatch(
   id: number,
-  position: number,
+  startMinutes = 0,
   state: LayoutMatchState = 'COMPLETED',
-  durationMinutes = 15,
-  marginMinutes = 5
+  durationMinutes = 15
 ): LayoutMatch {
-  return { ...match(id, position, durationMinutes, marginMinutes), state };
+  return { ...match(id, startMinutes, durationMinutes), state };
 }
 
 describe('computeScheduleLayout', () => {
-  it('packs matches sequentially from the tournament start time', () => {
+  it('uses actual start times and duration-only block sizes', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0, 15, 5), match(11, 1, 30, 10)] },
+      matchesByCourtId: { 1: [match(10, 0, 15), match(11, 20, 30)] },
       tournamentStartTime: TOURNAMENT_START,
     });
 
@@ -54,21 +55,19 @@ describe('computeScheduleLayout', () => {
 
     expect(blocks[0].startMinutes).toBe(0);
     expect(blocks[0].durationMinutes).toBe(15);
-    expect(blocks[0].marginMinutes).toBe(5);
-    expect(blocks[0].endMinutes).toBe(20);
+    expect(blocks[0].endMinutes).toBe(15);
     expect(blocks[0].startTime).toEqual(new Date('2026-06-10T09:00:00Z'));
 
     expect(blocks[1].startMinutes).toBe(20);
     expect(blocks[1].durationMinutes).toBe(30);
-    expect(blocks[1].marginMinutes).toBe(10);
-    expect(blocks[1].endMinutes).toBe(60);
+    expect(blocks[1].endMinutes).toBe(50);
     expect(blocks[1].startTime).toEqual(new Date('2026-06-10T09:20:00Z'));
   });
 
-  it('orders matches by position_in_schedule regardless of input order', () => {
+  it('orders matches by start time regardless of input order', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(12, 2), match(10, 0), match(11, 1)] },
+      matchesByCourtId: { 1: [match(12, 40), match(10, 0), match(11, 20)] },
       tournamentStartTime: TOURNAMENT_START,
     });
 
@@ -76,12 +75,12 @@ describe('computeScheduleLayout', () => {
     expect(layout.courts[0].blocks.map((b) => b.startMinutes)).toEqual([0, 20, 40]);
   });
 
-  it('packs each court independently with varying durations and margins', () => {
+  it('lays out each court independently with varying durations and gaps', () => {
     const layout = computeScheduleLayout({
       courts: [court(1), court(2), court(3)],
       matchesByCourtId: {
-        1: [match(10, 0, 15, 5), match(11, 1, 15, 5)],
-        2: [match(20, 0, 45, 0), match(21, 1, 10, 20)],
+        1: [match(10, 0, 15), match(11, 20, 15)],
+        2: [match(20, 0, 45), match(21, 45, 10)],
       },
       tournamentStartTime: TOURNAMENT_START,
     });
@@ -90,12 +89,12 @@ describe('computeScheduleLayout', () => {
 
     const [c1, c2, c3] = layout.courts;
     expect(c1.blocks.map((b) => [b.startMinutes, b.endMinutes])).toEqual([
-      [0, 20],
-      [20, 40],
+      [0, 15],
+      [20, 35],
     ]);
     expect(c2.blocks.map((b) => [b.startMinutes, b.endMinutes])).toEqual([
       [0, 45],
-      [45, 75],
+      [45, 55],
     ]);
     expect(c3.blocks).toEqual([]);
   });
@@ -103,7 +102,7 @@ describe('computeScheduleLayout', () => {
   it('excludes unscheduled matches (no start time)', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0), match(11, null, 15, 5, null)] },
+      matchesByCourtId: { 1: [match(10), match(11, null, 15, null)] },
       tournamentStartTime: TOURNAMENT_START,
     });
 
@@ -114,15 +113,14 @@ describe('computeScheduleLayout', () => {
     const layout = computeScheduleLayout({
       courts: [court(1), court(2)],
       matchesByCourtId: {
-        1: [match(10, 0, 15, 5)],
-        2: [match(20, 0, 60, 10)],
+        1: [match(10, 0, 15)],
+        2: [match(20, 0, 60)],
       },
       tournamentStartTime: TOURNAMENT_START,
       tickIntervalMinutes: 30,
     });
 
-    // Longest court ends at 70 minutes -> rounded up to 90.
-    expect(layout.totalMinutes).toBe(90);
+    expect(layout.totalMinutes).toBe(60);
   });
 
   it('uses a minimum total height for an empty schedule', () => {
@@ -141,7 +139,7 @@ describe('computeScheduleLayout', () => {
   it('generates ruler ticks at the given interval, including both ends', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0, 50, 10)] },
+      matchesByCourtId: { 1: [match(10, 0, 50)] },
       tournamentStartTime: TOURNAMENT_START,
       tickIntervalMinutes: 30,
     });
@@ -156,16 +154,16 @@ describe('computeScheduleLayout', () => {
   });
 
   it('reflects custom (already-resolved) durations in block sizes', () => {
-    // The backend folds custom durations/margins into duration_minutes/margin_minutes,
-    // so the layout only needs to honour the effective values.
+    // The backend folds custom durations into duration_minutes, so the layout only
+    // needs to honour the effective value.
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0, 90, 2), match(11, 1, 5, 0)] },
+      matchesByCourtId: { 1: [match(10, 0, 90), match(11, 92, 5)] },
       tournamentStartTime: TOURNAMENT_START,
     });
 
     const blocks = layout.courts[0].blocks;
-    expect(blocks[0].endMinutes - blocks[0].startMinutes).toBe(92);
+    expect(blocks[0].endMinutes - blocks[0].startMinutes).toBe(90);
     expect(blocks[1].startMinutes).toBe(92);
     expect(blocks[1].endMinutes).toBe(97);
   });
@@ -176,27 +174,26 @@ describe('computeInsertionLines', () => {
     expect(computeInsertionLines([])).toEqual([{ index: 0, offsetMinutes: 0 }]);
   });
 
-  it('puts lines half a margin above the first match, centered in each margin gap, and after the last match', () => {
+  it('puts lines before the first match, centered in gaps, and after the last match', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0, 15, 5), match(11, 1, 30, 10)] },
+      matchesByCourtId: { 1: [match(10, 0, 15), match(11, 20, 30)] },
       tournamentStartTime: TOURNAMENT_START,
+      defaultBreakMinutes: 5,
     });
 
     expect(computeInsertionLines(layout.courts[0].blocks)).toEqual([
-      // Half the first match's 5-minute margin above its start.
-      { index: 0, offsetMinutes: -2.5 },
+      { index: 0, offsetMinutes: 0 },
       // Centered in the 15..20 gap between the two cards.
       { index: 1, offsetMinutes: 17.5 },
-      // Centered in the 50..60 gap after the last card.
-      { index: 2, offsetMinutes: 55 },
+      { index: 2, offsetMinutes: 52.5 },
     ]);
   });
 
   it('places lines on the card boundary when there is no margin', () => {
     const layout = computeScheduleLayout({
       courts: [court(1)],
-      matchesByCourtId: { 1: [match(10, 0, 20, 0), match(11, 1, 20, 0)] },
+      matchesByCourtId: { 1: [match(10, 0, 20), match(11, 20, 20)] },
       tournamentStartTime: TOURNAMENT_START,
     });
 
@@ -218,7 +215,7 @@ describe('locked blocks for played matches', () => {
   }
 
   it('locks nothing on a court with only upcoming matches', () => {
-    const blocks = blocksFor([match(10, 0), match(11, 1)]);
+    const blocks = blocksFor([match(10, 0), match(11, 20)]);
 
     expect(blocks.map((b) => b.locked)).toEqual([false, false]);
   });
@@ -226,15 +223,15 @@ describe('locked blocks for played matches', () => {
   it('locks completed and in-progress matches', () => {
     const blocks = blocksFor([
       playedMatch(10, 0, 'COMPLETED'),
-      playedMatch(11, 1, 'IN_PROGRESS'),
-      match(12, 2),
+      playedMatch(11, 20, 'IN_PROGRESS'),
+      match(12, 40),
     ]);
 
     expect(blocks.map((b) => b.locked)).toEqual([true, true, false]);
   });
 
   it('treats matches without a state as upcoming', () => {
-    const blocks = blocksFor([match(10, 0), { ...match(11, 1), state: 'NOT_STARTED' }]);
+    const blocks = blocksFor([match(10, 0), { ...match(11, 20), state: 'NOT_STARTED' }]);
 
     expect(blocks.map((b) => b.locked)).toEqual([false, false]);
   });
@@ -242,7 +239,7 @@ describe('locked blocks for played matches', () => {
   it('locks an upcoming match sitting above a played one, freezing the whole past', () => {
     // Moving the sandwiched upcoming match would shift the recorded start time
     // of the completed match below it, so it is part of the frozen past.
-    const blocks = blocksFor([match(10, 0), playedMatch(11, 1, 'COMPLETED'), match(12, 2)]);
+    const blocks = blocksFor([match(10, 0), playedMatch(11, 20, 'COMPLETED'), match(12, 40)]);
 
     expect(blocks.map((b) => b.locked)).toEqual([true, true, false]);
   });
@@ -254,11 +251,12 @@ describe('computeInsertionLines with played matches', () => {
       courts: [court(1)],
       matchesByCourtId: { 1: matches },
       tournamentStartTime: TOURNAMENT_START,
+      defaultBreakMinutes: 5,
     }).courts[0].blocks;
   }
 
   it('offers all positions on a court with no played matches', () => {
-    const lines = computeInsertionLines(blocksFor([match(10, 0), match(11, 1)]));
+    const lines = computeInsertionLines(blocksFor([match(10, 0), match(11, 20)]));
 
     expect(lines.map((line) => line.index)).toEqual([0, 1, 2]);
   });
@@ -267,9 +265,9 @@ describe('computeInsertionLines with played matches', () => {
     const lines = computeInsertionLines(
       blocksFor([
         playedMatch(10, 0, 'COMPLETED'),
-        playedMatch(11, 1, 'COMPLETED'),
-        match(12, 2),
-        match(13, 3),
+        playedMatch(11, 20, 'COMPLETED'),
+        match(12, 40),
+        match(13, 60),
       ])
     );
 
@@ -283,7 +281,7 @@ describe('computeInsertionLines with played matches', () => {
 
   it('treats an in-progress match like a completed one', () => {
     const lines = computeInsertionLines(
-      blocksFor([playedMatch(10, 0, 'IN_PROGRESS'), match(11, 1)])
+      blocksFor([playedMatch(10, 0, 'IN_PROGRESS'), match(11, 20)])
     );
 
     expect(lines.map((line) => line.index)).toEqual([1, 2]);
@@ -291,7 +289,7 @@ describe('computeInsertionLines with played matches', () => {
 
   it('offers only the end-of-court line when every match is played', () => {
     const lines = computeInsertionLines(
-      blocksFor([playedMatch(10, 0, 'COMPLETED'), playedMatch(11, 1, 'IN_PROGRESS')])
+      blocksFor([playedMatch(10, 0, 'COMPLETED'), playedMatch(11, 20, 'IN_PROGRESS')])
     );
 
     expect(lines.map((line) => line.index)).toEqual([2]);
@@ -301,9 +299,9 @@ describe('computeInsertionLines with played matches', () => {
     const lines = computeInsertionLines(
       blocksFor([
         playedMatch(10, 0, 'COMPLETED'),
-        match(11, 1),
-        playedMatch(12, 2, 'COMPLETED'),
-        match(13, 3),
+        match(11, 20),
+        playedMatch(12, 40, 'COMPLETED'),
+        match(13, 60),
       ])
     );
 

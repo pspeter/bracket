@@ -73,7 +73,6 @@ function MatchModalForm({
       stage_item_input1_score: match.stage_item_input1_score,
       stage_item_input2_score: match.stage_item_input2_score,
       custom_duration_minutes: match.custom_duration_minutes,
-      custom_margin_minutes: match.custom_margin_minutes,
       state: match.state,
     },
 
@@ -82,16 +81,11 @@ function MatchModalForm({
       stage_item_input2_score: (value) => (value >= 0 ? null : t('negative_score_validation')),
       custom_duration_minutes: (value) =>
         value == null || value >= 0 ? null : t('negative_match_duration_validation'),
-      custom_margin_minutes: (value) =>
-        value == null || value >= 0 ? null : t('negative_match_margin_validation'),
     },
   });
 
   const [customDurationEnabled, setCustomDurationEnabled] = useState(
     match.custom_duration_minutes != null
-  );
-  const [customMarginEnabled, setCustomMarginEnabled] = useState(
-    match.custom_margin_minutes != null
   );
 
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
@@ -111,7 +105,6 @@ function MatchModalForm({
             stage_item_input2_score: values.stage_item_input2_score,
             court_id: match.court_id || null,
             custom_duration_minutes: customDurationEnabled ? values.custom_duration_minutes : null,
-            custom_margin_minutes: customMarginEnabled ? values.custom_margin_minutes : null,
             state: values.state,
             completed_at: match.completed_at,
           };
@@ -168,32 +161,6 @@ function MatchModalForm({
                 label={t('customize_checkbox_label')}
                 onChange={(event) => {
                   setCustomDurationEnabled(event.currentTarget.checked);
-                }}
-              />
-            </Center>
-          </Grid.Col>
-        </Grid>
-
-        <Text size="sm" mt="lg">
-          {t('custom_match_margin_label')}
-        </Text>
-        <Grid align="center">
-          <Grid.Col span={{ sm: 8 }}>
-            <NumberInput
-              disabled={!customMarginEnabled}
-              placeholder={`${match.margin_minutes}`}
-              rightSection={<Text>{t('minutes')}</Text>}
-              rightSectionWidth={92}
-              {...form.getInputProps('custom_margin_minutes')}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ sm: 4 }}>
-            <Center>
-              <Checkbox
-                checked={customMarginEnabled}
-                label={t('customize_checkbox_label')}
-                onChange={(event) => {
-                  setCustomMarginEnabled(event.currentTarget.checked);
                 }}
               />
             </Center>

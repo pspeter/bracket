@@ -18,29 +18,23 @@ function minutesAfterStart(minutes: number): string {
 function match({
   id,
   courtId,
-  position,
   startMinutes,
   input1,
   input2,
   durationMinutes = 90,
-  marginMinutes = 15,
 }: {
   id: number;
   courtId: number | null;
-  position: number | null;
   startMinutes: number | null;
   input1: number;
   input2: number;
   durationMinutes?: number;
-  marginMinutes?: number;
 }): ConflictPreviewMatch {
   return {
     id,
     court_id: courtId,
-    position_in_schedule: position,
     start_time: startMinutes == null ? null : minutesAfterStart(startMinutes),
     duration_minutes: durationMinutes,
-    margin_minutes: marginMinutes,
     stage_item_input1_id: input1,
     stage_item_input2_id: input2,
   };
@@ -53,9 +47,9 @@ function stagesWith(matches: ConflictPreviewMatch[]) {
 describe('actionCreatesSelectedConflict', () => {
   it('detects a selected-match team overlap after a simulated insertion repacks courts', () => {
     const stages = stagesWith([
-      match({ id: 1, courtId: 1, position: 0, startMinutes: 0, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 2, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, position: 0, startMinutes: 0, input1: 10, input2: 30 }),
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
     ]);
 
     expect(
@@ -77,20 +71,13 @@ describe('actionCreatesSelectedConflict', () => {
     ).toBe(true);
   });
 
-  it('counts post-match margin as team overlap, matching backend conflict flags', () => {
+  it('applies the default break when repacking, pushing the moved match into a team overlap', () => {
+    // Inserted after match 2, match 1 lands at 20 (end) + 10 break = 30, playing
+    // [30, 50). With no break it would sit at [20, 40) and clear match 3 at [45, 65).
     const stages = stagesWith([
-      match({ id: 1, courtId: 1, position: 0, startMinutes: 0, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 2, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({
-        id: 3,
-        courtId: 3,
-        position: 0,
-        startMinutes: 0,
-        input1: 40,
-        input2: 50,
-        marginMinutes: 0,
-      }),
-      match({ id: 4, courtId: 3, position: 1, startMinutes: 90, input1: 10, input2: 30 }),
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, durationMinutes: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50, durationMinutes: 20 }),
+      match({ id: 3, courtId: 3, startMinutes: 45, input1: 10, input2: 30, durationMinutes: 20 }),
     ]);
 
     expect(
@@ -98,6 +85,7 @@ describe('actionCreatesSelectedConflict', () => {
         stages,
         selectedMatchId: 1,
         tournamentStartTime: START,
+        defaultBreakMinutes: 10,
         action: {
           type: 'reschedule',
           matchId: 1,
@@ -105,7 +93,7 @@ describe('actionCreatesSelectedConflict', () => {
             old_court_id: 1,
             old_position: 0,
             new_court_id: 2,
-            new_position: 0,
+            new_position: 1,
           },
         },
       })
@@ -116,17 +104,10 @@ describe('actionCreatesSelectedConflict', () => {
 describe('computeConflictPreview', () => {
   it('flags insertion lines that would create a selected-match team overlap', () => {
     const matches = [
-      match({ id: 1, courtId: 1, position: 0, startMinutes: 0, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 2, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({
-        id: 3,
-        courtId: 2,
-        position: 1,
-        startMinutes: PACKED_SLOT_MINUTES,
-        input1: 40,
-        input2: 50,
-      }),
-      match({ id: 4, courtId: 3, position: 0, startMinutes: 0, input1: 10, input2: 30 }),
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 2, startMinutes: PACKED_SLOT_MINUTES, input1: 40, input2: 50 }),
+      match({ id: 4, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -153,9 +134,9 @@ describe('computeConflictPreview', () => {
 
   it('flags tray-initiated insertion lines using the unscheduled match teams', () => {
     const matches = [
-      match({ id: 1, courtId: null, position: null, startMinutes: null, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 1, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 2, position: 0, startMinutes: 0, input1: 10, input2: 30 }),
+      match({ id: 1, courtId: null, startMinutes: null, input1: 10, input2: 20 }),
+      match({ id: 2, courtId: 1, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 2, startMinutes: 0, input1: 10, input2: 30 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -181,63 +162,16 @@ describe('computeConflictPreview', () => {
       match({
         id: 1,
         courtId: null,
-        position: null,
         startMinutes: null,
         input1: 100,
         input2: 101,
         durationMinutes: 20,
-        marginMinutes: 10,
       }),
-      match({
-        id: 2,
-        courtId: 1,
-        position: 0,
-        startMinutes: 0,
-        input1: 200,
-        input2: 201,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 3,
-        courtId: 1,
-        position: 1,
-        startMinutes: 30,
-        input1: 10,
-        input2: 11,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 4,
-        courtId: 2,
-        position: 0,
-        startMinutes: 0,
-        input1: 300,
-        input2: 301,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 5,
-        courtId: 2,
-        position: 1,
-        startMinutes: 30,
-        input1: 302,
-        input2: 303,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 6,
-        courtId: 2,
-        position: 2,
-        startMinutes: 60,
-        input1: 10,
-        input2: 12,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
+      match({ id: 2, courtId: 1, startMinutes: 0, input1: 200, input2: 201, durationMinutes: 20 }),
+      match({ id: 3, courtId: 1, startMinutes: 30, input1: 10, input2: 11, durationMinutes: 20 }),
+      match({ id: 4, courtId: 2, startMinutes: 0, input1: 300, input2: 301, durationMinutes: 20 }),
+      match({ id: 5, courtId: 2, startMinutes: 30, input1: 302, input2: 303, durationMinutes: 20 }),
+      match({ id: 6, courtId: 2, startMinutes: 60, input1: 10, input2: 12, durationMinutes: 20 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -246,6 +180,7 @@ describe('computeConflictPreview', () => {
       ],
       matchesByCourtId: { 1: [matches[1], matches[2]], 2: [matches[3], matches[4], matches[5]] },
       tournamentStartTime: START,
+      defaultBreakMinutes: 10,
     });
 
     const preview = computeConflictPreview({
@@ -260,9 +195,9 @@ describe('computeConflictPreview', () => {
 
   it('flags swap targets that would put the selected match into a conflicting slot', () => {
     const matches = [
-      match({ id: 1, courtId: null, position: null, startMinutes: null, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 1, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 2, position: 0, startMinutes: 0, input1: 10, input2: 30 }),
+      match({ id: 1, courtId: null, startMinutes: null, input1: 10, input2: 20 }),
+      match({ id: 2, courtId: 1, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 2, startMinutes: 0, input1: 10, input2: 30 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -285,17 +220,10 @@ describe('computeConflictPreview', () => {
 
   it('flags scheduled-match swap targets after simulating the traded slots', () => {
     const matches = [
-      match({ id: 1, courtId: 1, position: 0, startMinutes: 0, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 2, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, position: 0, startMinutes: 0, input1: 10, input2: 30 }),
-      match({
-        id: 4,
-        courtId: 2,
-        position: 1,
-        startMinutes: PACKED_SLOT_MINUTES,
-        input1: 60,
-        input2: 70,
-      }),
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
+      match({ id: 4, courtId: 2, startMinutes: PACKED_SLOT_MINUTES, input1: 60, input2: 70 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -322,56 +250,11 @@ describe('computeConflictPreview', () => {
 
   it('flags swap targets when the other swapped match conflicts in the selected slot', () => {
     const matches = [
-      match({
-        id: 1,
-        courtId: 1,
-        position: 0,
-        startMinutes: 0,
-        input1: 100,
-        input2: 101,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 2,
-        courtId: 2,
-        position: 0,
-        startMinutes: 0,
-        input1: 200,
-        input2: 201,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 3,
-        courtId: 2,
-        position: 1,
-        startMinutes: 30,
-        input1: 202,
-        input2: 203,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 4,
-        courtId: 2,
-        position: 2,
-        startMinutes: 60,
-        input1: 10,
-        input2: 11,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
-      match({
-        id: 5,
-        courtId: 3,
-        position: 0,
-        startMinutes: 0,
-        input1: 10,
-        input2: 12,
-        durationMinutes: 20,
-        marginMinutes: 10,
-      }),
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 100, input2: 101, durationMinutes: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 200, input2: 201, durationMinutes: 20 }),
+      match({ id: 3, courtId: 2, startMinutes: 30, input1: 202, input2: 203, durationMinutes: 20 }),
+      match({ id: 4, courtId: 2, startMinutes: 60, input1: 10, input2: 11, durationMinutes: 20 }),
+      match({ id: 5, courtId: 3, startMinutes: 0, input1: 10, input2: 12, durationMinutes: 20 }),
     ];
     const layout = computeScheduleLayout({
       courts: [
@@ -385,6 +268,7 @@ describe('computeConflictPreview', () => {
         3: [matches[4]],
       },
       tournamentStartTime: START,
+      defaultBreakMinutes: 10,
     });
 
     const preview = computeConflictPreview({

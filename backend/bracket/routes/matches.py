@@ -95,7 +95,6 @@ def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBo
         "stage_item_input2_score": existing_match.stage_item_input2_score,
         "court_id": existing_match.court_id,
         "custom_duration_minutes": existing_match.custom_duration_minutes,
-        "custom_margin_minutes": existing_match.custom_margin_minutes,
         "state": existing_match.state,
     }
     match_body = match_body.model_copy(
@@ -135,7 +134,6 @@ def get_full_match_body_from_score_tracking(
         round_id=existing_match.round_id,
         court_id=existing_match.court_id,
         custom_duration_minutes=existing_match.custom_duration_minutes,
-        custom_margin_minutes=existing_match.custom_margin_minutes,
         stage_item_input1_score=body.stage_item_input1_score,
         stage_item_input2_score=body.stage_item_input2_score,
         state=body.state,
@@ -218,7 +216,6 @@ async def create_match(
     body_with_durations = MatchCreateBody(
         **match_body.model_dump(),
         duration_minutes=tournament.duration_minutes,
-        margin_minutes=tournament.margin_minutes,
     )
 
     return SingleMatchResponse(data=await sql_create_match(body_with_durations))
@@ -240,24 +237,12 @@ async def schedule_matches(
 )
 async def unschedule_match(
     tournament_id: TournamentId,
-    tournament: Tournament = Depends(disallow_archived_tournament),
+    __: Tournament = Depends(disallow_archived_tournament),
     _: UserPublic = Depends(user_authenticated_for_tournament),
     match_row: Match = Depends(match_dependency),
 ) -> SuccessResponse:
     validate_match_can_be_unscheduled(match_row)
-    old_court_id = match_row.court_id
-
     await sql_unschedule_match(match_row.id)
-
-    if old_court_id is not None:
-        # Only the vacated court needs re-packing; other courts keep their packing.
-        stages = await get_full_tournament_details(tournament_id)
-        court_matches = [
-            match_pos
-            for match_pos in get_scheduled_matches(stages)
-            if match_pos.match.court_id == old_court_id
-        ]
-        await reorder_all_matches(tournament, court_matches)
 
     await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
@@ -315,8 +300,8 @@ async def update_match_by_id(
 
     if (
         match_body.custom_duration_minutes != match.custom_duration_minutes
-        or match_body.custom_margin_minutes != match.custom_margin_minutes
-    ) and match.court_id is not None:
+        and match.court_id is not None
+    ):
         # A duration change only shifts start times on the match's own court.
         tournament = await sql_get_tournament(tournament_id)
         stages = await get_full_tournament_details(tournament_id)

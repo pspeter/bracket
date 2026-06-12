@@ -142,6 +142,7 @@ export default function SchedulePage() {
     courts,
     matchesByCourtId,
     tournamentStartTime: tournament.start_time,
+    defaultBreakMinutes: tournament.margin_minutes,
     tickIntervalMinutes: ZOOM_TICK_INTERVAL_MINUTES[planner.zoom],
   });
   const nowOffsetMinutes = currentTimeOffsetMinutes({
@@ -216,7 +217,12 @@ export default function SchedulePage() {
                 ? current!
                 : {
                     ...current,
-                    data: applyPlanningActions(current.data, actions, tournament.start_time),
+                    data: applyPlanningActions(
+                      current.data,
+                      actions,
+                      tournament.start_time,
+                      tournament.margin_minutes
+                    ),
                   },
             populateCache: false,
             revalidate: true,

@@ -30,7 +30,7 @@ T0 = DUMMY_MOCK_TIME
 DURATION = DUMMY_TOURNAMENT.duration_minutes  # 10
 MARGIN = DUMMY_TOURNAMENT.margin_minutes  # 5
 SLOT = DURATION + MARGIN  # 15 minutes per match
-SqlCall = tuple[CourtId, datetime_utc, int, MatchId]
+SqlCall = tuple[CourtId, datetime_utc, MatchId]
 
 
 def _match(id_: int) -> MatchWithDetails:
@@ -38,7 +38,6 @@ def _match(id_: int) -> MatchWithDetails:
         id=MatchId(id_),
         created=T0,
         duration_minutes=DURATION,
-        margin_minutes=MARGIN,
         round_id=RoundId(id_),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
@@ -459,10 +458,8 @@ def test_already_scheduled_matches_are_skipped() -> None:
         id=MatchId(99),
         created=T0,
         duration_minutes=DURATION,
-        margin_minutes=MARGIN,
         round_id=RoundId(99),
         start_time=T0,
-        position_in_schedule=0,
         court_id=CourtId(1),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
@@ -489,12 +486,12 @@ def capture_sql_calls(monkeypatch: pytest.MonkeyPatch) -> list[SqlCall]:
     """Replace the DB-writing helper with a list recorder."""
     calls: list[SqlCall] = []
 
-    async def fake_reschedule(court_id, start_time, position, match, tournament):  # type: ignore[no-untyped-def]
-        calls.append((court_id, start_time, position, match.id))
+    async def fake_reschedule(court_id, start_time, match, tournament):  # type: ignore[no-untyped-def]
+        calls.append((court_id, start_time, match.id))
 
     monkeypatch.setattr(
         planning_matches,
-        "sql_reschedule_match_and_determine_duration_and_margin",
+        "sql_reschedule_match_and_determine_duration",
         fake_reschedule,
     )
     return calls
@@ -515,8 +512,8 @@ async def test_reorder_respects_cross_level_position_ordering(
     await reorder_all_matches(_tournament(), positions)
 
     assert capture_sql_calls == [
-        (CourtId(1), T0, 0, level_b.id),
-        (CourtId(1), T0 + timedelta(minutes=SLOT), 1, level_a.id),
+        (CourtId(1), T0, level_b.id),
+        (CourtId(1), T0 + timedelta(minutes=SLOT), level_a.id),
     ]
 
 
@@ -534,8 +531,8 @@ async def test_reorder_keeps_same_level_matches_sequential(
     await reorder_all_matches(_tournament(), positions)
 
     assert capture_sql_calls == [
-        (CourtId(1), T0, 0, m1.id),
-        (CourtId(1), T0 + timedelta(minutes=SLOT), 1, m2.id),
+        (CourtId(1), T0, m1.id),
+        (CourtId(1), T0 + timedelta(minutes=SLOT), m2.id),
     ]
 
 
@@ -553,8 +550,8 @@ async def test_reorder_courts_are_independent(
     await reorder_all_matches(_tournament(), positions)
 
     by_court = {call[0]: call for call in capture_sql_calls}
-    assert by_court[CourtId(1)] == (CourtId(1), T0, 0, c1_match.id)
-    assert by_court[CourtId(2)] == (CourtId(2), T0, 0, c2_match.id)
+    assert by_court[CourtId(1)] == (CourtId(1), T0, c1_match.id)
+    assert by_court[CourtId(2)] == (CourtId(2), T0, c2_match.id)
 
 
 async def test_reorder_empty_input_is_noop(capture_sql_calls: list[SqlCall]) -> None:
@@ -575,4 +572,4 @@ async def test_reorder_skips_matches_without_court(
 
     await reorder_all_matches(_tournament(), positions)
 
-    assert capture_sql_calls == [(CourtId(1), T0, 0, with_court.id)]
+    assert capture_sql_calls == [(CourtId(1), T0, with_court.id)]

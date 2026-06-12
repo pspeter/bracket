@@ -278,10 +278,6 @@ export type Match = {
    */
   custom_duration_minutes: number | null;
   /**
-   * Custom Margin Minutes
-   */
-  custom_margin_minutes: number | null;
-  /**
    * Duration Minutes
    */
   duration_minutes: number;
@@ -289,14 +285,6 @@ export type Match = {
    * Id
    */
   id: number;
-  /**
-   * Margin Minutes
-   */
-  margin_minutes: number;
-  /**
-   * Position In Schedule
-   */
-  position_in_schedule: number | null;
   /**
    * Round Id
    */
@@ -364,10 +352,6 @@ export type MatchBody = {
    * Custom Duration Minutes
    */
   custom_duration_minutes: number | null;
-  /**
-   * Custom Margin Minutes
-   */
-  custom_margin_minutes: number | null;
   /**
    * Round Id
    */
@@ -493,10 +477,6 @@ export type MatchWithDetails = {
    */
   custom_duration_minutes: number | null;
   /**
-   * Custom Margin Minutes
-   */
-  custom_margin_minutes: number | null;
-  /**
    * Duration Minutes
    */
   duration_minutes: number;
@@ -508,14 +488,6 @@ export type MatchWithDetails = {
    * Level Id
    */
   level_id: number | null;
-  /**
-   * Margin Minutes
-   */
-  margin_minutes: number;
-  /**
-   * Position In Schedule
-   */
-  position_in_schedule: number | null;
   /**
    * Round Id
    */
@@ -589,10 +561,6 @@ export type MatchWithDetailsDefinitive = {
    */
   custom_duration_minutes: number | null;
   /**
-   * Custom Margin Minutes
-   */
-  custom_margin_minutes: number | null;
-  /**
    * Duration Minutes
    */
   duration_minutes: number;
@@ -604,14 +572,6 @@ export type MatchWithDetailsDefinitive = {
    * Level Id
    */
   level_id: number | null;
-  /**
-   * Margin Minutes
-   */
-  margin_minutes: number;
-  /**
-   * Position In Schedule
-   */
-  position_in_schedule: number | null;
   /**
    * Round Id
    */

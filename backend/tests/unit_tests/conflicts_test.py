@@ -55,10 +55,10 @@ _OVERLAP_CASES: list[tuple[object, int, int, object, int, int, bool]] = [
     (T + timedelta(minutes=5), 10, 0, T, 30, 0, True),
     # Identical intervals
     (T, 15, 0, T, 15, 0, True),
-    # Overlap only within margin window (durations disjoint, margins overlap)
-    (T, 10, 5, T + timedelta(minutes=12), 10, 5, True),
+    # Overlap only within the default break, not the playing interval
+    (T, 10, 5, T + timedelta(minutes=12), 10, 5, False),
     # Symmetric
-    (T + timedelta(minutes=12), 10, 5, T, 10, 5, True),
+    (T + timedelta(minutes=12), 10, 5, T, 10, 5, False),
     # Back-to-back: end1 == start2 — not a conflict (half-open intervals)
     (T, 15, 0, T + timedelta(minutes=15), 10, 0, False),
     # Back-to-back reversed (symmetric)
@@ -115,9 +115,9 @@ def test_get_conflicting_matches_partial_overlap_is_detected() -> None:
 
 def test_get_conflicting_matches_conflicts_to_clear() -> None:
     """
-    Matches separated by more than their combined duration+margin do not conflict.
+    Matches separated by more than their duration do not conflict.
 
-    Each match is 90+15=105 min; a 2-hour (120 min) gap between starts means no overlap.
+    Each match is 90 min; a 2-hour (120 min) gap between starts means no overlap.
     """
     stage = _make_stage(T, T + timedelta(hours=2))
     assert get_conflicting_matches([stage]) == ({}, {-1, -2})
@@ -125,5 +125,5 @@ def test_get_conflicting_matches_conflicts_to_clear() -> None:
 
 def test_get_conflicting_matches_back_to_back_no_conflict() -> None:
     """Back-to-back matches (end1 == start2) must not be flagged."""
-    stage = _make_stage(T, T + timedelta(minutes=105))  # 90+15=105 min
+    stage = _make_stage(T, T + timedelta(minutes=90))
     assert get_conflicting_matches([stage]) == ({}, {-1, -2})

@@ -28,7 +28,7 @@ from bracket.utils.dummy_records import (
     DUMMY_TEAM2,
 )
 from bracket.utils.http import HTTPMethod
-from bracket.utils.types import JsonDict
+from bracket.utils.types import JsonDict, assert_some
 from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
@@ -321,7 +321,7 @@ async def test_update_match_fails_when_stage_has_not_started(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_update_endpoint_custom_duration_margin(
+async def test_update_endpoint_custom_duration(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     async with (
@@ -369,7 +369,6 @@ async def test_update_endpoint_custom_duration_margin(
                     "stage_item_input2_id": stage_item_input2_inserted.id,
                     "court_id": court1_inserted.id,
                     "custom_duration_minutes": 20,
-                    "custom_margin_minutes": 10,
                 }
             )
         ) as match_inserted,
@@ -377,7 +376,6 @@ async def test_update_endpoint_custom_duration_margin(
         body = {
             "round_id": round_inserted.id,
             "custom_duration_minutes": 30,
-            "custom_margin_minutes": 20,
         }
         assert (
             await send_tournament_request(
@@ -395,13 +393,12 @@ async def test_update_endpoint_custom_duration_margin(
             query=matches.select().where(matches.c.id == match_inserted.id),
         )
         assert updated_match.custom_duration_minutes == body["custom_duration_minutes"]
-        assert updated_match.custom_margin_minutes == body["custom_margin_minutes"]
 
         await assert_row_count_and_clear(matches, 1)
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_update_endpoint_custom_duration_margin_unscheduled_match(
+async def test_update_endpoint_custom_duration_unscheduled_match(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     async with (
@@ -446,7 +443,6 @@ async def test_update_endpoint_custom_duration_margin_unscheduled_match(
                     "stage_item_input2_id": stage_item_input2_inserted.id,
                     "court_id": None,
                     "start_time": None,
-                    "position_in_schedule": None,
                 }
             )
         ) as match_inserted,
@@ -454,7 +450,6 @@ async def test_update_endpoint_custom_duration_margin_unscheduled_match(
         body = {
             "round_id": round_inserted.id,
             "custom_duration_minutes": 30,
-            "custom_margin_minutes": 20,
         }
         assert (
             await send_tournament_request(
@@ -472,16 +467,14 @@ async def test_update_endpoint_custom_duration_margin_unscheduled_match(
             query=matches.select().where(matches.c.id == match_inserted.id),
         )
         assert updated_match.custom_duration_minutes == body["custom_duration_minutes"]
-        assert updated_match.custom_margin_minutes == body["custom_margin_minutes"]
         assert updated_match.court_id is None
         assert updated_match.start_time is None
-        assert updated_match.position_in_schedule is None
 
         await assert_row_count_and_clear(matches, 1)
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_update_endpoint_custom_duration_margin_honours_positions_across_courts(
+async def test_update_endpoint_custom_duration_shifts_only_its_court(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tournament = auth_context.tournament
@@ -560,7 +553,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
                     "court_id": court1_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": tournament.start_time,
-                    "position_in_schedule": 0,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -576,7 +568,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
                     "court_id": court1_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": stage1_second_start,
-                    "position_in_schedule": 1,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -592,7 +583,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
                     "court_id": court2_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": tournament.start_time,
-                    "position_in_schedule": 0,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -608,7 +598,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
                     "court_id": court1_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": stage2_start,
-                    "position_in_schedule": 2,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -624,7 +613,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
                     "court_id": court2_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": stage2_start,
-                    "position_in_schedule": 1,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -635,7 +623,6 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
         body = {
             "round_id": stage1_round_inserted.id,
             "custom_duration_minutes": 20,
-            "custom_margin_minutes": 10,
         }
         assert (
             await send_tournament_request(
@@ -660,20 +647,20 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
     ]
     court1_matches = sorted(
         (m for m in all_matches if m.court_id == court1_inserted.id),
-        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
+        key=lambda m: assert_some(m.start_time),
     )
     court2_matches = sorted(
         (m for m in all_matches if m.court_id == court2_inserted.id),
-        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
+        key=lambda m: assert_some(m.start_time),
     )
 
-    # Court 1 keeps its 3 matches in position order; the updated match now
-    # consumes 30 minutes (20 duration + 10 margin) instead of the default 15.
+    # Court 1 keeps its 3 matches in start-time order; the updated match now
+    # occupies 20 minutes, with the tournament default break after it.
     assert len(court1_matches) == 3
     assert court1_matches[0].id == updated_match.id
     assert court1_matches[0].start_time == tournament.start_time
-    assert court1_matches[1].start_time == tournament.start_time + timedelta(minutes=30)
-    assert court1_matches[2].start_time == tournament.start_time + timedelta(minutes=45)
+    assert court1_matches[1].start_time == tournament.start_time + timedelta(minutes=25)
+    assert court1_matches[2].start_time == tournament.start_time + timedelta(minutes=40)
 
     # Court 2 is not touched at all: the re-pack is scoped to the updated match's
     # court, so its matches keep the start times they were inserted with.
@@ -683,7 +670,7 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_update_endpoint_custom_duration_margin_updates_conflicts(
+async def test_update_endpoint_custom_duration_updates_conflicts(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tournament = auth_context.tournament
@@ -734,8 +721,8 @@ async def test_update_endpoint_custom_duration_margin_updates_conflicts(
         inserted_court(
             DUMMY_COURT2.model_copy(update={"tournament_id": tournament.id})
         ) as court2_inserted,
-        # The same two teams play back-to-back on different courts: court 1 at
-        # T+0..T+15, court 2 at T+15..T+30 — adjacent, so no conflict initially.
+        # The same two teams play on different courts with a default break gap:
+        # court 1 at T+0..T+10, court 2 at T+15..T+25, so no conflict initially.
         inserted_match(
             DUMMY_MATCH1.model_copy(
                 update={
@@ -745,7 +732,6 @@ async def test_update_endpoint_custom_duration_margin_updates_conflicts(
                     "court_id": court1_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": tournament.start_time,
-                    "position_in_schedule": 0,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -761,7 +747,6 @@ async def test_update_endpoint_custom_duration_margin_updates_conflicts(
                     "court_id": court2_inserted.id,
                     "state": MatchState.NOT_STARTED,
                     "start_time": court2_match_start,
-                    "position_in_schedule": 0,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 0,
                     "completed_at": None,
@@ -769,13 +754,12 @@ async def test_update_endpoint_custom_duration_margin_updates_conflicts(
             )
         ) as court2_match,
     ):
-        # Growing the first match to 20+10 minutes makes it span T+0..T+30,
+        # Growing the first match to 20 minutes makes it span T+0..T+20,
         # overlapping the other court's match: the persisted conflict flags must
         # be set as part of the update, not left for the next scheduling action.
         body: JsonDict = {
             "round_id": round_inserted.id,
             "custom_duration_minutes": 20,
-            "custom_margin_minutes": 10,
         }
         assert (
             await send_tournament_request(
@@ -787,12 +771,11 @@ async def test_update_endpoint_custom_duration_margin_updates_conflicts(
         assert flags[court1_match.id] == (True, True)
         assert flags[court2_match.id] == (True, True)
 
-        # Reverting to the default duration/margin removes the overlap, which
+        # Reverting to the default duration removes the overlap, which
         # must clear the flags again.
         body = {
             "round_id": round_inserted.id,
             "custom_duration_minutes": None,
-            "custom_margin_minutes": None,
         }
         assert (
             await send_tournament_request(

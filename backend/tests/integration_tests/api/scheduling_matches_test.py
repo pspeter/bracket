@@ -185,8 +185,7 @@ async def test_schedule_distributes_evenly_across_courts_round_robin(
 async def test_schedule_does_not_move_already_scheduled_matches(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Calling schedule_matches twice: the second call must leave already-scheduled matches alone.
-    """
+    """Calling schedule_matches twice: the second call leaves already-scheduled matches alone."""
     tid = auth_context.tournament.id
     async with (
         inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
@@ -219,7 +218,7 @@ async def test_schedule_does_not_move_already_scheduled_matches(
 
         # Record state of every scheduled match
         match_states_before = {
-            match.id: (match.court_id, match.start_time, match.position_in_schedule)
+            match.id: (match.court_id, match.start_time)
             for stage_obj in stages_after_first
             for stage_item in stage_obj.stage_items
             for round_ in stage_item.rounds
@@ -234,7 +233,7 @@ async def test_schedule_does_not_move_already_scheduled_matches(
         await sql_delete_stage_item_with_foreign_keys(si.id)
 
     match_states_after = {
-        match.id: (match.court_id, match.start_time, match.position_in_schedule)
+        match.id: (match.court_id, match.start_time)
         for stage_obj in stages_after_second
         for stage_item in stage_obj.stage_items
         for round_ in stage_item.rounds

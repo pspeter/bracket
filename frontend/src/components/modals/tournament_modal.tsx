@@ -66,7 +66,7 @@ function GeneralTournamentForm({
       duration_minutes: (value) =>
         value != null && value > 0 ? null : t('duration_minutes_choose_title'),
       margin_minutes: (value) =>
-        value != null && value > 0 ? null : t('margin_minutes_choose_title'),
+        value != null && value >= 0 ? null : t('margin_minutes_choose_title'),
     },
   });
 

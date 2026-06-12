@@ -48,7 +48,7 @@ from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
     sql_create_match,
     sql_delete_matches,
-    sql_reschedule_match_and_determine_duration_and_margin,
+    sql_reschedule_match_and_determine_duration,
 )
 from bracket.sql.rounds import (
     get_next_round_name,
@@ -237,9 +237,7 @@ async def add_missing_round_robin_matches(
                     stage_item_input2_winner_from_match_id=None,
                     court_id=None,
                     duration_minutes=tournament.duration_minutes,
-                    margin_minutes=tournament.margin_minutes,
                     custom_duration_minutes=None,
-                    custom_margin_minutes=None,
                 )
             )
             existing_pairs.add(pair)
@@ -558,9 +556,7 @@ async def start_next_round(
                 stage_item_input1_winner_from_match_id=None,
                 stage_item_input2_winner_from_match_id=None,
                 duration_minutes=tournament.duration_minutes,
-                margin_minutes=tournament.margin_minutes,
                 custom_duration_minutes=None,
-                custom_margin_minutes=None,
             ),
         )
 
@@ -575,7 +571,7 @@ async def start_next_round(
 
         # TODO: if safe: await asyncio.gather(*rescheduling_operations)
         for op in rescheduling_operations:
-            await sql_reschedule_match_and_determine_duration_and_margin(*op)
+            await sql_reschedule_match_and_determine_duration(*op)
     except MatchTimingAdjustmentInfeasible as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

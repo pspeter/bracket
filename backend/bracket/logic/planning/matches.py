@@ -19,7 +19,7 @@ from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import StageWithStageItems
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
-    sql_reschedule_match_and_determine_duration_and_margin,
+    sql_reschedule_match_and_determine_duration,
     sql_unschedule_match,
 )
 from bracket.sql.stages import get_full_tournament_details
@@ -180,7 +180,7 @@ def build_schedule_plan(
                     match
                     for round_ in sorted(stage_item.rounds, key=lambda r: r.id)
                     for match in round_.matches
-                    if match.start_time is None and match.position_in_schedule is None
+                    if match.start_time is None
                 ]
                 if matches:
                     all_sis.append((level_id, matches))
@@ -201,10 +201,8 @@ def build_schedule_plan(
             for level_id, match in sequence:
                 start_time = max(current_time, level_stage_start[level_id])
                 operations.append(ScheduleOperation(court_id, start_time, position, match))
-                end_time = start_time + timedelta(
-                    minutes=match.duration_minutes + match.margin_minutes
-                )
-                current_time = end_time
+                end_time = start_time + timedelta(minutes=match.duration_minutes)
+                current_time = end_time + timedelta(minutes=tournament.margin_minutes)
                 position += 1
 
                 if level_id not in level_end_times or end_time > level_end_times[level_id]:
@@ -228,10 +226,9 @@ async def schedule_all_unscheduled_matches(
     courts = await get_all_courts_in_tournament(tournament_id)
 
     for op in build_schedule_plan(stages, courts, tournament):
-        await sql_reschedule_match_and_determine_duration_and_margin(
+        await sql_reschedule_match_and_determine_duration(
             op.court_id,
             op.start_time,
-            op.position,
             op.match,
             tournament,
         )
@@ -247,12 +244,12 @@ async def reorder_all_matches(
     match_positions: list[MatchPosition],
 ) -> None:
     """
-    Recompute start_time and position_in_schedule for all scheduled matches,
-    honouring the user-specified ordering (match_positions[i].position).
+    Recompute start_time for scheduled matches, honouring the user-specified
+    ordering (match_positions[i].position).
 
-    Each court is processed independently: matches are sorted by position and
-    scheduled sequentially with no gaps. Cross-level interleaving is honoured;
-    per-level stage-order violations are surfaced as warnings on the frontend.
+    Each court is processed independently: matches are sorted by transient
+    position and existing gaps are preserved unless a match would overlap the
+    previous occupied interval plus the tournament's default break.
     """
     if not match_positions:
         return
@@ -263,18 +260,20 @@ async def reorder_all_matches(
             court_matches[match_pos.match.court_id].append(match_pos)
 
     for court_id, matches in court_matches.items():
-        current_time = tournament.start_time
-        for position, match_pos in enumerate(sorted(matches, key=lambda mp: mp.position)):
-            await sql_reschedule_match_and_determine_duration_and_margin(
+        previous_end: datetime_utc | None = None
+        for match_pos in sorted(matches, key=lambda mp: mp.position):
+            current_time = match_pos.match.start_time or tournament.start_time
+            if previous_end is not None:
+                earliest_start = previous_end + timedelta(minutes=tournament.margin_minutes)
+                current_time = max(current_time, earliest_start)
+
+            await sql_reschedule_match_and_determine_duration(
                 court_id,
                 current_time,
-                position,
                 match_pos.match,
                 tournament,
             )
-            current_time += timedelta(
-                minutes=match_pos.match.duration_minutes + match_pos.match.margin_minutes
-            )
+            previous_end = current_time + timedelta(minutes=match_pos.match.duration_minutes)
 
 
 async def handle_match_reschedule(
@@ -322,7 +321,9 @@ async def handle_match_reschedule(
         offset = -0.5
         court_matches.append(
             MatchPosition(
-                match=target_match.model_copy(update={"court_id": body.new_court_id}),
+                match=target_match.model_copy(
+                    update={"court_id": body.new_court_id, "start_time": None}
+                ),
                 position=body.new_position + offset,
             )
         )
@@ -359,7 +360,9 @@ async def handle_match_reschedule(
     affected_court_ids = {body.old_court_id, body.new_court_id}
     scheduled_matches = [
         MatchPosition(
-            match=match_pos.match.model_copy(update={"court_id": body.new_court_id}),
+            match=match_pos.match.model_copy(
+                update={"court_id": body.new_court_id, "start_time": None}
+            ),
             position=body.new_position + offset,
         )
         if match_pos.match.id == match_id
@@ -415,7 +418,12 @@ async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None
         def swapped_position(match_pos: MatchPosition) -> MatchPosition:
             other = slot2 if match_pos.match.id == body.match1_id else slot1
             return MatchPosition(
-                match=match_pos.match.model_copy(update={"court_id": other.match.court_id}),
+                match=match_pos.match.model_copy(
+                    update={
+                        "court_id": other.match.court_id,
+                        "start_time": other.match.start_time,
+                    }
+                ),
                 position=other.position,
             )
 
@@ -449,7 +457,12 @@ async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None
 
     court_matches = [
         MatchPosition(
-            match=incoming_match.model_copy(update={"court_id": vacated_slot.match.court_id}),
+            match=incoming_match.model_copy(
+                update={
+                    "court_id": vacated_slot.match.court_id,
+                    "start_time": vacated_slot.match.start_time,
+                }
+            ),
             position=vacated_slot.position,
         )
         if match_pos.match.id == vacated_slot.match.id
@@ -469,13 +482,22 @@ async def update_start_times_of_matches(tournament_id: TournamentId) -> None:
 
 
 def get_scheduled_matches(stages: list[StageWithStageItems]) -> list[MatchPosition]:
+    matches_by_court: dict[CourtId, list[MatchWithDetailsDefinitive | MatchWithDetails]] = (
+        defaultdict(list)
+    )
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            for round_ in stage_item.rounds:
+                for match in round_.matches:
+                    if match.start_time is not None and match.court_id is not None:
+                        matches_by_court[match.court_id].append(match)
+
     return [
-        MatchPosition(match=match, position=float(assert_some(match.position_in_schedule)))
-        for stage in stages
-        for stage_item in stage.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
+        MatchPosition(match=match, position=float(position))
+        for matches in matches_by_court.values()
+        for position, match in enumerate(
+            sorted(matches, key=lambda match: (assert_some(match.start_time), match.id))
+        )
     ]
 
 

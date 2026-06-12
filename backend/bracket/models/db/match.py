@@ -23,10 +23,7 @@ class MatchBaseInsertable(BaseModelORM):
     created: datetime_utc
     start_time: datetime_utc | None = None
     duration_minutes: int
-    margin_minutes: int
     custom_duration_minutes: int | None = None
-    custom_margin_minutes: int | None = None
-    position_in_schedule: int | None = None
     round_id: RoundId
     stage_item_input1_score: int
     stage_item_input2_score: int
@@ -39,7 +36,7 @@ class MatchBaseInsertable(BaseModelORM):
     @property
     def end_time(self) -> datetime_utc:
         assert self.start_time
-        return self.start_time + timedelta(minutes=self.duration_minutes + self.margin_minutes)
+        return self.start_time + timedelta(minutes=self.duration_minutes)
 
 
 class MatchInsertable(MatchBaseInsertable):
@@ -114,7 +111,6 @@ class MatchBody(BaseModelORM):
     stage_item_input2_score: int = 0
     court_id: CourtId | None = None
     custom_duration_minutes: int | None = None
-    custom_margin_minutes: int | None = None
     state: MatchState = MatchState.NOT_STARTED
     completed_at: datetime_utc | None = None
 
@@ -136,9 +132,7 @@ class MatchCreateBodyFrontend(BaseModelORM):
 
 class MatchCreateBody(MatchCreateBodyFrontend):
     duration_minutes: int
-    margin_minutes: int
     custom_duration_minutes: int | None = None
-    custom_margin_minutes: int | None = None
 
 
 class MatchRescheduleBody(BaseModelORM):

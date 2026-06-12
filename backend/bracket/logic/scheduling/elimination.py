@@ -27,9 +27,7 @@ def determine_matches_first_round(
                 stage_item_input2_id=second_input.id,
                 stage_item_input2_winner_from_match_id=None,
                 duration_minutes=tournament.duration_minutes,
-                margin_minutes=tournament.margin_minutes,
                 custom_duration_minutes=None,
-                custom_margin_minutes=None,
             )
         )
 
@@ -56,9 +54,7 @@ def determine_matches_subsequent_round(
                 stage_item_input1_winner_from_match_id=first_match.id,
                 stage_item_input2_winner_from_match_id=second_match.id,
                 duration_minutes=tournament.duration_minutes,
-                margin_minutes=tournament.margin_minutes,
                 custom_duration_minutes=None,
-                custom_margin_minutes=None,
             )
         )
     return suggestions

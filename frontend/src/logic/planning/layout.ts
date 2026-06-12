@@ -1,9 +1,8 @@
 /**
  * Pure, headless layout computation for the time-proportional schedule grid.
  *
- * Mirrors the backend packing rule (`reschedule_matches_in_db`): per court, scheduled
- * matches are sorted by `position_in_schedule` and packed sequentially, gapless, from
- * the tournament start time, each occupying `duration_minutes + margin_minutes`.
+ * Mirrors the backend schedule source of truth: per court, scheduled matches are
+ * sorted by `start_time`, and each card occupies `duration_minutes`.
  * All positions are expressed in minutes from the tournament start; rendering converts
  * minutes to pixels.
  */
@@ -19,8 +18,6 @@ export type LayoutMatchState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export interface LayoutMatch {
   id: number;
   duration_minutes: number;
-  margin_minutes: number;
-  position_in_schedule: number | null;
   start_time: string | null;
   state?: LayoutMatchState | null;
 }
@@ -31,12 +28,12 @@ export interface MatchBlock<M extends LayoutMatch = LayoutMatch> {
   startMinutes: number;
   /** Playing time (the backend already folds custom durations into this). */
   durationMinutes: number;
-  /** Pause after the match, rendered as a gap between this card and the next. */
-  marginMinutes: number;
-  /** `startMinutes + durationMinutes + marginMinutes`. */
+  /** `startMinutes + durationMinutes`. */
   endMinutes: number;
   /** Absolute computed start time. */
   startTime: Date;
+  /** Tournament-level default break, used for insertion affordances. */
+  defaultBreakMinutes: number;
   /**
    * Inside the court's frozen past: at or before the court's last completed or
    * in-progress match. Moving any such match (even an upcoming one scored out
@@ -67,12 +64,14 @@ export interface ScheduleGridLayout<
   /** Height of the grid in minutes: the longest court, rounded up to a whole tick. */
   totalMinutes: number;
   ticks: RulerTick[];
+  defaultBreakMinutes: number;
 }
 
 export interface ScheduleLayoutInput<C extends LayoutCourt, M extends LayoutMatch> {
   courts: C[];
   matchesByCourtId: Record<number, M[]>;
   tournamentStartTime: string | Date;
+  defaultBreakMinutes?: number;
   tickIntervalMinutes?: number;
   minTotalMinutes?: number;
 }
@@ -89,10 +88,9 @@ function isPlayed(match: LayoutMatch): boolean {
 }
 
 /**
- * Tap targets for placing a match on a court: one line half a margin above the
- * first match (mirroring the end-of-court line below the last one), one centered
- * in each margin gap between consecutive matches, and one in the gap after the
- * last match. An empty court gets a single line at the top.
+ * Tap targets for placing a match on a court: one line before the first match, one
+ * centered in each actual gap between consecutive matches, and one after the last
+ * match. An empty court gets a single line at the top.
  *
  * Only the future portion of the court accepts insertions: lines above the last
  * locked (completed/in-progress) match are omitted, so a repack can never shift
@@ -107,13 +105,18 @@ export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
   const lockedCount = blocks.filter((block) => block.locked).length;
 
   const first = blocks[0];
+  const defaultBreakMinutes = first.defaultBreakMinutes;
   const lines: InsertionLine[] = [
-    { index: 0, offsetMinutes: first.startMinutes - first.marginMinutes / 2 },
+    { index: 0, offsetMinutes: Math.max(0, first.startMinutes - defaultBreakMinutes / 2) },
   ];
   for (let i = 1; i <= blocks.length; i += 1) {
     const previous = blocks[i - 1];
-    const gapStart = previous.startMinutes + previous.durationMinutes;
-    lines.push({ index: i, offsetMinutes: (gapStart + previous.endMinutes) / 2 });
+    const next = blocks[i];
+    if (next == null) {
+      lines.push({ index: i, offsetMinutes: previous.endMinutes + defaultBreakMinutes / 2 });
+    } else {
+      lines.push({ index: i, offsetMinutes: (previous.endMinutes + next.startMinutes) / 2 });
+    }
   }
   return lines.filter((line) => line.index >= lockedCount);
 }
@@ -129,6 +132,7 @@ export function computeScheduleLayout<C extends LayoutCourt, M extends LayoutMat
   courts,
   matchesByCourtId,
   tournamentStartTime,
+  defaultBreakMinutes = 0,
   tickIntervalMinutes = DEFAULT_TICK_INTERVAL_MINUTES,
   minTotalMinutes = DEFAULT_MIN_TOTAL_MINUTES,
 }: ScheduleLayoutInput<C, M>): ScheduleGridLayout<C, M> {
@@ -138,33 +142,35 @@ export function computeScheduleLayout<C extends LayoutCourt, M extends LayoutMat
   const courtTimelines = courts.map((c) => {
     const scheduled = (matchesByCourtId[c.id] ?? [])
       .filter((m) => m.start_time != null)
-      .sort((m1, m2) => (m1.position_in_schedule ?? 0) - (m2.position_in_schedule ?? 0));
+      .sort((m1, m2) => new Date(m1.start_time!).getTime() - new Date(m2.start_time!).getTime());
 
     // Everything up to the court's last played match is the frozen past.
     const lockedCount = scheduled.reduce((count, m, index) => (isPlayed(m) ? index + 1 : count), 0);
 
     const blocks: MatchBlock<M>[] = [];
-    let currentMinutes = 0;
     for (const m of scheduled) {
-      const endMinutes = currentMinutes + m.duration_minutes + m.margin_minutes;
+      const matchStartTime = new Date(m.start_time!);
+      const startMinutes = (matchStartTime.getTime() - startTime.getTime()) / 60_000;
+      const endMinutes = startMinutes + m.duration_minutes;
       blocks.push({
         match: m,
-        startMinutes: currentMinutes,
+        startMinutes,
         durationMinutes: m.duration_minutes,
-        marginMinutes: m.margin_minutes,
         endMinutes,
-        startTime: addMinutes(startTime, currentMinutes),
+        startTime: matchStartTime,
+        defaultBreakMinutes,
         locked: blocks.length < lockedCount,
       });
-      currentMinutes = endMinutes;
     }
     return { court: c, blocks };
   });
 
   const maxEndMinutes = Math.max(
     minTotalMinutes,
-    ...courtTimelines.map(
-      (timeline) => timeline.blocks[timeline.blocks.length - 1]?.endMinutes ?? 0
+    ...courtTimelines.map((timeline) =>
+      timeline.blocks.length === 0
+        ? 0
+        : timeline.blocks[timeline.blocks.length - 1].endMinutes + defaultBreakMinutes
     )
   );
   const totalMinutes = Math.ceil(maxEndMinutes / tickIntervalMinutes) * tickIntervalMinutes;
@@ -174,5 +180,5 @@ export function computeScheduleLayout<C extends LayoutCourt, M extends LayoutMat
     ticks.push({ offsetMinutes: offset, time: addMinutes(startTime, offset) });
   }
 
-  return { courts: courtTimelines, totalMinutes, ticks };
+  return { courts: courtTimelines, totalMinutes, ticks, defaultBreakMinutes };
 }

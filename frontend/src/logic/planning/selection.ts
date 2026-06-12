@@ -12,9 +12,9 @@
  * they can never be plainly selected, so the sheet is where the explicit
  * "move anyway" override lives.
  *
- * Positions are `position_in_schedule` values, which the backend keeps contiguous
- * (0..n-1) per court. An insertion line with index `k` on a court means "insert
- * before the match currently at position `k`"; `k === count` means "at the end".
+ * Positions are transient start-time-order indices (0..n-1) per court. An
+ * insertion line with index `k` on a court means "insert before the match
+ * currently at index `k`"; `k === count` means "at the end".
  *
  * `plannerReducer` wraps the selection machine with the semantic zoom level:
  * placement and swapping are only active at agenda/compact zoom, while taps at

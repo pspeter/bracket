@@ -57,9 +57,7 @@ async def build_round_robin_stage_item(
                     stage_item_input2_winner_from_match_id=None,
                     court_id=None,
                     duration_minutes=tournament.duration_minutes,
-                    margin_minutes=tournament.margin_minutes,
                     custom_duration_minutes=None,
-                    custom_margin_minutes=None,
                 )
                 await sql_create_match(match)
 

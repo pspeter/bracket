@@ -156,9 +156,7 @@ matches = Table(
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
     Column("start_time", DateTimeTZ, nullable=True),
     Column("duration_minutes", Integer, nullable=True),
-    Column("margin_minutes", Integer, nullable=True),
     Column("custom_duration_minutes", Integer, nullable=True),
-    Column("custom_margin_minutes", Integer, nullable=True),
     Column("round_id", BigInteger, ForeignKey("rounds.id"), nullable=False),
     Column("stage_item_input1_id", BigInteger, ForeignKey("stage_item_inputs.id"), nullable=True),
     Column("stage_item_input2_id", BigInteger, ForeignKey("stage_item_inputs.id"), nullable=True),
@@ -179,7 +177,6 @@ matches = Table(
     Column("court_id", BigInteger, ForeignKey("courts.id"), nullable=True),
     Column("stage_item_input1_score", Integer, nullable=False),
     Column("stage_item_input2_score", Integer, nullable=False),
-    Column("position_in_schedule", Integer, nullable=True),
     Column(
         "state",
         Enum(

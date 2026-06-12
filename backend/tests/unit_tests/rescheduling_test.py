@@ -56,8 +56,8 @@ def test_rescheduling_swiss() -> None:
     assert get_all_scheduling_operations_for_swiss_round(
         court_ids, [stage], tournament, [match3, match4], None
     ) == [
-        (CourtId(-1), DUMMY_MOCK_TIME + timedelta(minutes=105), 2, match3, tournament),
-        (CourtId(-2), DUMMY_MOCK_TIME + timedelta(minutes=105), 2, match4, tournament),
+        (CourtId(-1), DUMMY_MOCK_TIME + timedelta(minutes=95), match3, tournament),
+        (CourtId(-2), DUMMY_MOCK_TIME + timedelta(minutes=95), match4, tournament),
     ]
 
 
@@ -65,29 +65,15 @@ def test_rescheduling_swiss_with_time_adjustment() -> None:
     """
     Test `get_all_scheduling_operations_for_swiss_round` with `adjust_to_time` parameter
     """
-    tournament, stage, (match1, match2, match3, match4) = _setup_tournament()
+    tournament, stage, (_, _, match3, match4) = _setup_tournament()
     court_ids = [CourtId(-1), CourtId(-2)]
     adjust_to_time = DUMMY_MOCK_TIME + timedelta(minutes=120)
 
     assert get_all_scheduling_operations_for_swiss_round(
         court_ids, [stage], tournament, [match3, match4], adjust_to_time
     ) == [
-        (
-            CourtId(-1),
-            DUMMY_MOCK_TIME,
-            1,
-            match1.model_copy(update={"custom_margin_minutes": 30}),
-            tournament,
-        ),
-        (CourtId(-1), adjust_to_time, 2, match3, tournament),
-        (
-            CourtId(-2),
-            DUMMY_MOCK_TIME,
-            1,
-            match2.model_copy(update={"custom_margin_minutes": 30}),
-            tournament,
-        ),
-        (CourtId(-2), adjust_to_time, 2, match4, tournament),
+        (CourtId(-1), adjust_to_time, match3, tournament),
+        (CourtId(-2), adjust_to_time, match4, tournament),
     ]
 
 
