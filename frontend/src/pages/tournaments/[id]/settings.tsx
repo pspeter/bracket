@@ -184,7 +184,7 @@ function GeneralTournamentForm({
 
   const form = useForm({
     initialValues: {
-      start_time: dayjs(tournament.start_time),
+      start_time: tournament.start_time,
       name: tournament.name,
       club_id: `${tournament.club_id}`,
       dashboard_public: tournament.dashboard_public,
@@ -228,7 +228,7 @@ function GeneralTournamentForm({
           values.dashboard_endpoint,
           values.players_can_be_in_multiple_teams,
           values.auto_assign_courts,
-          values.start_time.toISOString(),
+          dayjs(values.start_time).toISOString(),
           values.duration_minutes,
           values.margin_minutes,
           values.signup_enabled ?? tournament.signup_enabled,
@@ -275,7 +275,7 @@ function GeneralTournamentForm({
               color="indigo"
               leftSection={<IconCalendarTime size="1.1rem" stroke={1.5} />}
               onClick={() => {
-                form.setFieldValue('start_time', dayjs());
+                form.setFieldValue('start_time', dayjs().toISOString());
               }}
             >
               {t('set_to_new_button')}

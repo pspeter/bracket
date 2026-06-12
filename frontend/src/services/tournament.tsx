@@ -1,4 +1,3 @@
-import { Dayjs } from 'dayjs';
 import { createAxios, handleRequestError } from './adapter';
 
 export async function createTournament(
@@ -8,7 +7,7 @@ export async function createTournament(
   dashboard_endpoint: string,
   players_can_be_in_multiple_teams: boolean,
   auto_assign_courts: boolean,
-  start_time: Dayjs,
+  start_time: string,
   duration_minutes: number,
   margin_minutes: number,
   signup_enabled: boolean = false,
