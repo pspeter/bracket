@@ -434,9 +434,11 @@ function StageColumn({
     const shuffled = [...candidates].sort(() => Math.random() - 0.5);
 
     await Promise.all(
-      emptyInputs.slice(0, shuffled.length).map(({ stageItemId, inputId }, i) =>
-        updateStageItemInput(tournament.id, stageItemId, inputId, shuffled[i].team_id, null, null)
-      )
+      emptyInputs
+        .slice(0, shuffled.length)
+        .map(({ stageItemId, inputId }, i) =>
+          updateStageItemInput(tournament.id, stageItemId, inputId, shuffled[i].team_id, null, null)
+        )
     );
 
     await swrStagesResponse.mutate();
@@ -491,10 +493,7 @@ function StageColumn({
             >
               {t('edit_stage_label')}
             </Menu.Item>
-            <Menu.Item
-              leftSection={<IconArrowsShuffle size="1.5rem" />}
-              onClick={autoAssignTeams}
-            >
+            <Menu.Item leftSection={<IconArrowsShuffle size="1.5rem" />} onClick={autoAssignTeams}>
               {t('auto_assign_teams_label')}
             </Menu.Item>
             <Menu.Item
