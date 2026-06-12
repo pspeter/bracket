@@ -327,6 +327,11 @@ async def update_match_by_id(
         ]
         await reorder_all_matches(tournament, court_matches)
 
+        # The match's new footprint and the shifted start times behind it can
+        # create or resolve overlaps with any court, so refresh the persisted
+        # conflict flags like the reschedule/swap/unschedule endpoints do.
+        await handle_conflicts(await get_full_tournament_details(tournament_id))
+
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
 
