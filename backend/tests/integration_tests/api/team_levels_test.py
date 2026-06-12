@@ -33,9 +33,7 @@ async def test_create_team_requires_level_id_when_tournament_has_levels(
         DUMMY_LEVEL1.model_copy(update={"tournament_id": auth_context.tournament.id})
     ):
         body = {"name": "Team A", "active": True, "player_ids": []}
-        response = await send_tournament_request(
-            HTTPMethod.POST, "teams", auth_context, None, body
-        )
+        response = await send_tournament_request(HTTPMethod.POST, "teams", auth_context, None, body)
     assert response == {"detail": "level_id is required when the tournament has levels"}
     await assert_row_count_and_clear(teams, 0)
 
@@ -45,18 +43,14 @@ async def test_create_team_persists_level_id(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tid = auth_context.tournament.id
-    async with inserted_level(
-        DUMMY_LEVEL1.model_copy(update={"tournament_id": tid})
-    ) as level:
+    async with inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tid})) as level:
         body = {
             "name": "Team A",
             "active": True,
             "player_ids": [],
             "level_id": level.id,
         }
-        response = await send_tournament_request(
-            HTTPMethod.POST, "teams", auth_context, None, body
-        )
+        response = await send_tournament_request(HTTPMethod.POST, "teams", auth_context, None, body)
         assert response["data"]["level_id"] == level.id
 
         team = await get_team_by_id(response["data"]["id"], tid)
@@ -74,9 +68,7 @@ async def test_create_team_rejects_level_id_when_no_levels(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     body = {"name": "Team A", "active": True, "player_ids": [], "level_id": 1}
-    response = await send_tournament_request(
-        HTTPMethod.POST, "teams", auth_context, None, body
-    )
+    response = await send_tournament_request(HTTPMethod.POST, "teams", auth_context, None, body)
     assert response == {"detail": "level_id must be null when the tournament has no levels"}
     await assert_row_count_and_clear(teams, 0)
 
@@ -86,9 +78,7 @@ async def test_create_teams_multi_applies_level_id_to_batch(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     tid = auth_context.tournament.id
-    async with inserted_level(
-        DUMMY_LEVEL1.model_copy(update={"tournament_id": tid})
-    ) as level:
+    async with inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tid})) as level:
         body = {
             "names": "Team -1,\nTeam -2,",
             "active": True,
@@ -171,9 +161,7 @@ async def test_update_team_rejects_level_change_when_assigned_to_stage_item(
         response = await send_tournament_request(
             HTTPMethod.PUT, f"teams/{team.id}", auth_context, None, body
         )
-        assert response == {
-            "detail": "Cannot change level: team is assigned to a stage item"
-        }
+        assert response == {"detail": "Cannot change level: team is assigned to a stage item"}
 
         refreshed = await get_team_by_id(team.id, tid)
         assert refreshed is not None

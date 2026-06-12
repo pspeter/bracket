@@ -112,6 +112,10 @@ disallow_any_generics = false
 module = ['fastapi_sso.*']
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ['asyncpg.*']
+ignore_missing_imports = true
+
 [tool.pylint.'MESSAGES CONTROL']
 disable = [
     'broad-except',

@@ -277,7 +277,7 @@ async def create_multiple_teams(
     check_requirement(existing_players, user, "max_players", additions=len(all_players))
 
     tournament = await sql_get_tournament(tournament_id)
-    for _, player_names in teams_and_players:
+    for _team_name, player_names in teams_and_players:
         if len(player_names) > tournament.max_team_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

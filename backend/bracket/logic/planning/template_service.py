@@ -3,6 +3,7 @@ from bracket.logic.planning.template import Blueprint, BlueprintInput
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
+    StageItemInputCreateBody,
     StageItemInputCreateBodyEmpty,
     StageItemInputCreateBodyTentative,
 )
@@ -16,8 +17,8 @@ from bracket.utils.id_types import LevelId, StageItemId, TournamentId
 def build_stage_item_inputs(
     inputs: list[BlueprintInput],
     stage_item_ids_by_name: dict[str, StageItemId],
-) -> list[StageItemInputCreateBodyEmpty | StageItemInputCreateBodyTentative]:
-    created_inputs: list[StageItemInputCreateBodyEmpty | StageItemInputCreateBodyTentative] = []
+) -> list[StageItemInputCreateBody]:
+    created_inputs: list[StageItemInputCreateBody] = []
 
     for input_ in inputs:
         if input_.winner_from is None:
@@ -45,9 +46,7 @@ async def replace_stages_from_template(
     level_id: LevelId | None = None,
 ) -> list[StageWithStageItems]:
     existing_stages = [
-        s
-        for s in await get_full_tournament_details(tournament_id)
-        if s.level_id == level_id
+        s for s in await get_full_tournament_details(tournament_id) if s.level_id == level_id
     ]
 
     async with database.transaction():
@@ -77,15 +76,15 @@ async def replace_stages_from_template(
 
         stage_item_ids_by_name: dict[str, StageItemId] = {}
         for blueprint_stage in blueprint.stages:
-            stage = await sql_create_stage(
+            new_stage = await sql_create_stage(
                 tournament_id, blueprint_stage.name, level_id=level_id
             )
 
             for blueprint_stage_item in blueprint_stage.items:
-                stage_item = await sql_create_stage_item_with_inputs(
+                new_stage_item = await sql_create_stage_item_with_inputs(
                     tournament_id,
                     StageItemWithInputsCreate(
-                        stage_id=stage.id,
+                        stage_id=new_stage.id,
                         name=blueprint_stage_item.name,
                         type=blueprint_stage_item.type,
                         team_count=blueprint_stage_item.team_count,
@@ -95,7 +94,7 @@ async def replace_stages_from_template(
                         ),
                     ),
                 )
-                stage_item_ids_by_name[blueprint_stage_item.name] = stage_item.id
-                await build_matches_for_stage_item(stage_item, tournament_id)
+                stage_item_ids_by_name[blueprint_stage_item.name] = new_stage_item.id
+                await build_matches_for_stage_item(new_stage_item, tournament_id)
 
     return await get_full_tournament_details(tournament_id)

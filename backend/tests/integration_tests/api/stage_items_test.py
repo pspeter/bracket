@@ -16,6 +16,7 @@ from bracket.utils.dummy_records import (
     DUMMY_TEAM3,
 )
 from bracket.utils.http import HTTPMethod
+from bracket.utils.id_types import StageItemId
 from tests.integration_tests.api.shared import (
     SUCCESS_RESPONSE,
     send_tournament_request,
@@ -31,7 +32,7 @@ from tests.integration_tests.sql import (
 
 async def create_stage_item_via_api(
     auth_context: AuthContext, stage_id: int, stage_type: StageType, team_count: int
-) -> int:
+) -> StageItemId:
     assert (
         await send_tournament_request(
             HTTPMethod.POST,

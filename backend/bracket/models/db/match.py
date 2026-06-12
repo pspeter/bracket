@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 from enum import auto
+from typing import cast
 
 from heliclockter import datetime_utc, timedelta
 from pydantic import BaseModel, field_validator
@@ -76,7 +77,7 @@ class MatchWithDetails(Match):
     @staticmethod
     def parse_nested_json(value: str | dict[str, object] | None) -> str | dict[str, object] | None:
         if isinstance(value, str):
-            return json.loads(value)
+            return cast("str | dict[str, object]", json.loads(value))
         return value
 
 
