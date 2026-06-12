@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from enum import auto
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg
 from fastapi import HTTPException
 from starlette import status
 
@@ -32,12 +32,8 @@ class ForeignKey(EnumAutoStr):
 
 
 unique_index_violation_error_lookup = {
-    UniqueIndex.ix_stages_one_active_no_level: (
-        "Only one stage can be active per tournament"
-    ),
-    UniqueIndex.ix_stages_one_active_per_level: (
-        "Only one stage can be active per level"
-    ),
+    UniqueIndex.ix_stages_one_active_no_level: ("Only one stage can be active per tournament"),
+    UniqueIndex.ix_stages_one_active_per_level: ("Only one stage can be active per level"),
     UniqueIndex.ix_tournaments_dashboard_endpoint: "This dashboard link is already taken",
     UniqueIndex.ix_users_email: "This email is already taken",
     UniqueIndex.stage_item_inputs_stage_item_id_team_id_key: (

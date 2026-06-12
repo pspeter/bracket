@@ -84,5 +84,5 @@ class TournamentBody(TournamentUpdateBody):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_levels(cls, data: dict) -> dict:  # type: ignore[override, type-arg]
+    def reject_levels(cls, data: dict) -> dict:  # type: ignore[type-arg]
         return data

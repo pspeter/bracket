@@ -53,6 +53,7 @@ DUMMY_TOURNAMENT = TournamentInsertable(
     auto_assign_courts=True,
     duration_minutes=10,
     margin_minutes=5,
+    max_team_size=4,
 )
 
 DUMMY_LEVEL1 = LevelInsertable(

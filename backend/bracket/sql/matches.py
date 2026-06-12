@@ -126,7 +126,7 @@ async def sql_update_match(match_id: MatchId, match: MatchBody, tournament: Tour
             "state": match.state.value,
             "completed_at": (
                 datetime.fromisoformat(match.completed_at.isoformat())
-                if getattr(match, "completed_at", None) is not None
+                if match.completed_at is not None
                 else None
             ),
         },

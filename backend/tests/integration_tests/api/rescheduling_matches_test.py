@@ -531,11 +531,11 @@ async def test_reschedule_match_honours_positions_across_courts(
     ]
     court1_matches = sorted(
         (m for m in all_matches if m.court_id == court1_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
     court2_matches = sorted(
         (m for m in all_matches if m.court_id == court2_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
 
     # Court 1 now holds all 3 stage-1 matches plus the stage-2 match in position order
@@ -1325,11 +1325,11 @@ async def test_unschedule_match_reorders_remaining_positions(
     ]
     court1_matches = sorted(
         (m for m in all_matches if m.court_id == court1_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
     court2_matches = sorted(
         (m for m in all_matches if m.court_id == court2_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
 
     # The unscheduled match is gone from any court

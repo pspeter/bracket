@@ -6,6 +6,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
+from bracket.models.db.util import StageWithStageItems
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
@@ -126,8 +127,8 @@ async def test_schedule_all_matches(
         assert len(round_.matches) == 2
 
 
-def _count_matches_per_court(stages: list) -> dict:
-    counts: dict = {}
+def _count_matches_per_court(stages: list[StageWithStageItems]) -> dict[object, int]:
+    counts: dict[object, int] = {}
     for stage in stages:
         for stage_item in stage.stage_items:
             for round_ in stage_item.rounds:
@@ -184,7 +185,8 @@ async def test_schedule_distributes_evenly_across_courts_round_robin(
 async def test_schedule_does_not_move_already_scheduled_matches(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Calling schedule_matches twice: the second call must leave already-scheduled matches alone."""
+    """Calling schedule_matches twice: the second call must leave already-scheduled matches alone.
+    """
     tid = auth_context.tournament.id
     async with (
         inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),

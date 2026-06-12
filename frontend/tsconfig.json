@@ -1,11 +1,10 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
     "paths": {
-      "@*": ["*"],
-      "@components/*": ["components/*"],
-      "@pages/*": ["pages/*"],
-      "@openapi/*": ["openapi/*"],
+      "@*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@openapi/*": ["./src/openapi/*"],
     },
     "target": "es6",
     "allowJs": true,

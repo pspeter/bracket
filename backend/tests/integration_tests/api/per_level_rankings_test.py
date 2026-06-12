@@ -18,9 +18,7 @@ from tests.integration_tests.api.shared import (
 from tests.integration_tests.models import AuthContext
 
 
-def _create_body(
-    endpoint: str, club_id: int, levels: list[str] | None = None
-) -> dict[str, object]:
+def _create_body(endpoint: str, club_id: int, levels: list[str] | None = None) -> dict[str, object]:
     body: dict[str, object] = {
         "name": "Per-Level Rankings Tournament",
         "start_time": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, cast
 
 from heliclockter import datetime_utc
 
@@ -42,7 +42,7 @@ class StageTemplateCreateBody(BaseModelORM):
 
     def to_template_config(self) -> TemplateConfig:
         return TemplateConfig(
-            groups=self.groups,
+            groups=cast("Literal[2, 4]", self.groups),
             total_teams=self.total_teams,
             until_rank=self.until_rank,
             include_semi_final=self.include_semi_final,

@@ -99,7 +99,10 @@ def test_4_groups_until_rank_4() -> None:
 def test_4_groups_until_rank_6() -> None:
     bp = build_template_blueprint(make_config(groups=4, until_rank=6))
     assert item_names_in(bp, "Semi-finals") == [
-        "Semi-final A", "Semi-final B", "5th-8th Semi A", "5th-8th Semi B",
+        "Semi-final A",
+        "Semi-final B",
+        "5th-8th Semi A",
+        "5th-8th Semi B",
     ]
     assert item_names_in(bp, "Finals") == ["Final", "3rd Place", "5th Place"]
 
@@ -118,7 +121,10 @@ def test_4_groups_until_rank_6() -> None:
 def test_4_groups_until_rank_8() -> None:
     bp = build_template_blueprint(make_config(groups=4, until_rank=8))
     assert item_names_in(bp, "Semi-finals") == [
-        "Semi-final A", "Semi-final B", "5th-8th Semi A", "5th-8th Semi B",
+        "Semi-final A",
+        "Semi-final B",
+        "5th-8th Semi A",
+        "5th-8th Semi B",
     ]
     assert item_names_in(bp, "Finals") == ["Final", "3rd Place", "5th Place", "7th Place"]
 
@@ -228,13 +234,17 @@ def test_2_groups_sf_all_resolves_to_2x_teams_per_group() -> None:
 
 def test_2_groups_sf_4_teams_raises() -> None:
     with pytest.raises(ValueError, match="teams per group must be at least 3"):
-        build_template_blueprint(make_config(groups=2, total_teams=4, include_semi_final=True, until_rank=2))
+        build_template_blueprint(
+            make_config(groups=2, total_teams=4, include_semi_final=True, until_rank=2)
+        )
 
 
 def test_2_groups_sf_rank_exceeds_team_count_raises() -> None:
     # 6 teams, 2 groups → 3 per group → max rank 6; until_rank=8 should fail
     with pytest.raises(ValueError, match="until_rank.*exceeds maximum"):
-        build_template_blueprint(make_config(groups=2, total_teams=6, include_semi_final=True, until_rank=8))
+        build_template_blueprint(
+            make_config(groups=2, total_teams=6, include_semi_final=True, until_rank=8)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +307,11 @@ def test_2_groups_nosf_all_resolves_to_teams_per_group_times_2() -> None:
 def test_2_groups_nosf_swiss_group_stage() -> None:
     bp = build_template_blueprint(
         make_config(
-            groups=2, total_teams=12, include_semi_final=False,
-            until_rank=2, group_stage_type=StageType.SWISS,
+            groups=2,
+            total_teams=12,
+            include_semi_final=False,
+            until_rank=2,
+            group_stage_type=StageType.SWISS,
         )
     )
     assert all(item.type == StageType.SWISS for item in items_in(bp, "Group Phase"))
@@ -311,7 +324,9 @@ def test_2_groups_nosf_swiss_group_stage() -> None:
 
 def test_uneven_2_groups_group_sizes() -> None:
     # 7 teams, 2 groups → Group A: 4 slots, Group B: 3 slots
-    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=False, until_rank=2))
+    bp = build_template_blueprint(
+        make_config(groups=2, total_teams=7, include_semi_final=False, until_rank=2)
+    )
     group_a, group_b = items_in(bp, "Group Phase")
     assert group_a.team_count == 4
     assert len(group_a.inputs) == 4
@@ -329,7 +344,9 @@ def test_uneven_4_groups_group_sizes() -> None:
 
 def test_uneven_groups_knockout_uses_min_team_count() -> None:
     # 7 teams, 2 groups → floor=3, max_rank=6; knockout references only positions 1–3
-    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=False, until_rank="all"))
+    bp = build_template_blueprint(
+        make_config(groups=2, total_teams=7, include_semi_final=False, until_rank="all")
+    )
     ko_items = items_in(bp, "Finals")
     assert len(ko_items) == 3  # Final, 3rd, 5th — not 4th rank (position 4 doesn't advance)
     assert ko_items[-1].inputs == [
@@ -340,7 +357,9 @@ def test_uneven_groups_knockout_uses_min_team_count() -> None:
 
 def test_uneven_2_groups_sf_valid() -> None:
     # 7 teams, 2 groups with SF → floor=3 ≥ min 3, should not raise
-    bp = build_template_blueprint(make_config(groups=2, total_teams=7, include_semi_final=True, until_rank=2))
+    bp = build_template_blueprint(
+        make_config(groups=2, total_teams=7, include_semi_final=True, until_rank=2)
+    )
     assert stage_names(bp) == ["Group Phase", "Semi-finals", "Finals"]
     group_a, group_b = items_in(bp, "Group Phase")
     assert group_a.team_count == 4
@@ -379,6 +398,8 @@ def test_one_team_per_group_raises() -> None:
 
 def test_4_groups_ignores_include_semi_final_false() -> None:
     bp_true = build_template_blueprint(make_config(groups=4, include_semi_final=True, until_rank=4))
-    bp_false = build_template_blueprint(make_config(groups=4, include_semi_final=False, until_rank=4))
+    bp_false = build_template_blueprint(
+        make_config(groups=4, include_semi_final=False, until_rank=4)
+    )
     assert stage_names(bp_true) == stage_names(bp_false)
     assert item_names_in(bp_true, "Semi-finals") == item_names_in(bp_false, "Semi-finals")

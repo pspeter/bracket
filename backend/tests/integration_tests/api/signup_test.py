@@ -26,12 +26,12 @@ async def test_signup_none_team_action_without_levels_creates_player_with_no_lev
         players_response: JsonDict = await send_tournament_request(
             HTTPMethod.GET, "players", auth_context
         )
-        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+        await database.execute(
+            query=players.delete().where(players.c.tournament_id == tournament_id)
+        )
 
     assert response == {"success": True}
-    player = next(
-        p for p in players_response["data"]["players"] if p["name"] == "Teamless Player"
-    )
+    player = next(p for p in players_response["data"]["players"] if p["name"] == "Teamless Player")
     assert player["level_id"] is None
 
 
@@ -74,11 +74,11 @@ async def test_signup_none_team_action_with_level_id_sets_player_level(
         players_response: JsonDict = await send_tournament_request(
             HTTPMethod.GET, "players", auth_context
         )
-        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+        await database.execute(
+            query=players.delete().where(players.c.tournament_id == tournament_id)
+        )
 
-    player = next(
-        p for p in players_response["data"]["players"] if p["name"] == "Leveled Teamless"
-    )
+    player = next(p for p in players_response["data"]["players"] if p["name"] == "Leveled Teamless")
     assert player["level_id"] == level.id
 
 
@@ -107,7 +107,9 @@ async def test_signup_create_team_copies_level_to_player(
             HTTPMethod.GET, "players", auth_context
         )
         await database.execute(query=teams.delete().where(teams.c.tournament_id == tournament_id))
-        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+        await database.execute(
+            query=players.delete().where(players.c.tournament_id == tournament_id)
+        )
 
     player = next(p for p in players_response["data"]["players"] if p["name"] == "Team Creator")
     assert player["level_id"] == level.id
@@ -135,7 +137,9 @@ async def test_signup_join_team_copies_level_to_player(
         players_response: JsonDict = await send_tournament_request(
             HTTPMethod.GET, "players", auth_context
         )
-        await database.execute(query=players.delete().where(players.c.tournament_id == tournament_id))
+        await database.execute(
+            query=players.delete().where(players.c.tournament_id == tournament_id)
+        )
 
     player = next(p for p in players_response["data"]["players"] if p["name"] == "Team Joiner")
     assert player["level_id"] == level.id

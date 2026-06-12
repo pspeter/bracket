@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from bracket.database import database
@@ -171,7 +173,7 @@ async def test_create_stages_from_template(
     semi_final_b_id = semis_stage_items["Semi-final B"]["id"]
 
     def relevant_inputs(
-        items: dict[str, dict], stage_item_name: str
+        items: dict[str, dict[str, Any]], stage_item_name: str
     ) -> list[tuple[int, int, int | None]]:
         return sorted(
             (

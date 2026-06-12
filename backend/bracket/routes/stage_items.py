@@ -72,7 +72,7 @@ from bracket.utils.errors import (
     ForeignKey,
     check_foreign_key_violation,
 )
-from bracket.utils.id_types import StageItemId, TournamentId
+from bracket.utils.id_types import MatchId, StageItemId, StageItemInputId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -86,7 +86,7 @@ def format_slots(slots: Iterable[int]) -> str:
 
 
 async def update_stage_item_input_slots(
-    stage_item_id: StageItemId, input_ids_in_slot_order: list[int]
+    stage_item_id: StageItemId, input_ids_in_slot_order: list[StageItemInputId]
 ) -> None:
     for index, stage_item_input_id in enumerate(input_ids_in_slot_order, start=1):
         await database.execute(
@@ -142,9 +142,9 @@ async def update_stage_item_row(
 
 
 def get_removed_match_ids_and_blocking_slots(
-    stage_item: StageItemWithRounds, removable_input_ids: set[int]
-) -> tuple[list[int], set[int]]:
-    removable_match_ids: list[int] = []
+    stage_item: StageItemWithRounds, removable_input_ids: set[StageItemInputId]
+) -> tuple[list[MatchId], set[int]]:
+    removable_match_ids: list[MatchId] = []
     blocking_slots: set[int] = set()
     slot_by_input_id = {
         input_.id: input_.slot for input_ in stage_item.inputs if input_.id is not None

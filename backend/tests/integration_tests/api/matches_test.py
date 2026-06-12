@@ -659,11 +659,11 @@ async def test_update_endpoint_custom_duration_margin_honours_positions_across_c
     ]
     court1_matches = sorted(
         (m for m in all_matches if m.court_id == court1_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
     court2_matches = sorted(
         (m for m in all_matches if m.court_id == court2_inserted.id),
-        key=lambda m: m.position_in_schedule,
+        key=lambda m: m.position_in_schedule if m.position_in_schedule is not None else -1,
     )
 
     # Court 1 keeps its 3 matches in position order; the updated match now

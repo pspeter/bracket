@@ -46,7 +46,10 @@ def _group_names(groups: int) -> list[str]:
 
 
 def _empty_inputs(team_count: int) -> list[BlueprintInput]:
-    return [BlueprintInput(slot=i + 1, winner_from=None, winner_position=None) for i in range(team_count)]
+    return [
+        BlueprintInput(slot=i + 1, winner_from=None, winner_position=None)
+        for i in range(team_count)
+    ]
 
 
 def _t(slot: int, winner_from: str, winner_position: int) -> BlueprintInput:
@@ -78,7 +81,8 @@ def _validate(config: TemplateConfig) -> None:
             raise ValueError("until_rank must be even")
         if config.until_rank > _max_rank(config):
             raise ValueError(
-                f"until_rank {config.until_rank} exceeds maximum {_max_rank(config)} for this config"
+                f"until_rank {config.until_rank} exceeds maximum "
+                f"{_max_rank(config)} for this config"
             )
 
 
@@ -92,12 +96,14 @@ def _build_group_stage(config: TemplateConfig) -> BlueprintStage:
     items = []
     for i, name in enumerate(_group_names(config.groups)):
         team_count = base + (1 if i < remainder else 0)
-        items.append(BlueprintStageItem(
-            name=name,
-            type=config.group_stage_type,
-            team_count=team_count,
-            inputs=_empty_inputs(team_count),
-        ))
+        items.append(
+            BlueprintStageItem(
+                name=name,
+                type=config.group_stage_type,
+                team_count=team_count,
+                inputs=_empty_inputs(team_count),
+            )
+        )
     return BlueprintStage(name="Group Phase", items=items)
 
 
@@ -138,10 +144,14 @@ def _build_4group_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintStag
             _item("7th Place", [_t(1, "5th-8th Semi A", 2), _t(2, "5th-8th Semi B", 2)])
         )
 
-    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
+    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(
+        name="Finals", items=finals_items
+    )
 
 
-def _build_2group_sf_stages(until_rank: int, teams_per_group: int) -> tuple[BlueprintStage, BlueprintStage]:
+def _build_2group_sf_stages(
+    until_rank: int, teams_per_group: int
+) -> tuple[BlueprintStage, BlueprintStage]:
     # Semi-finals stage: only the two main cross-seeded semis, always
     semis_items = [
         _item("Semi-final A", [_t(1, "Group A", 1), _t(2, "Group B", 2)]),
@@ -166,7 +176,9 @@ def _build_2group_sf_stages(until_rank: int, teams_per_group: int) -> tuple[Blue
         name = place_names[i] if i < len(place_names) else f"{rank - 1}th Place"
         finals_items.append(_item(name, [_t(1, "Group A", position), _t(2, "Group B", position)]))
 
-    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
+    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(
+        name="Finals", items=finals_items
+    )
 
 
 def _build_2group_nosf_finals(until_rank: int, teams_per_group: int) -> BlueprintStage:
@@ -190,7 +202,9 @@ def build_template_blueprint(config: TemplateConfig) -> Blueprint:
         if config.groups == 4:
             semis_stage, finals_stage = _build_4group_stages(until_rank)
         else:
-            semis_stage, finals_stage = _build_2group_sf_stages(until_rank, config.total_teams // config.groups)
+            semis_stage, finals_stage = _build_2group_sf_stages(
+                until_rank, config.total_teams // config.groups
+            )
         return Blueprint(stages=[group_stage, semis_stage, finals_stage])
 
     teams_per_group = config.total_teams // config.groups

@@ -90,6 +90,7 @@ async def setup_demo_account(user_id: UserId) -> None:
         max_team_size=4,
         signup_team_choice_enabled=True,
         score_tracking_enabled=False,
+        rules=None,
     )
     tournament_id = await sql_create_tournament(tournament)
 

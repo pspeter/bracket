@@ -14,6 +14,7 @@ from bracket.logic.subscriptions import check_requirement
 from bracket.logic.tournaments import get_tournament_logo_path
 from bracket.models.db.ranking import RankingCreateBody
 from bracket.models.db.tournament import (
+    LevelResponse,
     Tournament,
     TournamentBody,
     TournamentChangeStatusBody,
@@ -64,7 +65,13 @@ router = APIRouter(prefix=config.api_prefix)
 
 async def _tournament_with_levels(tournament: Tournament) -> TournamentWithLevels:
     levels = await sql_get_levels_for_tournament(tournament.id)
-    return TournamentWithLevels(**tournament.model_dump(), levels=levels)
+    return TournamentWithLevels(
+        **tournament.model_dump(),
+        levels=[
+            LevelResponse(id=level.id, name=level.name, position=level.position)
+            for level in levels
+        ],
+    )
 
 
 unauthorized_exception = HTTPException(
