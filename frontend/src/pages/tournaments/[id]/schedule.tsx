@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import CourtModal from '@components/modals/create_court_modal';
+import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
@@ -34,6 +35,8 @@ import {
 import { rescheduleMatch, scheduleMatches, swapMatches, unscheduleMatch } from '@services/match';
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
+import MatchActionSheet from '@components/scheduling/match_action_sheet';
+import MatchTimingModal, { TimingField } from '@components/scheduling/match_timing_modal';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
@@ -45,6 +48,12 @@ export default function SchedulePage() {
   );
   const [trayOpened, setTrayOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
+  // Modal opened from the action sheet; holds the match id (not the match) so a
+  // background revalidation refreshes the modal's data instead of detaching it.
+  const [matchDialog, setMatchDialog] = useState<{
+    kind: 'details' | TimingField;
+    matchId: number;
+  } | null>(null);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -171,6 +180,10 @@ export default function SchedulePage() {
         ? planner.selection.matchId
         : null;
   const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
+  const sheetMatchRef =
+    planner.selection.kind === 'action-sheet-open' ? planner.selection.match : null;
+  const dialogMatch =
+    matchDialog != null ? (matchesLookup[matchDialog.matchId]?.match ?? null) : null;
   const isOverview = planner.zoom === 'overview';
   const conflictPreview = isOverview
     ? { insertionLines: new Set<string>(), swapTargets: new Set<number>() }
@@ -262,6 +275,57 @@ export default function SchedulePage() {
               onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
             />
+            <MatchActionSheet
+              opened={sheetMatchRef != null}
+              match={
+                sheetMatchRef != null ? (matchesLookup[sheetMatchRef.matchId]?.match ?? null) : null
+              }
+              locked={sheetMatchRef?.locked ?? false}
+              stageItemsLookup={stageItemsLookup}
+              matchesLookup={matchesLookup}
+              onDismiss={() => handlePlannerEvent({ type: 'dismiss-action-sheet' })}
+              onOpenDetails={() => {
+                if (sheetMatchRef != null) {
+                  setMatchDialog({ kind: 'details', matchId: sheetMatchRef.matchId });
+                }
+                handlePlannerEvent({ type: 'dismiss-action-sheet' });
+              }}
+              onEditDuration={() => {
+                if (sheetMatchRef != null) {
+                  setMatchDialog({ kind: 'duration', matchId: sheetMatchRef.matchId });
+                }
+                handlePlannerEvent({ type: 'dismiss-action-sheet' });
+              }}
+              onEditMargin={() => {
+                if (sheetMatchRef != null) {
+                  setMatchDialog({ kind: 'margin', matchId: sheetMatchRef.matchId });
+                }
+                handlePlannerEvent({ type: 'dismiss-action-sheet' });
+              }}
+              onUnschedule={() => handlePlannerEvent({ type: 'unschedule' })}
+              onMoveAnyway={() => handlePlannerEvent({ type: 'move-anyway' })}
+            />
+            <MatchModal
+              tournamentData={tournamentData}
+              match={matchDialog?.kind === 'details' ? dialogMatch : null}
+              swrStagesResponse={swrStagesResponse}
+              swrUpcomingMatchesResponse={null}
+              opened={matchDialog?.kind === 'details' && dialogMatch != null}
+              setOpened={(value: boolean) => {
+                if (!value) setMatchDialog(null);
+              }}
+              round={null}
+            />
+            <MatchTimingModal
+              tournamentId={tournamentData.id}
+              match={matchDialog != null && matchDialog.kind !== 'details' ? dialogMatch : null}
+              field={matchDialog?.kind === 'margin' ? 'margin' : 'duration'}
+              opened={matchDialog != null && matchDialog.kind !== 'details' && dialogMatch != null}
+              onClose={() => setMatchDialog(null)}
+              onSaved={async () => {
+                await swrStagesResponse.mutate();
+              }}
+            />
             <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
               <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
             </Affix>
@@ -290,16 +354,19 @@ export default function SchedulePage() {
                       {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
                     </Text>
                   </Box>
-                  {planner.selection.kind === 'match-selected' && (
-                    <Button
-                      size="compact-sm"
-                      variant="light"
-                      color="orange"
-                      onClick={() => handlePlannerEvent({ type: 'unschedule' })}
-                    >
-                      {t('unschedule_button')}
-                    </Button>
-                  )}
+                  {planner.selection.kind === 'match-selected' &&
+                    // Played matches can't be unscheduled (the backend rejects
+                    // it), so a move-anyway selection only offers placement.
+                    selectedEntry.match.state === 'NOT_STARTED' && (
+                      <Button
+                        size="compact-sm"
+                        variant="light"
+                        color="orange"
+                        onClick={() => handlePlannerEvent({ type: 'unschedule' })}
+                      >
+                        {t('unschedule_button')}
+                      </Button>
+                    )}
                   <Button
                     size="compact-sm"
                     variant="light"
