@@ -47,14 +47,19 @@ const GRID_TOP_INSET_PX = 32;
  * among all courts, capped so few courts don't stretch wider than agenda.
  */
 function courtColumnWidth(zoom: ZoomLevel, courtCount: number): string {
+  // All courts share the available width, capped at the agenda width — so with
+  // few courts, overview occupies the same footprint as agenda instead of
+  // stretching, and compact widens up to that same footprint (the max() below)
+  // instead of staying narrower.
+  const evenShare = `min(calc((100cqw - ${RULER_WIDTH} - 4px) / ${Math.max(courtCount, 1)} - 1px), 20rem)`;
   switch (zoom) {
     case 'agenda':
       return `min(calc(100cqw - ${RULER_WIDTH} - 4px), 20rem)`;
     case 'compact':
-      return 'clamp(5.5rem, 27cqw, 9rem)';
+      return `max(clamp(5.5rem, 27cqw, 9rem), ${evenShare})`;
     case 'overview':
     default:
-      return `min(calc((100cqw - ${RULER_WIDTH} - 4px) / ${Math.max(courtCount, 1)} - 1px), 20rem)`;
+      return evenShare;
   }
 }
 
