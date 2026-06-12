@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { LayoutCourt, LayoutMatch, computeInsertionLines, computeScheduleLayout } from './layout';
+import {
+  LayoutCourt,
+  LayoutMatch,
+  LayoutMatchState,
+  computeInsertionLines,
+  computeScheduleLayout,
+} from './layout';
 
 const TOURNAMENT_START = '2026-06-10T09:00:00Z';
 
@@ -22,6 +28,16 @@ function match(
     margin_minutes: marginMinutes,
     start_time: startTime,
   };
+}
+
+function playedMatch(
+  id: number,
+  position: number,
+  state: LayoutMatchState = 'COMPLETED',
+  durationMinutes = 15,
+  marginMinutes = 5
+): LayoutMatch {
+  return { ...match(id, position, durationMinutes, marginMinutes), state };
 }
 
 describe('computeScheduleLayout', () => {
@@ -189,5 +205,112 @@ describe('computeInsertionLines', () => {
       { index: 1, offsetMinutes: 20 },
       { index: 2, offsetMinutes: 40 },
     ]);
+  });
+});
+
+describe('locked blocks for played matches', () => {
+  function blocksFor(matches: LayoutMatch[]) {
+    return computeScheduleLayout({
+      courts: [court(1)],
+      matchesByCourtId: { 1: matches },
+      tournamentStartTime: TOURNAMENT_START,
+    }).courts[0].blocks;
+  }
+
+  it('locks nothing on a court with only upcoming matches', () => {
+    const blocks = blocksFor([match(10, 0), match(11, 1)]);
+
+    expect(blocks.map((b) => b.locked)).toEqual([false, false]);
+  });
+
+  it('locks completed and in-progress matches', () => {
+    const blocks = blocksFor([
+      playedMatch(10, 0, 'COMPLETED'),
+      playedMatch(11, 1, 'IN_PROGRESS'),
+      match(12, 2),
+    ]);
+
+    expect(blocks.map((b) => b.locked)).toEqual([true, true, false]);
+  });
+
+  it('treats matches without a state as upcoming', () => {
+    const blocks = blocksFor([match(10, 0), { ...match(11, 1), state: 'NOT_STARTED' }]);
+
+    expect(blocks.map((b) => b.locked)).toEqual([false, false]);
+  });
+
+  it('locks an upcoming match sitting above a played one, freezing the whole past', () => {
+    // Moving the sandwiched upcoming match would shift the recorded start time
+    // of the completed match below it, so it is part of the frozen past.
+    const blocks = blocksFor([match(10, 0), playedMatch(11, 1, 'COMPLETED'), match(12, 2)]);
+
+    expect(blocks.map((b) => b.locked)).toEqual([true, true, false]);
+  });
+});
+
+describe('computeInsertionLines with played matches', () => {
+  function blocksFor(matches: LayoutMatch[]) {
+    return computeScheduleLayout({
+      courts: [court(1)],
+      matchesByCourtId: { 1: matches },
+      tournamentStartTime: TOURNAMENT_START,
+    }).courts[0].blocks;
+  }
+
+  it('offers all positions on a court with no played matches', () => {
+    const lines = computeInsertionLines(blocksFor([match(10, 0), match(11, 1)]));
+
+    expect(lines.map((line) => line.index)).toEqual([0, 1, 2]);
+  });
+
+  it('hides lines above the last completed match', () => {
+    const lines = computeInsertionLines(
+      blocksFor([
+        playedMatch(10, 0, 'COMPLETED'),
+        playedMatch(11, 1, 'COMPLETED'),
+        match(12, 2),
+        match(13, 3),
+      ])
+    );
+
+    expect(lines).toEqual([
+      // Centered in the 35..40 gap after the last completed match.
+      { index: 2, offsetMinutes: 37.5 },
+      { index: 3, offsetMinutes: 57.5 },
+      { index: 4, offsetMinutes: 77.5 },
+    ]);
+  });
+
+  it('treats an in-progress match like a completed one', () => {
+    const lines = computeInsertionLines(
+      blocksFor([playedMatch(10, 0, 'IN_PROGRESS'), match(11, 1)])
+    );
+
+    expect(lines.map((line) => line.index)).toEqual([1, 2]);
+  });
+
+  it('offers only the end-of-court line when every match is played', () => {
+    const lines = computeInsertionLines(
+      blocksFor([playedMatch(10, 0, 'COMPLETED'), playedMatch(11, 1, 'IN_PROGRESS')])
+    );
+
+    expect(lines.map((line) => line.index)).toEqual([2]);
+  });
+
+  it('hides lines around an upcoming match sandwiched between played ones', () => {
+    const lines = computeInsertionLines(
+      blocksFor([
+        playedMatch(10, 0, 'COMPLETED'),
+        match(11, 1),
+        playedMatch(12, 2, 'COMPLETED'),
+        match(13, 3),
+      ])
+    );
+
+    expect(lines.map((line) => line.index)).toEqual([3, 4]);
+  });
+
+  it('still offers the single top line on an empty court', () => {
+    expect(computeInsertionLines([])).toEqual([{ index: 0, offsetMinutes: 0 }]);
   });
 });

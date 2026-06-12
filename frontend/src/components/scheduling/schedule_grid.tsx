@@ -125,6 +125,16 @@ function MatchCard({
       {format(block.startTime, 'HH:mm')}
     </Text>
   );
+  // Status marker: a check for completed matches (paired with the dimmed card),
+  // a pulsing dot for in-progress ones. Upcoming matches carry no marker.
+  const statusIndicator =
+    match.state === 'COMPLETED' ? (
+      <Text component="span" c="teal" fz={fontSize ?? 12} fw={700} lh={1} style={{ flexShrink: 0 }}>
+        ✓
+      </Text>
+    ) : match.state === 'IN_PROGRESS' ? (
+      <Box component="span" className={classes.liveDot} />
+    ) : null;
   // Agenda is the full-detail level: cards also carry the match's level, stage
   // and stage item. The tallest cards spread that over two rows of their own
   // (level · stage, then stage item), shorter ones get a single combined row,
@@ -179,7 +189,10 @@ function MatchCard({
         left: 3,
         right: 3,
         overflow: 'hidden',
-        cursor: 'pointer',
+        // Soft-locked cards are not placement targets; tapping them is ignored
+        // by the reducer, so don't advertise them as tappable.
+        cursor: block.locked ? 'default' : 'pointer',
+        opacity: match.state === 'COMPLETED' ? 0.55 : undefined,
         borderRadius: 6,
         border: isSelected
           ? '1px solid var(--mantine-color-indigo-filled)'
@@ -203,7 +216,10 @@ function MatchCard({
       >
         {rows === 3 && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
-            {timeLabel}
+            <Flex gap={4} align="center" wrap="nowrap">
+              {timeLabel}
+              {statusIndicator}
+            </Flex>
             {contextRows.length === 0 && contextParts.length > 0
               ? contextBadge(contextParts.join(' · '))
               : null}
@@ -217,6 +233,7 @@ function MatchCard({
         ))}
         <Flex gap={6} align="center" wrap="nowrap">
           {rows < 3 && showTime && timeLabel}
+          {rows < 3 && statusIndicator}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
           {rows === 1 &&
             match.stage_item_input2_conflict &&
@@ -259,7 +276,8 @@ function OverviewBlock({
 }) {
   const blockHeightPx = block.durationMinutes * pxPerMinute;
   const isCompleted = block.match.state === 'COMPLETED';
-  const opacity = isCompleted ? 0.35 : block.match.state === 'IN_PROGRESS' ? 1 : 0.85;
+  const isInProgress = block.match.state === 'IN_PROGRESS';
+  const opacity = isCompleted ? 0.35 : isInProgress ? 1 : 0.85;
 
   return (
     <Box
@@ -284,6 +302,13 @@ function OverviewBlock({
         <Text c="white" fz={Math.min(blockHeightPx - 2, 12)} lh={1}>
           ✓
         </Text>
+      )}
+      {isInProgress && blockHeightPx >= 12 && (
+        <Box
+          component="span"
+          className={classes.liveDot}
+          style={{ backgroundColor: 'var(--mantine-color-white)' }}
+        />
       )}
     </Box>
   );
@@ -564,6 +589,7 @@ export default function ScheduleGrid({
                   matchId: block.match.id,
                   courtId: court.id,
                   position: block.match.position_in_schedule ?? blockIndex,
+                  locked: block.locked,
                 };
                 return (
                   <MatchCard

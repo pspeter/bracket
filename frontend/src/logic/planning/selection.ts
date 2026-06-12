@@ -22,6 +22,13 @@ export interface GridMatchRef {
   matchId: number;
   courtId: number;
   position: number;
+  /**
+   * Soft-locked: part of a court's frozen past (completed/in-progress, or
+   * scheduled above such a match — see `MatchBlock.locked`). Taps on locked
+   * matches never select or swap; an explicit override arrives with the
+   * action sheet.
+   */
+  locked?: boolean;
 }
 
 export type SelectionState =
@@ -132,6 +139,9 @@ export function selectionReducer(
     case 'idle':
       switch (event.type) {
         case 'tap-match':
+          if (event.match.locked) {
+            return stay(state);
+          }
           return stay({ kind: 'match-selected', match: event.match });
         case 'tap-tray-match':
           return stay({ kind: 'tray-match-selected', matchId: event.matchId });
@@ -144,9 +154,14 @@ export function selectionReducer(
           return stay(IDLE_SELECTION);
         case 'tap-match':
           // Tapping the selected match again deselects; tapping another
-          // match — scheduled or in the tray — swaps the two.
+          // match — scheduled or in the tray — swaps the two. Locked
+          // (played) matches are not swap targets: the selection stays so
+          // the user can pick a valid target instead.
           if (event.match.matchId === state.match.matchId) {
             return stay(IDLE_SELECTION);
+          }
+          if (event.match.locked) {
+            return stay(state);
           }
           return swap(state.match.matchId, event.match.matchId);
         case 'tap-tray-match':
@@ -167,6 +182,9 @@ export function selectionReducer(
           // The match was never scheduled; cancelling simply leaves it in the tray.
           return stay(IDLE_SELECTION);
         case 'tap-match':
+          if (event.match.locked) {
+            return stay(state);
+          }
           return swap(state.matchId, event.match.matchId);
         case 'tap-tray-match':
           // Swapping two tray matches is meaningless, so taps inside the tray

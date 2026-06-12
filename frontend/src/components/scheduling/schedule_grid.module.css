@@ -20,3 +20,28 @@
     animation: zoom-snap 120ms ease-out;
   }
 }
+
+/* Live indicator on in-progress match cards. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.liveDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--mantine-color-green-filled);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .liveDot {
+    animation: live-pulse 1.5s ease-in-out infinite;
+  }
+}
