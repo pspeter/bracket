@@ -27,6 +27,10 @@ function traySelected(matchId: number): SelectionState {
   return { kind: 'tray-match-selected', matchId };
 }
 
+function sheetOpen(match: GridMatchRef): SelectionState {
+  return { kind: 'action-sheet-open', match };
+}
+
 function planner(zoom: ZoomLevel, selection: SelectionState = IDLE_SELECTION): PlannerState {
   return { zoom, selection };
 }
@@ -90,13 +94,13 @@ describe('selectionReducer', () => {
       expect(actions).toEqual([]);
     });
 
-    it('tapping the selected match again deselects it', () => {
+    it('tapping the selected match again opens the action sheet', () => {
       const { state, actions } = selectionReducer(selection, {
         type: 'tap-match',
         match: ref(10, 1, 2),
       });
 
-      expect(state).toEqual(IDLE_SELECTION);
+      expect(state).toEqual(sheetOpen(ref(10, 1, 2)));
       expect(actions).toEqual([]);
     });
 
@@ -295,13 +299,15 @@ describe('selectionReducer', () => {
   });
 
   describe('soft-locked (completed/in-progress) matches', () => {
-    it('tapping a locked match from idle does not select it', () => {
+    it('tapping a locked match from idle opens the action sheet instead of selecting', () => {
+      // The sheet is the discoverable home of the "move anyway" override, so it
+      // must be reachable for played matches even though selection is soft-locked.
       const { state, actions } = selectionReducer(IDLE_SELECTION, {
         type: 'tap-match',
         match: lockedRef(10, 1, 0),
       });
 
-      expect(state).toEqual(IDLE_SELECTION);
+      expect(state).toEqual(sheetOpen(lockedRef(10, 1, 0)));
       expect(actions).toEqual([]);
     });
 
@@ -325,6 +331,127 @@ describe('selectionReducer', () => {
 
       expect(state).toEqual(selection);
       expect(actions).toEqual([]);
+    });
+  });
+
+  describe('with the action sheet open', () => {
+    const selection = sheetOpen(ref(10, 1, 2));
+
+    it('dismissing the sheet returns to the selected state', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'dismiss-action-sheet' });
+
+      expect(state).toEqual(selected(ref(10, 1, 2)));
+      expect(actions).toEqual([]);
+    });
+
+    it('dismissing the sheet of a locked match returns to idle, since it was never selectable', () => {
+      const { state, actions } = selectionReducer(sheetOpen(lockedRef(10, 1, 0)), {
+        type: 'dismiss-action-sheet',
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
+    });
+
+    it('cancel clears the whole selection', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'cancel' });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
+    });
+
+    it('unschedule sends the match to the tray and clears the selection', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'unschedule' });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
+    });
+
+    it('grid taps are ignored while the sheet is open', () => {
+      const events = [
+        { type: 'tap-match', match: ref(20, 2, 1) },
+        { type: 'tap-tray-match', matchId: 30 },
+        { type: 'tap-insertion-line', courtId: 2, index: 1 },
+      ] as const;
+
+      for (const event of events) {
+        const { state, actions } = selectionReducer(selection, event);
+        expect(state).toEqual(selection);
+        expect(actions).toEqual([]);
+      }
+    });
+
+    it('move-anyway is a no-op for a match that was never locked', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'move-anyway' });
+
+      expect(state).toEqual(selected({ ...ref(10, 1, 2), locked: false }));
+      expect(actions).toEqual([]);
+    });
+  });
+
+  describe('the move-anyway override', () => {
+    const lockedSheet = sheetOpen(lockedRef(10, 1, 0));
+
+    it('selects the locked match for placement with the lock lifted', () => {
+      const { state, actions } = selectionReducer(lockedSheet, { type: 'move-anyway' });
+
+      expect(state).toEqual(selected({ ...lockedRef(10, 1, 0), locked: false }));
+      expect(actions).toEqual([]);
+    });
+
+    it('an overridden match can then be placed on an insertion line', () => {
+      const { state: overridden } = selectionReducer(lockedSheet, { type: 'move-anyway' });
+      const { state, actions } = selectionReducer(overridden, {
+        type: 'tap-insertion-line',
+        courtId: 2,
+        index: 3,
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 10,
+          body: { old_court_id: 1, old_position: 0, new_court_id: 2, new_position: 3 },
+        },
+      ]);
+    });
+
+    it('an overridden match can swap with an unlocked match', () => {
+      const { state: overridden } = selectionReducer(lockedSheet, { type: 'move-anyway' });
+      const { state, actions } = selectionReducer(overridden, {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
+    });
+
+    it('the override is one-shot: cancelling drops it, and re-tapping reopens the sheet', () => {
+      const { state: overridden } = selectionReducer(lockedSheet, { type: 'move-anyway' });
+      const { state: cancelled } = selectionReducer(overridden, { type: 'cancel' });
+      expect(cancelled).toEqual(IDLE_SELECTION);
+
+      const { state } = selectionReducer(cancelled, {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+      expect(state).toEqual(sheetOpen(lockedRef(10, 1, 0)));
+    });
+  });
+
+  describe('events that only apply to the action sheet', () => {
+    it.each([
+      ['idle', IDLE_SELECTION],
+      ['match-selected', selected(ref(10, 1, 2))],
+      ['tray-match-selected', traySelected(30)],
+    ] as const)('dismiss-action-sheet and move-anyway are ignored at %s', (_kind, selection) => {
+      for (const type of ['dismiss-action-sheet', 'move-anyway'] as const) {
+        const { state, actions } = selectionReducer(selection, { type });
+        expect(state).toEqual(selection);
+        expect(actions).toEqual([]);
+      }
     });
   });
 });
@@ -418,13 +545,23 @@ describe('plannerReducer', () => {
       }
     );
 
-    it('never selects a locked (played) match', () => {
+    it('opens the action sheet instead of selecting a locked (played) match', () => {
       const { state, actions } = plannerReducer(planner('compact'), {
         type: 'tap-match',
         match: lockedRef(10, 1, 0),
       });
 
-      expect(state).toEqual(planner('compact'));
+      expect(state).toEqual(planner('compact', sheetOpen(lockedRef(10, 1, 0))));
+      expect(actions).toEqual([]);
+    });
+
+    it('opens the action sheet on a second tap of the selected match', () => {
+      const { state, actions } = plannerReducer(planner('agenda', selected(ref(10, 1, 2))), {
+        type: 'tap-match',
+        match: ref(10, 1, 2),
+      });
+
+      expect(state).toEqual(planner('agenda', sheetOpen(ref(10, 1, 2))));
       expect(actions).toEqual([]);
     });
 
@@ -506,6 +643,29 @@ describe('plannerReducer', () => {
 
       expect(state).toEqual(planner('overview'));
       expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
+    });
+
+    it('a tap on a locked match never opens the action sheet', () => {
+      const { state, actions } = plannerReducer(planner('overview'), {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('overview'));
+      expect(actions).toEqual([]);
+    });
+
+    it('the action sheet buttons still work, like the other explicit buttons', () => {
+      const sheet = planner('overview', sheetOpen(lockedRef(10, 1, 0)));
+
+      const dismissed = plannerReducer(sheet, { type: 'dismiss-action-sheet' });
+      expect(dismissed.state).toEqual(planner('overview'));
+
+      const overridden = plannerReducer(sheet, { type: 'move-anyway' });
+      expect(overridden.state).toEqual(
+        planner('overview', selected({ ...lockedRef(10, 1, 0), locked: false }))
+      );
+      expect(overridden.actions).toEqual([]);
     });
 
     it('a tap on the grid zooms in toward the tapped court/time region', () => {

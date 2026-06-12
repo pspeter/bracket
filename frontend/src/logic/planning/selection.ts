@@ -2,9 +2,15 @@
  * Pure, headless state machine for the planning grid's tap-to-place interaction.
  *
  * The UI dispatches events (tap on a match card, tap on a tray match, tap on an
- * insertion line, unschedule, cancel) and the reducer returns the next selection
- * state plus the backend action the tap triggers (zero or one). Later slices
- * (action sheet) extend this same reducer.
+ * insertion line, action sheet buttons, unschedule, cancel) and the reducer
+ * returns the next selection state plus the backend action the tap triggers
+ * (zero or one).
+ *
+ * Tapping an already-selected match opens the per-match action sheet, the home
+ * of secondary operations (unschedule, duration/margin edits, match details,
+ * move-anyway). Soft-locked (played) matches open the sheet directly from idle —
+ * they can never be plainly selected, so the sheet is where the explicit
+ * "move anyway" override lives.
  *
  * Positions are `position_in_schedule` values, which the backend keeps contiguous
  * (0..n-1) per court. An insertion line with index `k` on a court means "insert
@@ -34,7 +40,8 @@ export interface GridMatchRef {
 export type SelectionState =
   | { kind: 'idle' }
   | { kind: 'match-selected'; match: GridMatchRef }
-  | { kind: 'tray-match-selected'; matchId: number };
+  | { kind: 'tray-match-selected'; matchId: number }
+  | { kind: 'action-sheet-open'; match: GridMatchRef };
 
 export const IDLE_SELECTION: SelectionState = { kind: 'idle' };
 
@@ -43,6 +50,8 @@ export type SelectionEvent =
   | { type: 'tap-tray-match'; matchId: number }
   | { type: 'tap-insertion-line'; courtId: number; index: number }
   | { type: 'unschedule' }
+  | { type: 'dismiss-action-sheet' }
+  | { type: 'move-anyway' }
   | { type: 'cancel' };
 
 export type PlanningAction =
@@ -139,8 +148,11 @@ export function selectionReducer(
     case 'idle':
       switch (event.type) {
         case 'tap-match':
+          // A locked (played) match can't be plainly selected, but its action
+          // sheet must stay reachable: that's where match details and the
+          // explicit "move anyway" override live.
           if (event.match.locked) {
-            return stay(state);
+            return stay({ kind: 'action-sheet-open', match: event.match });
           }
           return stay({ kind: 'match-selected', match: event.match });
         case 'tap-tray-match':
@@ -153,12 +165,12 @@ export function selectionReducer(
         case 'cancel':
           return stay(IDLE_SELECTION);
         case 'tap-match':
-          // Tapping the selected match again deselects; tapping another
-          // match — scheduled or in the tray — swaps the two. Locked
+          // Tapping the selected match again opens its action sheet; tapping
+          // another match — scheduled or in the tray — swaps the two. Locked
           // (played) matches are not swap targets: the selection stays so
           // the user can pick a valid target instead.
           if (event.match.matchId === state.match.matchId) {
-            return stay(IDLE_SELECTION);
+            return stay({ kind: 'action-sheet-open', match: state.match });
           }
           if (event.match.locked) {
             return stay(state);
@@ -196,6 +208,29 @@ export function selectionReducer(
         case 'tap-insertion-line':
           return placeFromTray(state.matchId, event.courtId, event.index);
         default:
+          return stay(state);
+      }
+    case 'action-sheet-open':
+      switch (event.type) {
+        case 'dismiss-action-sheet':
+          // Back to where the sheet was opened from: the selected state — except
+          // for a locked match, which was never selectable to begin with.
+          return stay(
+            state.match.locked ? IDLE_SELECTION : { kind: 'match-selected', match: state.match }
+          );
+        case 'cancel':
+          return stay(IDLE_SELECTION);
+        case 'unschedule':
+          return {
+            state: IDLE_SELECTION,
+            actions: [{ type: 'unschedule', matchId: state.match.matchId }],
+          };
+        case 'move-anyway':
+          // The explicit override: select the match for placement with the soft
+          // lock lifted, for this one operation only (cancelling drops it).
+          return stay({ kind: 'match-selected', match: { ...state.match, locked: false } });
+        default:
+          // The sheet is modal; grid taps slipping through must not change anything.
           return stay(state);
       }
     default:
@@ -272,6 +307,8 @@ export function plannerReducer(state: PlannerState, event: PlannerEvent): Planne
       });
     case 'cancel':
     case 'unschedule':
+    case 'dismiss-action-sheet':
+    case 'move-anyway':
       // Explicit buttons, not grid geometry: usable at any zoom level.
       return delegate(state, event);
     case 'tap-tray-match':

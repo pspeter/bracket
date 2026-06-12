@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import CourtModal from '@components/modals/create_court_modal';
+import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
@@ -34,6 +35,7 @@ import {
 import { rescheduleMatch, scheduleMatches, swapMatches, unscheduleMatch } from '@services/match';
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
+import MatchActionSheet from '@components/scheduling/match_action_sheet';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
@@ -45,6 +47,10 @@ export default function SchedulePage() {
   );
   const [trayOpened, setTrayOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
+  // Details modal opened from the action sheet; holds the match id (not the
+  // match) so a background revalidation refreshes the modal's data instead of
+  // detaching it.
+  const [detailsMatchId, setDetailsMatchId] = useState<number | null>(null);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -171,6 +177,10 @@ export default function SchedulePage() {
         ? planner.selection.matchId
         : null;
   const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
+  const sheetMatchRef =
+    planner.selection.kind === 'action-sheet-open' ? planner.selection.match : null;
+  const detailsMatch =
+    detailsMatchId != null ? (matchesLookup[detailsMatchId]?.match ?? null) : null;
   const isOverview = planner.zoom === 'overview';
   const conflictPreview = isOverview
     ? { insertionLines: new Set<string>(), swapTargets: new Set<number>() }
@@ -262,11 +272,45 @@ export default function SchedulePage() {
               onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
             />
-            <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
+            <MatchActionSheet
+              opened={sheetMatchRef != null}
+              match={
+                sheetMatchRef != null ? (matchesLookup[sheetMatchRef.matchId]?.match ?? null) : null
+              }
+              locked={sheetMatchRef?.locked ?? false}
+              stageItemsLookup={stageItemsLookup}
+              matchesLookup={matchesLookup}
+              onDismiss={() => handlePlannerEvent({ type: 'dismiss-action-sheet' })}
+              onOpenDetails={() => {
+                if (sheetMatchRef != null) {
+                  setDetailsMatchId(sheetMatchRef.matchId);
+                }
+                handlePlannerEvent({ type: 'dismiss-action-sheet' });
+              }}
+              onUnschedule={() => handlePlannerEvent({ type: 'unschedule' })}
+              onMoveAnyway={() => handlePlannerEvent({ type: 'move-anyway' })}
+            />
+            <MatchModal
+              tournamentData={tournamentData}
+              match={detailsMatch}
+              swrStagesResponse={swrStagesResponse}
+              swrUpcomingMatchesResponse={null}
+              opened={detailsMatch != null}
+              setOpened={(value: boolean) => {
+                if (!value) setDetailsMatchId(null);
+              }}
+              round={null}
+            />
+            {/* Like the selection pill below: above the tray (150), below the
+                modals (200) and the action sheet (400). */}
+            <Affix position={{ right: 8, top: '45%' }} zIndex={180}>
               <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
             </Affix>
             {selectedEntry != null ? (
-              <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
+              // Below the action sheet (400) and the details modal (Mantine's
+              // default 200), so the selection pill never covers them on small
+              // screens; above the tray (150), which sits underneath it.
+              <Affix position={{ bottom: 70, left: '50%' }} zIndex={180}>
                 <Paper
                   shadow="md"
                   radius="xl"
@@ -290,16 +334,19 @@ export default function SchedulePage() {
                       {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
                     </Text>
                   </Box>
-                  {planner.selection.kind === 'match-selected' && (
-                    <Button
-                      size="compact-sm"
-                      variant="light"
-                      color="orange"
-                      onClick={() => handlePlannerEvent({ type: 'unschedule' })}
-                    >
-                      {t('unschedule_button')}
-                    </Button>
-                  )}
+                  {planner.selection.kind === 'match-selected' &&
+                    // Played matches can't be unscheduled (the backend rejects
+                    // it), so a move-anyway selection only offers placement.
+                    selectedEntry.match.state === 'NOT_STARTED' && (
+                      <Button
+                        size="compact-sm"
+                        variant="light"
+                        color="orange"
+                        onClick={() => handlePlannerEvent({ type: 'unschedule' })}
+                      >
+                        {t('unschedule_button')}
+                      </Button>
+                    )}
                   <Button
                     size="compact-sm"
                     variant="light"

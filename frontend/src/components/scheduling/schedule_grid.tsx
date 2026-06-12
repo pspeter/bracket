@@ -203,9 +203,9 @@ function MatchCard({
         left: 3,
         right: 3,
         overflow: 'hidden',
-        // Soft-locked cards are not placement targets; tapping them is ignored
-        // by the reducer, so don't advertise them as tappable.
-        cursor: block.locked ? 'default' : 'pointer',
+        // Every card is tappable: unlocked ones select for placement, locked
+        // (played) ones open the action sheet with the move-anyway override.
+        cursor: 'pointer',
         opacity: match.state === 'COMPLETED' ? 0.55 : undefined,
         borderRadius: 6,
         border: isSelected
@@ -438,8 +438,13 @@ export default function ScheduleGrid({
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
   const gridHeight = layout.totalMinutes * pxPerMinute;
-  const selectedMatch = selection.kind === 'match-selected' ? selection.match : null;
-  const placing = selection.kind !== 'idle';
+  const selectedMatch =
+    selection.kind === 'match-selected' || selection.kind === 'action-sheet-open'
+      ? selection.match
+      : null;
+  // Insertion lines only make sense while a match is being placed; with the
+  // action sheet open the grid is inert behind the sheet's overlay.
+  const placing = selection.kind === 'match-selected' || selection.kind === 'tray-match-selected';
   const isOverview = zoom === 'overview';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
