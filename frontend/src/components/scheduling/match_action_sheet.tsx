@@ -1,11 +1,5 @@
 import { Button, Drawer, Stack, Text } from '@mantine/core';
-import {
-  IconArrowsMove,
-  IconCalendarOff,
-  IconClockEdit,
-  IconClockPause,
-  IconListDetails,
-} from '@tabler/icons-react';
+import { IconArrowsMove, IconCalendarOff, IconListDetails } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
@@ -16,11 +10,12 @@ import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
  * Bottom action sheet with the secondary per-match operations, opened by tapping
  * an already-selected match (or a soft-locked played match, which can't be
  * plainly selected). Dismissing it returns to the selected state; each button
- * dispatches back to the page, which owns the reducer and the modals.
+ * dispatches back to the page, which owns the reducer and the details modal.
  *
- * Played (locked) matches can't be unscheduled (the backend rejects it), so they
- * get the explicit "move anyway" override instead, which lifts the soft lock for
- * one placement operation.
+ * The match details modal is the single place for editing — scores, state and
+ * custom duration/margin. Played (locked) matches can't be unscheduled (the
+ * backend rejects it), so they get the explicit "move anyway" override instead,
+ * which lifts the soft lock for one placement operation.
  */
 export default function MatchActionSheet({
   match,
@@ -30,8 +25,6 @@ export default function MatchActionSheet({
   matchesLookup,
   onDismiss,
   onOpenDetails,
-  onEditDuration,
-  onEditMargin,
   onUnschedule,
   onMoveAnyway,
 }: {
@@ -42,8 +35,6 @@ export default function MatchActionSheet({
   matchesLookup: Record<number, MatchLookupEntry>;
   onDismiss: () => void;
   onOpenDetails: () => void;
-  onEditDuration: () => void;
-  onEditMargin: () => void;
   onUnschedule: () => void;
   onMoveAnyway: () => void;
 }) {
@@ -77,22 +68,6 @@ export default function MatchActionSheet({
           onClick={onOpenDetails}
         >
           {t('match_details_button')}
-        </Button>
-        <Button
-          variant="light"
-          justify="flex-start"
-          leftSection={<IconClockEdit size={20} />}
-          onClick={onEditDuration}
-        >
-          {t('edit_match_duration_button')}
-        </Button>
-        <Button
-          variant="light"
-          justify="flex-start"
-          leftSection={<IconClockPause size={20} />}
-          onClick={onEditMargin}
-        >
-          {t('edit_match_margin_button')}
         </Button>
         {locked ? (
           <>

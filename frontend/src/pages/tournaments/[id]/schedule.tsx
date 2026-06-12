@@ -36,7 +36,6 @@ import { rescheduleMatch, scheduleMatches, swapMatches, unscheduleMatch } from '
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import MatchActionSheet from '@components/scheduling/match_action_sheet';
-import MatchTimingModal, { TimingField } from '@components/scheduling/match_timing_modal';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
@@ -48,12 +47,10 @@ export default function SchedulePage() {
   );
   const [trayOpened, setTrayOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
-  // Modal opened from the action sheet; holds the match id (not the match) so a
-  // background revalidation refreshes the modal's data instead of detaching it.
-  const [matchDialog, setMatchDialog] = useState<{
-    kind: 'details' | TimingField;
-    matchId: number;
-  } | null>(null);
+  // Details modal opened from the action sheet; holds the match id (not the
+  // match) so a background revalidation refreshes the modal's data instead of
+  // detaching it.
+  const [detailsMatchId, setDetailsMatchId] = useState<number | null>(null);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -182,8 +179,8 @@ export default function SchedulePage() {
   const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
   const sheetMatchRef =
     planner.selection.kind === 'action-sheet-open' ? planner.selection.match : null;
-  const dialogMatch =
-    matchDialog != null ? (matchesLookup[matchDialog.matchId]?.match ?? null) : null;
+  const detailsMatch =
+    detailsMatchId != null ? (matchesLookup[detailsMatchId]?.match ?? null) : null;
   const isOverview = planner.zoom === 'overview';
   const conflictPreview = isOverview
     ? { insertionLines: new Set<string>(), swapTargets: new Set<number>() }
@@ -286,19 +283,7 @@ export default function SchedulePage() {
               onDismiss={() => handlePlannerEvent({ type: 'dismiss-action-sheet' })}
               onOpenDetails={() => {
                 if (sheetMatchRef != null) {
-                  setMatchDialog({ kind: 'details', matchId: sheetMatchRef.matchId });
-                }
-                handlePlannerEvent({ type: 'dismiss-action-sheet' });
-              }}
-              onEditDuration={() => {
-                if (sheetMatchRef != null) {
-                  setMatchDialog({ kind: 'duration', matchId: sheetMatchRef.matchId });
-                }
-                handlePlannerEvent({ type: 'dismiss-action-sheet' });
-              }}
-              onEditMargin={() => {
-                if (sheetMatchRef != null) {
-                  setMatchDialog({ kind: 'margin', matchId: sheetMatchRef.matchId });
+                  setDetailsMatchId(sheetMatchRef.matchId);
                 }
                 handlePlannerEvent({ type: 'dismiss-action-sheet' });
               }}
@@ -307,30 +292,25 @@ export default function SchedulePage() {
             />
             <MatchModal
               tournamentData={tournamentData}
-              match={matchDialog?.kind === 'details' ? dialogMatch : null}
+              match={detailsMatch}
               swrStagesResponse={swrStagesResponse}
               swrUpcomingMatchesResponse={null}
-              opened={matchDialog?.kind === 'details' && dialogMatch != null}
+              opened={detailsMatch != null}
               setOpened={(value: boolean) => {
-                if (!value) setMatchDialog(null);
+                if (!value) setDetailsMatchId(null);
               }}
               round={null}
             />
-            <MatchTimingModal
-              tournamentId={tournamentData.id}
-              match={matchDialog != null && matchDialog.kind !== 'details' ? dialogMatch : null}
-              field={matchDialog?.kind === 'margin' ? 'margin' : 'duration'}
-              opened={matchDialog != null && matchDialog.kind !== 'details' && dialogMatch != null}
-              onClose={() => setMatchDialog(null)}
-              onSaved={async () => {
-                await swrStagesResponse.mutate();
-              }}
-            />
-            <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
+            {/* Like the selection pill below: above the tray (150), below the
+                modals (200) and the action sheet (400). */}
+            <Affix position={{ right: 8, top: '45%' }} zIndex={180}>
               <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
             </Affix>
             {selectedEntry != null ? (
-              <Affix position={{ bottom: 70, left: '50%' }} zIndex={300}>
+              // Below the action sheet (400) and the details modal (Mantine's
+              // default 200), so the selection pill never covers them on small
+              // screens; above the tray (150), which sits underneath it.
+              <Affix position={{ bottom: 70, left: '50%' }} zIndex={180}>
                 <Paper
                   shadow="md"
                   radius="xl"
