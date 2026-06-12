@@ -118,15 +118,19 @@ export function initialPlannerState(zoom: ZoomLevel): PlannerState {
 
 export type PlannerEvent =
   | SelectionEvent
-  | { type: 'zoom-in' }
-  | { type: 'zoom-out' }
+  | { type: 'zoom-in'; anchor?: FocusTarget | null }
+  | { type: 'zoom-out'; anchor?: FocusTarget | null }
   | { type: 'set-zoom'; zoom: ZoomLevel }
-  | { type: 'tap-overview'; courtId: number; offsetMinutes: number };
+  | { type: 'tap-overview'; courtId: number; fraction: number };
 
-/** Where to scroll the grid after an overview tap zooms in. */
+/**
+ * Where to scroll the grid after a zoom change: a court plus a vertical
+ * position expressed as a fraction (0..1) of the schedule's total length, so
+ * it stays meaningful across the zoom levels' different scales.
+ */
 export interface FocusTarget {
   courtId: number;
-  offsetMinutes: number;
+  fraction: number;
 }
 
 export interface PlannerTransition {
@@ -139,23 +143,32 @@ function noEffect(state: PlannerState): PlannerTransition {
   return { state, reschedule: null, focus: null };
 }
 
+function zoomTo(
+  state: PlannerState,
+  zoom: ZoomLevel,
+  anchor?: FocusTarget | null
+): PlannerTransition {
+  // Already clamped at this level: nothing changes, so nothing to focus.
+  if (zoom === state.zoom) return noEffect(state);
+  return { state: { ...state, zoom }, reschedule: null, focus: anchor ?? null };
+}
+
 export function plannerReducer(state: PlannerState, event: PlannerEvent): PlannerTransition {
   switch (event.type) {
     case 'zoom-in':
-      return noEffect({ ...state, zoom: zoomIn(state.zoom) });
+      return zoomTo(state, zoomIn(state.zoom), event.anchor);
     case 'zoom-out':
-      return noEffect({ ...state, zoom: zoomOut(state.zoom) });
+      return zoomTo(state, zoomOut(state.zoom), event.anchor);
     case 'set-zoom':
-      return noEffect({ ...state, zoom: event.zoom });
+      return zoomTo(state, event.zoom);
     case 'tap-overview':
       // Overview taps navigate toward the tapped region; they never select or
       // place, and a selection in progress rides along to the next level.
       if (state.zoom !== 'overview') return noEffect(state);
-      return {
-        state: { ...state, zoom: zoomIn(state.zoom) },
-        reschedule: null,
-        focus: { courtId: event.courtId, offsetMinutes: event.offsetMinutes },
-      };
+      return zoomTo(state, zoomIn(state.zoom), {
+        courtId: event.courtId,
+        fraction: event.fraction,
+      });
     case 'cancel': {
       const { state: selection } = selectionReducer(state.selection, event);
       return noEffect({ ...state, selection });

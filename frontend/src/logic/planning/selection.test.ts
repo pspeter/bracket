@@ -184,11 +184,31 @@ describe('plannerReducer', () => {
       expect(state.zoom).toBe('overview');
     });
 
-    it('never reschedules or focuses', () => {
+    it('never reschedules or focuses without an anchor', () => {
       const transition = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
         type: 'zoom-out',
       });
       expect(transition.reschedule).toBeNull();
+      expect(transition.focus).toBeNull();
+    });
+
+    it('keeps the anchored region in focus when zooming with an anchor', () => {
+      const anchor = { courtId: 6, fraction: 0.8 };
+
+      const zoomedIn = plannerReducer(planner('overview'), { type: 'zoom-in', anchor });
+      expect(zoomedIn.state.zoom).toBe('compact');
+      expect(zoomedIn.focus).toEqual(anchor);
+
+      const zoomedOut = plannerReducer(planner('compact'), { type: 'zoom-out', anchor });
+      expect(zoomedOut.state.zoom).toBe('overview');
+      expect(zoomedOut.focus).toEqual(anchor);
+    });
+
+    it('does not focus when the zoom level is already at its end', () => {
+      const anchor = { courtId: 6, fraction: 0.8 };
+      const transition = plannerReducer(planner('agenda'), { type: 'zoom-in', anchor });
+
+      expect(transition.state.zoom).toBe('agenda');
       expect(transition.focus).toBeNull();
     });
 
@@ -236,7 +256,7 @@ describe('plannerReducer', () => {
       const transition = plannerReducer(start, {
         type: 'tap-overview',
         courtId: 2,
-        offsetMinutes: 90,
+        fraction: 0.5,
       });
 
       expect(transition.state).toEqual(start);
@@ -270,11 +290,11 @@ describe('plannerReducer', () => {
       const { state, reschedule, focus } = plannerReducer(planner('overview'), {
         type: 'tap-overview',
         courtId: 3,
-        offsetMinutes: 120,
+        fraction: 0.25,
       });
 
       expect(state.zoom).toBe('compact');
-      expect(focus).toEqual({ courtId: 3, offsetMinutes: 120 });
+      expect(focus).toEqual({ courtId: 3, fraction: 0.25 });
       expect(reschedule).toBeNull();
     });
 
@@ -284,7 +304,7 @@ describe('plannerReducer', () => {
       const navigated = plannerReducer(start, {
         type: 'tap-overview',
         courtId: 2,
-        offsetMinutes: 60,
+        fraction: 0.1,
       });
       expect(navigated.state).toEqual(planner('compact', selected(ref(10, 1, 2))));
 

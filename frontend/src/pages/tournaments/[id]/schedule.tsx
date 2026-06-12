@@ -171,7 +171,13 @@ export default function SchedulePage() {
             />
           </Stack>
         ) : (
-          <Box mt="1rem" pb={planner.selection.kind === 'match-selected' ? '14rem' : '4rem'}>
+          <Box
+            mt="1rem"
+            pb={planner.selection.kind === 'match-selected' ? '14rem' : '4rem'}
+            // The grid sizes its court columns in cqw units of this box, so the
+            // schedule hugs the same available width at every zoom level.
+            style={{ containerType: 'inline-size' }}
+          >
             {isOverview && levels.length > 0 && (
               <Group gap="xs" mb="xs">
                 {[...levels]

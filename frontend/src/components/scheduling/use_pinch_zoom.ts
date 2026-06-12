@@ -2,6 +2,8 @@ import { useCallback, useRef } from 'react';
 
 import { PlannerEvent } from '@logic/planning/selection';
 
+import { resolvePlannerAnchor } from './planner_anchor';
+
 /** How much a pinch must scale before the grid snaps one zoom level. */
 const PINCH_SNAP_RATIO = 1.3;
 /** Accumulated ctrl+wheel delta that snaps one zoom level on desktop. */
@@ -40,11 +42,17 @@ export function usePinchZoom(onZoomEvent: (event: PlannerEvent) => void) {
       if (event.touches.length !== 2 || pinchBaseline == null) return;
       event.preventDefault();
       const ratio = distance(event.touches) / pinchBaseline;
-      if (ratio >= PINCH_SNAP_RATIO) {
-        onZoomEventRef.current({ type: 'zoom-in' });
-        pinchBaseline = distance(event.touches);
-      } else if (ratio <= 1 / PINCH_SNAP_RATIO) {
-        onZoomEventRef.current({ type: 'zoom-out' });
+      if (ratio >= PINCH_SNAP_RATIO || ratio <= 1 / PINCH_SNAP_RATIO) {
+        // Anchor the zoom on the pinch midpoint, measured before the level
+        // changes, so the pinched region stays in view.
+        const anchor = resolvePlannerAnchor(
+          (event.touches[0].clientX + event.touches[1].clientX) / 2,
+          (event.touches[0].clientY + event.touches[1].clientY) / 2
+        );
+        onZoomEventRef.current({
+          type: ratio >= PINCH_SNAP_RATIO ? 'zoom-in' : 'zoom-out',
+          anchor,
+        });
         pinchBaseline = distance(event.touches);
       }
     };
@@ -55,11 +63,14 @@ export function usePinchZoom(onZoomEvent: (event: PlannerEvent) => void) {
       if (!event.ctrlKey) return;
       event.preventDefault();
       wheelAccumulated += event.deltaY;
-      if (wheelAccumulated <= -WHEEL_SNAP_DELTA) {
-        onZoomEventRef.current({ type: 'zoom-in' });
-        wheelAccumulated = 0;
-      } else if (wheelAccumulated >= WHEEL_SNAP_DELTA) {
-        onZoomEventRef.current({ type: 'zoom-out' });
+      if (Math.abs(wheelAccumulated) >= WHEEL_SNAP_DELTA) {
+        // Anchor the zoom on the pointer, so the region under the cursor
+        // stays in view.
+        const anchor = resolvePlannerAnchor(event.clientX, event.clientY);
+        onZoomEventRef.current({
+          type: wheelAccumulated < 0 ? 'zoom-in' : 'zoom-out',
+          anchor,
+        });
         wheelAccumulated = 0;
       }
     };

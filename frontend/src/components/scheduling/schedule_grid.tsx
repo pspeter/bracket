@@ -22,6 +22,7 @@ import {
 import { Court, LevelResponse, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/lookups';
 
+import { COURT_CONTENT_ATTRIBUTE, PLANNER_GRID_ATTRIBUTE } from './planner_anchor';
 import classes from './schedule_grid.module.css';
 
 const RULER_WIDTH = '3.25rem';
@@ -38,14 +39,24 @@ const INSERTION_HIT_AREA_PX = 32;
 const GRID_TOP_INSET_PX = 32;
 
 /**
- * Court column width per zoom level. Agenda fills a phone screen with a single
- * court; compact fits 3–4 courts on a phone and widens on larger screens;
- * overview divides the viewport among all courts (flex, no fixed width).
+ * Court column width per zoom level, in container-query units of the grid's
+ * parent (set up by the page), so the grid hugs its content at every level
+ * instead of jumping between content width and full width when zooming.
+ * Agenda fills a phone screen with a single court; compact fits 3–4 courts on
+ * a phone and widens on larger screens; overview divides the available width
+ * among all courts, capped so few courts don't stretch wider than agenda.
  */
-const COURT_COLUMN_WIDTH: Record<Exclude<ZoomLevel, 'overview'>, string> = {
-  agenda: 'min(calc(100vw - 6.5rem), 20rem)',
-  compact: 'clamp(5.5rem, 27vw, 9rem)',
-};
+function courtColumnWidth(zoom: ZoomLevel, courtCount: number): string {
+  switch (zoom) {
+    case 'agenda':
+      return `min(calc(100cqw - ${RULER_WIDTH} - 4px), 20rem)`;
+    case 'compact':
+      return 'clamp(5.5rem, 27cqw, 9rem)';
+    case 'overview':
+    default:
+      return `min(calc((100cqw - ${RULER_WIDTH} - 4px) / ${Math.max(courtCount, 1)} - 1px), 20rem)`;
+  }
+}
 
 function matchColour(
   match: MatchWithDetails,
@@ -384,8 +395,9 @@ export default function ScheduleGrid({
     element.classList.add(classes.zoomSnap);
   }, [zoom]);
 
-  // After an overview tap zooms in, center the tapped court/time region. Runs
-  // after the re-render at the new zoom level, so measurements are up to date.
+  // After a zoom change with a focus target (overview tap, anchored pinch or
+  // ctrl+wheel), center the focused court/time region. Runs after the
+  // re-render at the new zoom level, so measurements are up to date.
   useEffect(() => {
     if (focus == null) return;
     const container = containerRef.current;
@@ -396,31 +408,32 @@ export default function ScheduleGrid({
       column.getBoundingClientRect().left -
       container.getBoundingClientRect().left +
       container.scrollLeft;
-    const targetY = HEADER_HEIGHT_PX + GRID_TOP_INSET_PX + focus.offsetMinutes * pxPerMinute;
+    const targetY = HEADER_HEIGHT_PX + GRID_TOP_INSET_PX + focus.fraction * gridHeight;
     container.scrollTo({
       left: columnLeft - (container.clientWidth - column.clientWidth) / 2,
       top: targetY - container.clientHeight / 2,
       behavior: 'smooth',
     });
-    // Only re-run per navigation tap; pxPerMinute is already the post-zoom scale.
+    // Only re-run per navigation event; gridHeight is already the post-zoom scale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
   return (
     <Box
       ref={containerRef}
+      {...{ [PLANNER_GRID_ATTRIBUTE]: true }}
       onClick={() => onSelectionEvent({ type: 'cancel' })}
       style={{
         overflow: 'auto',
         maxHeight: 'calc(100dvh - 14rem)',
         maxWidth: '100%',
-        width: isOverview ? '100%' : 'fit-content',
+        width: 'fit-content',
         border: '1px solid var(--mantine-color-default-border)',
         borderRadius: 8,
         touchAction: 'pan-x pan-y',
       }}
     >
-      <Flex wrap="nowrap" style={{ minWidth: isOverview ? '100%' : 'fit-content' }}>
+      <Flex wrap="nowrap" style={{ minWidth: 'fit-content' }}>
         <Box
           style={{
             position: 'sticky',
@@ -468,8 +481,8 @@ export default function ScheduleGrid({
             key={court.id}
             data-court-id={court.id}
             style={{
-              flex: isOverview ? '1 1 0' : '0 0 auto',
-              width: isOverview ? undefined : COURT_COLUMN_WIDTH[zoom],
+              flex: '0 0 auto',
+              width: courtColumnWidth(zoom, layout.courts.length),
               minWidth: isOverview ? 14 : undefined,
               borderRight: '1px solid var(--mantine-color-default-border)',
             }}
@@ -493,16 +506,17 @@ export default function ScheduleGrid({
               </Text>
             </Box>
             <Box
+              {...{ [COURT_CONTENT_ATTRIBUTE]: court.id }}
               onClick={
                 isOverview
                   ? (event) => {
                       event.stopPropagation();
                       const rect = event.currentTarget.getBoundingClientRect();
-                      const offsetMinutes = Math.min(
-                        Math.max((event.clientY - rect.top) / pxPerMinute, 0),
-                        layout.totalMinutes
+                      const fraction = Math.min(
+                        Math.max((event.clientY - rect.top) / rect.height, 0),
+                        1
                       );
-                      onSelectionEvent({ type: 'tap-overview', courtId: court.id, offsetMinutes });
+                      onSelectionEvent({ type: 'tap-overview', courtId: court.id, fraction });
                     }
                   : undefined
               }
