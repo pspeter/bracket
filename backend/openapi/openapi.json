@@ -450,17 +450,6 @@
             ],
             "title": "Custom Duration Minutes"
           },
-          "custom_margin_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Custom Margin Minutes"
-          },
           "duration_minutes": {
             "title": "Duration Minutes",
             "type": "integer"
@@ -468,21 +457,6 @@
           "id": {
             "title": "Id",
             "type": "integer"
-          },
-          "margin_minutes": {
-            "title": "Margin Minutes",
-            "type": "integer"
-          },
-          "position_in_schedule": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Position In Schedule"
           },
           "round_id": {
             "title": "Round Id",
@@ -603,10 +577,7 @@
           "created",
           "start_time",
           "duration_minutes",
-          "margin_minutes",
           "custom_duration_minutes",
-          "custom_margin_minutes",
-          "position_in_schedule",
           "round_id",
           "stage_item_input1_score",
           "stage_item_input2_score",
@@ -662,17 +633,6 @@
             ],
             "title": "Custom Duration Minutes"
           },
-          "custom_margin_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Custom Margin Minutes"
-          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
@@ -698,7 +658,6 @@
           "stage_item_input2_score",
           "court_id",
           "custom_duration_minutes",
-          "custom_margin_minutes",
           "state",
           "completed_at"
         ],
@@ -924,17 +883,6 @@
             ],
             "title": "Custom Duration Minutes"
           },
-          "custom_margin_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Custom Margin Minutes"
-          },
           "duration_minutes": {
             "title": "Duration Minutes",
             "type": "integer"
@@ -953,21 +901,6 @@
               }
             ],
             "title": "Level Id"
-          },
-          "margin_minutes": {
-            "title": "Margin Minutes",
-            "type": "integer"
-          },
-          "position_in_schedule": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Position In Schedule"
           },
           "round_id": {
             "title": "Round Id",
@@ -1088,10 +1021,7 @@
           "created",
           "start_time",
           "duration_minutes",
-          "margin_minutes",
           "custom_duration_minutes",
-          "custom_margin_minutes",
-          "position_in_schedule",
           "round_id",
           "stage_item_input1_score",
           "stage_item_input2_score",
@@ -1164,17 +1094,6 @@
             ],
             "title": "Custom Duration Minutes"
           },
-          "custom_margin_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Custom Margin Minutes"
-          },
           "duration_minutes": {
             "title": "Duration Minutes",
             "type": "integer"
@@ -1193,21 +1112,6 @@
               }
             ],
             "title": "Level Id"
-          },
-          "margin_minutes": {
-            "title": "Margin Minutes",
-            "type": "integer"
-          },
-          "position_in_schedule": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Position In Schedule"
           },
           "round_id": {
             "title": "Round Id",
@@ -1322,10 +1226,7 @@
           "created",
           "start_time",
           "duration_minutes",
-          "margin_minutes",
           "custom_duration_minutes",
-          "custom_margin_minutes",
-          "position_in_schedule",
           "round_id",
           "stage_item_input1_score",
           "stage_item_input2_score",

@@ -26,6 +26,7 @@ interface PreparedPreview {
   matchesById: Map<number, ConflictPreviewMatch>;
   blocksByCourtId: Map<number, PreviewBlock[]>;
   blockByMatchId: Map<number, PreviewBlock>;
+  defaultBreakMinutes: number;
 }
 
 export function insertionLineKey(courtId: number, index: number): string {
@@ -86,7 +87,7 @@ function playingTimesOverlap(match1: ConflictPreviewMatch, match2: ConflictPrevi
 }
 
 function slotLengthMinutes(match: ConflictPreviewMatch): number {
-  return match.duration_minutes + match.margin_minutes;
+  return match.duration_minutes;
 }
 
 function playingMinutesOverlap(
@@ -105,14 +106,21 @@ export function actionCreatesSelectedConflict({
   stages,
   selectedMatchId,
   tournamentStartTime,
+  defaultBreakMinutes = 0,
   action,
 }: {
   stages: ConflictPreviewStage[];
   selectedMatchId: number;
   tournamentStartTime: string | Date;
+  defaultBreakMinutes?: number;
   action: PlanningAction;
 }): boolean {
-  const simulated = applyPlanningActions(stages, [action], tournamentStartTime);
+  const simulated = applyPlanningActions(
+    stages,
+    [action],
+    tournamentStartTime,
+    defaultBreakMinutes
+  );
   const matches = getMatches(simulated);
   const selected = matches.find((match) => match.id === selectedMatchId);
   if (selected == null || matchInputIds(selected).size === 0) return false;
@@ -151,16 +159,51 @@ function preparePreview(
     }
   }
 
-  return { matchesById, blocksByCourtId, blockByMatchId };
+  return {
+    matchesById,
+    blocksByCourtId,
+    blockByMatchId,
+    defaultBreakMinutes: layout.defaultBreakMinutes,
+  };
 }
 
-function repackCourt(courtId: number, matches: ConflictPreviewMatch[]): PreviewBlock[] {
-  let startMinutes = 0;
-  return matches.map((match) => {
+/**
+ * A match queued for a court, paired with the start it would keep if nothing
+ * forced it later. Matches that stay put carry their existing start; a match
+ * that moves into a slot adopts that slot's start (mirroring the backend, which
+ * copies the swapped match's `start_time` or resets a rescheduled one to None).
+ */
+interface RescheduleEntry {
+  match: ConflictPreviewMatch;
+  baseStartMinutes: number;
+}
+
+function rescheduleCourt(
+  prepared: PreparedPreview,
+  courtId: number,
+  entries: RescheduleEntry[]
+): PreviewBlock[] {
+  let previousEnd: number | null = null;
+  return entries.map(({ match, baseStartMinutes }) => {
+    let startMinutes = baseStartMinutes;
+    if (previousEnd != null) {
+      startMinutes = Math.max(startMinutes, previousEnd + prepared.defaultBreakMinutes);
+    }
     const block = { courtId, match, startMinutes };
-    startMinutes += slotLengthMinutes(match);
+    previousEnd = startMinutes + slotLengthMinutes(match);
     return block;
   });
+}
+
+/** Existing matches on a court as entries that keep their current starts. */
+function courtEntries(
+  prepared: PreparedPreview,
+  courtId: number,
+  excludeMatchId?: number
+): RescheduleEntry[] {
+  return (prepared.blocksByCourtId.get(courtId) ?? [])
+    .filter((block) => block.match.id !== excludeMatchId)
+    .map((block) => ({ match: block.match, baseStartMinutes: block.startMinutes }));
 }
 
 function blocksConflict(block1: PreviewBlock, block2: PreviewBlock): boolean {
@@ -214,16 +257,6 @@ function affectedScheduleCreatesConflict(
   return false;
 }
 
-function insertMatchAt(
-  blocks: PreviewBlock[],
-  match: ConflictPreviewMatch,
-  position: number
-): ConflictPreviewMatch[] {
-  const matches = blocks.map((block) => block.match);
-  const index = Math.min(Math.max(position, 0), matches.length);
-  return [...matches.slice(0, index), match, ...matches.slice(index)];
-}
-
 function rescheduleAffectedCourts(
   prepared: PreparedPreview,
   action: Extract<PlanningAction, { type: 'reschedule' }>
@@ -232,20 +265,22 @@ function rescheduleAffectedCourts(
   if (match == null) return null;
 
   const { old_court_id, new_court_id, new_position } = action.body;
-  const targetBlocks = (prepared.blocksByCourtId.get(new_court_id) ?? []).filter(
-    (block) => block.match.id !== match.id
-  );
+  const targetEntries = courtEntries(prepared, new_court_id, match.id);
+  const index = Math.min(Math.max(new_position, 0), targetEntries.length);
+  // The moved match seeds at the tournament start (backend resets start_time to None).
+  const newCourtEntries: RescheduleEntry[] = [
+    ...targetEntries.slice(0, index),
+    { match, baseStartMinutes: 0 },
+    ...targetEntries.slice(index),
+  ];
   const affectedCourts = new Map<number, PreviewBlock[]>();
-  affectedCourts.set(
-    new_court_id,
-    repackCourt(new_court_id, insertMatchAt(targetBlocks, match, new_position))
-  );
+  affectedCourts.set(new_court_id, rescheduleCourt(prepared, new_court_id, newCourtEntries));
 
   if (old_court_id != null && old_court_id !== new_court_id) {
-    const oldCourtMatches = (prepared.blocksByCourtId.get(old_court_id) ?? [])
-      .filter((block) => block.match.id !== match.id)
-      .map((block) => block.match);
-    affectedCourts.set(old_court_id, repackCourt(old_court_id, oldCourtMatches));
+    affectedCourts.set(
+      old_court_id,
+      rescheduleCourt(prepared, old_court_id, courtEntries(prepared, old_court_id, match.id))
+    );
   }
 
   return affectedCourts;
@@ -266,35 +301,52 @@ function swapAffectedCourts(
   const affectedCourts = new Map<number, PreviewBlock[]>();
 
   if (block1 != null && block2 != null) {
+    // Two scheduled matches trade slots: each adopts the other slot's start.
+    const swapEntry = (block: PreviewBlock): RescheduleEntry => {
+      if (block.match.id === match1.id)
+        return { match: match2, baseStartMinutes: block.startMinutes };
+      if (block.match.id === match2.id)
+        return { match: match1, baseStartMinutes: block.startMinutes };
+      return { match: block.match, baseStartMinutes: block.startMinutes };
+    };
+
     if (block1.courtId === block2.courtId) {
-      const swappedMatches = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map((block) => {
-        if (block.match.id === match1.id) return match2;
-        if (block.match.id === match2.id) return match1;
-        return block.match;
-      });
-      affectedCourts.set(block1.courtId, repackCourt(block1.courtId, swappedMatches));
+      const entries = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map(swapEntry);
+      affectedCourts.set(block1.courtId, rescheduleCourt(prepared, block1.courtId, entries));
       return affectedCourts;
     }
 
-    const court1Matches = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map((block) =>
-      block.match.id === match1.id ? match2 : block.match
+    affectedCourts.set(
+      block1.courtId,
+      rescheduleCourt(
+        prepared,
+        block1.courtId,
+        (prepared.blocksByCourtId.get(block1.courtId) ?? []).map(swapEntry)
+      )
     );
-    const court2Matches = (prepared.blocksByCourtId.get(block2.courtId) ?? []).map((block) =>
-      block.match.id === match2.id ? match1 : block.match
+    affectedCourts.set(
+      block2.courtId,
+      rescheduleCourt(
+        prepared,
+        block2.courtId,
+        (prepared.blocksByCourtId.get(block2.courtId) ?? []).map(swapEntry)
+      )
     );
-    affectedCourts.set(block1.courtId, repackCourt(block1.courtId, court1Matches));
-    affectedCourts.set(block2.courtId, repackCourt(block2.courtId, court2Matches));
     return affectedCourts;
   }
 
+  // Mixed swap: the tray match takes over the scheduled match's slot.
   const scheduledBlock = block1 ?? block2!;
   const incomingMatch = block1 == null ? match1 : match2;
-  const scheduledCourtMatches = (prepared.blocksByCourtId.get(scheduledBlock.courtId) ?? []).map(
-    (block) => (block.match.id === scheduledBlock.match.id ? incomingMatch : block.match)
+  const entries = (prepared.blocksByCourtId.get(scheduledBlock.courtId) ?? []).map(
+    (block): RescheduleEntry =>
+      block.match.id === scheduledBlock.match.id
+        ? { match: incomingMatch, baseStartMinutes: block.startMinutes }
+        : { match: block.match, baseStartMinutes: block.startMinutes }
   );
   affectedCourts.set(
     scheduledBlock.courtId,
-    repackCourt(scheduledBlock.courtId, scheduledCourtMatches)
+    rescheduleCourt(prepared, scheduledBlock.courtId, entries)
   );
   return affectedCourts;
 }
@@ -355,7 +407,7 @@ export function computeConflictPreview({
         match: {
           matchId: block.match.id,
           courtId: court.id,
-          position: block.match.position_in_schedule ?? blockIndex,
+          position: blockIndex,
         },
       });
       if (hasConflict(transition.actions)) {

@@ -4,24 +4,18 @@ import { OptimisticMatch, applyPlanningActions } from './optimistic';
 import { PlanningAction } from './selection';
 
 const START = '2022-01-01T10:00:00.000Z';
+const BREAK = 5;
 
 function minutesAfterStart(minutes: number): string {
   return new Date(new Date(START).getTime() + minutes * 60_000).toISOString();
 }
 
-function match(
-  id: number,
-  courtId: number | null,
-  position: number | null,
-  startMinutes: number | null
-): OptimisticMatch {
+function match(id: number, courtId: number | null, startMinutes: number | null): OptimisticMatch {
   return {
     id,
     court_id: courtId,
-    position_in_schedule: position,
     start_time: startMinutes == null ? null : minutesAfterStart(startMinutes),
     duration_minutes: 10,
-    margin_minutes: 5,
   };
 }
 
@@ -30,7 +24,7 @@ function stagesWith(matches: OptimisticMatch[]) {
 }
 
 function apply(matches: OptimisticMatch[], actions: PlanningAction[]) {
-  const result = applyPlanningActions(stagesWith(matches), actions, START);
+  const result = applyPlanningActions(stagesWith(matches), actions, START, BREAK);
   const byId = new Map<number, OptimisticMatch>();
   for (const m of result[0].stage_items[0].rounds[0].matches) {
     byId.set(m.id, m);
@@ -41,120 +35,79 @@ function apply(matches: OptimisticMatch[], actions: PlanningAction[]) {
 function slot(m: OptimisticMatch | undefined) {
   return {
     court_id: m?.court_id,
-    position: m?.position_in_schedule,
     start_time: m?.start_time,
   };
 }
 
 describe('applyPlanningActions', () => {
   it('does not mutate the input stages', () => {
-    const matches = [match(1, 1, 0, 0), match(2, 2, 0, 0)];
+    const matches = [match(1, 1, 0), match(2, 2, 0)];
     const stages = stagesWith(matches);
 
-    applyPlanningActions(stages, [{ type: 'swap', matchId1: 1, matchId2: 2 }], START);
+    applyPlanningActions(stages, [{ type: 'swap', matchId1: 1, matchId2: 2 }], START, BREAK);
 
     expect(matches[0].court_id).toEqual(1);
     expect(matches[1].court_id).toEqual(2);
   });
 
-  it('swaps court and position of two matches on different courts', () => {
-    // Court 1: 1, 2; court 2: 3, 4. Swap 2 (court 1, pos 1) with 3 (court 2, pos 0).
+  it('swaps court and start time of two matches on different courts', () => {
+    // Court 1: 1@0, 2@15; court 2: 3@0, 4@15. Swap 2 with 3.
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, 2, 0, 0), match(4, 2, 1, 15)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, 2, 0), match(4, 2, 15)],
       [{ type: 'swap', matchId1: 2, matchId2: 3 }]
     );
 
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 2,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(4))).toEqual({
-      court_id: 2,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
+    expect(slot(byId.get(2))).toEqual({ court_id: 2, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(4))).toEqual({ court_id: 2, start_time: minutesAfterStart(15) });
   });
 
   it('swaps two matches on the same court, leaving the one in between untouched', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, 1, 2, 30)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, 1, 30)],
       [{ type: 'swap', matchId1: 1, matchId2: 3 }]
     );
 
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 2,
-      start_time: minutesAfterStart(30),
-    });
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
   });
 
   it('swaps a scheduled match with a tray match, trading slot for tray', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, null, null, null)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, null, null)],
       [{ type: 'swap', matchId1: 1, matchId2: 3 }]
     );
 
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(1))).toEqual({ court_id: null, start_time: null });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
   });
 
   it('swaps a tray match with a scheduled match regardless of argument order', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, null, null, null)],
+      [match(1, 1, 0), match(2, null, null)],
       [{ type: 'swap', matchId1: 2, matchId2: 1 }]
     );
 
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(1))).toEqual({ court_id: null, start_time: null });
   });
 
   it('ignores a swap of two unscheduled matches', () => {
     const byId = apply(
-      [match(1, null, null, null), match(2, null, null, null)],
+      [match(1, null, null), match(2, null, null)],
       [{ type: 'swap', matchId1: 1, matchId2: 2 }]
     );
 
-    expect(slot(byId.get(1))).toEqual({ court_id: null, position: null, start_time: null });
-    expect(slot(byId.get(2))).toEqual({ court_id: null, position: null, start_time: null });
+    expect(slot(byId.get(1))).toEqual({ court_id: null, start_time: null });
+    expect(slot(byId.get(2))).toEqual({ court_id: null, start_time: null });
   });
 
   it('reschedules a match to another court, inserting before the occupant', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, 2, 0, 0)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, 2, 0)],
       [
         {
           type: 'reschedule',
@@ -164,26 +117,14 @@ describe('applyPlanningActions', () => {
       ]
     );
 
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 2,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 2,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
+    expect(slot(byId.get(2))).toEqual({ court_id: 2, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(3))).toEqual({ court_id: 2, start_time: minutesAfterStart(15) });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
   });
 
-  it('reschedules a match later on the same court, inserting after the occupant', () => {
+  it('reschedules a match later on the same court, leaving the vacated gap behind', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, 1, 2, 30)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, 1, 30)],
       [
         {
           type: 'reschedule',
@@ -195,26 +136,16 @@ describe('applyPlanningActions', () => {
       ]
     );
 
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 2,
-      start_time: minutesAfterStart(30),
-    });
+    // The other matches keep their start times; only the moved match shifts to
+    // after the last occupied interval (30 + 10 duration + 5 break = 45).
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(45) });
   });
 
-  it('schedules a tray match onto a court', () => {
+  it('schedules a tray match onto a court, shifting the occupant', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, null, null, null)],
+      [match(1, 1, 0), match(2, null, null)],
       [
         {
           type: 'reschedule',
@@ -224,34 +155,18 @@ describe('applyPlanningActions', () => {
       ]
     );
 
-    expect(slot(byId.get(2))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
   });
 
-  it('unschedules a match and re-packs the remaining ones', () => {
+  it('unschedules a match and leaves a gap, not re-packing the remaining ones', () => {
     const byId = apply(
-      [match(1, 1, 0, 0), match(2, 1, 1, 15), match(3, 1, 2, 30)],
+      [match(1, 1, 0), match(2, 1, 15), match(3, 1, 30)],
       [{ type: 'unschedule', matchId: 2 }]
     );
 
-    expect(slot(byId.get(2))).toEqual({ court_id: null, position: null, start_time: null });
-    expect(slot(byId.get(1))).toEqual({
-      court_id: 1,
-      position: 0,
-      start_time: minutesAfterStart(0),
-    });
-    expect(slot(byId.get(3))).toEqual({
-      court_id: 1,
-      position: 1,
-      start_time: minutesAfterStart(15),
-    });
+    expect(slot(byId.get(2))).toEqual({ court_id: null, start_time: null });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
   });
 });

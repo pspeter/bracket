@@ -748,7 +748,7 @@ export default function ScheduleGrid({
                 const matchRef: GridMatchRef = {
                   matchId: block.match.id,
                   courtId: court.id,
-                  position: block.match.position_in_schedule ?? blockIndex,
+                  position: blockIndex,
                   locked: block.locked,
                 };
                 return (
