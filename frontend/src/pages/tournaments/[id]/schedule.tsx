@@ -7,6 +7,7 @@ import CourtModal from '@components/modals/create_court_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
+import { computeConflictPreview } from '@logic/planning/conflict_preview';
 import { computeScheduleLayout } from '@logic/planning/layout';
 import { applyPlanningActions } from '@logic/planning/optimistic';
 import {
@@ -165,6 +166,13 @@ export default function SchedulePage() {
         : null;
   const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
   const isOverview = planner.zoom === 'overview';
+  const conflictPreview = isOverview
+    ? { insertionLines: new Set<string>(), swapTargets: new Set<number>() }
+    : computeConflictPreview({
+        stages: rawStages,
+        layout,
+        selection: planner.selection,
+      });
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
@@ -230,6 +238,7 @@ export default function SchedulePage() {
             <ScheduleGrid
               layout={layout}
               violations={violations}
+              conflictPreview={conflictPreview}
               stageItemsLookup={stageItemsLookup}
               matchesLookup={matchesLookup}
               levels={levels}
