@@ -23,10 +23,9 @@ interface PreviewBlock {
 }
 
 interface PreparedPreview {
-  selected: ConflictPreviewMatch;
+  matchesById: Map<number, ConflictPreviewMatch>;
   blocksByCourtId: Map<number, PreviewBlock[]>;
   blockByMatchId: Map<number, PreviewBlock>;
-  sharedBlocks: PreviewBlock[];
 }
 
 export function insertionLineKey(courtId: number, index: number): string {
@@ -134,15 +133,11 @@ function preparePreview(
   const selectedMatchId = getSelectedMatchId(selection);
   if (selectedMatchId == null) return null;
 
-  const selected = getMatches(stages).find((match) => match.id === selectedMatchId);
-  if (selected == null) return null;
-
-  const selectedInputIds = matchInputIds(selected);
-  if (selectedInputIds.size === 0) return null;
+  const matchesById = new Map(getMatches(stages).map((match) => [match.id, match]));
+  if (!matchesById.has(selectedMatchId)) return null;
 
   const blocksByCourtId = new Map<number, PreviewBlock[]>();
   const blockByMatchId = new Map<number, PreviewBlock>();
-  const sharedBlocks: PreviewBlock[] = [];
 
   for (const { court, blocks } of layout.courts) {
     const previewBlocks = blocks.map((block) => ({
@@ -153,13 +148,10 @@ function preparePreview(
     blocksByCourtId.set(court.id, previewBlocks);
     for (const block of previewBlocks) {
       blockByMatchId.set(block.match.id, block);
-      if (block.match.id !== selected.id && sharesInput(selected, block.match)) {
-        sharedBlocks.push(block);
-      }
     }
   }
 
-  return { selected, blocksByCourtId, blockByMatchId, sharedBlocks };
+  return { matchesById, blocksByCourtId, blockByMatchId };
 }
 
 function repackCourt(courtId: number, matches: ConflictPreviewMatch[]): PreviewBlock[] {
@@ -171,131 +163,157 @@ function repackCourt(courtId: number, matches: ConflictPreviewMatch[]): PreviewB
   });
 }
 
-function startAtPosition(blocks: PreviewBlock[], position: number): number {
-  let startMinutes = 0;
-  for (const block of blocks.slice(0, position)) {
-    startMinutes += slotLengthMinutes(block.match);
-  }
-  return startMinutes;
-}
-
-function blockConflictsWithSelected(
-  prepared: PreparedPreview,
-  selectedStartMinutes: number,
-  block: PreviewBlock
-): boolean {
+function blocksConflict(block1: PreviewBlock, block2: PreviewBlock): boolean {
   return (
-    sharesInput(prepared.selected, block.match) &&
+    sharesInput(block1.match, block2.match) &&
     playingMinutesOverlap(
-      selectedStartMinutes,
-      slotLengthMinutes(prepared.selected),
-      block.startMinutes,
-      slotLengthMinutes(block.match)
+      block1.startMinutes,
+      slotLengthMinutes(block1.match),
+      block2.startMinutes,
+      slotLengthMinutes(block2.match)
     )
   );
 }
 
-function selectedIntervalConflicts({
-  prepared,
-  selectedCourtId,
-  selectedStartMinutes,
-  affectedCourts,
-}: {
-  prepared: PreparedPreview;
-  selectedCourtId: number;
-  selectedStartMinutes: number;
-  affectedCourts: Map<number, PreviewBlock[]>;
-}): boolean {
-  for (const [courtId, blocks] of affectedCourts) {
-    if (courtId === selectedCourtId) continue;
-    if (blocks.some((block) => blockConflictsWithSelected(prepared, selectedStartMinutes, block))) {
-      return true;
-    }
-  }
-
-  return prepared.sharedBlocks.some(
-    (block) =>
-      block.courtId !== selectedCourtId &&
-      !affectedCourts.has(block.courtId) &&
-      blockConflictsWithSelected(prepared, selectedStartMinutes, block)
+function postScheduleBlocks(
+  prepared: PreparedPreview,
+  affectedCourts: Map<number, PreviewBlock[]>
+): PreviewBlock[] {
+  const courtIds = new Set([...prepared.blocksByCourtId.keys(), ...affectedCourts.keys()]);
+  return [...courtIds].flatMap(
+    (courtId) => affectedCourts.get(courtId) ?? prepared.blocksByCourtId.get(courtId) ?? []
   );
 }
 
-function rescheduleCreatesSelectedConflict(
+function changedPostBlocks(prepared: PreparedPreview, postBlocks: PreviewBlock[]): PreviewBlock[] {
+  return postBlocks.filter((block) => {
+    const previous = prepared.blockByMatchId.get(block.match.id);
+    return (
+      previous == null ||
+      previous.courtId !== block.courtId ||
+      previous.startMinutes !== block.startMinutes
+    );
+  });
+}
+
+function affectedScheduleCreatesConflict(
+  prepared: PreparedPreview,
+  affectedCourts: Map<number, PreviewBlock[]>
+): boolean {
+  const postBlocks = postScheduleBlocks(prepared, affectedCourts);
+  const changedBlocks = changedPostBlocks(prepared, postBlocks);
+
+  for (const changedBlock of changedBlocks) {
+    for (const block of postBlocks) {
+      if (changedBlock.match.id !== block.match.id && blocksConflict(changedBlock, block)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function insertMatchAt(
+  blocks: PreviewBlock[],
+  match: ConflictPreviewMatch,
+  position: number
+): ConflictPreviewMatch[] {
+  const matches = blocks.map((block) => block.match);
+  const index = Math.min(Math.max(position, 0), matches.length);
+  return [...matches.slice(0, index), match, ...matches.slice(index)];
+}
+
+function rescheduleAffectedCourts(
   prepared: PreparedPreview,
   action: Extract<PlanningAction, { type: 'reschedule' }>
-): boolean {
-  if (action.matchId !== prepared.selected.id) return false;
+): Map<number, PreviewBlock[]> | null {
+  const match = prepared.matchesById.get(action.matchId);
+  if (match == null) return null;
 
   const { old_court_id, new_court_id, new_position } = action.body;
   const targetBlocks = (prepared.blocksByCourtId.get(new_court_id) ?? []).filter(
-    (block) => block.match.id !== prepared.selected.id
+    (block) => block.match.id !== match.id
   );
-  const selectedStartMinutes = startAtPosition(targetBlocks, new_position);
   const affectedCourts = new Map<number, PreviewBlock[]>();
+  affectedCourts.set(
+    new_court_id,
+    repackCourt(new_court_id, insertMatchAt(targetBlocks, match, new_position))
+  );
 
   if (old_court_id != null && old_court_id !== new_court_id) {
     const oldCourtMatches = (prepared.blocksByCourtId.get(old_court_id) ?? [])
-      .filter((block) => block.match.id !== prepared.selected.id)
+      .filter((block) => block.match.id !== match.id)
       .map((block) => block.match);
     affectedCourts.set(old_court_id, repackCourt(old_court_id, oldCourtMatches));
   }
 
-  return selectedIntervalConflicts({
-    prepared,
-    selectedCourtId: new_court_id,
-    selectedStartMinutes,
-    affectedCourts,
-  });
+  return affectedCourts;
 }
 
-function swapCreatesSelectedConflict(
+function swapAffectedCourts(
   prepared: PreparedPreview,
   action: Extract<PlanningAction, { type: 'swap' }>
-): boolean {
-  const selectedMatchId = prepared.selected.id;
-  const targetMatchId =
-    action.matchId1 === selectedMatchId
-      ? action.matchId2
-      : action.matchId2 === selectedMatchId
-        ? action.matchId1
-        : null;
-  if (targetMatchId == null) return false;
+): Map<number, PreviewBlock[]> | null {
+  const match1 = prepared.matchesById.get(action.matchId1);
+  const match2 = prepared.matchesById.get(action.matchId2);
+  if (match1 == null || match2 == null) return null;
 
-  const targetBlock = prepared.blockByMatchId.get(targetMatchId);
-  // Swapping a scheduled selected match with a tray match sends the selected
-  // match to the tray, so there is no selected match interval to preview.
-  if (targetBlock == null) return false;
+  const block1 = prepared.blockByMatchId.get(match1.id);
+  const block2 = prepared.blockByMatchId.get(match2.id);
+  if (block1 == null && block2 == null) return null;
 
-  const selectedBlock = prepared.blockByMatchId.get(selectedMatchId);
   const affectedCourts = new Map<number, PreviewBlock[]>();
-  if (selectedBlock != null && selectedBlock.courtId !== targetBlock.courtId) {
-    const oldCourtMatches = (prepared.blocksByCourtId.get(selectedBlock.courtId) ?? []).map(
-      (block) => (block.match.id === selectedMatchId ? targetBlock.match : block.match)
+
+  if (block1 != null && block2 != null) {
+    if (block1.courtId === block2.courtId) {
+      const swappedMatches = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map((block) => {
+        if (block.match.id === match1.id) return match2;
+        if (block.match.id === match2.id) return match1;
+        return block.match;
+      });
+      affectedCourts.set(block1.courtId, repackCourt(block1.courtId, swappedMatches));
+      return affectedCourts;
+    }
+
+    const court1Matches = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map((block) =>
+      block.match.id === match1.id ? match2 : block.match
     );
-    affectedCourts.set(selectedBlock.courtId, repackCourt(selectedBlock.courtId, oldCourtMatches));
+    const court2Matches = (prepared.blocksByCourtId.get(block2.courtId) ?? []).map((block) =>
+      block.match.id === match2.id ? match1 : block.match
+    );
+    affectedCourts.set(block1.courtId, repackCourt(block1.courtId, court1Matches));
+    affectedCourts.set(block2.courtId, repackCourt(block2.courtId, court2Matches));
+    return affectedCourts;
   }
 
-  return selectedIntervalConflicts({
-    prepared,
-    selectedCourtId: targetBlock.courtId,
-    selectedStartMinutes: targetBlock.startMinutes,
-    affectedCourts,
-  });
+  const scheduledBlock = block1 ?? block2!;
+  const incomingMatch = block1 == null ? match1 : match2;
+  const scheduledCourtMatches = (prepared.blocksByCourtId.get(scheduledBlock.courtId) ?? []).map(
+    (block) => (block.match.id === scheduledBlock.match.id ? incomingMatch : block.match)
+  );
+  affectedCourts.set(
+    scheduledBlock.courtId,
+    repackCourt(scheduledBlock.courtId, scheduledCourtMatches)
+  );
+  return affectedCourts;
 }
 
-function planningActionCreatesSelectedConflict(
-  prepared: PreparedPreview,
-  action: PlanningAction
-): boolean {
+function planningActionCreatesConflict(prepared: PreparedPreview, action: PlanningAction): boolean {
+  let affectedCourts: Map<number, PreviewBlock[]> | null = null;
+
   switch (action.type) {
     case 'reschedule':
-      return rescheduleCreatesSelectedConflict(prepared, action);
+      affectedCourts = rescheduleAffectedCourts(prepared, action);
+      break;
     case 'swap':
-      return swapCreatesSelectedConflict(prepared, action);
+      affectedCourts = swapAffectedCourts(prepared, action);
+      break;
     default:
       return false;
   }
+
+  return affectedCourts != null && affectedScheduleCreatesConflict(prepared, affectedCourts);
 }
 
 export function computeConflictPreview({
@@ -315,7 +333,7 @@ export function computeConflictPreview({
   const preview = emptyPreview();
 
   function hasConflict(actions: PlanningAction[]): boolean {
-    return actions.some((action) => planningActionCreatesSelectedConflict(preparedPreview, action));
+    return actions.some((action) => planningActionCreatesConflict(preparedPreview, action));
   }
 
   for (const { court, blocks } of layout.courts) {

@@ -176,6 +176,88 @@ describe('computeConflictPreview', () => {
     expect([...preview.insertionLines]).not.toContain(insertionLineKey(1, 1));
   });
 
+  it('flags insertion lines that push a later match into a team overlap', () => {
+    const matches = [
+      match({
+        id: 1,
+        courtId: null,
+        position: null,
+        startMinutes: null,
+        input1: 100,
+        input2: 101,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 2,
+        courtId: 1,
+        position: 0,
+        startMinutes: 0,
+        input1: 200,
+        input2: 201,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 3,
+        courtId: 1,
+        position: 1,
+        startMinutes: 30,
+        input1: 10,
+        input2: 11,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 4,
+        courtId: 2,
+        position: 0,
+        startMinutes: 0,
+        input1: 300,
+        input2: 301,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 5,
+        courtId: 2,
+        position: 1,
+        startMinutes: 30,
+        input1: 302,
+        input2: 303,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 6,
+        courtId: 2,
+        position: 2,
+        startMinutes: 60,
+        input1: 10,
+        input2: 12,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+    ];
+    const layout = computeScheduleLayout({
+      courts: [
+        { id: 1, name: 'Court 1' },
+        { id: 2, name: 'Court 2' },
+      ],
+      matchesByCourtId: { 1: [matches[1], matches[2]], 2: [matches[3], matches[4], matches[5]] },
+      tournamentStartTime: START,
+    });
+
+    const preview = computeConflictPreview({
+      stages: stagesWith(matches),
+      layout,
+      selection: { kind: 'tray-match-selected', matchId: 1 },
+    });
+
+    expect([...preview.insertionLines]).toContain(insertionLineKey(1, 0));
+    expect([...preview.insertionLines]).not.toContain(insertionLineKey(1, 2));
+  });
+
   it('flags swap targets that would put the selected match into a conflicting slot', () => {
     const matches = [
       match({ id: 1, courtId: null, position: null, startMinutes: null, input1: 10, input2: 20 }),
@@ -236,5 +318,85 @@ describe('computeConflictPreview', () => {
 
     expect([...preview.swapTargets]).toContain(2);
     expect([...preview.swapTargets]).not.toContain(4);
+  });
+
+  it('flags swap targets when the other swapped match conflicts in the selected slot', () => {
+    const matches = [
+      match({
+        id: 1,
+        courtId: 1,
+        position: 0,
+        startMinutes: 0,
+        input1: 100,
+        input2: 101,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 2,
+        courtId: 2,
+        position: 0,
+        startMinutes: 0,
+        input1: 200,
+        input2: 201,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 3,
+        courtId: 2,
+        position: 1,
+        startMinutes: 30,
+        input1: 202,
+        input2: 203,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 4,
+        courtId: 2,
+        position: 2,
+        startMinutes: 60,
+        input1: 10,
+        input2: 11,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+      match({
+        id: 5,
+        courtId: 3,
+        position: 0,
+        startMinutes: 0,
+        input1: 10,
+        input2: 12,
+        durationMinutes: 20,
+        marginMinutes: 10,
+      }),
+    ];
+    const layout = computeScheduleLayout({
+      courts: [
+        { id: 1, name: 'Court 1' },
+        { id: 2, name: 'Court 2' },
+        { id: 3, name: 'Court 3' },
+      ],
+      matchesByCourtId: {
+        1: [matches[0]],
+        2: [matches[1], matches[2], matches[3]],
+        3: [matches[4]],
+      },
+      tournamentStartTime: START,
+    });
+
+    const preview = computeConflictPreview({
+      stages: stagesWith(matches),
+      layout,
+      selection: {
+        kind: 'match-selected',
+        match: { matchId: 1, courtId: 1, position: 0 },
+      },
+    });
+
+    expect([...preview.swapTargets]).toContain(4);
+    expect([...preview.swapTargets]).not.toContain(2);
   });
 });
