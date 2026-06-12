@@ -18,6 +18,7 @@ import {
   initialPlannerState,
   plannerReducer,
 } from '@logic/planning/selection';
+import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tray';
 import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel, levelColour } from '@logic/planning/zoom';
 import { Court, LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
@@ -122,18 +123,18 @@ export default function SchedulePage() {
       setFocus((previous) => ({ ...focusTarget, nonce: (previous?.nonce ?? 0) + 1 }));
     }
 
-    // Picking a match from the tray collapses it so the grid is free for placing.
-    if (state.selection.kind === 'tray-match-selected') {
-      setTrayOpened(false);
-    }
+    const updateTrayOpened = () =>
+      setTrayOpened((opened) =>
+        nextTrayOpenedAfterPlannerEvent({
+          opened,
+          previousSelection: planner.selection,
+          nextSelection: state.selection,
+          event,
+          actions,
+        })
+      );
 
     if (actions.length > 0) {
-      // After placing a tray match, reopen the tray so scheduling many matches
-      // in a row flows without extra taps.
-      if (wasTraySelection && event.type === 'tap-insertion-line') {
-        setTrayOpened(true);
-      }
-
       // Show the predicted outcome immediately; the revalidation that follows the
       // request replaces it with the backend's authoritative schedule.
       await swrStagesResponse.mutate(
@@ -155,6 +156,11 @@ export default function SchedulePage() {
           revalidate: true,
         }
       );
+      if (wasTraySelection) {
+        updateTrayOpened();
+      }
+    } else {
+      updateTrayOpened();
     }
   }
 
@@ -251,8 +257,9 @@ export default function SchedulePage() {
               unscheduledMatches={unscheduledMatches}
               stageItemsLookup={stageItemsLookup}
               matchesLookup={matchesLookup}
+              levels={levels}
               opened={trayOpened}
-              onToggle={() => setTrayOpened(!trayOpened)}
+              onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
             />
             <Affix position={{ right: 8, top: '45%' }} zIndex={200}>
