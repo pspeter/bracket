@@ -13,12 +13,16 @@ export interface LayoutCourt {
   name: string;
 }
 
+/** Structural mirror of the generated `MatchState`; absent means upcoming. */
+export type LayoutMatchState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+
 export interface LayoutMatch {
   id: number;
   duration_minutes: number;
   margin_minutes: number;
   position_in_schedule: number | null;
   start_time: string | null;
+  state?: LayoutMatchState | null;
 }
 
 export interface MatchBlock<M extends LayoutMatch = LayoutMatch> {
@@ -33,6 +37,13 @@ export interface MatchBlock<M extends LayoutMatch = LayoutMatch> {
   endMinutes: number;
   /** Absolute computed start time. */
   startTime: Date;
+  /**
+   * Inside the court's frozen past: at or before the court's last completed or
+   * in-progress match. Moving any such match (even an upcoming one scored out
+   * of order around) would repack the court and shift the recorded start times
+   * of played matches, so locked matches are excluded from tap-to-place.
+   */
+  locked: boolean;
 }
 
 export interface CourtTimeline<
@@ -73,16 +84,27 @@ export interface InsertionLine {
   offsetMinutes: number;
 }
 
+function isPlayed(match: LayoutMatch): boolean {
+  return match.state === 'COMPLETED' || match.state === 'IN_PROGRESS';
+}
+
 /**
  * Tap targets for placing a match on a court: one line half a margin above the
  * first match (mirroring the end-of-court line below the last one), one centered
  * in each margin gap between consecutive matches, and one in the gap after the
  * last match. An empty court gets a single line at the top.
+ *
+ * Only the future portion of the court accepts insertions: lines above the last
+ * locked (completed/in-progress) match are omitted, so a repack can never shift
+ * the recorded start times of already-played matches. Courts with no played
+ * matches offer all positions.
  */
 export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
   if (blocks.length === 0) {
     return [{ index: 0, offsetMinutes: 0 }];
   }
+
+  const lockedCount = blocks.filter((block) => block.locked).length;
 
   const first = blocks[0];
   const lines: InsertionLine[] = [
@@ -93,7 +115,7 @@ export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
     const gapStart = previous.startMinutes + previous.durationMinutes;
     lines.push({ index: i, offsetMinutes: (gapStart + previous.endMinutes) / 2 });
   }
-  return lines;
+  return lines.filter((line) => line.index >= lockedCount);
 }
 
 const DEFAULT_TICK_INTERVAL_MINUTES = 30;
@@ -118,6 +140,9 @@ export function computeScheduleLayout<C extends LayoutCourt, M extends LayoutMat
       .filter((m) => m.start_time != null)
       .sort((m1, m2) => (m1.position_in_schedule ?? 0) - (m2.position_in_schedule ?? 0));
 
+    // Everything up to the court's last played match is the frozen past.
+    const lockedCount = scheduled.reduce((count, m, index) => (isPlayed(m) ? index + 1 : count), 0);
+
     const blocks: MatchBlock<M>[] = [];
     let currentMinutes = 0;
     for (const m of scheduled) {
@@ -129,6 +154,7 @@ export function computeScheduleLayout<C extends LayoutCourt, M extends LayoutMat
         marginMinutes: m.margin_minutes,
         endMinutes,
         startTime: addMinutes(startTime, currentMinutes),
+        locked: blocks.length < lockedCount,
       });
       currentMinutes = endMinutes;
     }

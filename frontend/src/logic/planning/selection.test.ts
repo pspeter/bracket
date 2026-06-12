@@ -15,6 +15,10 @@ function ref(matchId: number, courtId: number, position: number): GridMatchRef {
   return { matchId, courtId, position };
 }
 
+function lockedRef(matchId: number, courtId: number, position: number): GridMatchRef {
+  return { matchId, courtId, position, locked: true };
+}
+
 function selected(match: GridMatchRef): SelectionState {
   return { kind: 'match-selected', match };
 }
@@ -289,6 +293,40 @@ describe('selectionReducer', () => {
       expect(actions).toEqual([]);
     });
   });
+
+  describe('soft-locked (completed/in-progress) matches', () => {
+    it('tapping a locked match from idle does not select it', () => {
+      const { state, actions } = selectionReducer(IDLE_SELECTION, {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
+    });
+
+    it('tapping a locked match with a scheduled match selected does not swap', () => {
+      const selection = selected(ref(10, 1, 2));
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-match',
+        match: lockedRef(20, 2, 0),
+      });
+
+      expect(state).toEqual(selection);
+      expect(actions).toEqual([]);
+    });
+
+    it('tapping a locked match with a tray match selected does not swap', () => {
+      const selection = traySelected(30);
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(selection);
+      expect(actions).toEqual([]);
+    });
+  });
 });
 
 describe('plannerReducer', () => {
@@ -379,6 +417,16 @@ describe('plannerReducer', () => {
         ]);
       }
     );
+
+    it('never selects a locked (played) match', () => {
+      const { state, actions } = plannerReducer(planner('compact'), {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('compact'));
+      expect(actions).toEqual([]);
+    });
 
     it('swaps two matches on a card tap', () => {
       const { state, actions } = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
