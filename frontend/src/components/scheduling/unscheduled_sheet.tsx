@@ -49,6 +49,11 @@ export default function UnscheduledSheet({
 }) {
   const { t } = useTranslation();
   const groups = groupUnscheduledMatchesForTray(unscheduledMatches, matchesLookup, levels);
+  const visibleLevelCount = groups.kind === 'grouped' ? groups.levels.length : 1;
+  const preferredTrayWidthRem =
+    groups.kind === 'grouped'
+      ? Math.max(30, visibleLevelCount * 18 + Math.max(visibleLevelCount - 1, 0) * 0.75 + 2)
+      : 30;
 
   function renderMatchRow(match: MatchWithDetails, badgeLabel?: string) {
     const entry = matchesLookup[match.id];
@@ -98,11 +103,18 @@ export default function UnscheduledSheet({
     }
 
     return (
-      <Stack gap="sm">
+      <Box
+        style={{
+          display: 'grid',
+          gap: 'var(--mantine-spacing-sm)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 18rem), 1fr))',
+          alignItems: 'start',
+        }}
+      >
         {groupedMatches.levels.map((level) => (
           <Box key={level.id ?? 'none'}>
             <Group justify="space-between" gap="xs" mb={4}>
-              <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+              <Text size="md" fw={700} tt="uppercase">
                 {level.name || t('all_levels_label')}
               </Text>
               <Badge size="sm" color={levelColour(level.id, levels)} variant="light">
@@ -112,7 +124,7 @@ export default function UnscheduledSheet({
             <Stack gap="xs">
               {level.stages.map((stage) => (
                 <Box key={stage.id}>
-                  <Text size="sm" fw={600} mb={2}>
+                  <Text size="sm" fw={600} c="dimmed" mb={2}>
                     {stage.name}
                   </Text>
                   <Box>
@@ -126,7 +138,7 @@ export default function UnscheduledSheet({
             </Stack>
           </Box>
         ))}
-      </Stack>
+      </Box>
     );
   }
 
@@ -140,7 +152,7 @@ export default function UnscheduledSheet({
         bottom: 0,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 'min(100%, 30rem)',
+        width: `min(100%, ${preferredTrayWidthRem}rem)`,
         zIndex: 150,
         borderTopLeftRadius: 12,
         borderTopRightRadius: 12,
