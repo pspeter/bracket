@@ -31,6 +31,7 @@ import classes from './schedule_grid.module.css';
 const RULER_WIDTH = '3.25rem';
 const HEADER_HEIGHT = '2.5rem';
 const HEADER_HEIGHT_PX = 40;
+const NOW_LINE_OPACITY = 0.4;
 /** Height of an insertion line's tap target; the visible line is centered inside it. */
 const INSERTION_HIT_AREA_PX = 32;
 /**
@@ -604,6 +605,7 @@ export default function ScheduleGrid({
                   right: 0,
                   zIndex: 1,
                   borderTop: '2px solid var(--mantine-color-red-filled)',
+                  opacity: NOW_LINE_OPACITY,
                 }}
               >
                 <Text
@@ -719,6 +721,7 @@ export default function ScheduleGrid({
                     right: 0,
                     zIndex: 2,
                     borderTop: '2px solid var(--mantine-color-red-filled)',
+                    opacity: NOW_LINE_OPACITY,
                     pointerEvents: 'none',
                   }}
                 />
