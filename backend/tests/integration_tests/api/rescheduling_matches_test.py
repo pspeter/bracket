@@ -114,6 +114,94 @@ async def test_reschedule_match(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_reschedule_match_stale_position_returns_conflict(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    A reschedule whose old court/position no longer matches (someone else moved the
+    match in between) is rejected with 409 and leaves the schedule untouched.
+    """
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input1_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as stage_item_input2_inserted,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court1_inserted,
+        inserted_court(
+            DUMMY_COURT2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as court2_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": stage_item_input1_inserted.id,
+                    "stage_item_input2_id": stage_item_input2_inserted.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        # The match sits at position 1 on court 1; claim it was at position 0.
+        body = MatchRescheduleBody(
+            old_court_id=court1_inserted.id,
+            old_position=0,
+            new_court_id=court2_inserted.id,
+            new_position=0,
+        )
+        response = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/reschedule",
+            auth_context,
+            json=body.model_dump(),
+        )
+        match = await sql_get_match(match_inserted.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    assert response["detail"] == (
+        "The schedule changed since this device last refreshed: "
+        "the match is no longer at the given court and position"
+    )
+    assert match.court_id == court1_inserted.id
+    assert match.position_in_schedule == DUMMY_MATCH1.position_in_schedule
+    assert match.start_time == DUMMY_MATCH1.start_time
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_unschedule_match(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

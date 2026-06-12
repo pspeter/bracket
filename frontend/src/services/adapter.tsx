@@ -196,6 +196,29 @@ export function getStages(
   );
 }
 
+/**
+ * Like `getStages`, but revalidates every `refreshIntervalMs` so changes made by
+ * co-organizers on other devices show up without a manual refresh. Pass 0 to
+ * hold the data still (e.g. while the planner has a match selected); that also
+ * suspends focus/reconnect revalidation, so nothing shifts under the user.
+ */
+export function getStagesWithPolling(
+  tournament_id: number | null,
+  refreshIntervalMs: number
+): SWRResponse<StagesWithStageItemsResponse> {
+  return useSWR(
+    tournament_id == null || tournament_id === -1
+      ? null
+      : `tournaments/${tournament_id}/stages?no_draft_rounds=false`,
+    fetcher,
+    {
+      refreshInterval: refreshIntervalMs,
+      revalidateOnFocus: refreshIntervalMs > 0,
+      revalidateOnReconnect: refreshIntervalMs > 0,
+    }
+  );
+}
+
 export function getStagesLive(
   tournament_id: number | null
 ): SWRResponse<StagesWithStageItemsResponse> {

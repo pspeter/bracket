@@ -226,6 +226,8 @@
     "save_button": "Speichern",
     "save_players_button": "Spieler speichern",
     "save_ranking_button": "Rangliste speichern",
+    "schedule_changed_message": "Jemand anderes hat den Zeitplan in der Zwischenzeit geändert. Er wurde aktualisiert – bitte wählen Sie erneut.",
+    "schedule_changed_title": "Zeitplan geändert",
     "schedule_description": "Alle ungeplanten Spiele planen",
     "schedule_title": "Zeitplan",
     "score_of_label": "Punktzahl von",
