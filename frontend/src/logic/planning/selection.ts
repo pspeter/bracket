@@ -4,12 +4,19 @@
  * The UI dispatches events (tap on a match card, tap on a tray match, tap on an
  * insertion line, unschedule, cancel) and the reducer returns the next selection
  * state plus the backend action the tap triggers (zero or one). Later slices
- * (zoom gating, action sheet) extend this same reducer.
+ * (action sheet) extend this same reducer.
  *
  * Positions are `position_in_schedule` values, which the backend keeps contiguous
  * (0..n-1) per court. An insertion line with index `k` on a court means "insert
  * before the match currently at position `k`"; `k === count` means "at the end".
+ *
+ * `plannerReducer` wraps the selection machine with the semantic zoom level:
+ * placement and swapping are only active at agenda/compact zoom, while taps at
+ * overview zoom navigate (zoom in toward the tapped court/time region). An
+ * active selection survives zoom changes.
  */
+
+import { ZoomLevel, zoomIn, zoomOut } from './zoom';
 
 export interface GridMatchRef {
   matchId: number;
@@ -175,5 +182,95 @@ export function selectionReducer(
       }
     default:
       return stay(state);
+  }
+}
+
+export interface PlannerState {
+  zoom: ZoomLevel;
+  selection: SelectionState;
+}
+
+export function initialPlannerState(zoom: ZoomLevel): PlannerState {
+  return { zoom, selection: IDLE_SELECTION };
+}
+
+export type PlannerEvent =
+  | SelectionEvent
+  | { type: 'zoom-in'; anchor?: FocusTarget | null }
+  | { type: 'zoom-out'; anchor?: FocusTarget | null }
+  | { type: 'set-zoom'; zoom: ZoomLevel }
+  | { type: 'tap-overview'; courtId: number; fraction: number };
+
+/**
+ * Where to scroll the grid after a zoom change: a court plus a vertical
+ * position expressed as a fraction (0..1) of the schedule's total length, so
+ * it stays meaningful across the zoom levels' different scales.
+ */
+export interface FocusTarget {
+  courtId: number;
+  fraction: number;
+}
+
+export interface PlannerTransition {
+  state: PlannerState;
+  actions: PlanningAction[];
+  focus: FocusTarget | null;
+}
+
+function noEffect(state: PlannerState): PlannerTransition {
+  return { state, actions: [], focus: null };
+}
+
+function zoomTo(
+  state: PlannerState,
+  zoom: ZoomLevel,
+  anchor?: FocusTarget | null
+): PlannerTransition {
+  // Already clamped at this level: nothing changes, so nothing to focus.
+  if (zoom === state.zoom) return noEffect(state);
+  return { state: { ...state, zoom }, actions: [], focus: anchor ?? null };
+}
+
+function delegate(state: PlannerState, event: SelectionEvent): PlannerTransition {
+  const { state: selection, actions } = selectionReducer(state.selection, event);
+  return { state: { ...state, selection }, actions, focus: null };
+}
+
+export function plannerReducer(state: PlannerState, event: PlannerEvent): PlannerTransition {
+  switch (event.type) {
+    case 'zoom-in':
+      return zoomTo(state, zoomIn(state.zoom), event.anchor);
+    case 'zoom-out':
+      return zoomTo(state, zoomOut(state.zoom), event.anchor);
+    case 'set-zoom':
+      return zoomTo(state, event.zoom);
+    case 'tap-overview':
+      // Overview taps navigate toward the tapped region; they never select or
+      // place, and a selection in progress rides along to the next level.
+      if (state.zoom !== 'overview') return noEffect(state);
+      return zoomTo(state, zoomIn(state.zoom), {
+        courtId: event.courtId,
+        fraction: event.fraction,
+      });
+    case 'cancel':
+    case 'unschedule':
+      // Explicit buttons, not grid geometry: usable at any zoom level.
+      return delegate(state, event);
+    case 'tap-tray-match':
+      // Tray rows are finger-sized at every zoom, so selecting from the tray
+      // at overview is fine (orient first, then zoom in to place). But with a
+      // selection active the tap would swap, and swap targets are gated to
+      // agenda/compact like all other placement.
+      if (state.zoom === 'overview' && state.selection.kind !== 'idle') {
+        return noEffect(state);
+      }
+      return delegate(state, event);
+    default: {
+      // Targets at overview zoom are a few pixels wide; even if a stale UI
+      // still dispatches a card or line tap there, it must never select,
+      // swap or place anything.
+      if (state.zoom === 'overview') return noEffect(state);
+      return delegate(state, event);
+    }
   }
 }

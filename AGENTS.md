@@ -64,6 +64,33 @@ To see Rodney's available commands, run:
 nix develop -c uvx rodney --help
 ```
 
+#### Phone Viewport Emulation
+
+The released Rodney pins the viewport to 1280×800 on every command, so phone-viewport testing
+(e.g. verifying mobile defaults that read `window.innerWidth` at mount) doesn't work with it.
+The open PR [simonw/rodney#33](https://github.com/simonw/rodney/pull/33) adds a persistent
+`viewport` command. Until it's merged, build it from the PR ref (Rodney is a Go project; the
+PyPI package only wraps prebuilt binaries, so `uvx --from git+...` does not work):
+
+```bash
+git clone --depth 1 https://github.com/simonw/rodney /tmp/rodney-pr33
+cd /tmp/rodney-pr33
+git fetch --depth 1 origin refs/pull/33/head && git checkout FETCH_HEAD
+go build -o rodney .
+```
+
+The PR build shares session state with the installed Rodney, so it can drive a browser started
+or connected by `uvx rodney`:
+
+```bash
+/tmp/rodney-pr33/rodney viewport 375 812   # persists across commands; --reset to undo
+```
+
+Gotcha: each Rodney invocation re-attaches to the page and briefly applies the default
+1280×800 before re-applying the override. A Rodney command issued while the page is still
+loading (e.g. `reload && waitload`) can race the app's mount, which then sees the desktop
+width. Use `reload`, then a plain `sleep`, then assert.
+
 ### Seed Database
 
 ```bash

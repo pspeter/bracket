@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { GridMatchRef, IDLE_SELECTION, SelectionState, selectionReducer } from './selection';
+import {
+  GridMatchRef,
+  IDLE_SELECTION,
+  PlannerState,
+  SelectionState,
+  initialPlannerState,
+  plannerReducer,
+  selectionReducer,
+} from './selection';
+import { ZoomLevel } from './zoom';
 
 function ref(matchId: number, courtId: number, position: number): GridMatchRef {
   return { matchId, courtId, position };
@@ -12,6 +21,10 @@ function selected(match: GridMatchRef): SelectionState {
 
 function traySelected(matchId: number): SelectionState {
   return { kind: 'tray-match-selected', matchId };
+}
+
+function planner(zoom: ZoomLevel, selection: SelectionState = IDLE_SELECTION): PlannerState {
+  return { zoom, selection };
 }
 
 describe('selectionReducer', () => {
@@ -274,6 +287,220 @@ describe('selectionReducer', () => {
 
       expect(state).toEqual(selection);
       expect(actions).toEqual([]);
+    });
+  });
+});
+
+describe('plannerReducer', () => {
+  it('starts idle at the requested zoom level', () => {
+    expect(initialPlannerState('compact')).toEqual(planner('compact'));
+  });
+
+  describe('zoom events', () => {
+    it('zoom-in and zoom-out snap between the three levels and clamp at the ends', () => {
+      expect(plannerReducer(planner('overview'), { type: 'zoom-in' }).state.zoom).toBe('compact');
+      expect(plannerReducer(planner('compact'), { type: 'zoom-in' }).state.zoom).toBe('agenda');
+      expect(plannerReducer(planner('agenda'), { type: 'zoom-in' }).state.zoom).toBe('agenda');
+      expect(plannerReducer(planner('agenda'), { type: 'zoom-out' }).state.zoom).toBe('compact');
+      expect(plannerReducer(planner('overview'), { type: 'zoom-out' }).state.zoom).toBe('overview');
+    });
+
+    it('set-zoom jumps straight to a level', () => {
+      const { state } = plannerReducer(planner('agenda'), { type: 'set-zoom', zoom: 'overview' });
+      expect(state.zoom).toBe('overview');
+    });
+
+    it('never triggers actions or focuses without an anchor', () => {
+      const transition = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
+        type: 'zoom-out',
+      });
+      expect(transition.actions).toEqual([]);
+      expect(transition.focus).toBeNull();
+    });
+
+    it('keeps the anchored region in focus when zooming with an anchor', () => {
+      const anchor = { courtId: 6, fraction: 0.8 };
+
+      const zoomedIn = plannerReducer(planner('overview'), { type: 'zoom-in', anchor });
+      expect(zoomedIn.state.zoom).toBe('compact');
+      expect(zoomedIn.focus).toEqual(anchor);
+
+      const zoomedOut = plannerReducer(planner('compact'), { type: 'zoom-out', anchor });
+      expect(zoomedOut.state.zoom).toBe('overview');
+      expect(zoomedOut.focus).toEqual(anchor);
+    });
+
+    it('does not focus when the zoom level is already at its end', () => {
+      const anchor = { courtId: 6, fraction: 0.8 };
+      const transition = plannerReducer(planner('agenda'), { type: 'zoom-in', anchor });
+
+      expect(transition.state.zoom).toBe('agenda');
+      expect(transition.focus).toBeNull();
+    });
+
+    it('an active selection survives zoom changes in both directions', () => {
+      const start = planner('compact', selected(ref(10, 1, 2)));
+
+      const zoomedOut = plannerReducer(start, { type: 'zoom-out' }).state;
+      expect(zoomedOut).toEqual(planner('overview', selected(ref(10, 1, 2))));
+
+      const zoomedBackIn = plannerReducer(zoomedOut, { type: 'zoom-in' }).state;
+      expect(zoomedBackIn).toEqual(planner('compact', selected(ref(10, 1, 2))));
+    });
+  });
+
+  describe('at agenda and compact zoom', () => {
+    it.each(['agenda', 'compact'] as ZoomLevel[])('selects a tapped match at %s', (zoom) => {
+      const { state, actions } = plannerReducer(planner(zoom), {
+        type: 'tap-match',
+        match: ref(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner(zoom, selected(ref(10, 1, 0))));
+      expect(actions).toEqual([]);
+    });
+
+    it.each(['agenda', 'compact'] as ZoomLevel[])(
+      'places the selected match on an insertion line at %s',
+      (zoom) => {
+        const { state, actions } = plannerReducer(planner(zoom, selected(ref(10, 1, 2))), {
+          type: 'tap-insertion-line',
+          courtId: 2,
+          index: 1,
+        });
+
+        expect(state).toEqual(planner(zoom));
+        expect(actions).toEqual([
+          {
+            type: 'reschedule',
+            matchId: 10,
+            body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
+          },
+        ]);
+      }
+    );
+
+    it('swaps two matches on a card tap', () => {
+      const { state, actions } = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+
+      expect(state).toEqual(planner('compact'));
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
+    });
+
+    it('ignores overview taps', () => {
+      const start = planner('compact', selected(ref(10, 1, 2)));
+      const transition = plannerReducer(start, {
+        type: 'tap-overview',
+        courtId: 2,
+        fraction: 0.5,
+      });
+
+      expect(transition.state).toEqual(start);
+      expect(transition.actions).toEqual([]);
+      expect(transition.focus).toBeNull();
+    });
+  });
+
+  describe('at overview zoom', () => {
+    it('a tap on a match never selects, swaps or places', () => {
+      const idleTap = plannerReducer(planner('overview'), {
+        type: 'tap-match',
+        match: ref(10, 1, 0),
+      });
+      expect(idleTap.state).toEqual(planner('overview'));
+      expect(idleTap.actions).toEqual([]);
+
+      const selectedTap = plannerReducer(planner('overview', selected(ref(10, 1, 2))), {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+      expect(selectedTap.state).toEqual(planner('overview', selected(ref(10, 1, 2))));
+      expect(selectedTap.actions).toEqual([]);
+    });
+
+    it('a tap on an insertion line never places, even with an active selection', () => {
+      const start = planner('overview', selected(ref(10, 1, 2)));
+      const transition = plannerReducer(start, {
+        type: 'tap-insertion-line',
+        courtId: 2,
+        index: 1,
+      });
+
+      expect(transition.state).toEqual(start);
+      expect(transition.actions).toEqual([]);
+    });
+
+    it('a tray tap from idle selects, enabling the orient-then-place flow', () => {
+      const { state, actions } = plannerReducer(planner('overview'), {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(planner('overview', traySelected(30)));
+      expect(actions).toEqual([]);
+    });
+
+    it('a tray tap with an active selection never swaps', () => {
+      const start = planner('overview', selected(ref(10, 1, 2)));
+      const transition = plannerReducer(start, { type: 'tap-tray-match', matchId: 30 });
+
+      expect(transition.state).toEqual(start);
+      expect(transition.actions).toEqual([]);
+    });
+
+    it('the unschedule button still works', () => {
+      const { state, actions } = plannerReducer(planner('overview', selected(ref(10, 1, 2))), {
+        type: 'unschedule',
+      });
+
+      expect(state).toEqual(planner('overview'));
+      expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
+    });
+
+    it('a tap on the grid zooms in toward the tapped court/time region', () => {
+      const { state, actions, focus } = plannerReducer(planner('overview'), {
+        type: 'tap-overview',
+        courtId: 3,
+        fraction: 0.25,
+      });
+
+      expect(state.zoom).toBe('compact');
+      expect(focus).toEqual({ courtId: 3, fraction: 0.25 });
+      expect(actions).toEqual([]);
+    });
+
+    it('zooming in via a tap keeps the active selection for placement at compact', () => {
+      const start = planner('overview', traySelected(30));
+
+      const navigated = plannerReducer(start, {
+        type: 'tap-overview',
+        courtId: 2,
+        fraction: 0.1,
+      });
+      expect(navigated.state).toEqual(planner('compact', traySelected(30)));
+
+      const placed = plannerReducer(navigated.state, {
+        type: 'tap-insertion-line',
+        courtId: 2,
+        index: 0,
+      });
+      expect(placed.actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 30,
+          body: { old_court_id: null, old_position: null, new_court_id: 2, new_position: 0 },
+        },
+      ]);
+    });
+
+    it('cancel still clears the selection', () => {
+      const { state } = plannerReducer(planner('overview', selected(ref(10, 1, 2))), {
+        type: 'cancel',
+      });
+      expect(state).toEqual(planner('overview'));
     });
   });
 });
