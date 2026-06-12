@@ -138,6 +138,22 @@ function MatchCard({
     ) : match.state === 'IN_PROGRESS' ? (
       <Box component="span" className={classes.liveDot} />
     ) : null;
+  // Agenda also carries the current score once a match has started. Scores are
+  // pinned to the card's right edge and never shrink, so they stay visible at
+  // every card height — including the one-line layout of short matches, where
+  // both scores collapse into a single "1–2" next to the names.
+  const showScore = zoom === 'agenda' && match.state !== 'NOT_STARTED';
+  const scoreText = (value: string) => (
+    <Text
+      size="xs"
+      fz={fontSize}
+      fw={700}
+      lh={1.3}
+      style={{ flexShrink: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}
+    >
+      {value}
+    </Text>
+  );
   // Agenda is the full-detail level: cards also carry the match's level, stage
   // and stage item. The tallest cards spread that over two rows of their own
   // (level · stage, then stage item), shorter ones get a single combined row,
@@ -265,6 +281,12 @@ function MatchCard({
           <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
             {rows === 1 ? `${input1} – ${input2}` : input1}
           </Text>
+          {showScore &&
+            scoreText(
+              rows === 1
+                ? `${match.stage_item_input1_score}–${match.stage_item_input2_score}`
+                : `${match.stage_item_input1_score}`
+            )}
           {rows < 3 && violationIcon}
         </Flex>
         {rows > 1 && (
@@ -273,6 +295,7 @@ function MatchCard({
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>
+            {showScore && scoreText(`${match.stage_item_input2_score}`)}
           </Flex>
         )}
       </Box>
