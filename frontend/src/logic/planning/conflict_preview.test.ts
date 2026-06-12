@@ -77,7 +77,7 @@ describe('actionCreatesSelectedConflict', () => {
     ).toBe(true);
   });
 
-  it('does not count the selected match post-match margin as team overlap', () => {
+  it('counts post-match margin as team overlap, matching backend conflict flags', () => {
     const stages = stagesWith([
       match({ id: 1, courtId: 1, position: 0, startMinutes: 0, input1: 10, input2: 20 }),
       match({ id: 2, courtId: 2, position: 0, startMinutes: 0, input1: 40, input2: 50 }),
@@ -109,7 +109,7 @@ describe('actionCreatesSelectedConflict', () => {
           },
         },
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

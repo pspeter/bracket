@@ -74,7 +74,7 @@ function playingIntervalMillis(match: ConflictPreviewMatch): [number, number] | 
   if (match.start_time == null) return null;
 
   const start = new Date(match.start_time).getTime();
-  return [start, start + match.duration_minutes * 60_000];
+  return [start, start + slotLengthMinutes(match) * 60_000];
 }
 
 function playingTimesOverlap(match1: ConflictPreviewMatch, match2: ConflictPreviewMatch): boolean {
@@ -188,9 +188,9 @@ function blockConflictsWithSelected(
     sharesInput(prepared.selected, block.match) &&
     playingMinutesOverlap(
       selectedStartMinutes,
-      prepared.selected.duration_minutes,
+      slotLengthMinutes(prepared.selected),
       block.startMinutes,
-      block.match.duration_minutes
+      slotLengthMinutes(block.match)
     )
   );
 }
