@@ -6,12 +6,14 @@ import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
+import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
   InsertionLine,
   MatchBlock,
   ScheduleGridLayout,
   computeInsertionLines,
 } from '@logic/planning/layout';
+import { nowLineScrollTop } from '@logic/planning/now_line';
 import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
 import {
   ZOOM_PX_PER_MINUTE,
@@ -83,6 +85,8 @@ function MatchCard({
   isViolation,
   hasPlacementWarning,
   isSelected,
+  highlightActive,
+  isHighlighted,
   stageItemsLookup,
   matchesLookup,
   levels,
@@ -94,6 +98,8 @@ function MatchCard({
   isViolation: boolean;
   hasPlacementWarning: boolean;
   isSelected: boolean;
+  highlightActive: boolean;
+  isHighlighted: boolean;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
   levels: LevelResponse[];
@@ -207,6 +213,8 @@ function MatchCard({
   return (
     <Box
       data-match-id={match.id}
+      data-highlighted={isHighlighted ? 'true' : undefined}
+      data-dimmed={highlightActive && !isHighlighted ? 'true' : undefined}
       data-conflict-preview={hasPlacementWarning ? 'true' : undefined}
       onClick={(event) => {
         event.stopPropagation();
@@ -222,7 +230,8 @@ function MatchCard({
         // Every card is tappable: unlocked ones select for placement, locked
         // (played) ones open the action sheet with the move-anyway override.
         cursor: 'pointer',
-        opacity: match.state === 'COMPLETED' ? 0.55 : undefined,
+        opacity:
+          highlightActive && !isHighlighted ? 0.22 : match.state === 'COMPLETED' ? 0.55 : undefined,
         borderRadius: 6,
         border: isSelected
           ? '1px solid var(--mantine-color-indigo-filled)'
@@ -233,9 +242,11 @@ function MatchCard({
         backgroundColor: `var(--mantine-color-${color}-light)`,
         boxShadow: isSelected
           ? '0 0 0 2px var(--mantine-color-indigo-filled)'
-          : hasPlacementWarning
-            ? '0 0 0 2px var(--mantine-color-orange-light)'
-            : undefined,
+          : isHighlighted
+            ? '0 0 0 2px var(--mantine-color-teal-filled)'
+            : hasPlacementWarning
+              ? '0 0 0 2px var(--mantine-color-orange-light)'
+              : undefined,
         zIndex: isSelected ? 1 : undefined,
       }}
     >
@@ -313,19 +324,27 @@ function OverviewBlock({
   pxPerMinute,
   colour,
   isSelected,
+  highlightActive,
+  isHighlighted,
 }: {
   block: MatchBlock<MatchWithDetails>;
   pxPerMinute: number;
   colour: string;
   isSelected: boolean;
+  highlightActive: boolean;
+  isHighlighted: boolean;
 }) {
   const blockHeightPx = block.durationMinutes * pxPerMinute;
   const isCompleted = block.match.state === 'COMPLETED';
   const isInProgress = block.match.state === 'IN_PROGRESS';
-  const opacity = isCompleted ? 0.35 : isInProgress ? 1 : 0.85;
+  const opacity =
+    highlightActive && !isHighlighted ? 0.18 : isCompleted ? 0.35 : isInProgress ? 1 : 0.85;
 
   return (
     <Box
+      data-match-id={block.match.id}
+      data-highlighted={isHighlighted ? 'true' : undefined}
+      data-dimmed={highlightActive && !isHighlighted ? 'true' : undefined}
       style={{
         position: 'absolute',
         top: block.startMinutes * pxPerMinute,
@@ -335,7 +354,11 @@ function OverviewBlock({
         borderRadius: 2,
         backgroundColor: `var(--mantine-color-${colour}-filled)`,
         opacity,
-        boxShadow: isSelected ? '0 0 0 2px var(--mantine-color-indigo-filled)' : undefined,
+        boxShadow: isSelected
+          ? '0 0 0 2px var(--mantine-color-indigo-filled)'
+          : isHighlighted
+            ? '0 0 0 2px var(--mantine-color-teal-filled)'
+            : undefined,
         zIndex: isSelected ? 1 : undefined,
         pointerEvents: 'none',
         display: 'flex',
@@ -444,8 +467,11 @@ export default function ScheduleGrid({
   matchesLookup,
   levels,
   selection,
+  highlightTarget,
   zoom,
   focus,
+  nowOffsetMinutes,
+  nowScrollNonce,
   onSelectionEvent,
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
@@ -455,8 +481,11 @@ export default function ScheduleGrid({
   matchesLookup: Record<number, MatchLookupEntry>;
   levels: LevelResponse[];
   selection: SelectionState;
+  highlightTarget: HighlightTarget | null;
   zoom: ZoomLevel;
   focus: (FocusTarget & { nonce: number }) | null;
+  nowOffsetMinutes: number | null;
+  nowScrollNonce: number;
   onSelectionEvent: (event: PlannerEvent) => void;
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
@@ -469,6 +498,8 @@ export default function ScheduleGrid({
   // action sheet open the grid is inert behind the sheet's overlay.
   const placing = selection.kind === 'match-selected' || selection.kind === 'tray-match-selected';
   const isOverview = zoom === 'overview';
+  const highlightActive = highlightTarget != null;
+  const { t } = useTranslation();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -508,6 +539,23 @@ export default function ScheduleGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
+  useEffect(() => {
+    if (nowScrollNonce === 0 || nowOffsetMinutes == null) return;
+    const container = containerRef.current;
+    if (container == null) return;
+
+    container.scrollTo({
+      top: nowLineScrollTop({
+        offsetMinutes: nowOffsetMinutes,
+        pxPerMinute,
+        viewportHeightPx: container.clientHeight,
+        headerHeightPx: HEADER_HEIGHT_PX,
+        gridTopInsetPx: GRID_TOP_INSET_PX,
+      }),
+      behavior: 'smooth',
+    });
+  }, [nowOffsetMinutes, nowScrollNonce, pxPerMinute]);
+
   return (
     <Box
       ref={containerRef}
@@ -546,6 +594,35 @@ export default function ScheduleGrid({
             }}
           />
           <Box style={{ position: 'relative', height: gridHeight, marginTop: GRID_TOP_INSET_PX }}>
+            {nowOffsetMinutes != null && (
+              <Box
+                data-now-line="ruler"
+                style={{
+                  position: 'absolute',
+                  top: nowOffsetMinutes * pxPerMinute,
+                  left: 0,
+                  right: 0,
+                  zIndex: 1,
+                  borderTop: '2px solid var(--mantine-color-red-filled)',
+                }}
+              >
+                <Text
+                  component="span"
+                  c="red"
+                  fz={10}
+                  fw={700}
+                  style={{
+                    position: 'absolute',
+                    top: -8,
+                    right: 6,
+                    backgroundColor: 'var(--mantine-color-body)',
+                    lineHeight: 1,
+                  }}
+                >
+                  {t('now_marker_label', 'Now')}
+                </Text>
+              </Box>
+            )}
             {layout.ticks.map((tick) => (
               <Text
                 key={tick.offsetMinutes}
@@ -632,7 +709,26 @@ export default function ScheduleGrid({
                   />
                 )
               )}
+              {nowOffsetMinutes != null && (
+                <Box
+                  data-now-line="court"
+                  style={{
+                    position: 'absolute',
+                    top: nowOffsetMinutes * pxPerMinute,
+                    left: 0,
+                    right: 0,
+                    zIndex: 2,
+                    borderTop: '2px solid var(--mantine-color-red-filled)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
               {blocks.map((block, blockIndex) => {
+                const isHighlighted = matchInvolvesHighlight(
+                  block.match,
+                  highlightTarget,
+                  matchesLookup
+                );
                 if (isOverview) {
                   return (
                     <OverviewBlock
@@ -641,6 +737,8 @@ export default function ScheduleGrid({
                       pxPerMinute={pxPerMinute}
                       colour={matchColour(block.match, matchesLookup[block.match.id], levels)}
                       isSelected={selectedMatch?.matchId === block.match.id}
+                      highlightActive={highlightActive}
+                      isHighlighted={isHighlighted}
                     />
                   );
                 }
@@ -659,6 +757,8 @@ export default function ScheduleGrid({
                     isViolation={violations.has(block.match.id)}
                     hasPlacementWarning={conflictPreview.swapTargets.has(block.match.id)}
                     isSelected={selectedMatch?.matchId === block.match.id}
+                    highlightActive={highlightActive}
+                    isHighlighted={isHighlighted}
                     stageItemsLookup={stageItemsLookup}
                     matchesLookup={matchesLookup}
                     levels={levels}

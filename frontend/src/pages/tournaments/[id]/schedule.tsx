@@ -1,6 +1,18 @@
-import { Affix, Badge, Box, Button, Grid, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import {
+  Affix,
+  Badge,
+  Box,
+  Button,
+  Grid,
+  Group,
+  Paper,
+  Select,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { IconCalendarPlus } from '@tabler/icons-react';
+import { IconCalendarPlus, IconClock } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +23,9 @@ import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { computeConflictPreview } from '@logic/planning/conflict_preview';
+import { stageHighlightOptions } from '@logic/planning/highlight';
 import { computeScheduleLayout } from '@logic/planning/layout';
+import { currentTimeOffsetMinutes } from '@logic/planning/now_line';
 import { applyPlanningActions } from '@logic/planning/optimistic';
 import {
   isStaleScheduleError,
@@ -58,6 +72,9 @@ export default function SchedulePage() {
   const [planner, setPlanner] = useState<PlannerState>(() =>
     initialPlannerState(defaultZoomLevel(window.innerWidth))
   );
+  const [highlightValue, setHighlightValue] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  const [nowScrollNonce, setNowScrollNonce] = useState(0);
   const [trayOpened, setTrayOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
   // Details modal opened from the action sheet; holds the match id (not the
@@ -67,6 +84,11 @@ export default function SchedulePage() {
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
@@ -112,12 +134,20 @@ export default function SchedulePage() {
   const courts: Court[] = swrCourtsResponse.data?.data ?? [];
   const rawStages: StageWithStageItems[] = swrStagesResponse.data?.data ?? [];
   const levels: LevelResponse[] = tournament.levels ?? [];
+  const highlightOptions = stageHighlightOptions(rawStages);
+  const highlightTarget =
+    highlightOptions.find((option) => option.value === highlightValue)?.target ?? null;
 
   const layout = computeScheduleLayout({
     courts,
     matchesByCourtId,
     tournamentStartTime: tournament.start_time,
     tickIntervalMinutes: ZOOM_TICK_INTERVAL_MINUTES[planner.zoom],
+  });
+  const nowOffsetMinutes = currentTimeOffsetMinutes({
+    tournamentStartTime: tournament.start_time,
+    totalMinutes: layout.totalMinutes,
+    now,
   });
 
   const violations = new Set<number>();
@@ -249,12 +279,36 @@ export default function SchedulePage() {
           </Grid.Col>
           <Grid.Col span={6}>
             <Group justify="right">
+              <Select
+                aria-label={t('team_highlight_label', 'Highlight team or input')}
+                placeholder={t('team_highlight_placeholder', 'Find team or input')}
+                data={highlightOptions}
+                value={highlightValue}
+                onChange={setHighlightValue}
+                searchable
+                clearable
+                limit={24}
+                w={220}
+                size="sm"
+                mb={10}
+              />
               <CourtsToolbar
                 tournamentId={tournamentData.id}
                 swrCourtsResponse={swrCourtsResponse}
                 courts={courts}
                 matchesByCourtId={matchesByCourtId}
               />
+              <Button
+                color="red"
+                size="sm"
+                variant="light"
+                style={{ marginBottom: 10 }}
+                leftSection={<IconClock size={18} />}
+                disabled={nowOffsetMinutes == null}
+                onClick={() => setNowScrollNonce((nonce) => nonce + 1)}
+              >
+                {t('jump_to_now_label', 'Now')}
+              </Button>
               {courts.length < 1 ? null : (
                 <Button
                   color="indigo"
@@ -309,8 +363,11 @@ export default function SchedulePage() {
               matchesLookup={matchesLookup}
               levels={levels}
               selection={planner.selection}
+              highlightTarget={highlightTarget}
               zoom={planner.zoom}
               focus={focus}
+              nowOffsetMinutes={nowOffsetMinutes}
+              nowScrollNonce={nowScrollNonce}
               onSelectionEvent={handlePlannerEvent}
             />
             <UnscheduledSheet
