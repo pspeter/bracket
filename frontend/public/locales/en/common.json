@@ -201,6 +201,7 @@
     "only_recommended_radio_label": "Only recommended",
     "password_input_label": "Password",
     "password_input_placeholder": "Your password",
+    "placement_conflict_preview_label": "Would double-book a team",
     "plan_next_round_button": "Plan next round",
     "plan_next_stage_button": "Start the next stage",
     "plan_previous_stage_button": "Go back to the previous stage",

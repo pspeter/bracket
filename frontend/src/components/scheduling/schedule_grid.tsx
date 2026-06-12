@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import {
   InsertionLine,
   MatchBlock,
@@ -80,6 +81,7 @@ function MatchCard({
   zoom,
   pxPerMinute,
   isViolation,
+  hasPlacementWarning,
   isSelected,
   stageItemsLookup,
   matchesLookup,
@@ -90,6 +92,7 @@ function MatchCard({
   zoom: 'agenda' | 'compact';
   pxPerMinute: number;
   isViolation: boolean;
+  hasPlacementWarning: boolean;
   isSelected: boolean;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
@@ -164,10 +167,21 @@ function MatchCard({
       </Box>
     </Tooltip>
   ) : null;
+  const placementWarningIcon = hasPlacementWarning ? (
+    <Tooltip label={t('placement_conflict_preview_label', 'Would double-book a team')}>
+      <Box
+        component="span"
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+      >
+        <AiFillWarning color="var(--mantine-color-orange-filled)" />
+      </Box>
+    </Tooltip>
+  ) : null;
 
   return (
     <Box
       data-match-id={match.id}
+      data-conflict-preview={hasPlacementWarning ? 'true' : undefined}
       onClick={(event) => {
         event.stopPropagation();
         onTap();
@@ -183,10 +197,16 @@ function MatchCard({
         borderRadius: 6,
         border: isSelected
           ? '1px solid var(--mantine-color-indigo-filled)'
-          : '1px solid var(--mantine-color-default-border)',
+          : hasPlacementWarning
+            ? '1px dashed var(--mantine-color-orange-filled)'
+            : '1px solid var(--mantine-color-default-border)',
         borderLeft: `4px solid var(--mantine-color-${color}-filled)`,
         backgroundColor: `var(--mantine-color-${color}-light)`,
-        boxShadow: isSelected ? '0 0 0 2px var(--mantine-color-indigo-filled)' : undefined,
+        boxShadow: isSelected
+          ? '0 0 0 2px var(--mantine-color-indigo-filled)'
+          : hasPlacementWarning
+            ? '0 0 0 2px var(--mantine-color-orange-light)'
+            : undefined,
         zIndex: isSelected ? 1 : undefined,
       }}
     >
@@ -207,6 +227,7 @@ function MatchCard({
             {contextRows.length === 0 && contextParts.length > 0
               ? contextBadge(contextParts.join(' · '))
               : null}
+            {placementWarningIcon}
             {violationIcon}
           </Flex>
         )}
@@ -218,6 +239,7 @@ function MatchCard({
         <Flex gap={6} align="center" wrap="nowrap">
           {rows < 3 && showTime && timeLabel}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
+          {rows < 3 && placementWarningIcon}
           {rows === 1 &&
             match.stage_item_input2_conflict &&
             !(mergeConflictIcons && match.stage_item_input1_conflict) && (
@@ -294,12 +316,14 @@ function InsertionLineTarget({
   gridHeight,
   pxPerMinute,
   isNoop,
+  hasConflictWarning,
   onTap,
 }: {
   line: InsertionLine;
   gridHeight: number;
   pxPerMinute: number;
   isNoop: boolean;
+  hasConflictWarning: boolean;
   onTap: () => void;
 }) {
   const lineY = line.offsetMinutes * pxPerMinute;
@@ -316,6 +340,7 @@ function InsertionLineTarget({
   return (
     <Box
       data-insertion-index={line.index}
+      data-conflict-preview={hasConflictWarning ? 'true' : undefined}
       onClick={(event) => {
         event.stopPropagation();
         onTap();
@@ -339,8 +364,12 @@ function InsertionLineTarget({
           right: 4,
           height: 4,
           borderRadius: 2,
-          backgroundColor: 'var(--mantine-color-indigo-filled)',
-          boxShadow: '0 0 0 1px var(--mantine-color-body)',
+          backgroundColor: hasConflictWarning
+            ? 'var(--mantine-color-orange-filled)'
+            : 'var(--mantine-color-indigo-filled)',
+          boxShadow: hasConflictWarning
+            ? '0 0 0 1px var(--mantine-color-body), 0 0 0 4px var(--mantine-color-orange-light)'
+            : '0 0 0 1px var(--mantine-color-body)',
         }}
       />
     </Box>
@@ -362,6 +391,7 @@ function InsertionLineTarget({
 export default function ScheduleGrid({
   layout,
   violations,
+  conflictPreview,
   stageItemsLookup,
   matchesLookup,
   levels,
@@ -372,6 +402,7 @@ export default function ScheduleGrid({
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
   violations: Set<number>;
+  conflictPreview: ConflictPreview;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
   levels: LevelResponse[];
@@ -572,6 +603,7 @@ export default function ScheduleGrid({
                     zoom={zoom}
                     pxPerMinute={pxPerMinute}
                     isViolation={violations.has(block.match.id)}
+                    hasPlacementWarning={conflictPreview.swapTargets.has(block.match.id)}
                     isSelected={selectedMatch?.matchId === block.match.id}
                     stageItemsLookup={stageItemsLookup}
                     matchesLookup={matchesLookup}
@@ -594,6 +626,9 @@ export default function ScheduleGrid({
                       (line.index === selectedMatch.position ||
                         line.index === selectedMatch.position + 1)
                     }
+                    hasConflictWarning={conflictPreview.insertionLines.has(
+                      insertionLineKey(court.id, line.index)
+                    )}
                     onTap={() =>
                       onSelectionEvent({
                         type: 'tap-insertion-line',
