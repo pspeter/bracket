@@ -7,18 +7,11 @@ from bracket.utils.id_types import MatchId
 
 
 def matches_overlap(match1: Match, match2: Match) -> bool:
-    if (
-        match1.start_time is None
-        or match1.end_time is None
-        or match2.start_time is None
-        or match2.end_time is None
-    ):
+    if match1.start_time is None or match2.start_time is None:
         return False
 
-    return not (
-        (match1.end_time < match2.end_time and match1.start_time < match2.start_time)
-        or (match1.start_time > match2.start_time or match1.end_time > match2.end_time)
-    )
+    # Half-open intervals [start, end): back-to-back matches (end1 == start2) do not conflict.
+    return match1.start_time < match2.end_time and match2.start_time < match1.end_time
 
 
 def get_conflicting_matches(
@@ -42,9 +35,6 @@ def get_conflicting_matches(
 
     for i, match1 in enumerate(matches):
         for match2 in matches[i + 1 :]:
-            if match1.id == match2.id:
-                continue
-
             conflicting_input_ids = []
 
             if match2.stage_item_input1_id in match1.stage_item_input_ids:
