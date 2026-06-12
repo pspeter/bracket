@@ -234,6 +234,8 @@
     "save_button": "Save",
     "save_players_button": "Save players",
     "save_ranking_button": "Save Ranking",
+    "schedule_changed_message": "Someone else changed the schedule in the meantime. It has been refreshed — please pick again.",
+    "schedule_changed_title": "Schedule changed",
     "schedule_description": "Schedule All Unscheduled Matches",
     "schedule_title": "Schedule",
     "score_tracking_copy_button": "Copy score tracking URL",

@@ -305,7 +305,13 @@ async def handle_match_reschedule(
             if match.id == match_id
         )
         if target_match.court_id is not None or target_match.start_time is not None:
-            raise ValueError("match_id doesn't match unscheduled match state")
+            # The client thought the match was unscheduled but someone scheduled it
+            # in the meantime: reject so the client can refetch and retry.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The schedule changed since this device last refreshed: "
+                "the match is no longer unscheduled",
+            )
 
         # Only the destination court changes; other courts keep their packing.
         court_matches = [
@@ -333,7 +339,15 @@ async def handle_match_reschedule(
         or target.position != body.old_position
         or target.match.court_id != body.old_court_id
     ):
-        raise ValueError("match_id doesn't match court id or position in schedule")
+        # Optimistic-concurrency check: the match moved since the client last
+        # refreshed (e.g. a co-organizer rescheduled it from another device).
+        # 409 lets the client distinguish this from a real error and recover by
+        # refetching the schedule.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The schedule changed since this device last refreshed: "
+            "the match is no longer at the given court and position",
+        )
 
     offset = (
         -0.5

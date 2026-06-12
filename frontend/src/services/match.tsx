@@ -47,10 +47,13 @@ export async function updateTournamentScoreTrackingMatch(
     .catch((response: any) => handleRequestError(response));
 }
 
+// The planner's scheduling mutations let errors propagate instead of handling
+// them here: the planner must see failures (in particular the 409 stale-write
+// rejection when another device moved a match concurrently) to refetch the
+// schedule and clear the selection.
+
 export async function unscheduleMatch(tournament_id: number, match_id: number) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`)
-    .catch((response: any) => handleRequestError(response));
+  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`);
 }
 
 export async function rescheduleMatch(
@@ -58,15 +61,11 @@ export async function rescheduleMatch(
   match_id: number,
   match: MatchRescheduleBody
 ) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/reschedule`, match)
-    .catch((response: any) => handleRequestError(response));
+  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/reschedule`, match);
 }
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/matches/swap`, body)
-    .catch((response: any) => handleRequestError(response));
+  return createAxios().post(`tournaments/${tournament_id}/matches/swap`, body);
 }
 
 export async function scheduleMatches(tournament_id: number) {

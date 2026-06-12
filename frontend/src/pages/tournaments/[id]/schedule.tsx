@@ -1,6 +1,8 @@
 import { Affix, Badge, Box, Button, Grid, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { showNotification } from '@mantine/notifications';
 import { IconCalendarPlus } from '@tabler/icons-react';
-import { useState } from 'react';
+import { isAxiosError } from 'axios';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import CourtModal from '@components/modals/create_court_modal';
@@ -12,7 +14,13 @@ import { computeConflictPreview } from '@logic/planning/conflict_preview';
 import { computeScheduleLayout } from '@logic/planning/layout';
 import { applyPlanningActions } from '@logic/planning/optimistic';
 import {
+  isStaleScheduleError,
+  scheduleRefreshInterval,
+  shouldRefreshOnSelectionChange,
+} from '@logic/planning/polling';
+import {
   FocusTarget,
+  IDLE_SELECTION,
   PlannerEvent,
   PlannerState,
   PlanningAction,
@@ -23,7 +31,12 @@ import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tra
 import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel, levelColour } from '@logic/planning/zoom';
 import { Court, LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getCourts, getStages, getTournamentById } from '@services/adapter';
+import {
+  getCourts,
+  getStagesWithPolling,
+  getTournamentById,
+  handleRequestError,
+} from '@services/adapter';
 import {
   MatchLookupEntry,
   getMatchLookup,
@@ -57,9 +70,25 @@ export default function SchedulePage() {
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
-  const swrStagesResponse = getStages(tournamentData.id);
+  // The schedule polls so co-organizers' changes show up, but holds still
+  // (interval 0) while a selection or the action sheet is active.
+  const swrStagesResponse = getStagesWithPolling(
+    tournamentData.id,
+    scheduleRefreshInterval(planner.selection)
+  );
   const swrCourtsResponse = getCourts(tournamentData.id);
   const swrTournamentResponse = getTournamentById(tournamentData.id);
+
+  // When a pause ends (selection cleared), refresh immediately instead of
+  // waiting up to a full polling interval for changes made in the meantime.
+  const refreshSchedule = swrStagesResponse.mutate;
+  const previousSelectionRef = useRef(planner.selection);
+  useEffect(() => {
+    if (shouldRefreshOnSelectionChange(previousSelectionRef.current, planner.selection)) {
+      refreshSchedule();
+    }
+    previousSelectionRef.current = planner.selection;
+  }, [planner.selection, refreshSchedule]);
 
   const stageItemsLookup = responseIsValid(swrStagesResponse)
     ? getStageItemLookup(swrStagesResponse)
@@ -141,27 +170,48 @@ export default function SchedulePage() {
       );
 
     if (actions.length > 0) {
-      // Show the predicted outcome immediately; the revalidation that follows the
-      // request replaces it with the backend's authoritative schedule.
-      await swrStagesResponse.mutate(
-        async (current) => {
-          for (const action of actions) {
-            await performAction(action);
+      try {
+        // Show the predicted outcome immediately; the revalidation that follows the
+        // request replaces it with the backend's authoritative schedule.
+        await swrStagesResponse.mutate(
+          async (current) => {
+            for (const action of actions) {
+              await performAction(action);
+            }
+            return current;
+          },
+          {
+            optimisticData: (current) =>
+              current == null
+                ? current!
+                : {
+                    ...current,
+                    data: applyPlanningActions(current.data, actions, tournament.start_time),
+                  },
+            populateCache: false,
+            revalidate: true,
           }
-          return current;
-        },
-        {
-          optimisticData: (current) =>
-            current == null
-              ? current!
-              : {
-                  ...current,
-                  data: applyPlanningActions(current.data, actions, tournament.start_time),
-                },
-          populateCache: false,
-          revalidate: true,
+        );
+      } catch (error) {
+        // The optimistic update was rolled back; resync with the backend's
+        // authoritative schedule and restart the placement flow from idle.
+        setPlanner((current) => ({ ...current, selection: IDLE_SELECTION }));
+        await swrStagesResponse.mutate();
+        if (isStaleScheduleError(error)) {
+          // Someone else moved a match between this device's last refresh and
+          // the placement: not an error to apologize for, just pick again.
+          showNotification({
+            color: 'orange',
+            title: t('schedule_changed_title'),
+            message: t('schedule_changed_message'),
+            autoClose: 10000,
+          });
+        } else if (isAxiosError(error)) {
+          handleRequestError(error);
+        } else {
+          throw error;
         }
-      );
+      }
       if (wasTraySelection) {
         updateTrayOpened();
       }
