@@ -854,6 +854,24 @@
         "title": "MatchState",
         "type": "string"
       },
+      "MatchSwapBody": {
+        "properties": {
+          "match1_id": {
+            "title": "Match1 Id",
+            "type": "integer"
+          },
+          "match2_id": {
+            "title": "Match2 Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "match1_id",
+          "match2_id"
+        ],
+        "title": "MatchSwapBody",
+        "type": "object"
+      },
       "MatchWithDetails": {
         "description": "MatchWithDetails has zero or one defined stage item inputs, but not both.",
         "properties": {
@@ -5172,6 +5190,63 @@
           }
         ],
         "summary": "Create Match",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/swap": {
+      "post": {
+        "operationId": "swap_matches_tournaments__tournament_id__matches_swap_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchSwapBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Swap Matches",
         "tags": [
           "Matches"
         ]

@@ -456,6 +456,20 @@ export type MatchScoreTrackingBody = {
 export type MatchState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 
 /**
+ * MatchSwapBody
+ */
+export type MatchSwapBody = {
+  /**
+   * Match1 Id
+   */
+  match1_id: number;
+  /**
+   * Match2 Id
+   */
+  match2_id: number;
+};
+
+/**
  * MatchWithDetails
  *
  * MatchWithDetails has zero or one defined stage item inputs, but not both.
@@ -2966,6 +2980,38 @@ export type CreateMatchTournamentsTournamentIdMatchesPostResponses = {
 
 export type CreateMatchTournamentsTournamentIdMatchesPostResponse =
   CreateMatchTournamentsTournamentIdMatchesPostResponses[keyof CreateMatchTournamentsTournamentIdMatchesPostResponses];
+
+export type SwapMatchesTournamentsTournamentIdMatchesSwapPostData = {
+  body: MatchSwapBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/swap';
+};
+
+export type SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type SwapMatchesTournamentsTournamentIdMatchesSwapPostError =
+  SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors[keyof SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors];
+
+export type SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type SwapMatchesTournamentsTournamentIdMatchesSwapPostResponse =
+  SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses[keyof SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses];
 
 export type DeleteMatchTournamentsTournamentIdMatchesMatchIdDeleteData = {
   body?: never;

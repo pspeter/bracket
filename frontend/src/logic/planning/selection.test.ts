@@ -19,148 +19,274 @@ function selected(match: GridMatchRef): SelectionState {
   return { kind: 'match-selected', match };
 }
 
+function traySelected(matchId: number): SelectionState {
+  return { kind: 'tray-match-selected', matchId };
+}
+
 function planner(zoom: ZoomLevel, selection: SelectionState = IDLE_SELECTION): PlannerState {
   return { zoom, selection };
 }
 
 describe('selectionReducer', () => {
   describe('in idle state', () => {
-    it('selects a match on tap without rescheduling', () => {
-      const { state, reschedule } = selectionReducer(IDLE_SELECTION, {
+    it('selects a match on tap without any actions', () => {
+      const { state, actions } = selectionReducer(IDLE_SELECTION, {
         type: 'tap-match',
         match: ref(10, 1, 0),
       });
 
       expect(state).toEqual(selected(ref(10, 1, 0)));
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
+    });
+
+    it('selects a tray match on tap without any actions', () => {
+      const { state, actions } = selectionReducer(IDLE_SELECTION, {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(traySelected(30));
+      expect(actions).toEqual([]);
     });
 
     it('ignores insertion line taps', () => {
-      const { state, reschedule } = selectionReducer(IDLE_SELECTION, {
+      const { state, actions } = selectionReducer(IDLE_SELECTION, {
         type: 'tap-insertion-line',
         courtId: 1,
         index: 0,
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
+    });
+
+    it('ignores unschedule', () => {
+      const { state, actions } = selectionReducer(IDLE_SELECTION, { type: 'unschedule' });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
     });
 
     it('ignores cancel', () => {
-      const { state, reschedule } = selectionReducer(IDLE_SELECTION, { type: 'cancel' });
+      const { state, actions } = selectionReducer(IDLE_SELECTION, { type: 'cancel' });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
   });
 
-  describe('with a match selected', () => {
+  describe('with a scheduled match selected', () => {
     // Court 1 has matches at positions 0..3; the selected match sits at position 2.
     const selection = selected(ref(10, 1, 2));
 
-    it('cancel returns to idle without rescheduling', () => {
-      const { state, reschedule } = selectionReducer(selection, { type: 'cancel' });
+    it('cancel returns to idle without any actions', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'cancel' });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
 
     it('tapping the selected match again deselects it', () => {
-      const { state, reschedule } = selectionReducer(selection, {
+      const { state, actions } = selectionReducer(selection, {
         type: 'tap-match',
         match: ref(10, 1, 2),
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
-    });
-
-    it('tapping a different match selects that match instead', () => {
-      const { state, reschedule } = selectionReducer(selection, {
-        type: 'tap-match',
-        match: ref(20, 2, 0),
-      });
-
-      expect(state).toEqual(selected(ref(20, 2, 0)));
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
 
     it('placing on another court inserts before the match at that index', () => {
-      const { state, reschedule } = selectionReducer(selection, {
+      const { state, actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 2,
         index: 1,
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toEqual({
-        matchId: 10,
-        body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
-      });
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 10,
+          body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
+        },
+      ]);
     });
 
     it('placing at the start of another court uses position 0', () => {
-      const { reschedule } = selectionReducer(selection, {
+      const { actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 2,
         index: 0,
       });
 
-      expect(reschedule).toEqual({
-        matchId: 10,
-        body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 0 },
-      });
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 10,
+          body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 0 },
+        },
+      ]);
     });
 
     it('placing earlier on the same court keeps the insertion index as the position', () => {
-      const { state, reschedule } = selectionReducer(selection, {
+      const { state, actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 1,
         index: 0,
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toEqual({
-        matchId: 10,
-        body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 0 },
-      });
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 10,
+          body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 0 },
+        },
+      ]);
     });
 
     it('placing later on the same court accounts for the match leaving its slot', () => {
       // Insertion line 4 means "after the match currently at position 3"; once the
       // selected match vacates position 2, that target becomes position 3.
-      const { reschedule } = selectionReducer(selection, {
+      const { actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 1,
         index: 4,
       });
 
-      expect(reschedule).toEqual({
-        matchId: 10,
-        body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 3 },
-      });
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 10,
+          body: { old_court_id: 1, old_position: 2, new_court_id: 1, new_position: 3 },
+        },
+      ]);
     });
 
     it('placing directly before itself is a no-op that clears the selection', () => {
-      const { state, reschedule } = selectionReducer(selection, {
+      const { state, actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 1,
         index: 2,
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
 
     it('placing directly after itself is a no-op that clears the selection', () => {
-      const { state, reschedule } = selectionReducer(selection, {
+      const { state, actions } = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: 1,
         index: 3,
       });
 
       expect(state).toEqual(IDLE_SELECTION);
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
+    });
+
+    it('unschedule sends the selected match back to the tray and clears the selection', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'unschedule' });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
+    });
+
+    it('tapping a tray match swaps it into the selected slot', () => {
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 30 }]);
+    });
+  });
+
+  describe('swapping two scheduled matches', () => {
+    it('tapping a match on another court emits a single id-based swap action', () => {
+      const { state, actions } = selectionReducer(selected(ref(10, 1, 2)), {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
+    });
+
+    it('swaps with a match on the same court regardless of relative position', () => {
+      const { actions } = selectionReducer(selected(ref(10, 1, 3)), {
+        type: 'tap-match',
+        match: ref(20, 1, 1),
+      });
+
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
+    });
+  });
+
+  describe('with a tray match selected', () => {
+    const selection = traySelected(30);
+
+    it('cancel returns to idle without any actions, leaving the match unscheduled', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'cancel' });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
+    });
+
+    it('tapping the selected tray match again deselects it', () => {
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([]);
+    });
+
+    it('tapping a different tray match selects that match instead', () => {
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-tray-match',
+        matchId: 31,
+      });
+
+      expect(state).toEqual(traySelected(31));
+      expect(actions).toEqual([]);
+    });
+
+    it('tapping a scheduled match swaps the tray match into its slot', () => {
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-match',
+        match: ref(10, 1, 2),
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([{ type: 'swap', matchId1: 30, matchId2: 10 }]);
+    });
+
+    it('placing on an insertion line schedules the tray match there', () => {
+      const { state, actions } = selectionReducer(selection, {
+        type: 'tap-insertion-line',
+        courtId: 2,
+        index: 1,
+      });
+
+      expect(state).toEqual(IDLE_SELECTION);
+      expect(actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 30,
+          body: { old_court_id: null, old_position: null, new_court_id: 2, new_position: 1 },
+        },
+      ]);
+    });
+
+    it('ignores unschedule, since the match is already unscheduled', () => {
+      const { state, actions } = selectionReducer(selection, { type: 'unschedule' });
+
+      expect(state).toEqual(selection);
+      expect(actions).toEqual([]);
     });
   });
 });
@@ -184,11 +310,11 @@ describe('plannerReducer', () => {
       expect(state.zoom).toBe('overview');
     });
 
-    it('never reschedules or focuses without an anchor', () => {
+    it('never triggers actions or focuses without an anchor', () => {
       const transition = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
         type: 'zoom-out',
       });
-      expect(transition.reschedule).toBeNull();
+      expect(transition.actions).toEqual([]);
       expect(transition.focus).toBeNull();
     });
 
@@ -225,31 +351,44 @@ describe('plannerReducer', () => {
 
   describe('at agenda and compact zoom', () => {
     it.each(['agenda', 'compact'] as ZoomLevel[])('selects a tapped match at %s', (zoom) => {
-      const { state, reschedule } = plannerReducer(planner(zoom), {
+      const { state, actions } = plannerReducer(planner(zoom), {
         type: 'tap-match',
         match: ref(10, 1, 0),
       });
 
       expect(state).toEqual(planner(zoom, selected(ref(10, 1, 0))));
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
 
     it.each(['agenda', 'compact'] as ZoomLevel[])(
       'places the selected match on an insertion line at %s',
       (zoom) => {
-        const { state, reschedule } = plannerReducer(planner(zoom, selected(ref(10, 1, 2))), {
+        const { state, actions } = plannerReducer(planner(zoom, selected(ref(10, 1, 2))), {
           type: 'tap-insertion-line',
           courtId: 2,
           index: 1,
         });
 
         expect(state).toEqual(planner(zoom));
-        expect(reschedule).toEqual({
-          matchId: 10,
-          body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
-        });
+        expect(actions).toEqual([
+          {
+            type: 'reschedule',
+            matchId: 10,
+            body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 1 },
+          },
+        ]);
       }
     );
+
+    it('swaps two matches on a card tap', () => {
+      const { state, actions } = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+
+      expect(state).toEqual(planner('compact'));
+      expect(actions).toEqual([{ type: 'swap', matchId1: 10, matchId2: 20 }]);
+    });
 
     it('ignores overview taps', () => {
       const start = planner('compact', selected(ref(10, 1, 2)));
@@ -260,18 +399,26 @@ describe('plannerReducer', () => {
       });
 
       expect(transition.state).toEqual(start);
-      expect(transition.reschedule).toBeNull();
+      expect(transition.actions).toEqual([]);
       expect(transition.focus).toBeNull();
     });
   });
 
   describe('at overview zoom', () => {
-    it('a tap on a match never selects or places', () => {
-      const start = planner('overview');
-      const transition = plannerReducer(start, { type: 'tap-match', match: ref(10, 1, 0) });
+    it('a tap on a match never selects, swaps or places', () => {
+      const idleTap = plannerReducer(planner('overview'), {
+        type: 'tap-match',
+        match: ref(10, 1, 0),
+      });
+      expect(idleTap.state).toEqual(planner('overview'));
+      expect(idleTap.actions).toEqual([]);
 
-      expect(transition.state).toEqual(start);
-      expect(transition.reschedule).toBeNull();
+      const selectedTap = plannerReducer(planner('overview', selected(ref(10, 1, 2))), {
+        type: 'tap-match',
+        match: ref(20, 2, 1),
+      });
+      expect(selectedTap.state).toEqual(planner('overview', selected(ref(10, 1, 2))));
+      expect(selectedTap.actions).toEqual([]);
     });
 
     it('a tap on an insertion line never places, even with an active selection', () => {
@@ -283,11 +430,38 @@ describe('plannerReducer', () => {
       });
 
       expect(transition.state).toEqual(start);
-      expect(transition.reschedule).toBeNull();
+      expect(transition.actions).toEqual([]);
+    });
+
+    it('a tray tap from idle selects, enabling the orient-then-place flow', () => {
+      const { state, actions } = plannerReducer(planner('overview'), {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(planner('overview', traySelected(30)));
+      expect(actions).toEqual([]);
+    });
+
+    it('a tray tap with an active selection never swaps', () => {
+      const start = planner('overview', selected(ref(10, 1, 2)));
+      const transition = plannerReducer(start, { type: 'tap-tray-match', matchId: 30 });
+
+      expect(transition.state).toEqual(start);
+      expect(transition.actions).toEqual([]);
+    });
+
+    it('the unschedule button still works', () => {
+      const { state, actions } = plannerReducer(planner('overview', selected(ref(10, 1, 2))), {
+        type: 'unschedule',
+      });
+
+      expect(state).toEqual(planner('overview'));
+      expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
     });
 
     it('a tap on the grid zooms in toward the tapped court/time region', () => {
-      const { state, reschedule, focus } = plannerReducer(planner('overview'), {
+      const { state, actions, focus } = plannerReducer(planner('overview'), {
         type: 'tap-overview',
         courtId: 3,
         fraction: 0.25,
@@ -295,28 +469,31 @@ describe('plannerReducer', () => {
 
       expect(state.zoom).toBe('compact');
       expect(focus).toEqual({ courtId: 3, fraction: 0.25 });
-      expect(reschedule).toBeNull();
+      expect(actions).toEqual([]);
     });
 
     it('zooming in via a tap keeps the active selection for placement at compact', () => {
-      const start = planner('overview', selected(ref(10, 1, 2)));
+      const start = planner('overview', traySelected(30));
 
       const navigated = plannerReducer(start, {
         type: 'tap-overview',
         courtId: 2,
         fraction: 0.1,
       });
-      expect(navigated.state).toEqual(planner('compact', selected(ref(10, 1, 2))));
+      expect(navigated.state).toEqual(planner('compact', traySelected(30)));
 
       const placed = plannerReducer(navigated.state, {
         type: 'tap-insertion-line',
         courtId: 2,
         index: 0,
       });
-      expect(placed.reschedule).toEqual({
-        matchId: 10,
-        body: { old_court_id: 1, old_position: 2, new_court_id: 2, new_position: 0 },
-      });
+      expect(placed.actions).toEqual([
+        {
+          type: 'reschedule',
+          matchId: 30,
+          body: { old_court_id: null, old_position: null, new_court_id: 2, new_position: 0 },
+        },
+      ]);
     });
 
     it('cancel still clears the selection', () => {

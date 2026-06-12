@@ -2,11 +2,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from fastapi import HTTPException
 from heliclockter import datetime_utc, timedelta
+from starlette import status
 
 from bracket.models.db.court import Court
 from bracket.models.db.match import (
+    Match,
     MatchRescheduleBody,
+    MatchState,
+    MatchSwapBody,
     MatchWithDetails,
     MatchWithDetailsDefinitive,
 )
@@ -15,6 +20,7 @@ from bracket.models.db.util import StageWithStageItems
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
     sql_reschedule_match_and_determine_duration_and_margin,
+    sql_unschedule_match,
 )
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
@@ -290,14 +296,6 @@ async def handle_match_reschedule(
     stages = await get_full_tournament_details(tournament.id)
 
     if body.old_court_id is None:
-        all_matches = [
-            MatchPosition(match=match, position=float(assert_some(match.position_in_schedule)))
-            for stage in stages
-            for stage_item in stage.stage_items
-            for round_ in stage_item.rounds
-            for match in round_.matches
-            if match.start_time is not None and match.id != match_id
-        ]
         target_match = next(
             match
             for stage in stages
@@ -309,43 +307,144 @@ async def handle_match_reschedule(
         if target_match.court_id is not None or target_match.start_time is not None:
             raise ValueError("match_id doesn't match unscheduled match state")
 
+        # Only the destination court changes; other courts keep their packing.
+        court_matches = [
+            match_pos
+            for match_pos in get_scheduled_matches(stages)
+            if match_pos.match.court_id == body.new_court_id
+        ]
         offset = -0.5
-        all_matches.append(
+        court_matches.append(
             MatchPosition(
                 match=target_match.model_copy(update={"court_id": body.new_court_id}),
                 position=body.new_position + offset,
             )
         )
-        await reorder_all_matches(tournament, all_matches)
+        await reorder_all_matches(tournament, court_matches)
         return
 
     scheduled_matches_old = get_scheduled_matches(stages)
 
-    # For match in prev position: set new position
-    scheduled_matches = []
-    for match_pos in scheduled_matches_old:
-        if match_pos.match.id == match_id:
-            if (
-                match_pos.position != body.old_position
-                or match_pos.match.court_id != body.old_court_id
-            ):
-                raise ValueError("match_id doesn't match court id or position in schedule")
+    target = next(
+        (match_pos for match_pos in scheduled_matches_old if match_pos.match.id == match_id), None
+    )
+    if (
+        target is None
+        or target.position != body.old_position
+        or target.match.court_id != body.old_court_id
+    ):
+        raise ValueError("match_id doesn't match court id or position in schedule")
 
-            offset = (
-                -0.5
-                if body.new_position < body.old_position or body.new_court_id != body.old_court_id
-                else +0.5
-            )
-            scheduled_matches.append(
-                MatchPosition(
-                    match=match_pos.match.model_copy(update={"court_id": body.new_court_id}),
-                    position=body.new_position + offset,
-                )
-            )
-        else:
-            scheduled_matches.append(match_pos)
+    offset = (
+        -0.5
+        if body.new_position < body.old_position or body.new_court_id != body.old_court_id
+        else +0.5
+    )
+
+    # Only the source and destination courts change; other courts keep their packing.
+    affected_court_ids = {body.old_court_id, body.new_court_id}
+    scheduled_matches = [
+        MatchPosition(
+            match=match_pos.match.model_copy(update={"court_id": body.new_court_id}),
+            position=body.new_position + offset,
+        )
+        if match_pos.match.id == match_id
+        else match_pos
+        for match_pos in scheduled_matches_old
+        if match_pos.match.court_id in affected_court_ids
+    ]
 
     await reorder_all_matches(tournament, scheduled_matches)
+
+
+def validate_match_can_be_unscheduled(match: Match) -> None:
+    if match.state is MatchState.NOT_STARTED:
+        return
+
+    state_label = "in progress" if match.state is MatchState.IN_PROGRESS else "completed"
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f"Cannot move a {state_label} match back to Unscheduled. "
+            "Only not started matches can be unscheduled."
+        ),
+    )
+
+
+async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None:
+    """
+    Trade the schedule slots (court + position) of two matches atomically.
+
+    Matches are identified by id, so the operation is robust against a stale client
+    view: "swap A and B" means the same thing regardless of where A and B currently
+    sit. An unscheduled match has no slot: swapping it with a scheduled one puts it
+    in that match's slot and sends the scheduled match back to the tray.
+    """
+    if body.match1_id == body.match2_id:
+        return
+
+    stages = await get_full_tournament_details(tournament.id)
+    scheduled_matches = get_scheduled_matches(stages)
+    slots_by_id = {match_pos.match.id: match_pos for match_pos in scheduled_matches}
+
+    slot1 = slots_by_id.get(body.match1_id)
+    slot2 = slots_by_id.get(body.match2_id)
+
+    if slot1 is None and slot2 is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of the matches must be scheduled to swap them",
+        )
+
+    if slot1 is not None and slot2 is not None:
+
+        def swapped_position(match_pos: MatchPosition) -> MatchPosition:
+            other = slot2 if match_pos.match.id == body.match1_id else slot1
+            return MatchPosition(
+                match=match_pos.match.model_copy(update={"court_id": other.match.court_id}),
+                position=other.position,
+            )
+
+        # Only the two slots' courts change; other courts keep their packing.
+        affected_court_ids = {slot1.match.court_id, slot2.match.court_id}
+        await reorder_all_matches(
+            tournament,
+            [
+                swapped_position(match_pos)
+                if match_pos.match.id in (body.match1_id, body.match2_id)
+                else match_pos
+                for match_pos in scheduled_matches
+                if match_pos.match.court_id in affected_court_ids
+            ],
+        )
+        return
+
+    # Mixed swap: the tray match takes over the scheduled match's slot, and the
+    # scheduled match is sent back to the tray (only allowed when not started).
+    vacated_slot = assert_some(slot1 if slot1 is not None else slot2)
+    incoming_match_id = body.match2_id if slot1 is not None else body.match1_id
+    incoming_match = next(
+        match
+        for stage in stages
+        for stage_item in stage.stage_items
+        for round_ in stage_item.rounds
+        for match in round_.matches
+        if match.id == incoming_match_id
+    )
+    validate_match_can_be_unscheduled(vacated_slot.match)
+
+    court_matches = [
+        MatchPosition(
+            match=incoming_match.model_copy(update={"court_id": vacated_slot.match.court_id}),
+            position=vacated_slot.position,
+        )
+        if match_pos.match.id == vacated_slot.match.id
+        else match_pos
+        for match_pos in scheduled_matches
+        if match_pos.match.court_id == vacated_slot.match.court_id
+    ]
+    await sql_unschedule_match(vacated_slot.match.id)
+    await reorder_all_matches(tournament, court_matches)
 
 
 async def update_start_times_of_matches(tournament_id: TournamentId) -> None:

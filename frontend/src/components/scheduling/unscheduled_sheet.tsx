@@ -10,7 +10,6 @@ import {
   Text,
   UnstyledButton,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,21 +20,26 @@ import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/
 
 /**
  * Collapsible bottom sheet listing matches that are not on the schedule yet.
- * Read-only flat list; grouping and the tap-to-place flow come in later slices.
+ * Tapping a match selects it for tap-to-place placement on the grid; the parent
+ * collapses the sheet while placing, so `opened` is controlled. Grouping by
+ * level/stage comes in a later slice.
  */
 export default function UnscheduledSheet({
   unscheduledMatches,
   stageItemsLookup,
   matchesLookup,
-  openMatchModal,
+  opened,
+  onToggle,
+  onSelectMatch,
 }: {
   unscheduledMatches: MatchWithDetails[];
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
-  openMatchModal: (m: MatchWithDetails) => void;
+  opened: boolean;
+  onToggle: () => void;
+  onSelectMatch: (m: MatchWithDetails) => void;
 }) {
   const { t } = useTranslation();
-  const [opened, { toggle }] = useDisclosure(false);
 
   return (
     <Paper
@@ -54,7 +58,7 @@ export default function UnscheduledSheet({
         borderBottom: 'none',
       }}
     >
-      <UnstyledButton onClick={toggle} w="100%" p="sm" aria-expanded={opened}>
+      <UnstyledButton onClick={onToggle} w="100%" p="sm" aria-expanded={opened}>
         <Group justify="space-between" wrap="nowrap">
           <Group gap="xs" wrap="nowrap">
             <Text fw={600}>{t('unscheduled_title')}</Text>
@@ -78,7 +82,7 @@ export default function UnscheduledSheet({
               return (
                 <Fragment key={match.id}>
                   {index > 0 && <Divider />}
-                  <UnstyledButton onClick={() => openMatchModal(match)} w="100%" py="xs">
+                  <UnstyledButton onClick={() => onSelectMatch(match)} w="100%" py="xs">
                     <Flex justify="space-between" align="center" gap="xs" wrap="nowrap">
                       <Box style={{ minWidth: 0 }}>
                         <Text size="sm" fw={500} truncate>

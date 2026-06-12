@@ -1,17 +1,17 @@
 /**
  * Pure, headless state machine for the planning grid's tap-to-place interaction.
  *
- * The UI dispatches events (tap on a match card, tap on an insertion line, cancel)
- * and the reducer returns the next selection state plus, when a tap completes a
- * placement, the reschedule request to send to the backend. Later slices (swap,
- * tray placement, action sheet) extend this same reducer.
+ * The UI dispatches events (tap on a match card, tap on a tray match, tap on an
+ * insertion line, unschedule, cancel) and the reducer returns the next selection
+ * state plus the backend action the tap triggers (zero or one). Later slices
+ * (action sheet) extend this same reducer.
  *
  * Positions are `position_in_schedule` values, which the backend keeps contiguous
  * (0..n-1) per court. An insertion line with index `k` on a court means "insert
  * before the match currently at position `k`"; `k === count` means "at the end".
  *
  * `plannerReducer` wraps the selection machine with the semantic zoom level:
- * selection and placement are only active at agenda/compact zoom, while taps at
+ * placement and swapping are only active at agenda/compact zoom, while taps at
  * overview zoom navigate (zoom in toward the tapped court/time region). An
  * active selection survives zoom changes.
  */
@@ -24,28 +24,41 @@ export interface GridMatchRef {
   position: number;
 }
 
-export type SelectionState = { kind: 'idle' } | { kind: 'match-selected'; match: GridMatchRef };
+export type SelectionState =
+  | { kind: 'idle' }
+  | { kind: 'match-selected'; match: GridMatchRef }
+  | { kind: 'tray-match-selected'; matchId: number };
 
 export const IDLE_SELECTION: SelectionState = { kind: 'idle' };
 
 export type SelectionEvent =
   | { type: 'tap-match'; match: GridMatchRef }
+  | { type: 'tap-tray-match'; matchId: number }
   | { type: 'tap-insertion-line'; courtId: number; index: number }
+  | { type: 'unschedule' }
   | { type: 'cancel' };
 
-export interface RescheduleRequest {
-  matchId: number;
-  body: {
-    old_court_id: number;
-    old_position: number;
-    new_court_id: number;
-    new_position: number;
-  };
-}
+export type PlanningAction =
+  | {
+      type: 'reschedule';
+      matchId: number;
+      body: {
+        old_court_id: number | null;
+        old_position: number | null;
+        new_court_id: number;
+        new_position: number;
+      };
+    }
+  | { type: 'swap'; matchId1: number; matchId2: number }
+  | { type: 'unschedule'; matchId: number };
 
 export interface SelectionTransition {
   state: SelectionState;
-  reschedule: RescheduleRequest | null;
+  actions: PlanningAction[];
+}
+
+function stay(state: SelectionState): SelectionTransition {
+  return { state, actions: [] };
 }
 
 function place(selected: GridMatchRef, courtId: number, index: number): SelectionTransition {
@@ -54,7 +67,7 @@ function place(selected: GridMatchRef, courtId: number, index: number): Selectio
   // The lines directly before and after the selected match put it back where it
   // already is; placing there is a no-op that just clears the selection.
   if (sameCourt && (index === selected.position || index === selected.position + 1)) {
-    return { state: IDLE_SELECTION, reschedule: null };
+    return stay(IDLE_SELECTION);
   }
 
   // When moving later on the same court, the match vacates its old slot first, so
@@ -64,15 +77,50 @@ function place(selected: GridMatchRef, courtId: number, index: number): Selectio
 
   return {
     state: IDLE_SELECTION,
-    reschedule: {
-      matchId: selected.matchId,
-      body: {
-        old_court_id: selected.courtId,
-        old_position: selected.position,
-        new_court_id: courtId,
-        new_position: newPosition,
+    actions: [
+      {
+        type: 'reschedule',
+        matchId: selected.matchId,
+        body: {
+          old_court_id: selected.courtId,
+          old_position: selected.position,
+          new_court_id: courtId,
+          new_position: newPosition,
+        },
       },
-    },
+    ],
+  };
+}
+
+function placeFromTray(matchId: number, courtId: number, index: number): SelectionTransition {
+  return {
+    state: IDLE_SELECTION,
+    actions: [
+      {
+        type: 'reschedule',
+        matchId,
+        body: {
+          old_court_id: null,
+          old_position: null,
+          new_court_id: courtId,
+          new_position: index,
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Swap two matches as a single atomic backend operation. The backend identifies
+ * both matches by id and trades their slots, so the action stays valid even if
+ * the grid the user tapped on was slightly stale. The tray counts as "no slot":
+ * swapping a scheduled match with a tray match puts the tray match in its slot
+ * and sends the scheduled match back to the tray.
+ */
+function swap(selectedMatchId: number, targetMatchId: number): SelectionTransition {
+  return {
+    state: IDLE_SELECTION,
+    actions: [{ type: 'swap', matchId1: selectedMatchId, matchId2: targetMatchId }],
   };
 }
 
@@ -82,28 +130,58 @@ export function selectionReducer(
 ): SelectionTransition {
   switch (state.kind) {
     case 'idle':
-      if (event.type === 'tap-match') {
-        return { state: { kind: 'match-selected', match: event.match }, reschedule: null };
+      switch (event.type) {
+        case 'tap-match':
+          return stay({ kind: 'match-selected', match: event.match });
+        case 'tap-tray-match':
+          return stay({ kind: 'tray-match-selected', matchId: event.matchId });
+        default:
+          return stay(state);
       }
-      return { state, reschedule: null };
     case 'match-selected':
       switch (event.type) {
         case 'cancel':
-          return { state: IDLE_SELECTION, reschedule: null };
+          return stay(IDLE_SELECTION);
         case 'tap-match':
-          // Tapping the selected match again deselects; tapping another match
-          // moves the selection there (swap arrives in a later slice).
+          // Tapping the selected match again deselects; tapping another
+          // match — scheduled or in the tray — swaps the two.
           if (event.match.matchId === state.match.matchId) {
-            return { state: IDLE_SELECTION, reschedule: null };
+            return stay(IDLE_SELECTION);
           }
-          return { state: { kind: 'match-selected', match: event.match }, reschedule: null };
+          return swap(state.match.matchId, event.match.matchId);
+        case 'tap-tray-match':
+          return swap(state.match.matchId, event.matchId);
         case 'tap-insertion-line':
           return place(state.match, event.courtId, event.index);
+        case 'unschedule':
+          return {
+            state: IDLE_SELECTION,
+            actions: [{ type: 'unschedule', matchId: state.match.matchId }],
+          };
         default:
-          return { state, reschedule: null };
+          return stay(state);
+      }
+    case 'tray-match-selected':
+      switch (event.type) {
+        case 'cancel':
+          // The match was never scheduled; cancelling simply leaves it in the tray.
+          return stay(IDLE_SELECTION);
+        case 'tap-match':
+          return swap(state.matchId, event.match.matchId);
+        case 'tap-tray-match':
+          // Swapping two tray matches is meaningless, so taps inside the tray
+          // keep switching the selection instead.
+          if (event.matchId === state.matchId) {
+            return stay(IDLE_SELECTION);
+          }
+          return stay({ kind: 'tray-match-selected', matchId: event.matchId });
+        case 'tap-insertion-line':
+          return placeFromTray(state.matchId, event.courtId, event.index);
+        default:
+          return stay(state);
       }
     default:
-      return { state, reschedule: null };
+      return stay(state);
   }
 }
 
@@ -135,12 +213,12 @@ export interface FocusTarget {
 
 export interface PlannerTransition {
   state: PlannerState;
-  reschedule: RescheduleRequest | null;
+  actions: PlanningAction[];
   focus: FocusTarget | null;
 }
 
 function noEffect(state: PlannerState): PlannerTransition {
-  return { state, reschedule: null, focus: null };
+  return { state, actions: [], focus: null };
 }
 
 function zoomTo(
@@ -150,7 +228,12 @@ function zoomTo(
 ): PlannerTransition {
   // Already clamped at this level: nothing changes, so nothing to focus.
   if (zoom === state.zoom) return noEffect(state);
-  return { state: { ...state, zoom }, reschedule: null, focus: anchor ?? null };
+  return { state: { ...state, zoom }, actions: [], focus: anchor ?? null };
+}
+
+function delegate(state: PlannerState, event: SelectionEvent): PlannerTransition {
+  const { state: selection, actions } = selectionReducer(state.selection, event);
+  return { state: { ...state, selection }, actions, focus: null };
 }
 
 export function plannerReducer(state: PlannerState, event: PlannerEvent): PlannerTransition {
@@ -169,17 +252,25 @@ export function plannerReducer(state: PlannerState, event: PlannerEvent): Planne
         courtId: event.courtId,
         fraction: event.fraction,
       });
-    case 'cancel': {
-      const { state: selection } = selectionReducer(state.selection, event);
-      return noEffect({ ...state, selection });
-    }
+    case 'cancel':
+    case 'unschedule':
+      // Explicit buttons, not grid geometry: usable at any zoom level.
+      return delegate(state, event);
+    case 'tap-tray-match':
+      // Tray rows are finger-sized at every zoom, so selecting from the tray
+      // at overview is fine (orient first, then zoom in to place). But with a
+      // selection active the tap would swap, and swap targets are gated to
+      // agenda/compact like all other placement.
+      if (state.zoom === 'overview' && state.selection.kind !== 'idle') {
+        return noEffect(state);
+      }
+      return delegate(state, event);
     default: {
       // Targets at overview zoom are a few pixels wide; even if a stale UI
-      // still dispatches a card or line tap there, it must never select or
-      // place anything.
+      // still dispatches a card or line tap there, it must never select,
+      // swap or place anything.
       if (state.zoom === 'overview') return noEffect(state);
-      const { state: selection, reschedule } = selectionReducer(state.selection, event);
-      return { state: { ...state, selection }, reschedule, focus: null };
+      return delegate(state, event);
     }
   }
 }
