@@ -59,10 +59,10 @@ SOLVER_RANDOM_SEED = 77
 # the ratios below are what set the priorities. They were chosen so makespan and team rest
 # lead and locality/sync bend the schedule only where it is otherwise free; retune on a
 # realistic fixture (e.g. the dev-db seed) if the balance feels off.
-WEIGHT_MAKESPAN = 20
-WEIGHT_TEAM_REST = 10
+WEIGHT_MAKESPAN = 100
+WEIGHT_TEAM_REST = 13
+WEIGHT_GROUP_SYNC = 8
 WEIGHT_COURT_LOCALITY = 5
-WEIGHT_GROUP_SYNC = 3
 
 # A team is considered rested once this many minutes separate the end of one of its matches
 # and the start of the next; gaps shorter than this are penalised, longer gaps are free.
