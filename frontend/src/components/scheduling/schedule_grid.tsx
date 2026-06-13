@@ -1,8 +1,10 @@
 import {
+  ActionIcon,
   Badge,
   Box,
   Button,
   Flex,
+  Group,
   Modal,
   NumberInput,
   Popover,
@@ -436,19 +438,57 @@ function BreakElement({
     onResize(Math.max(0, Math.round(minutes)));
   };
 
+  const stepBy = (delta: number) =>
+    setDraftMinutes((current) => {
+      const value = typeof current === 'number' ? current : Number(current) || 0;
+      return Math.max(0, value + delta);
+    });
+
+  // The number field. On the small-screen modal the native (tiny) steppers are
+  // hidden and the input does not auto-focus, so tapping the editor never pops
+  // the iOS keyboard on its own; big +/- buttons drive the value instead.
+  const numberField = (
+    <NumberInput
+      aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
+      value={draftMinutes}
+      onChange={setDraftMinutes}
+      min={0}
+      step={5}
+      suffix={` ${t('minutes_suffix', 'min')}`}
+      size={asModal ? 'md' : 'sm'}
+      hideControls={asModal}
+      {...(asModal ? {} : { 'data-autofocus': true })}
+    />
+  );
+
   // The duration form, shared by the desktop popover and the small-screen modal.
   const form = (
     <>
-      <NumberInput
-        aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
-        value={draftMinutes}
-        onChange={setDraftMinutes}
-        min={0}
-        step={5}
-        suffix={` ${t('minutes_suffix', 'min')}`}
-        size="sm"
-        data-autofocus
-      />
+      {asModal ? (
+        <Group gap="sm" wrap="nowrap" align="stretch">
+          {/* The -/+ buttons adjust the value without focusing the input, so
+              stepping never opens the keyboard. */}
+          <ActionIcon
+            size="xl"
+            variant="default"
+            aria-label={t('break_decrease_label', 'Decrease break')}
+            onClick={() => stepBy(-5)}
+          >
+            –
+          </ActionIcon>
+          <Box style={{ flex: 1 }}>{numberField}</Box>
+          <ActionIcon
+            size="xl"
+            variant="default"
+            aria-label={t('break_increase_label', 'Increase break')}
+            onClick={() => stepBy(5)}
+          >
+            +
+          </ActionIcon>
+        </Group>
+      ) : (
+        numberField
+      )}
       <Stack mt="sm" gap={6}>
         <Button
           size="compact-sm"
@@ -556,6 +596,10 @@ function BreakElement({
             title={t('break_popover_title', 'Break duration')}
             // Above the action sheet (400) and selection pill, so it is never covered.
             zIndex={500}
+            // On iOS the keyboard sliding up shifts the centered modal, and the
+            // delayed synthetic click then lands outside it — which would dismiss
+            // the edit. Require an explicit close (the X or a button) instead.
+            closeOnClickOutside={false}
           >
             {form}
           </Modal>
