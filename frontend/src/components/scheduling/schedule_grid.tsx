@@ -395,8 +395,12 @@ function OverviewBlock({
   );
 }
 
-/** Minimum clickable height for a break, so a 0-minute gap is still a tap target. */
-const BREAK_MIN_HIT_AREA_PX = 18;
+/**
+ * Touch-target height for a break's chip, so even a 0-minute break is comfortably
+ * tappable. The target hugs the centered chip — not the full column width — so the
+ * match cards on either side keep almost all of their own tap area.
+ */
+const BREAK_TARGET_HEIGHT_PX = 32;
 
 /**
  * A derived break between two consecutive matches: the calendar-style gap from
@@ -420,12 +424,7 @@ function BreakElement({
     Math.round(breakBlock.durationMinutes)
   );
 
-  const gapTop = breakBlock.startMinutes * pxPerMinute;
-  const gapHeight = breakBlock.durationMinutes * pxPerMinute;
   const gapMiddle = ((breakBlock.startMinutes + breakBlock.endMinutes) / 2) * pxPerMinute;
-  const hitHeight = Math.max(gapHeight, BREAK_MIN_HIT_AREA_PX);
-  const top = gapMiddle - hitHeight / 2;
-  const showLabel = gapHeight >= 14;
   const roundedDuration = Math.round(breakBlock.durationMinutes);
 
   const apply = (minutes: number) => {
@@ -434,62 +433,75 @@ function BreakElement({
   };
 
   return (
-    <Popover
-      opened={opened}
-      onChange={setOpened}
-      position="right"
-      withArrow
-      shadow="md"
-      trapFocus
-      width={220}
+    // A full-width band centered on the break, but click-through: only the chip
+    // inside it captures taps, so the cards on either side keep their tap area.
+    <Box
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: gapMiddle - BREAK_TARGET_HEIGHT_PX / 2,
+        height: BREAK_TARGET_HEIGHT_PX,
+        pointerEvents: 'none',
+        zIndex: 1,
+      }}
     >
-      <Popover.Target>
-        <Box
-          aria-label={t('edit_break_aria_label', 'Edit break')}
-          data-break-before-match-id={breakBlock.matchId}
-          onClick={(event) => {
-            event.stopPropagation();
-            setDraftMinutes(roundedDuration);
-            setOpened((value) => !value);
-          }}
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            setOpened(false);
-            onResize(breakBlock.defaultBreakMinutes);
-          }}
-          style={{
-            position: 'absolute',
-            top,
-            left: 3,
-            right: 3,
-            height: hitHeight,
-            cursor: 'pointer',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {/* The break line, on the true gap midpoint inside the hit area. */}
+      {/* The break line: full width, visual only — taps fall through to the cards. */}
+      <Box
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: BREAK_TARGET_HEIGHT_PX / 2,
+          borderTop: '1px dashed var(--mantine-color-dimmed)',
+          opacity: 0.7,
+        }}
+      />
+      <Popover
+        opened={opened}
+        onChange={setOpened}
+        position="right"
+        withArrow
+        shadow="md"
+        trapFocus
+        width={220}
+      >
+        <Popover.Target>
+          {/* The chip is the tap target: full band height for a comfortable touch
+              area, but only as wide as the label so it stays clear of the cards. */}
           <Box
+            aria-label={t('edit_break_aria_label', 'Edit break')}
+            data-break-before-match-id={breakBlock.matchId}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDraftMinutes(roundedDuration);
+              setOpened((value) => !value);
+            }}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              setOpened(false);
+              onResize(breakBlock.defaultBreakMinutes);
+            }}
             style={{
               position: 'absolute',
-              left: 0,
-              right: 0,
-              top: hitHeight / 2,
-              borderTop: '1px dashed var(--mantine-color-dimmed)',
-              opacity: 0.7,
+              top: 0,
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 12px',
+              cursor: 'pointer',
+              pointerEvents: 'auto',
             }}
-          />
-          {showLabel && (
+          >
             <Text
               component="span"
               fz={10}
               c="dimmed"
               style={{
-                position: 'relative',
                 lineHeight: 1,
-                padding: '1px 4px',
+                padding: '1px 6px',
                 borderRadius: 4,
                 backgroundColor: 'var(--mantine-color-body)',
                 border: '1px solid var(--mantine-color-default-border)',
@@ -498,44 +510,44 @@ function BreakElement({
             >
               {t('break_minutes_short', '{{count}}m', { count: roundedDuration })}
             </Text>
-          )}
-        </Box>
-      </Popover.Target>
-      <Popover.Dropdown onClick={(event) => event.stopPropagation()}>
-        <Text size="sm" fw={600} mb={6}>
-          {t('break_popover_title', 'Break duration')}
-        </Text>
-        <NumberInput
-          aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
-          value={draftMinutes}
-          onChange={setDraftMinutes}
-          min={0}
-          step={5}
-          suffix={` ${t('minutes_suffix', 'min')}`}
-          size="sm"
-          data-autofocus
-        />
-        <Stack mt="sm" gap={6}>
-          <Button
-            size="compact-sm"
-            fullWidth
-            onClick={() =>
-              apply(typeof draftMinutes === 'number' ? draftMinutes : Number(draftMinutes) || 0)
-            }
-          >
-            {t('apply_break_button', 'Set')}
-          </Button>
-          <Button
-            size="compact-sm"
-            fullWidth
-            variant="light"
-            onClick={() => apply(breakBlock.defaultBreakMinutes)}
-          >
-            {t('default_pause_duration_button', 'Default pause duration')}
-          </Button>
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
+          </Box>
+        </Popover.Target>
+        <Popover.Dropdown onClick={(event) => event.stopPropagation()}>
+          <Text size="sm" fw={600} mb={6}>
+            {t('break_popover_title', 'Break duration')}
+          </Text>
+          <NumberInput
+            aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
+            value={draftMinutes}
+            onChange={setDraftMinutes}
+            min={0}
+            step={5}
+            suffix={` ${t('minutes_suffix', 'min')}`}
+            size="sm"
+            data-autofocus
+          />
+          <Stack mt="sm" gap={6}>
+            <Button
+              size="compact-sm"
+              fullWidth
+              onClick={() =>
+                apply(typeof draftMinutes === 'number' ? draftMinutes : Number(draftMinutes) || 0)
+              }
+            >
+              {t('apply_break_button', 'Set')}
+            </Button>
+            <Button
+              size="compact-sm"
+              fullWidth
+              variant="light"
+              onClick={() => apply(breakBlock.defaultBreakMinutes)}
+            >
+              {t('default_pause_duration_button', 'Default pause duration')}
+            </Button>
+          </Stack>
+        </Popover.Dropdown>
+      </Popover>
+    </Box>
   );
 }
 
