@@ -16,8 +16,9 @@ from bracket.models.db.match import (
     MatchWithDetails,
     MatchWithDetailsDefinitive,
 )
+from bracket.models.db.stage_item_inputs import StageItemInputEmpty
 from bracket.models.db.tournament import Tournament
-from bracket.models.db.util import StageWithStageItems
+from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
     sql_reschedule_match_and_determine_duration,
@@ -27,6 +28,7 @@ from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import (
     CourtId,
+    LevelId,
     MatchId,
     StageId,
     StageItemId,
@@ -57,7 +59,7 @@ SOLVER_RANDOM_SEED = 77
 # the ratios below are what set the priorities. They were chosen so makespan and team rest
 # lead and locality/sync bend the schedule only where it is otherwise free; retune on a
 # realistic fixture (e.g. the dev-db seed) if the balance feels off.
-WEIGHT_MAKESPAN = 100
+WEIGHT_MAKESPAN = 20
 WEIGHT_TEAM_REST = 10
 WEIGHT_COURT_LOCALITY = 5
 WEIGHT_GROUP_SYNC = 3
@@ -70,11 +72,15 @@ COMFORTABLE_REST_MINUTES = 30
 @dataclass(frozen=True)
 class _MatchContext:
     match: ScheduleMatch
+    level_id: LevelId | None
     stage_id: StageId
     stage_item_id: StageItemId
     round_index: int
     input_ids: tuple[StageItemInputId, ...]
     cross_stage_source_ids: tuple[StageItemId, ...]
+    # True when the match's stage item has at least one unwired (empty) input slot, e.g. a
+    # knockout place filled manually only once the previous stage is fully played.
+    stage_item_has_open_slot: bool
 
 
 @dataclass(frozen=True)
@@ -108,15 +114,21 @@ def _cross_stage_source_ids(match: ScheduleMatch) -> tuple[StageItemId, ...]:
     return tuple(dict.fromkeys(source_ids))
 
 
+def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
+    return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
+
+
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
     return [
         _MatchContext(
             match=match,
+            level_id=stage.level_id,
             stage_id=stage.id,
             stage_item_id=stage_item.id,
             round_index=round_index,
             input_ids=_input_ids(match),
             cross_stage_source_ids=_cross_stage_source_ids(match),
+            stage_item_has_open_slot=_has_open_slot(stage_item),
         )
         for stage in stages
         for stage_item in stage.stage_items
@@ -331,6 +343,39 @@ def _add_movable_vs_pinned_input_constraints(
                 model.AddBoolOr([before, after])
 
 
+def _open_slot_precedence_ids(contexts: list[_MatchContext]) -> set[tuple[MatchId, MatchId]]:
+    """Pair each open-slot stage item's matches with its whole immediately-preceding stage.
+
+    A stage item with an unwired input slot has no explicit feeder to follow, but it still
+    cannot be played before the stage that fills that slot is over. Lacking a specific
+    source, we conservatively make every match of such a stage item wait for every match of
+    the immediately-preceding stage in the same level. Cross-level scheduling is unaffected,
+    and fully-wired stage items keep their tighter, feeder-specific dependencies.
+    """
+    contexts_by_stage: dict[StageId, list[_MatchContext]] = defaultdict(list)
+    stages_by_level: dict[LevelId | None, set[StageId]] = defaultdict(set)
+    for context in contexts:
+        contexts_by_stage[context.stage_id].append(context)
+        stages_by_level[context.level_id].add(context.stage_id)
+
+    ordered_stages_by_level = {
+        level_id: sorted(stage_ids) for level_id, stage_ids in stages_by_level.items()
+    }
+
+    pair_ids = set()
+    for successor in contexts:
+        if not successor.stage_item_has_open_slot:
+            continue
+        ordered_stages = ordered_stages_by_level[successor.level_id]
+        position = ordered_stages.index(successor.stage_id)
+        if position == 0:
+            continue  # first stage in the level — nothing precedes it
+        preceding_stage_id = ordered_stages[position - 1]
+        for feeder in contexts_by_stage[preceding_stage_id]:
+            pair_ids.add((feeder.match.id, successor.match.id))
+    return pair_ids
+
+
 def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext, _MatchContext]]:
     contexts_by_match_id = {context.match.id: context for context in contexts}
     contexts_by_stage_item: dict[StageItemId, list[_MatchContext]] = defaultdict(list)
@@ -350,6 +395,8 @@ def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext
             for feeder in contexts_by_stage_item[source_stage_item_id]:
                 if feeder.match.id != successor.match.id:
                     pair_ids.add((feeder.match.id, successor.match.id))
+
+    pair_ids |= _open_slot_precedence_ids(contexts)
 
     return [
         (contexts_by_match_id[feeder_id], contexts_by_match_id[successor_id])
