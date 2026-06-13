@@ -1,16 +1,28 @@
-import { Badge, Box, Flex, Text, Tooltip } from '@mantine/core';
+import {
+  Badge,
+  Box,
+  Button,
+  Flex,
+  NumberInput,
+  Popover,
+  Stack,
+  Text,
+  Tooltip,
+} from '@mantine/core';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
+  BreakBlock,
   InsertionLine,
   MatchBlock,
   ScheduleGridLayout,
+  computeBreaks,
   computeInsertionLines,
 } from '@logic/planning/layout';
 import { nowLineScrollTop } from '@logic/planning/now_line';
@@ -380,6 +392,150 @@ function OverviewBlock({
         />
       )}
     </Box>
+  );
+}
+
+/** Minimum clickable height for a break, so a 0-minute gap is still a tap target. */
+const BREAK_MIN_HIT_AREA_PX = 18;
+
+/**
+ * A derived break between two consecutive matches: the calendar-style gap from
+ * the previous match's end to the next match's start. Clicking it opens a popup
+ * to set the break's duration (with a "default pause duration" reset); a
+ * double-click resets it to the default directly. A 0-minute break still renders
+ * as a clickable line so a pause can be added anywhere.
+ */
+function BreakElement({
+  breakBlock,
+  pxPerMinute,
+  onResize,
+}: {
+  breakBlock: BreakBlock;
+  pxPerMinute: number;
+  onResize: (newDurationMinutes: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [opened, setOpened] = useState(false);
+  const [draftMinutes, setDraftMinutes] = useState<number | string>(
+    Math.round(breakBlock.durationMinutes)
+  );
+
+  const gapTop = breakBlock.startMinutes * pxPerMinute;
+  const gapHeight = breakBlock.durationMinutes * pxPerMinute;
+  const gapMiddle = ((breakBlock.startMinutes + breakBlock.endMinutes) / 2) * pxPerMinute;
+  const hitHeight = Math.max(gapHeight, BREAK_MIN_HIT_AREA_PX);
+  const top = gapMiddle - hitHeight / 2;
+  const showLabel = gapHeight >= 14;
+  const roundedDuration = Math.round(breakBlock.durationMinutes);
+
+  const apply = (minutes: number) => {
+    setOpened(false);
+    onResize(Math.max(0, Math.round(minutes)));
+  };
+
+  return (
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      position="right"
+      withArrow
+      shadow="md"
+      trapFocus
+      width={220}
+    >
+      <Popover.Target>
+        <Box
+          aria-label={t('edit_break_aria_label', 'Edit break')}
+          data-break-before-match-id={breakBlock.matchId}
+          onClick={(event) => {
+            event.stopPropagation();
+            setDraftMinutes(roundedDuration);
+            setOpened((value) => !value);
+          }}
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            setOpened(false);
+            onResize(breakBlock.defaultBreakMinutes);
+          }}
+          style={{
+            position: 'absolute',
+            top,
+            left: 3,
+            right: 3,
+            height: hitHeight,
+            cursor: 'pointer',
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* The break line, on the true gap midpoint inside the hit area. */}
+          <Box
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: hitHeight / 2,
+              borderTop: '1px dashed var(--mantine-color-dimmed)',
+              opacity: 0.7,
+            }}
+          />
+          {showLabel && (
+            <Text
+              component="span"
+              fz={10}
+              c="dimmed"
+              style={{
+                position: 'relative',
+                lineHeight: 1,
+                padding: '1px 4px',
+                borderRadius: 4,
+                backgroundColor: 'var(--mantine-color-body)',
+                border: '1px solid var(--mantine-color-default-border)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t('break_minutes_short', '{{count}}m', { count: roundedDuration })}
+            </Text>
+          )}
+        </Box>
+      </Popover.Target>
+      <Popover.Dropdown onClick={(event) => event.stopPropagation()}>
+        <Text size="sm" fw={600} mb={6}>
+          {t('break_popover_title', 'Break duration')}
+        </Text>
+        <NumberInput
+          aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
+          value={draftMinutes}
+          onChange={setDraftMinutes}
+          min={0}
+          step={5}
+          suffix={` ${t('minutes_suffix', 'min')}`}
+          size="sm"
+          data-autofocus
+        />
+        <Stack mt="sm" gap={6}>
+          <Button
+            size="compact-sm"
+            fullWidth
+            onClick={() =>
+              apply(typeof draftMinutes === 'number' ? draftMinutes : Number(draftMinutes) || 0)
+            }
+          >
+            {t('apply_break_button', 'Set')}
+          </Button>
+          <Button
+            size="compact-sm"
+            fullWidth
+            variant="light"
+            onClick={() => apply(breakBlock.defaultBreakMinutes)}
+          >
+            {t('default_pause_duration_button', 'Default pause duration')}
+          </Button>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -769,6 +925,26 @@ export default function ScheduleGrid({
                   />
                 );
               })}
+              {/* Breaks are the resting state of a court lane; while placing a
+                  match, insertion lines take their place instead. */}
+              {!placing &&
+                !isOverview &&
+                computeBreaks(blocks)
+                  .filter((breakBlock) => !breakBlock.locked)
+                  .map((breakBlock) => (
+                    <BreakElement
+                      key={breakBlock.matchId}
+                      breakBlock={breakBlock}
+                      pxPerMinute={pxPerMinute}
+                      onResize={(newDurationMinutes) =>
+                        onSelectionEvent({
+                          type: 'resize-break',
+                          matchId: breakBlock.matchId,
+                          newDurationMinutes,
+                        })
+                      }
+                    />
+                  ))}
               {placing &&
                 !isOverview &&
                 computeInsertionLines(blocks).map((line) => (

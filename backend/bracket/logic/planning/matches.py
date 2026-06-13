@@ -474,6 +474,57 @@ async def handle_match_swap(tournament: Tournament, body: MatchSwapBody) -> None
     await reorder_all_matches(tournament, court_matches)
 
 
+async def handle_match_resize_break(
+    tournament: Tournament, match_id: MatchId, new_duration_minutes: int
+) -> None:
+    """
+    Resize the break before ``match_id`` (the gap between the previous match's end
+    and this match's start on the same court) to ``new_duration_minutes``.
+
+    The match and every later match on the court shift by the resulting delta, so
+    their relative gaps are preserved; growing the break pushes them back, shrinking
+    it pulls them forward. Earlier matches and every other court stay put.
+    """
+    stages = await get_full_tournament_details(tournament.id)
+    matches_per_court = get_scheduled_matches_per_court(stages)
+
+    for court_id, match_positions in matches_per_court.items():
+        index = next((i for i, mp in enumerate(match_positions) if mp.match.id == match_id), None)
+        if index is None:
+            continue
+
+        if index == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="There is no break before the first match on a court",
+            )
+
+        previous = match_positions[index - 1].match
+        previous_end = assert_some(previous.start_time) + timedelta(
+            minutes=previous.duration_minutes
+        )
+        target = match_positions[index].match
+        new_start = previous_end + timedelta(minutes=new_duration_minutes)
+        delta = new_start - assert_some(target.start_time)
+        if delta == timedelta():
+            return
+
+        for match_pos in match_positions[index:]:
+            shifted_start = assert_some(match_pos.match.start_time) + delta
+            await sql_reschedule_match_and_determine_duration(
+                CourtId(court_id),
+                shifted_start,
+                match_pos.match,
+                tournament,
+            )
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="The match is not currently scheduled on a court",
+    )
+
+
 async def update_start_times_of_matches(tournament_id: TournamentId) -> None:
     stages = await get_full_tournament_details(tournament_id)
     tournament = await sql_get_tournament(tournament_id)

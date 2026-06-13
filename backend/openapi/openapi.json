@@ -779,6 +779,20 @@
         "title": "MatchRescheduleBody",
         "type": "object"
       },
+      "MatchResizeBreakBody": {
+        "properties": {
+          "new_duration_minutes": {
+            "minimum": 0.0,
+            "title": "New Duration Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new_duration_minutes"
+        ],
+        "title": "MatchResizeBreakBody",
+        "type": "object"
+      },
       "MatchScoreTrackingBody": {
         "properties": {
           "stage_item_input1_score": {
@@ -5334,6 +5348,72 @@
           }
         ],
         "summary": "Reschedule Match",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/{match_id}/resize_break": {
+      "post": {
+        "operationId": "resize_match_break_tournaments__tournament_id__matches__match_id__resize_break_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchResizeBreakBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Resize Match Break",
         "tags": [
           "Matches"
         ]

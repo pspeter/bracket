@@ -121,6 +121,55 @@ export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
   return lines.filter((line) => line.index >= lockedCount);
 }
 
+/**
+ * A derived break between two consecutive matches on a court: the gap from the
+ * previous match's end to the next match's start. Identified by the match that
+ * *follows* it (resizing the break shifts that match and every later one).
+ */
+export interface BreakBlock {
+  /** The match after the break; the backend key for resizing it. */
+  matchId: number;
+  /** Index of the following match in the court's blocks. */
+  index: number;
+  /** Break start, in minutes from the tournament start (previous match's end). */
+  startMinutes: number;
+  /** Break end (next match's start). */
+  endMinutes: number;
+  /** `endMinutes - startMinutes`, clamped at 0 for overlapping/sub-default spacing. */
+  durationMinutes: number;
+  /** Tournament-level default break, used by the "default pause duration" reset. */
+  defaultBreakMinutes: number;
+  /**
+   * Inside the court's frozen past: the following match is locked (see
+   * `MatchBlock.locked`). Editing such a break would shift recorded start times
+   * of played matches, so the UI does not offer it.
+   */
+  locked: boolean;
+}
+
+/**
+ * Derive the break elements for a court: one between every pair of consecutive
+ * matches. A back-to-back pair still yields a 0-minute break so the planner can
+ * render a clickable line where a pause can be inserted.
+ */
+export function computeBreaks(blocks: MatchBlock[]): BreakBlock[] {
+  const breaks: BreakBlock[] = [];
+  for (let i = 1; i < blocks.length; i += 1) {
+    const previous = blocks[i - 1];
+    const next = blocks[i];
+    breaks.push({
+      matchId: next.match.id,
+      index: i,
+      startMinutes: previous.endMinutes,
+      endMinutes: next.startMinutes,
+      durationMinutes: Math.max(0, next.startMinutes - previous.endMinutes),
+      defaultBreakMinutes: next.defaultBreakMinutes,
+      locked: next.locked,
+    });
+  }
+  return breaks;
+}
+
 const DEFAULT_TICK_INTERVAL_MINUTES = 30;
 const DEFAULT_MIN_TOTAL_MINUTES = 60;
 

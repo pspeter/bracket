@@ -158,6 +158,9 @@ import type {
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostData,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostErrors,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses,
+  ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostData,
+  ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors,
+  ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostErrors,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponses,
@@ -825,6 +828,32 @@ export const rescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePost 
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/matches/{match_id}/reschedule',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Resize Match Break
+ */
+export const resizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses,
+    ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/resize_break',
     ...options,
     headers: {
       'Content-Type': 'application/json',

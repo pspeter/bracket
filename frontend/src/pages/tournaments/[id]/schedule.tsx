@@ -59,7 +59,13 @@ import {
   getStageOrderViolations,
   getUnscheduledMatches,
 } from '@services/lookups';
-import { rescheduleMatch, scheduleMatches, swapMatches, unscheduleMatch } from '@services/match';
+import {
+  rescheduleMatch,
+  resizeMatchBreak,
+  scheduleMatches,
+  swapMatches,
+  unscheduleMatch,
+} from '@services/match';
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import MatchActionSheet from '@components/scheduling/match_action_sheet';
@@ -175,6 +181,11 @@ export default function SchedulePage() {
         break;
       case 'unschedule':
         await unscheduleMatch(tournamentData.id, action.matchId);
+        break;
+      case 'resize-break':
+        await resizeMatchBreak(tournamentData.id, action.matchId, {
+          new_duration_minutes: action.newDurationMinutes,
+        });
         break;
       default:
         break;

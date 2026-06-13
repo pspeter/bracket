@@ -587,6 +587,21 @@ describe('plannerReducer', () => {
       expect(transition.actions).toEqual([]);
       expect(transition.focus).toBeNull();
     });
+
+    it.each(['agenda', 'compact'] as ZoomLevel[])(
+      'emits a resize-break action without touching the selection at %s',
+      (zoom) => {
+        const start = planner(zoom, selected(ref(10, 1, 2)));
+        const { state, actions } = plannerReducer(start, {
+          type: 'resize-break',
+          matchId: 20,
+          newDurationMinutes: 15,
+        });
+
+        expect(state).toEqual(start);
+        expect(actions).toEqual([{ type: 'resize-break', matchId: 20, newDurationMinutes: 15 }]);
+      }
+    );
   });
 
   describe('at overview zoom', () => {
@@ -612,6 +627,18 @@ describe('plannerReducer', () => {
         type: 'tap-insertion-line',
         courtId: 2,
         index: 1,
+      });
+
+      expect(transition.state).toEqual(start);
+      expect(transition.actions).toEqual([]);
+    });
+
+    it('ignores a resize-break dispatched at overview zoom', () => {
+      const start = planner('overview', selected(ref(10, 1, 2)));
+      const transition = plannerReducer(start, {
+        type: 'resize-break',
+        matchId: 20,
+        newDurationMinutes: 15,
       });
 
       expect(transition.state).toEqual(start);

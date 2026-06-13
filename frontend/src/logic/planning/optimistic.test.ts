@@ -159,6 +159,44 @@ describe('applyPlanningActions', () => {
     expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
   });
 
+  it('grows a break, shifting the match after it and all later ones by the delta', () => {
+    // Court 1: 1@0..10, 2@15..25, 3@30..40 (default 5-minute breaks).
+    const byId = apply(
+      [match(1, 1, 0), match(2, 1, 15), match(3, 1, 30)],
+      [{ type: 'resize-break', matchId: 2, newDurationMinutes: 20 }]
+    );
+
+    // Match 1 is before the break: untouched. Match 2 starts at 1's end (10) + 20.
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
+    // Match 3 keeps its gap to 2 and shifts by the same +15 delta.
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(45) });
+  });
+
+  it('shrinks a leftover pause to compact the court from that point', () => {
+    // Court 1: 1@0..10, 2@50..60 (40-minute pause), 3@65..75.
+    const byId = apply(
+      [match(1, 1, 0), match(2, 1, 50), match(3, 1, 65)],
+      [{ type: 'resize-break', matchId: 2, newDurationMinutes: BREAK }]
+    );
+
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    // Compacted to the default break after 1's end: 10 + 5 = 15.
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+    // Match 3 keeps its 5-minute gap to 2 and moves by the same -35 delta.
+    expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
+  });
+
+  it('ignores a break resize on the first match of a court', () => {
+    const byId = apply(
+      [match(1, 1, 0), match(2, 1, 15)],
+      [{ type: 'resize-break', matchId: 1, newDurationMinutes: 20 }]
+    );
+
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+  });
+
   it('unschedules a match and leaves a gap, not re-packing the remaining ones', () => {
     const byId = apply(
       [match(1, 1, 0), match(2, 1, 15), match(3, 1, 30)],

@@ -1,4 +1,10 @@
-import { MatchBody, MatchCreateBodyFrontend, MatchRescheduleBody, MatchSwapBody } from '@openapi';
+import {
+  MatchBody,
+  MatchCreateBodyFrontend,
+  MatchRescheduleBody,
+  MatchResizeBreakBody,
+  MatchSwapBody,
+} from '@openapi';
 import { createAxios, handleRequestError } from './adapter';
 
 export async function createMatch(tournament_id: number, match: MatchCreateBodyFrontend) {
@@ -66,6 +72,14 @@ export async function rescheduleMatch(
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
   return createAxios().post(`tournaments/${tournament_id}/matches/swap`, body);
+}
+
+export async function resizeMatchBreak(
+  tournament_id: number,
+  match_id: number,
+  body: MatchResizeBreakBody
+) {
+  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/resize_break`, body);
 }
 
 export async function scheduleMatches(tournament_id: number) {
