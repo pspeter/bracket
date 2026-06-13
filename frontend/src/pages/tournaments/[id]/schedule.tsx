@@ -96,6 +96,27 @@ export default function SchedulePage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Escape cancels an active match selection, the keyboard equivalent of the
+  // selection pill's "cancel" button. The action sheet and details modal own
+  // Escape while they're open (Mantine closes them first), so only act on the
+  // plain selected states here.
+  useEffect(() => {
+    if (
+      detailsMatchId != null ||
+      (planner.selection.kind !== 'match-selected' &&
+        planner.selection.kind !== 'tray-match-selected')
+    ) {
+      return undefined;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handlePlannerEvent({ type: 'cancel' });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [planner.selection, detailsMatchId]);
+
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
   // The schedule polls so co-organizers' changes show up, but holds still
