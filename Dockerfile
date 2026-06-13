@@ -18,13 +18,13 @@ ARG VITE_API_BASE_URL=/api
 RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build
 
 # Build backend image that also serves frontend (stored in `/app/frontend-dist`)
-FROM python:3.13-alpine3.22
+FROM python:3.13-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-RUN addgroup --system bracket && \
-    adduser --system bracket --ingroup bracket && \
+RUN groupadd --system bracket && \
+    useradd --system --create-home --gid bracket --home-dir /home/bracket bracket && \
     chown bracket:bracket /app
 USER bracket
 
@@ -40,7 +40,7 @@ COPY --from=builder /app/dist /app/frontend-dist
 EXPOSE 8400
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
-    CMD ["wget", "-O", "/dev/null", "http://0.0.0.0:8400/ping"]
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8400/ping', timeout=5).read()"]
 
 CMD [ \
     "uv", \
