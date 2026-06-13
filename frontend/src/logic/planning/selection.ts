@@ -66,7 +66,8 @@ export type PlanningAction =
       };
     }
   | { type: 'swap'; matchId1: number; matchId2: number }
-  | { type: 'unschedule'; matchId: number };
+  | { type: 'unschedule'; matchId: number }
+  | { type: 'resize-break'; matchId: number; newDurationMinutes: number };
 
 export interface SelectionTransition {
   state: SelectionState;
@@ -252,7 +253,8 @@ export type PlannerEvent =
   | { type: 'zoom-in'; anchor?: FocusTarget | null }
   | { type: 'zoom-out'; anchor?: FocusTarget | null }
   | { type: 'set-zoom'; zoom: ZoomLevel }
-  | { type: 'tap-overview'; courtId: number; fraction: number };
+  | { type: 'tap-overview'; courtId: number; fraction: number }
+  | { type: 'resize-break'; matchId: number; newDurationMinutes: number };
 
 /**
  * Where to scroll the grid after a zoom change: a court plus a vertical
@@ -305,6 +307,22 @@ export function plannerReducer(state: PlannerState, event: PlannerEvent): Planne
         courtId: event.courtId,
         fraction: event.fraction,
       });
+    case 'resize-break':
+      // Editing a derived break is an explicit popup action on a specific match;
+      // it never touches the selection. Break elements only render at the card
+      // zoom levels, so a stale dispatch at overview is ignored.
+      if (state.zoom === 'overview') return noEffect(state);
+      return {
+        state,
+        actions: [
+          {
+            type: 'resize-break',
+            matchId: event.matchId,
+            newDurationMinutes: event.newDurationMinutes,
+          },
+        ],
+        focus: null,
+      };
     case 'cancel':
     case 'unschedule':
     case 'dismiss-action-sheet':

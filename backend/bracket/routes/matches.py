@@ -8,6 +8,7 @@ from bracket.logic.planning.conflicts import handle_conflicts
 from bracket.logic.planning.matches import (
     get_scheduled_matches,
     handle_match_reschedule,
+    handle_match_resize_break,
     handle_match_swap,
     reorder_all_matches,
     schedule_all_unscheduled_matches,
@@ -28,6 +29,7 @@ from bracket.models.db.match import (
     MatchCreateBodyFrontend,
     MatchFilter,
     MatchRescheduleBody,
+    MatchResizeBreakBody,
     MatchScoreTrackingBody,
     MatchState,
     MatchSwapBody,
@@ -268,6 +270,23 @@ async def reschedule_match(
     await handle_conflicts(
         await get_full_tournament_details(tournament_id), tournament.margin_minutes
     )
+    return SuccessResponse()
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/resize_break",
+    response_model=SuccessResponse,
+)
+async def resize_match_break(
+    tournament_id: TournamentId,
+    match_id: MatchId,
+    body: MatchResizeBreakBody,
+    tournament: Tournament = Depends(disallow_archived_tournament),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+) -> SuccessResponse:
+    async with database.transaction():
+        await handle_match_resize_break(tournament, match_id, body.new_duration_minutes)
+        await handle_conflicts(await get_full_tournament_details(tournament_id))
     return SuccessResponse()
 
 

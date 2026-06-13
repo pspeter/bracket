@@ -121,6 +121,79 @@ export function computeInsertionLines(blocks: MatchBlock[]): InsertionLine[] {
   return lines.filter((line) => line.index >= lockedCount);
 }
 
+/**
+ * A derived break on a court. For a break between two matches it is the gap from
+ * the previous match's end to the next match's start; for the leading break it is
+ * the delay between the tournament start and the first match. Either way it is
+ * identified by the match that *follows* it (resizing shifts that match and every
+ * later one on the court).
+ */
+export interface BreakBlock {
+  /** The match after the break; the backend key for resizing it. */
+  matchId: number;
+  /** Index of the following match in the court's blocks. */
+  index: number;
+  /** Break start, in minutes from the tournament start (previous match's end, or 0). */
+  startMinutes: number;
+  /** Break end (next match's start). */
+  endMinutes: number;
+  /** `endMinutes - startMinutes`, clamped at 0 for overlapping/sub-default spacing. */
+  durationMinutes: number;
+  /**
+   * The value the "default pause duration" reset writes: the tournament default
+   * break for a break between matches, but 0 for the leading break (a court has
+   * no delay by default).
+   */
+  defaultBreakMinutes: number;
+  /**
+   * Inside the court's frozen past: the following match is locked (see
+   * `MatchBlock.locked`). Editing such a break would shift recorded start times
+   * of played matches, so the UI does not offer it.
+   */
+  locked: boolean;
+}
+
+/**
+ * Derive the break elements for a court: a leading break before the first match
+ * (the court's start delay, 0 by default) plus one between every pair of
+ * consecutive matches. A back-to-back pair — or a court starting at the
+ * tournament start — still yields a 0-minute break so the planner can render a
+ * clickable line where a pause can be inserted.
+ */
+export function computeBreaks(blocks: MatchBlock[]): BreakBlock[] {
+  if (blocks.length === 0) {
+    return [];
+  }
+
+  const first = blocks[0];
+  const breaks: BreakBlock[] = [
+    {
+      matchId: first.match.id,
+      index: 0,
+      startMinutes: 0,
+      endMinutes: first.startMinutes,
+      durationMinutes: Math.max(0, first.startMinutes),
+      // A court has no start delay by default, so resetting clears it to 0.
+      defaultBreakMinutes: 0,
+      locked: first.locked,
+    },
+  ];
+  for (let i = 1; i < blocks.length; i += 1) {
+    const previous = blocks[i - 1];
+    const next = blocks[i];
+    breaks.push({
+      matchId: next.match.id,
+      index: i,
+      startMinutes: previous.endMinutes,
+      endMinutes: next.startMinutes,
+      durationMinutes: Math.max(0, next.startMinutes - previous.endMinutes),
+      defaultBreakMinutes: next.defaultBreakMinutes,
+      locked: next.locked,
+    });
+  }
+  return breaks;
+}
+
 const DEFAULT_TICK_INTERVAL_MINUTES = 30;
 const DEFAULT_MIN_TOTAL_MINUTES = 60;
 

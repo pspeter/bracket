@@ -114,6 +114,32 @@ export function applyPlanningActions<S extends OptimisticStage>(
         insertMatchAt(action.body.new_court_id, match, action.body.new_position, match.id);
         break;
       }
+      case 'resize-break': {
+        const match = matchesById.get(action.matchId);
+        if (match == null || match.court_id == null || match.start_time == null) {
+          break;
+        }
+        const courtMatches = scheduledOnCourt(match.court_id);
+        const index = courtMatches.findIndex((m) => m.id === match.id);
+        if (index < 0) {
+          break;
+        }
+        // The leading break is anchored at the tournament start (minute 0); a break
+        // between matches is anchored at the previous match's end.
+        const previousEnd =
+          index === 0
+            ? 0
+            : startMinutes(courtMatches[index - 1]) + courtMatches[index - 1].duration_minutes;
+        const newStart = previousEnd + action.newDurationMinutes;
+        const delta = newStart - startMinutes(match);
+        if (delta === 0) {
+          break;
+        }
+        for (const later of courtMatches.slice(index)) {
+          later.start_time = minutesAfterStart(startMinutes(later) + delta);
+        }
+        break;
+      }
       case 'unschedule': {
         const match = matchesById.get(action.matchId);
         if (match == null) {

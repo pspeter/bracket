@@ -1,16 +1,32 @@
-import { Badge, Box, Flex, Text, Tooltip } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Flex,
+  Group,
+  Modal,
+  NumberInput,
+  Popover,
+  Stack,
+  Text,
+  Tooltip,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
+  BreakBlock,
   InsertionLine,
   MatchBlock,
   ScheduleGridLayout,
+  computeBreaks,
   computeInsertionLines,
 } from '@logic/planning/layout';
 import { nowLineScrollTop } from '@logic/planning/now_line';
@@ -401,6 +417,234 @@ function OverviewBlock({
   );
 }
 
+/**
+ * Touch-target height for a break's chip, so even a 0-minute break is comfortably
+ * tappable. The target hugs the centered chip — not the full column width — so the
+ * match cards on either side keep almost all of their own tap area.
+ */
+const BREAK_TARGET_HEIGHT_PX = 32;
+
+/**
+ * A derived break between two consecutive matches: the calendar-style gap from
+ * the previous match's end to the next match's start. Clicking it opens a popup
+ * to set the break's duration (with a "default pause duration" reset); a
+ * double-click resets it to the default directly. A 0-minute break still renders
+ * as a clickable line so a pause can be added anywhere.
+ */
+function BreakElement({
+  breakBlock,
+  pxPerMinute,
+  asModal,
+  onResize,
+}: {
+  breakBlock: BreakBlock;
+  pxPerMinute: number;
+  asModal: boolean;
+  onResize: (newDurationMinutes: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [opened, setOpened] = useState(false);
+  const [draftMinutes, setDraftMinutes] = useState<number | string>(
+    Math.round(breakBlock.durationMinutes)
+  );
+
+  const gapMiddle = ((breakBlock.startMinutes + breakBlock.endMinutes) / 2) * pxPerMinute;
+  const roundedDuration = Math.round(breakBlock.durationMinutes);
+
+  const apply = (minutes: number) => {
+    setOpened(false);
+    onResize(Math.max(0, Math.round(minutes)));
+  };
+
+  const stepBy = (delta: number) =>
+    setDraftMinutes((current) => {
+      const value = typeof current === 'number' ? current : Number(current) || 0;
+      return Math.max(0, value + delta);
+    });
+
+  // The number field. On the small-screen modal the native (tiny) steppers are
+  // hidden and the input does not auto-focus, so tapping the editor never pops
+  // the iOS keyboard on its own; big +/- buttons drive the value instead.
+  const numberField = (
+    <NumberInput
+      aria-label={t('break_duration_minutes_label', 'Break duration (minutes)')}
+      value={draftMinutes}
+      onChange={setDraftMinutes}
+      min={0}
+      step={5}
+      suffix={` ${t('minutes_suffix', 'min')}`}
+      size={asModal ? 'md' : 'sm'}
+      hideControls={asModal}
+      {...(asModal ? {} : { 'data-autofocus': true })}
+    />
+  );
+
+  // The duration form, shared by the desktop popover and the small-screen modal.
+  const form = (
+    <>
+      {asModal ? (
+        <Group gap="sm" wrap="nowrap" align="stretch">
+          {/* The -/+ buttons adjust the value without focusing the input, so
+              stepping never opens the keyboard. */}
+          <ActionIcon
+            size="xl"
+            variant="default"
+            aria-label={t('break_decrease_label', 'Decrease break')}
+            onClick={() => stepBy(-5)}
+          >
+            –
+          </ActionIcon>
+          <Box style={{ flex: 1 }}>{numberField}</Box>
+          <ActionIcon
+            size="xl"
+            variant="default"
+            aria-label={t('break_increase_label', 'Increase break')}
+            onClick={() => stepBy(5)}
+          >
+            +
+          </ActionIcon>
+        </Group>
+      ) : (
+        numberField
+      )}
+      <Stack mt="sm" gap={6}>
+        <Button
+          size="compact-sm"
+          fullWidth
+          onClick={() =>
+            apply(typeof draftMinutes === 'number' ? draftMinutes : Number(draftMinutes) || 0)
+          }
+        >
+          {t('apply_break_button', 'Set')}
+        </Button>
+        <Button
+          size="compact-sm"
+          fullWidth
+          variant="light"
+          onClick={() => apply(breakBlock.defaultBreakMinutes)}
+        >
+          {t('default_pause_duration_button', 'Default pause duration')}
+        </Button>
+      </Stack>
+    </>
+  );
+
+  // The chip is the tap target: full band height for a comfortable touch area,
+  // but only as wide as the label so it stays clear of the cards.
+  const chip = (
+    <Box
+      aria-label={t('edit_break_aria_label', 'Edit break')}
+      data-break-before-match-id={breakBlock.matchId}
+      onClick={(event) => {
+        event.stopPropagation();
+        setDraftMinutes(roundedDuration);
+        setOpened((value) => !value);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        setOpened(false);
+        onResize(breakBlock.defaultBreakMinutes);
+      }}
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 12px',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+      }}
+    >
+      <Text
+        component="span"
+        fz={10}
+        c="dimmed"
+        style={{
+          lineHeight: 1,
+          padding: '1px 6px',
+          borderRadius: 4,
+          backgroundColor: 'var(--mantine-color-body)',
+          border: '1px solid var(--mantine-color-default-border)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {t('break_minutes_short', '{{count}}m', { count: roundedDuration })}
+      </Text>
+    </Box>
+  );
+
+  return (
+    // A full-width band centered on the break, but click-through: only the chip
+    // inside it captures taps, so the cards on either side keep their tap area.
+    <Box
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: gapMiddle - BREAK_TARGET_HEIGHT_PX / 2,
+        height: BREAK_TARGET_HEIGHT_PX,
+        pointerEvents: 'none',
+        zIndex: 1,
+      }}
+    >
+      {/* The break line: full width, visual only — taps fall through to the cards. */}
+      <Box
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: BREAK_TARGET_HEIGHT_PX / 2,
+          borderTop: '1px dashed var(--mantine-color-dimmed)',
+          opacity: 0.7,
+        }}
+      />
+      {asModal ? (
+        <>
+          {chip}
+          {/* On phones an anchored popover can open off-screen, so the editor
+              becomes a centered modal that is always fully visible. */}
+          <Modal
+            opened={opened}
+            onClose={() => setOpened(false)}
+            centered
+            size="xs"
+            title={t('break_popover_title', 'Break duration')}
+            // Above the action sheet (400) and selection pill, so it is never covered.
+            zIndex={500}
+            // On iOS the keyboard sliding up shifts the centered modal, and the
+            // delayed synthetic click then lands outside it — which would dismiss
+            // the edit. Require an explicit close (the X or a button) instead.
+            closeOnClickOutside={false}
+          >
+            {form}
+          </Modal>
+        </>
+      ) : (
+        <Popover
+          opened={opened}
+          onChange={setOpened}
+          position="right"
+          withArrow
+          shadow="md"
+          trapFocus
+          width={220}
+        >
+          <Popover.Target>{chip}</Popover.Target>
+          <Popover.Dropdown onClick={(event) => event.stopPropagation()}>
+            <Text size="sm" fw={600} mb={6}>
+              {t('break_popover_title', 'Break duration')}
+            </Text>
+            {form}
+          </Popover.Dropdown>
+        </Popover>
+      )}
+    </Box>
+  );
+}
+
 function InsertionLineTarget({
   line,
   gridHeight,
@@ -509,6 +753,9 @@ export default function ScheduleGrid({
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
   const gridHeight = layout.totalMinutes * pxPerMinute;
+  // On phones an anchored break popover can open off-screen, so the editor
+  // switches to a centered modal at the same breakpoint as the default zoom.
+  const editBreaksInModal = useMediaQuery('(max-width: 768px)') ?? false;
   const selectedMatch =
     selection.kind === 'match-selected' || selection.kind === 'action-sheet-open'
       ? selection.match
@@ -787,6 +1034,27 @@ export default function ScheduleGrid({
                   />
                 );
               })}
+              {/* Breaks are the resting state of a court lane; while placing a
+                  match, insertion lines take their place instead. */}
+              {!placing &&
+                !isOverview &&
+                computeBreaks(blocks)
+                  .filter((breakBlock) => !breakBlock.locked)
+                  .map((breakBlock) => (
+                    <BreakElement
+                      key={breakBlock.matchId}
+                      breakBlock={breakBlock}
+                      pxPerMinute={pxPerMinute}
+                      asModal={editBreaksInModal}
+                      onResize={(newDurationMinutes) =>
+                        onSelectionEvent({
+                          type: 'resize-break',
+                          matchId: breakBlock.matchId,
+                          newDurationMinutes,
+                        })
+                      }
+                    />
+                  ))}
               {placing &&
                 !isOverview &&
                 computeInsertionLines(blocks).map((line) => (

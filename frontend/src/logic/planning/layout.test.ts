@@ -4,6 +4,7 @@ import {
   LayoutCourt,
   LayoutMatch,
   LayoutMatchState,
+  computeBreaks,
   computeInsertionLines,
   computeScheduleLayout,
 } from './layout';
@@ -242,6 +243,110 @@ describe('locked blocks for played matches', () => {
     const blocks = blocksFor([match(10, 0), playedMatch(11, 20, 'COMPLETED'), match(12, 40)]);
 
     expect(blocks.map((b) => b.locked)).toEqual([true, true, false]);
+  });
+});
+
+describe('computeBreaks', () => {
+  function blocksFor(matches: LayoutMatch[], defaultBreakMinutes = 5) {
+    return computeScheduleLayout({
+      courts: [court(1)],
+      matchesByCourtId: { 1: matches },
+      tournamentStartTime: TOURNAMENT_START,
+      defaultBreakMinutes,
+    }).courts[0].blocks;
+  }
+
+  it('returns no breaks for an empty court', () => {
+    expect(computeBreaks(blocksFor([]))).toEqual([]);
+  });
+
+  it('derives a leading break before the first match, defaulting to 0', () => {
+    // First match starts 8 minutes after the tournament start.
+    const breaks = computeBreaks(blocksFor([match(10, 8, 15)]));
+
+    expect(breaks).toEqual([
+      {
+        matchId: 10,
+        index: 0,
+        startMinutes: 0,
+        endMinutes: 8,
+        durationMinutes: 8,
+        defaultBreakMinutes: 0,
+        locked: false,
+      },
+    ]);
+  });
+
+  it('derives a leading break plus one between every pair of consecutive matches', () => {
+    // Court: 10@0..15, 11@20..50, 12@60..75. Breaks: leading 0, 15..20 (5), 50..60 (10).
+    const breaks = computeBreaks(
+      blocksFor([match(10, 0, 15), match(11, 20, 30), match(12, 60, 15)])
+    );
+
+    expect(breaks).toEqual([
+      {
+        matchId: 10,
+        index: 0,
+        startMinutes: 0,
+        endMinutes: 0,
+        durationMinutes: 0,
+        defaultBreakMinutes: 0,
+        locked: false,
+      },
+      {
+        matchId: 11,
+        index: 1,
+        startMinutes: 15,
+        endMinutes: 20,
+        durationMinutes: 5,
+        defaultBreakMinutes: 5,
+        locked: false,
+      },
+      {
+        matchId: 12,
+        index: 2,
+        startMinutes: 50,
+        endMinutes: 60,
+        durationMinutes: 10,
+        defaultBreakMinutes: 5,
+        locked: false,
+      },
+    ]);
+  });
+
+  it('keeps a 0-minute break between back-to-back matches', () => {
+    const breaks = computeBreaks(blocksFor([match(10, 0, 20), match(11, 20, 20)]));
+
+    // Leading break (before 10) plus the back-to-back break before 11.
+    expect(breaks).toHaveLength(2);
+    expect(breaks[1]).toMatchObject({
+      matchId: 11,
+      startMinutes: 20,
+      endMinutes: 20,
+      durationMinutes: 0,
+    });
+  });
+
+  it('never reports a negative break when matches overlap', () => {
+    // Sub-default/overlapping spacing (10@0..20, 11@15..35) clamps to 0.
+    const breaks = computeBreaks(blocksFor([match(10, 0, 20), match(11, 15, 20)]));
+
+    // breaks[0] is the leading break; breaks[1] is the overlapping pair.
+    expect(breaks[1].durationMinutes).toBe(0);
+  });
+
+  it('marks a break as locked when the match after it is locked', () => {
+    const breaks = computeBreaks(
+      blocksFor([playedMatch(10, 0, 'COMPLETED'), playedMatch(11, 20, 'COMPLETED'), match(12, 40)])
+    );
+
+    // Leading break before 10 (locked), before 11 (locked) and before 12
+    // (unlocked, follows the frozen past).
+    expect(breaks.map((b) => [b.matchId, b.locked])).toEqual([
+      [10, true],
+      [11, true],
+      [12, false],
+    ]);
   });
 });
 

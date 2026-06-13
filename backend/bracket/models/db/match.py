@@ -4,7 +4,7 @@ from enum import auto
 from typing import cast
 
 from heliclockter import datetime_utc, timedelta
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from bracket.models.db.court import Court
 from bracket.models.db.shared import BaseModelORM
@@ -147,6 +147,14 @@ class MatchRescheduleBody(BaseModelORM):
 class MatchSwapBody(BaseModelORM):
     match1_id: MatchId
     match2_id: MatchId
+
+
+class MatchResizeBreakBody(BaseModelORM):
+    # The break sits before this match on its court: the gap between the previous
+    # match's end (or the tournament start, for the first match) and this match's
+    # start. Resizing it shifts this match and every later match on the court by
+    # the delta.
+    new_duration_minutes: int = Field(ge=0)
 
 
 class MatchFilter(BaseModel):

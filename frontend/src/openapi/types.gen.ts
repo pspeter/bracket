@@ -428,6 +428,16 @@ export type MatchRescheduleBody = {
 };
 
 /**
+ * MatchResizeBreakBody
+ */
+export type MatchResizeBreakBody = {
+  /**
+   * New Duration Minutes
+   */
+  new_duration_minutes: number;
+};
+
+/**
  * MatchScoreTrackingBody
  */
 export type MatchScoreTrackingBody = {
@@ -3104,6 +3114,42 @@ export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostRe
 
 export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponse =
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses[keyof RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses];
+
+export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostData = {
+  body: MatchResizeBreakBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/resize_break';
+};
+
+export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostError =
+  ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors[keyof ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors];
+
+export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponse =
+  ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses[keyof ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses];
 
 export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData = {
   body?: never;

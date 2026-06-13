@@ -1,7 +1,12 @@
 import pytest
 from heliclockter import timedelta
 
-from bracket.models.db.match import MatchRescheduleBody, MatchState, MatchSwapBody
+from bracket.models.db.match import (
+    MatchRescheduleBody,
+    MatchResizeBreakBody,
+    MatchState,
+    MatchSwapBody,
+)
 from bracket.models.db.stage_item_inputs import StageItemInputInsertable
 from bracket.schema import matches
 from bracket.sql.matches import sql_get_match
@@ -1515,3 +1520,351 @@ async def test_unschedule_match_reorders_remaining_positions(
     # Court 2 only has the stage-2 match left; the removed match's time stays as a gap.
     assert len(court2_matches) == 1
     assert court2_matches[0].start_time == stage2_start
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_resize_break_shifts_later_matches(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    Growing the break before a match shifts that match and every later match on
+    the court by exactly the delta; earlier matches and other courts are untouched.
+    """
+    tournament = auth_context.tournament
+    second_start = tournament.start_time + timedelta(minutes=15)
+    third_start = tournament.start_time + timedelta(minutes=30)
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_court(
+            DUMMY_COURT2.model_copy(update={"tournament_id": tournament.id})
+        ) as court2_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as second_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": third_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as third_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court2_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as other_court_match,
+    ):
+        # The break before the second match is currently 5 minutes (default);
+        # grow it to 20, which pushes the second match from +15 to +30.
+        body = MatchResizeBreakBody(new_duration_minutes=20)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{second_match.id}/resize_break",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        first = await sql_get_match(first_match.id)
+        second = await sql_get_match(second_match.id)
+        third = await sql_get_match(third_match.id)
+        other = await sql_get_match(other_court_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    # The first match is earlier than the break: untouched.
+    assert first.start_time == tournament.start_time
+    # The second match starts after the first match's end (+10) plus the new break (20).
+    assert second.start_time == tournament.start_time + timedelta(minutes=30)
+    # The third match shifted by the same +15 delta, keeping its gap to the second.
+    assert third.start_time == tournament.start_time + timedelta(minutes=45)
+    # The other court is untouched.
+    assert other.court_id == court2_inserted.id
+    assert other.start_time == tournament.start_time
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_resize_break_compacts_leftover_pause(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    Resetting a leftover pause (a wide gap left behind by a removed match) to the
+    default break compacts the court from that point: the match after the gap and
+    every later match move earlier by the delta.
+    """
+    tournament = auth_context.tournament
+    # A 40-minute leftover pause before the second match (its predecessor ends at +10).
+    second_start = tournament.start_time + timedelta(minutes=50)
+    third_start = tournament.start_time + timedelta(minutes=65)
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as second_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": third_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as third_match,
+    ):
+        body = MatchResizeBreakBody(new_duration_minutes=tournament.margin_minutes)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{second_match.id}/resize_break",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        first = await sql_get_match(first_match.id)
+        second = await sql_get_match(second_match.id)
+        third = await sql_get_match(third_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    assert first.start_time == tournament.start_time
+    # Compacted to the default 5-minute break after the first match's +10 end.
+    assert second.start_time == tournament.start_time + timedelta(minutes=15)
+    # The third match keeps its gap to the second and shifts by the same delta.
+    assert third.start_time == tournament.start_time + timedelta(minutes=30)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_resize_break_before_first_match_delays_court(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """
+    The break before the first match is the delay between the tournament start and
+    that match; resizing it pushes the first match (and every later one) back.
+    """
+    tournament = auth_context.tournament
+    second_start = tournament.start_time + timedelta(minutes=15)
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court1_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as second_match,
+    ):
+        body = MatchResizeBreakBody(new_duration_minutes=20)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{first_match.id}/resize_break",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        first = await sql_get_match(first_match.id)
+        second = await sql_get_match(second_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    # The first match now starts 20 minutes after the tournament start.
+    assert first.start_time == tournament.start_time + timedelta(minutes=20)
+    # The second match keeps its gap to the first and shifts by the same +20 delta.
+    assert second.start_time == tournament.start_time + timedelta(minutes=35)
