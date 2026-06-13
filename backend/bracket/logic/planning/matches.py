@@ -50,7 +50,7 @@ class ScheduleOperation(NamedTuple):
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
 SOLVER_TIME_LIMIT_SECONDS = 5.0
 SOLVER_RANDOM_SEED = 77  # Applied only under tests (see currently_testing); prod runs unseeded.
-SOLVER_SEARCH_WORKERS = 8
+SOLVER_SEARCH_WORKERS = 4
 
 # Objective blend (PRD #73, issue #78). The schedule minimises a single weighted sum.
 # Makespan is the headline term; team rest keeps a player from going straight from one
@@ -61,7 +61,7 @@ SOLVER_SEARCH_WORKERS = 8
 # the ratios below are what set the priorities. They were chosen so makespan and team rest
 # lead and locality/sync bend the schedule only where it is otherwise free; retune on a
 # realistic fixture (e.g. the dev-db seed) if the balance feels off.
-WEIGHT_MAKESPAN = 100
+WEIGHT_MAKESPAN = 150
 WEIGHT_TEAM_REST = 13
 WEIGHT_GROUP_SYNC = 8
 WEIGHT_COURT_LOCALITY = 4
