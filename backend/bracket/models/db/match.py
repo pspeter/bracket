@@ -149,8 +149,9 @@ class MatchSwapBody(BaseModelORM):
 
 class MatchResizeBreakBody(BaseModelORM):
     # The break sits before this match on its court: the gap between the previous
-    # match's end and this match's start. Resizing it shifts this match and every
-    # later match on the court by the delta.
+    # match's end (or the tournament start, for the first match) and this match's
+    # start. Resizing it shifts this match and every later match on the court by
+    # the delta.
     new_duration_minutes: int = Field(ge=0)
 
 

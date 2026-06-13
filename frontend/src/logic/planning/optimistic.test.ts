@@ -187,14 +187,16 @@ describe('applyPlanningActions', () => {
     expect(slot(byId.get(3))).toEqual({ court_id: 1, start_time: minutesAfterStart(30) });
   });
 
-  it('ignores a break resize on the first match of a court', () => {
+  it('delays the whole court when the leading break (before the first match) grows', () => {
+    // Resizing the break before match 1 delays it from the tournament start by 20.
     const byId = apply(
       [match(1, 1, 0), match(2, 1, 15)],
       [{ type: 'resize-break', matchId: 1, newDurationMinutes: 20 }]
     );
 
-    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(0) });
-    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(15) });
+    expect(slot(byId.get(1))).toEqual({ court_id: 1, start_time: minutesAfterStart(20) });
+    // Match 2 keeps its gap to the first and shifts by the same +20 delta.
+    expect(slot(byId.get(2))).toEqual({ court_id: 1, start_time: minutesAfterStart(35) });
   });
 
   it('unschedules a match and leaves a gap, not re-packing the remaining ones', () => {

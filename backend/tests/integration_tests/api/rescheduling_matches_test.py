@@ -1776,11 +1776,15 @@ async def test_resize_break_compacts_leftover_pause(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_resize_break_before_first_match_fails(
+async def test_resize_break_before_first_match_delays_court(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """There is no break before the first match on a court, so resizing it is rejected."""
+    """
+    The break before the first match is the delay between the tournament start and
+    that match; resizing it pushes the first match (and every later one) back.
+    """
     tournament = auth_context.tournament
+    second_start = tournament.start_time + timedelta(minutes=15)
 
     async with (
         inserted_stage(
@@ -1830,16 +1834,37 @@ async def test_resize_break_before_first_match_fails(
                 }
             )
         ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court1_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as second_match,
     ):
         body = MatchResizeBreakBody(new_duration_minutes=20)
-        response = await send_tournament_request(
-            HTTPMethod.POST,
-            f"matches/{first_match.id}/resize_break",
-            auth_context,
-            json=body.model_dump(mode="json"),
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{first_match.id}/resize_break",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
         )
-        match = await sql_get_match(first_match.id)
+        first = await sql_get_match(first_match.id)
+        second = await sql_get_match(second_match.id)
         await assert_row_count_and_clear(matches, 0)
 
-    assert response["detail"] == "There is no break before the first match on a court"
-    assert match.start_time == tournament.start_time
+    # The first match now starts 20 minutes after the tournament start.
+    assert first.start_time == tournament.start_time + timedelta(minutes=20)
+    # The second match keeps its gap to the first and shifts by the same +20 delta.
+    assert second.start_time == tournament.start_time + timedelta(minutes=35)

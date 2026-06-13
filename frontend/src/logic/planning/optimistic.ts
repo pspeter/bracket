@@ -121,12 +121,15 @@ export function applyPlanningActions<S extends OptimisticStage>(
         }
         const courtMatches = scheduledOnCourt(match.court_id);
         const index = courtMatches.findIndex((m) => m.id === match.id);
-        // No break exists before the first match on a court.
-        if (index <= 0) {
+        if (index < 0) {
           break;
         }
-        const previous = courtMatches[index - 1];
-        const previousEnd = startMinutes(previous) + previous.duration_minutes;
+        // The leading break is anchored at the tournament start (minute 0); a break
+        // between matches is anchored at the previous match's end.
+        const previousEnd =
+          index === 0
+            ? 0
+            : startMinutes(courtMatches[index - 1]) + courtMatches[index - 1].duration_minutes;
         const newStart = previousEnd + action.newDurationMinutes;
         const delta = newStart - startMinutes(match);
         if (delta === 0) {

@@ -256,18 +256,43 @@ describe('computeBreaks', () => {
     }).courts[0].blocks;
   }
 
-  it('returns no breaks for an empty court or a single match', () => {
+  it('returns no breaks for an empty court', () => {
     expect(computeBreaks(blocksFor([]))).toEqual([]);
-    expect(computeBreaks(blocksFor([match(10, 0, 15)]))).toEqual([]);
   });
 
-  it('derives one break between every pair of consecutive matches', () => {
-    // Court: 10@0..15, 11@20..50, 12@60..75. Breaks: 15..20 (5), 50..60 (10).
+  it('derives a leading break before the first match, defaulting to 0', () => {
+    // First match starts 8 minutes after the tournament start.
+    const breaks = computeBreaks(blocksFor([match(10, 8, 15)]));
+
+    expect(breaks).toEqual([
+      {
+        matchId: 10,
+        index: 0,
+        startMinutes: 0,
+        endMinutes: 8,
+        durationMinutes: 8,
+        defaultBreakMinutes: 0,
+        locked: false,
+      },
+    ]);
+  });
+
+  it('derives a leading break plus one between every pair of consecutive matches', () => {
+    // Court: 10@0..15, 11@20..50, 12@60..75. Breaks: leading 0, 15..20 (5), 50..60 (10).
     const breaks = computeBreaks(
       blocksFor([match(10, 0, 15), match(11, 20, 30), match(12, 60, 15)])
     );
 
     expect(breaks).toEqual([
+      {
+        matchId: 10,
+        index: 0,
+        startMinutes: 0,
+        endMinutes: 0,
+        durationMinutes: 0,
+        defaultBreakMinutes: 0,
+        locked: false,
+      },
       {
         matchId: 11,
         index: 1,
@@ -292,8 +317,9 @@ describe('computeBreaks', () => {
   it('keeps a 0-minute break between back-to-back matches', () => {
     const breaks = computeBreaks(blocksFor([match(10, 0, 20), match(11, 20, 20)]));
 
-    expect(breaks).toHaveLength(1);
-    expect(breaks[0]).toMatchObject({
+    // Leading break (before 10) plus the back-to-back break before 11.
+    expect(breaks).toHaveLength(2);
+    expect(breaks[1]).toMatchObject({
       matchId: 11,
       startMinutes: 20,
       endMinutes: 20,
@@ -305,7 +331,8 @@ describe('computeBreaks', () => {
     // Sub-default/overlapping spacing (10@0..20, 11@15..35) clamps to 0.
     const breaks = computeBreaks(blocksFor([match(10, 0, 20), match(11, 15, 20)]));
 
-    expect(breaks[0].durationMinutes).toBe(0);
+    // breaks[0] is the leading break; breaks[1] is the overlapping pair.
+    expect(breaks[1].durationMinutes).toBe(0);
   });
 
   it('marks a break as locked when the match after it is locked', () => {
@@ -313,8 +340,10 @@ describe('computeBreaks', () => {
       blocksFor([playedMatch(10, 0, 'COMPLETED'), playedMatch(11, 20, 'COMPLETED'), match(12, 40)])
     );
 
-    // Break before 11 (locked) and before 12 (unlocked, follows the frozen past).
+    // Leading break before 10 (locked), before 11 (locked) and before 12
+    // (unlocked, follows the frozen past).
     expect(breaks.map((b) => [b.matchId, b.locked])).toEqual([
+      [10, true],
       [11, true],
       [12, false],
     ]);

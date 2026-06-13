@@ -481,6 +481,9 @@ async def handle_match_resize_break(
     Resize the break before ``match_id`` (the gap between the previous match's end
     and this match's start on the same court) to ``new_duration_minutes``.
 
+    For the first match on a court the break is the delay between the tournament
+    start and that match, so editing it delays the whole court's first match.
+
     The match and every later match on the court shift by the resulting delta, so
     their relative gaps are preserved; growing the break pushes them back, shrinking
     it pulls them forward. Earlier matches and every other court stay put.
@@ -494,15 +497,14 @@ async def handle_match_resize_break(
             continue
 
         if index == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="There is no break before the first match on a court",
+            # The break before the first match is the delay between the tournament
+            # start and that match; editing it shifts the whole court.
+            previous_end = tournament.start_time
+        else:
+            previous = match_positions[index - 1].match
+            previous_end = assert_some(previous.start_time) + timedelta(
+                minutes=previous.duration_minutes
             )
-
-        previous = match_positions[index - 1].match
-        previous_end = assert_some(previous.start_time) + timedelta(
-            minutes=previous.duration_minutes
-        )
         target = match_positions[index].match
         new_start = previous_end + timedelta(minutes=new_duration_minutes)
         delta = new_start - assert_some(target.start_time)
