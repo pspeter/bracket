@@ -7,6 +7,7 @@ from heliclockter import datetime_utc, timedelta
 from ortools.sat.python import cp_model
 from starlette import status
 
+from bracket.config import currently_testing
 from bracket.models.db.court import Court
 from bracket.models.db.match import (
     Match,
@@ -48,7 +49,8 @@ class ScheduleOperation(NamedTuple):
 
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
 SOLVER_TIME_LIMIT_SECONDS = 5.0
-SOLVER_RANDOM_SEED = 77
+SOLVER_RANDOM_SEED = 77  # Applied only under tests (see currently_testing); prod runs unseeded.
+SOLVER_SEARCH_WORKERS = 8
 
 # Objective blend (PRD #73, issue #78). The schedule minimises a single weighted sum.
 # Makespan is the headline term; team rest keeps a player from going straight from one
@@ -62,7 +64,7 @@ SOLVER_RANDOM_SEED = 77
 WEIGHT_MAKESPAN = 100
 WEIGHT_TEAM_REST = 13
 WEIGHT_GROUP_SYNC = 8
-WEIGHT_COURT_LOCALITY = 5
+WEIGHT_COURT_LOCALITY = 4
 
 # A team is considered rested once this many minutes separate the end of one of its matches
 # and the start of the next; gaps shorter than this are penalised, longer gaps are free.
@@ -692,8 +694,16 @@ def build_schedule_plan(
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
-    solver.parameters.random_seed = SOLVER_RANDOM_SEED
-    solver.parameters.num_search_workers = 1
+    if currently_testing():
+        # Pin the seed only under tests, for reproducible runs. In production a fixed seed
+        # would bake the same pseudo-random tie-breaking into every tournament's schedule.
+        solver.parameters.random_seed = SOLVER_RANDOM_SEED
+    # Use CP-SAT's parallel portfolio search. With a single worker the solver explores far
+    # too little within the few-second wall limit on realistic fixtures and returns a poor
+    # feasible solution (matches crammed onto one court, others left idle); the makespan
+    # objective never gets a chance to matter. Multiple workers find a near-optimal layout
+    # in the same wall time. (Auto/0 segfaults with this ortools build, so pin a count.)
+    solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
     status_code = solver.Solve(model)
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         # Never fail the request: the action must always succeed. Leave the unscheduled
