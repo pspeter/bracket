@@ -5,6 +5,7 @@ import {
   Button,
   Grid,
   Group,
+  Modal,
   Paper,
   Select,
   Stack,
@@ -12,7 +13,7 @@ import {
   Title,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { IconCalendarPlus, IconClock } from '@tabler/icons-react';
+import { IconCalendarPlus, IconClock, IconWand } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +61,7 @@ import {
   getUnscheduledMatches,
 } from '@services/lookups';
 import {
+  reoptimizeMatches,
   rescheduleMatch,
   resizeMatchBreak,
   scheduleMatches,
@@ -87,6 +89,9 @@ export default function SchedulePage() {
   // match) so a background revalidation refreshes the modal's data instead of
   // detaching it.
   const [detailsMatchId, setDetailsMatchId] = useState<number | null>(null);
+  // Guards "Re-optimize everything": the modal warns that manual placements and
+  // adjusted breaks are recomputed, so nothing is sent until the user confirms.
+  const [reoptimizeModalOpened, setReoptimizeModalOpened] = useState(false);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -362,6 +367,18 @@ export default function SchedulePage() {
                   {t('schedule_description')}
                 </Button>
               )}
+              {courts.length < 1 ? null : (
+                <Button
+                  color="grape"
+                  size="md"
+                  variant="light"
+                  style={{ marginBottom: 10 }}
+                  leftSection={<IconWand size={24} />}
+                  onClick={() => setReoptimizeModalOpened(true)}
+                >
+                  {t('reoptimize_description')}
+                </Button>
+              )}
             </Group>
           </Grid.Col>
         </Grid>
@@ -446,6 +463,31 @@ export default function SchedulePage() {
               }}
               round={null}
             />
+            <Modal
+              opened={reoptimizeModalOpened}
+              onClose={() => setReoptimizeModalOpened(false)}
+              title={t('reoptimize_modal_title')}
+            >
+              <Stack>
+                <Text>{t('reoptimize_modal_body')}</Text>
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => setReoptimizeModalOpened(false)}>
+                    {t('reoptimize_modal_cancel')}
+                  </Button>
+                  <Button
+                    color="grape"
+                    leftSection={<IconWand size={18} />}
+                    onClick={async () => {
+                      setReoptimizeModalOpened(false);
+                      await reoptimizeMatches(tournamentData.id);
+                      await swrStagesResponse.mutate();
+                    }}
+                  >
+                    {t('reoptimize_modal_confirm')}
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
             {/* Like the selection pill below: above the tray (150), below the
                 modals (200) and the action sheet (400). */}
             <Affix position={{ right: 8, top: '45%' }} zIndex={180}>

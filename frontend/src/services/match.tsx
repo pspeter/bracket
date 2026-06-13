@@ -87,3 +87,9 @@ export async function scheduleMatches(tournament_id: number) {
     .post(`tournaments/${tournament_id}/schedule_matches`)
     .catch((response: any) => handleRequestError(response));
 }
+
+export async function reoptimizeMatches(tournament_id: number) {
+  return createAxios()
+    .post(`tournaments/${tournament_id}/reoptimize_matches`)
+    .catch((response: any) => handleRequestError(response));
+}

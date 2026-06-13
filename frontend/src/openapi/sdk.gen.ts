@@ -155,6 +155,9 @@ import type {
   RegisterUserUsersRegisterPostData,
   RegisterUserUsersRegisterPostErrors,
   RegisterUserUsersRegisterPostResponses,
+  ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData,
+  ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors,
+  ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostData,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostErrors,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses,
@@ -1091,6 +1094,25 @@ export const updateRankingByIdTournamentsTournamentIdRankingsRankingIdPut = <
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Reoptimize Matches
+ */
+export const reoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData, ThrowOnError>
+) =>
+  (options.client ?? client).post<
+    ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses,
+    ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/reoptimize_matches',
+    ...options,
   });
 
 /**
