@@ -125,12 +125,11 @@ def _assert_match_ids_scheduled(
     assert {op.match.id for op in ops} == {match.id for match in matches}
 
 
-def _assert_starts_on_five_minute_grid(ops: list[ScheduleOperation]) -> None:
+def _assert_starts_on_whole_minute(ops: list[ScheduleOperation]) -> None:
     for op in ops:
         offset = op.start_time - T0
         assert offset.total_seconds() >= 0
         assert offset.total_seconds() % 60 == 0
-        assert int(offset.total_seconds() // 60) % 5 == 0
 
 
 def _assert_default_break_between_court_matches(ops: list[ScheduleOperation]) -> None:
@@ -205,7 +204,7 @@ def test_one_court_two_equal_sis_are_scheduled_with_default_breaks() -> None:
 
     _assert_match_ids_scheduled(ops, [a1, a2, b1, b2])
     assert all(op.court_id == CourtId(1) for op in ops)
-    _assert_starts_on_five_minute_grid(ops)
+    _assert_starts_on_whole_minute(ops)
     _assert_default_break_between_court_matches(ops)
 
 

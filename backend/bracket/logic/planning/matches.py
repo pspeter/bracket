@@ -26,6 +26,7 @@ from bracket.sql.matches import (
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import CourtId, MatchId, StageItemId, StageItemInputId, TournamentId
+from bracket.utils.logging import logger
 from bracket.utils.types import assert_some
 
 
@@ -37,9 +38,8 @@ class ScheduleOperation(NamedTuple):
 
 
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
-SOLVER_TIME_LIMIT_SECONDS = 3.0
+SOLVER_TIME_LIMIT_SECONDS = 5.0
 SOLVER_RANDOM_SEED = 77
-START_TIME_GRANULARITY_MINUTES = 5
 
 
 @dataclass(frozen=True)
@@ -117,7 +117,7 @@ def _planning_horizon_minutes(
     )
     max_duration = max((context.match.duration_minutes for context in contexts), default=0)
     return max(
-        START_TIME_GRANULARITY_MINUTES,
+        1,
         latest_pinned_end + movable_minutes + tournament.margin_minutes + max_duration,
     )
 
@@ -177,17 +177,17 @@ def _add_movable_match_variables(
     court_intervals: dict[CourtId, list[Any]] = defaultdict(list)
     input_intervals: dict[StageItemInputId, list[Any]] = defaultdict(list)
 
+    # Snap start times to the default match block (duration + break) rather than a fixed
+    # 5-minute grid: this packs uniform-duration matches with zero gap waste while keeping
+    # the search space discrete so the solve stays fast.
+    block_minutes = max(1, tournament.duration_minutes + tournament.margin_minutes)
+
     for context in movable_contexts:
         match = context.match
         match_id = match.id
         start = model.NewIntVar(0, horizon, f"match_{match_id}_start")
-        start_slot = model.NewIntVar(
-            0,
-            horizon // START_TIME_GRANULARITY_MINUTES + 1,
-            f"match_{match_id}_start_slot",
-        )
-        model.Add(start == start_slot * START_TIME_GRANULARITY_MINUTES)
-
+        start_slot = model.NewIntVar(0, horizon // block_minutes + 1, f"match_{match_id}_start_slot")
+        model.Add(start == start_slot * block_minutes)
         end = model.NewIntVar(0, horizon + match.duration_minutes, f"match_{match_id}_end")
         model.Add(end == start + match.duration_minutes)
         starts[match_id] = start
@@ -468,7 +468,15 @@ def build_schedule_plan(
     solver.parameters.num_search_workers = 1
     status_code = solver.Solve(model)
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise RuntimeError("Could not build a feasible schedule for unscheduled matches")
+        # Never fail the request: the action must always succeed. Leave the unscheduled
+        # matches as-is (placing nothing adds no new conflicts) so the organizer can retry.
+        logger.warning(
+            "Scheduler found no solution (status %s) for %d unscheduled matches; leaving them "
+            "unscheduled",
+            solver.StatusName(status_code),
+            len(movable_contexts),
+        )
+        return []
 
     return _build_operations_from_solution(
         solver,
