@@ -409,6 +409,90 @@ def test_optimizer_uses_shared_courts_without_idle_gaps_in_simple_case() -> None
     assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 2 * SLOT)
 
 
+# ── Objective blend: team rest ───────────────────────────────────────────────
+
+
+def _team_input(match: MatchWithDetails, team_id: int) -> MatchWithDetails:
+    return match.model_copy(
+        update={"stage_item_input1_id": StageItemInputId(team_id), "stage_item_input2_id": None}
+    )
+
+
+def test_team_rest_spaces_back_to_back_matches_when_it_is_free() -> None:
+    """A team's two matches get a gap when spacing them costs no makespan.
+
+    One court, three matches: a team plays the first and the last, with an
+    unrelated match available to slot between them. Every ordering finishes in
+    the same three slots, so the rest objective should pull the team's matches
+    apart rather than leave them back-to-back.
+    """
+    m1 = _team_input(_match(1), team_id=1)
+    m2 = _match(2).model_copy(
+        update={"stage_item_input1_id": StageItemInputId(2), "stage_item_input2_id": None}
+    )
+    m3 = _team_input(_match(3), team_id=1)
+    stages = [_stage(1, [[m1, m2, m3]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [m1, m2, m3])
+    by_id = {op.match.id: op for op in ops}
+    earlier, later = sorted((by_id[m1.id], by_id[m3.id]), key=lambda op: op.start_time)
+    # At least one match sits between the team's two matches (a full slot of rest).
+    assert later.start_time - _end_time(earlier) >= timedelta(minutes=SLOT)
+
+
+# ── Objective blend: court locality ──────────────────────────────────────────
+
+
+def _courts_used_by(ops: list[ScheduleOperation], matches: list[MatchWithDetails]) -> set[CourtId]:
+    match_ids = {match.id for match in matches}
+    return {op.court_id for op in ops if op.match.id in match_ids}
+
+
+def test_each_group_stays_on_one_court_when_makespan_allows() -> None:
+    """With two courts and two groups of two matches, each group stays on a single court.
+
+    Both groups fit in two slots either way, so confining each group to one court costs
+    no makespan; the locality objective should prefer that over the naive spread that
+    scatters a group across both courts.
+    """
+    group_a = [_match(10), _match(11)]
+    group_b = [_match(20), _match(21)]
+    stages = [_stage(1, [group_a, group_b])]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, group_a + group_b)
+    _assert_default_break_between_court_matches(ops)
+    assert len(_courts_used_by(ops, group_a)) == 1
+    assert len(_courts_used_by(ops, group_b)) == 1
+
+
+# ── Objective blend: group sync ──────────────────────────────────────────────
+
+
+def test_groups_in_a_stage_progress_round_for_round_when_free() -> None:
+    """Two groups in one stage keep the same round finishing at the same time.
+
+    Each group has two single-match rounds; with two courts every layout finishes in
+    two slots, so keeping the groups in lockstep (round 1 of both, then round 2 of both)
+    costs no makespan. The group-sync objective should pick that over letting one group
+    race a round ahead.
+    """
+    a1, a2 = _match(10), _match(11)
+    b1, b2 = _match(20), _match(21)
+    stages = [_stage_with_rounds(1, [[[a1], [a2]], [[b1], [b2]]])]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [a1, a2, b1, b2])
+    by_id = {op.match.id: op for op in ops}
+    # Each round's matches across the two groups finish at the same time (zero spread).
+    assert _end_time(by_id[a1.id]) == _end_time(by_id[b1.id])
+    assert _end_time(by_id[a2.id]) == _end_time(by_id[b2.id])
+
+
 # ── Edge cases ────────────────────────────────────────────────────────────────
 
 
