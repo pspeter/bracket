@@ -216,6 +216,8 @@
     "save_players_button": "Spelers opslaan",
     "save_ranking_button": "Sla Ranglijst op",
     "schedule_description": "Plan alle ongeplande wedstrijden",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Schema",
     "score_of_label": "Score van",
     "search_placeholder": "Zoeken ...",

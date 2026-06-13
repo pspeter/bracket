@@ -216,6 +216,8 @@
     "save_players_button": "Salva giocatori",
     "save_ranking_button": "Salva Classifica",
     "schedule_description": "Pianifica Tutte Le Partite Non Programmate",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Pianifica",
     "score_of_label": "Punteggio di",
     "search_placeholder": "Cerca ...",

@@ -216,6 +216,8 @@
     "save_players_button": "Spara spelare",
     "save_ranking_button": "Spara Ranking",
     "schedule_description": "Schemalägg alla oschemalagda matchningar",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Schema",
     "score_of_label": "Poäng av",
     "search_placeholder": "Sök ...",

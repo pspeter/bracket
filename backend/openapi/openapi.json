@@ -458,9 +458,19 @@
             "title": "Id",
             "type": "integer"
           },
+          "precedence_conflict": {
+            "default": false,
+            "title": "Precedence Conflict",
+            "type": "boolean"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
+          },
+          "short_break_conflict": {
+            "default": false,
+            "title": "Short Break Conflict",
+            "type": "boolean"
           },
           "stage_item_input1": {
             "anyOf": [
@@ -584,6 +594,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "precedence_conflict",
+          "short_break_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -902,9 +914,19 @@
             ],
             "title": "Level Id"
           },
+          "precedence_conflict": {
+            "default": false,
+            "title": "Precedence Conflict",
+            "type": "boolean"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
+          },
+          "short_break_conflict": {
+            "default": false,
+            "title": "Short Break Conflict",
+            "type": "boolean"
           },
           "stage_item_input1": {
             "anyOf": [
@@ -1028,6 +1050,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "precedence_conflict",
+          "short_break_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1113,9 +1137,19 @@
             ],
             "title": "Level Id"
           },
+          "precedence_conflict": {
+            "default": false,
+            "title": "Precedence Conflict",
+            "type": "boolean"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
+          },
+          "short_break_conflict": {
+            "default": false,
+            "title": "Short Break Conflict",
+            "type": "boolean"
           },
           "stage_item_input1": {
             "anyOf": [
@@ -1233,6 +1267,8 @@
           "court_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
+          "precedence_conflict",
+          "short_break_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",

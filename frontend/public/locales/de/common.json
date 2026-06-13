@@ -196,6 +196,8 @@
     "password_input_label": "Passwort",
     "password_input_placeholder": "Ihr Passwort",
     "placement_conflict_preview_label": "Würde ein Team doppelt belegen",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "plan_next_round_button": "Nächste Runde planen",
     "plan_next_stage_button": "Nächste Phase starten",
     "plan_previous_stage_button": "Zur vorherigen Phase zurückgehen",

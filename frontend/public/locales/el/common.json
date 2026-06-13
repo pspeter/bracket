@@ -216,6 +216,8 @@
     "save_players_button": "Αποθήκευση παικτών",
     "save_ranking_button": "Αποθήκευση Κατάταξης",
     "schedule_description": "Προγραμματισμός Όλων Των Μη Προγραμματισμένων Αγώνων",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Χρονοδιάγραμμα",
     "score_of_label": "Βαθμολογία από",
     "search_placeholder": "Αναζήτηση ...",

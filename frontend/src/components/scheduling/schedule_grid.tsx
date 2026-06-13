@@ -190,13 +190,29 @@ function MatchCard({
       {label}
     </Badge>
   );
-  const violationIcon = isViolation ? (
-    <Tooltip label={t('match_scheduled_before_previous_stage_label')}>
+  const precedenceWarningLabel = match.precedence_conflict
+    ? t('precedence_conflict_label', 'Starts before a feeder match has finished')
+    : t('match_scheduled_before_previous_stage_label');
+  const violationIcon =
+    isViolation || match.precedence_conflict ? (
+      <Tooltip label={precedenceWarningLabel}>
+        <Box
+          component="span"
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+        >
+          <AiFillWarning color="orange" />
+        </Box>
+      </Tooltip>
+    ) : null;
+  const shortBreakIcon = match.short_break_conflict ? (
+    <Tooltip
+      label={t('short_break_conflict_label', 'Break before this match is shorter than the default')}
+    >
       <Box
         component="span"
         style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
       >
-        <AiFillWarning color="orange" />
+        <AiFillWarning color="var(--mantine-color-yellow-filled)" />
       </Box>
     </Tooltip>
   ) : null;
@@ -272,6 +288,7 @@ function MatchCard({
               ? contextBadge(contextParts.join(' · '))
               : null}
             {placementWarningIcon}
+            {shortBreakIcon}
             {violationIcon}
           </Flex>
         )}
@@ -285,6 +302,7 @@ function MatchCard({
           {rows < 3 && statusIndicator}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
           {rows < 3 && placementWarningIcon}
+          {rows < 3 && shortBreakIcon}
           {rows === 1 &&
             match.stage_item_input2_conflict &&
             !(mergeConflictIcons && match.stage_item_input1_conflict) && (

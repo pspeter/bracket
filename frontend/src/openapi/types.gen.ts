@@ -286,9 +286,17 @@ export type Match = {
    */
   id: number;
   /**
+   * Precedence Conflict
+   */
+  precedence_conflict: boolean;
+  /**
    * Round Id
    */
   round_id: number;
+  /**
+   * Short Break Conflict
+   */
+  short_break_conflict: boolean;
   /**
    * Stage Item Input1
    */
@@ -489,9 +497,17 @@ export type MatchWithDetails = {
    */
   level_id: number | null;
   /**
+   * Precedence Conflict
+   */
+  precedence_conflict: boolean;
+  /**
    * Round Id
    */
   round_id: number;
+  /**
+   * Short Break Conflict
+   */
+  short_break_conflict: boolean;
   /**
    * Stage Item Input1
    */
@@ -573,9 +589,17 @@ export type MatchWithDetailsDefinitive = {
    */
   level_id: number | null;
   /**
+   * Precedence Conflict
+   */
+  precedence_conflict: boolean;
+  /**
    * Round Id
    */
   round_id: number;
+  /**
+   * Short Break Conflict
+   */
+  short_break_conflict: boolean;
   /**
    * Stage Item Input1
    */

@@ -155,6 +155,8 @@
     "match_filter_option_past": "Hide past matches",
     "max_results_input_label": "Max results",
     "match_scheduled_before_previous_stage_label": "Scheduled before a match of an earlier stage on this court",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "members_table_header": "Members",
     "minutes": "minutes",
     "miscellaneous_label": "Allow players to be in multiple teams",
