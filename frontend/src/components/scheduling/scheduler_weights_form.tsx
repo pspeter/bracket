@@ -33,7 +33,14 @@ export default function SchedulerWeightsForm({
 
   return (
     <Stack gap="xs">
-      <Anchor component="button" type="button" onClick={onToggle} size="sm">
+      <Anchor
+        component="button"
+        type="button"
+        onClick={onToggle}
+        size="sm"
+        c="rgba(255, 255, 255, 0.5)"
+        style={{ alignSelf: 'flex-start' }}
+      >
         {opened ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}{' '}
         {t('scheduler_advanced_label')}
       </Anchor>
