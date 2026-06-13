@@ -18,12 +18,16 @@ import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import {
+  levelSwatchColour,
+  NEUTRAL_STAGE_ITEM_COLOUR,
+  type StageItemColour,
+} from '@logic/planning/colours';
+import {
   groupUnscheduledMatchesForTray,
   type TrayMatchGroups,
 } from '@logic/planning/unscheduled_tray';
-import { levelColour } from '@logic/planning/zoom';
 import type { LevelResponse, MatchWithDetails } from '@openapi';
-import { getStageItemLookup, type MatchLookupEntry, stringToColour } from '@services/lookups';
+import { getStageItemLookup, type MatchLookupEntry } from '@services/lookups';
 
 /**
  * Collapsible bottom sheet listing matches that are not on the schedule yet.
@@ -35,6 +39,7 @@ export default function UnscheduledSheet({
   stageItemsLookup,
   matchesLookup,
   levels,
+  stageItemColours,
   opened,
   onToggle,
   onSelectMatch,
@@ -43,6 +48,7 @@ export default function UnscheduledSheet({
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
   levels: LevelResponse[];
+  stageItemColours: Record<number, StageItemColour>;
   opened: boolean;
   onToggle: () => void;
   onSelectMatch: (m: MatchWithDetails) => void;
@@ -57,8 +63,14 @@ export default function UnscheduledSheet({
 
   function renderMatchRow(match: MatchWithDetails, badgeLabel?: string) {
     const entry = matchesLookup[match.id];
-    const label =
+    const baseLabel =
       badgeLabel ?? (entry != null ? `${entry.stage.name} · ${entry.stageItem.name}` : null);
+    // Mirror the grid badge: append the running match number ("Group C · 3").
+    const label =
+      baseLabel != null && entry != null ? `${baseLabel} · ${entry.matchNumber}` : baseLabel;
+    const colour =
+      (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
+      NEUTRAL_STAGE_ITEM_COLOUR;
 
     return (
       <UnstyledButton key={match.id} onClick={() => onSelectMatch(match)} w="100%" py="xs">
@@ -72,11 +84,7 @@ export default function UnscheduledSheet({
             </Text>
           </Box>
           {entry != null && label != null && (
-            <Badge
-              color={stringToColour(`${entry.stageItem.id}`)}
-              variant="outline"
-              style={{ flexShrink: 0 }}
-            >
+            <Badge color={colour.accent} variant="outline" style={{ flexShrink: 0 }}>
               {label}
             </Badge>
           )}
@@ -117,7 +125,11 @@ export default function UnscheduledSheet({
               <Text size="md" fw={700} tt="uppercase">
                 {level.name || t('all_levels_label')}
               </Text>
-              <Badge size="sm" color={levelColour(level.id, levels)} variant="light">
+              <Badge
+                size="sm"
+                color={level.id != null ? levelSwatchColour(level.id) : undefined}
+                variant="light"
+              >
                 {level.stages.reduce((count, stage) => count + stage.matches.length, 0)}
               </Badge>
             </Group>

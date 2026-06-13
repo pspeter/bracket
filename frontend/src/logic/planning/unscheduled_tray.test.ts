@@ -42,6 +42,7 @@ function entry(
     match: matchDetails,
     stage: parentStage,
     stageItem: parentStageItem,
+    matchNumber: 1,
   };
 }
 

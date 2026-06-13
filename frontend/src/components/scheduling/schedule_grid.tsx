@@ -15,10 +15,11 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import { NEUTRAL_STAGE_ITEM_COLOUR, type StageItemColour } from '@logic/planning/colours';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
@@ -34,12 +35,12 @@ import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/
 import {
   ZOOM_PX_PER_MINUTE,
   ZoomLevel,
+  abbreviateStageItem,
   abbreviateTeamName,
-  levelColour,
   shortCourtLabel,
 } from '@logic/planning/zoom';
-import { Court, LevelResponse, MatchWithDetails } from '@openapi';
-import { MatchLookupEntry, getStageItemLookup, stringToColour } from '@services/lookups';
+import { Court, MatchWithDetails } from '@openapi';
+import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
 
 import { COURT_CONTENT_ATTRIBUTE, PLANNER_GRID_ATTRIBUTE } from './planner_anchor';
 import classes from './schedule_grid.module.css';
@@ -57,6 +58,21 @@ const INSERTION_HIT_AREA_PX = 32;
  * an easy tap.
  */
 const GRID_TOP_INSET_PX = 32;
+
+/**
+ * Winner / draw / loser score colours, matching the results page. Used as solid
+ * chip backgrounds with white text so the score keeps strong contrast on top of
+ * any stage-item tint.
+ */
+const SCORE_WIN_COLOUR = '#2a8f37';
+const SCORE_DRAW_COLOUR = '#656565';
+const SCORE_LOSE_COLOUR = '#af4034';
+
+function scoreColour(own: number, other: number): string {
+  if (own > other) return SCORE_WIN_COLOUR;
+  if (own < other) return SCORE_LOSE_COLOUR;
+  return SCORE_DRAW_COLOUR;
+}
 
 /**
  * Court column width per zoom level, in container-query units of the grid's
@@ -83,18 +99,6 @@ function courtColumnWidth(zoom: ZoomLevel, courtCount: number): string {
   }
 }
 
-function matchColour(
-  match: MatchWithDetails,
-  entry: MatchLookupEntry | undefined,
-  levels: LevelResponse[]
-) {
-  // Colored by level when the tournament has levels; tournaments without
-  // levels degrade to the stage-item colours used by the detailed cards.
-  // The level is assigned on the stage; match.level_id is not populated.
-  if (levels.length > 0) return levelColour(entry?.stage.level_id ?? match.level_id, levels);
-  return entry != null ? stringToColour(`${entry.stageItem.id}`) : 'gray';
-}
-
 function MatchCard({
   block,
   zoom,
@@ -106,7 +110,7 @@ function MatchCard({
   isHighlighted,
   stageItemsLookup,
   matchesLookup,
-  levels,
+  colour,
   onTap,
 }: {
   block: MatchBlock<MatchWithDetails>;
@@ -119,25 +123,23 @@ function MatchCard({
   isHighlighted: boolean;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
-  levels: LevelResponse[];
+  colour: StageItemColour;
   onTap: () => void;
 }) {
   const { t } = useTranslation();
   const { match } = block;
   const entry = matchesLookup[match.id];
-  const color = entry != null ? stringToColour(`${entry.stageItem.id}`) : 'gray';
 
   // The card covers only the playing time; the margin after the match shows as a
   // calendar-style gap before the next card.
   const cardHeightPx = block.durationMinutes * pxPerMinute;
   // Pick the densest layout that still fits: three rows (time / team 1 / team 2),
-  // two rows (time + team 1 / team 2), or a single "time team 1 – team 2" row.
+  // two rows (badge + team 1 / team 2), or a single "team 1 – team 2" row.
   const rows = cardHeightPx >= 52 ? 3 : cardHeightPx >= 34 ? 2 : 1;
   const fontSize = zoom === 'compact' ? 11 : undefined;
-  // A one-row compact card is too narrow for time plus names plus icons; the
-  // names win, and both conflict flags collapse into a single icon.
-  const showTime = !(zoom === 'compact' && rows === 1);
-  const mergeConflictIcons = zoom === 'compact' && rows === 1;
+  // A one-row card is too narrow for everything; both conflict flags collapse
+  // into a single icon.
+  const mergeConflictIcons = rows === 1;
 
   let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
@@ -146,13 +148,62 @@ function MatchCard({
     input2 = abbreviateTeamName(input2);
   }
 
+  // The match's identity badge, shown at every card height: the stage item plus
+  // its running match number ("Group C · 3"). The colour already carries the
+  // level (and, via its hue cluster, the stage), so the level name is never
+  // written; the stage name is prepended only when the card has a line to spare.
+  const counter = entry?.matchNumber;
+  const itemName = entry?.stageItem.name;
+  const stageName = entry?.stage.name;
+  const coreFull =
+    itemName != null && counter != null ? `${itemName} · ${counter}` : (itemName ?? null);
+  const coreShort =
+    itemName != null && counter != null
+      ? `${abbreviateStageItem(itemName)} · ${counter}`
+      : itemName != null
+        ? abbreviateStageItem(itemName)
+        : null;
+  const badgeLabel =
+    cardHeightPx >= 72 && stageName != null && coreFull != null
+      ? `${stageName} · ${coreFull}`
+      : coreFull;
+  // Full pill at 2+ rows; a bare coloured token on the shortest one-row cards,
+  // where a pill's padding would crowd out the team names.
+  // The accent (the level's hue) shares the fill's hue, so using it as text on the
+  // fill has no guaranteed contrast. The fill is built so the theme's default text
+  // colour always reads on it, so the badge text uses that; the accent stays on the
+  // border, where it sits against the page and keeps its contrast.
+  const fullBadge = (label: string) => (
+    <Badge
+      color={colour.accent}
+      variant="outline"
+      size="sm"
+      styles={{ label: { color: 'var(--mantine-color-text)' } }}
+      style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}
+    >
+      {label}
+    </Badge>
+  );
+  const inlineBadge = (label: string) => (
+    <Text
+      component="span"
+      fz={fontSize ?? 10}
+      fw={700}
+      lh={1.3}
+      c="var(--mantine-color-text)"
+      style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+    >
+      {label}
+    </Text>
+  );
+
   const timeLabel = (
     <Text size="xs" fz={fontSize} c="dimmed" lh={1.3} style={{ whiteSpace: 'nowrap' }}>
       {format(block.startTime, 'HH:mm')}
     </Text>
   );
-  // Status marker: a check for completed matches (paired with the dimmed card),
-  // a pulsing dot for in-progress ones. Upcoming matches carry no marker.
+  // Status marker: a check for completed matches, a pulsing dot for in-progress
+  // ones. Upcoming matches carry no marker.
   const statusIndicator =
     match.state === 'COMPLETED' ? (
       <Text component="span" c="teal" fz={fontSize ?? 12} fw={700} lh={1} style={{ flexShrink: 0 }}>
@@ -161,50 +212,37 @@ function MatchCard({
     ) : match.state === 'IN_PROGRESS' ? (
       <Box component="span" className={classes.liveDot} />
     ) : null;
-  // Agenda also carries the current score once a match has started. Scores are
-  // pinned to the card's right edge and never shrink, so they stay visible at
-  // every card height — including the one-line layout of short matches, where
-  // both scores collapse into a single "1–2" next to the names.
-  const showScore = zoom === 'agenda' && match.state !== 'NOT_STARTED';
-  const scoreText = (value: string) => (
+  // Both zoom levels carry the current score once a match has started. Scores are
+  // pinned to the card's right edge as solid winner/loser-coloured chips, so they
+  // stay readable on any tint and at every card height — including short matches'
+  // one-line layout, where both scores sit side by side next to the names.
+  const showScore = match.state !== 'NOT_STARTED';
+  const score1Colour = scoreColour(match.stage_item_input1_score, match.stage_item_input2_score);
+  const score2Colour = scoreColour(match.stage_item_input2_score, match.stage_item_input1_score);
+  const scoreChip = (value: number, chipColour: string) => (
     <Text
-      size="xs"
-      fz={fontSize}
-      fw={700}
-      lh={1.3}
-      style={{ flexShrink: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}
+      component="span"
+      fz={fontSize ?? 12}
+      fw={800}
+      lh={1}
+      style={{
+        flexShrink: 0,
+        color: '#fff',
+        backgroundColor: chipColour,
+        borderRadius: 4,
+        padding: '1px 5px',
+        whiteSpace: 'nowrap',
+      }}
     >
       {value}
     </Text>
   );
-  // Agenda is the full-detail level: cards also carry the match's level, stage
-  // and stage item. The tallest cards spread that over two rows of their own
-  // (level · stage, then stage item), shorter ones get a single combined row,
-  // and below that the badge squeezes in next to the time.
-  const levelName = levels.find((level) => level.id === entry?.stage.level_id)?.name;
-  const contextParts =
-    zoom === 'agenda' && rows === 3 && entry != null
-      ? [levelName, entry.stage.name, entry.stageItem.name].filter(
-          (part): part is string => part != null
-        )
-      : [];
-  const contextRows: string[] =
-    contextParts.length === 0
-      ? []
-      : cardHeightPx >= 96 && contextParts.length > 1
-        ? [contextParts.slice(0, -1).join(' · '), contextParts[contextParts.length - 1]]
-        : cardHeightPx >= 72
-          ? [contextParts.join(' · ')]
-          : [];
-  const contextBadge = (label: string) => (
-    <Badge
-      color={color}
-      variant="outline"
-      size="sm"
-      style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}
+  const pinnedScores = (...chips: ReactNode[]) => (
+    <Box
+      style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', gap: 3, alignItems: 'center' }}
     >
-      {label}
-    </Badge>
+      {chips}
+    </Box>
   );
   const precedenceWarningLabel = match.precedence_conflict
     ? t('precedence_conflict_label', 'Starts before a feeder match has finished')
@@ -263,16 +301,17 @@ function MatchCard({
         // Every card is tappable: unlocked ones select for placement, locked
         // (played) ones open the action sheet with the move-anyway override.
         cursor: 'pointer',
-        opacity:
-          highlightActive && !isHighlighted ? 0.22 : match.state === 'COMPLETED' ? 0.55 : undefined,
+        // Completed matches are no longer dimmed (which muddied the tint); the
+        // winner/loser-coloured scores carry that they are finished instead.
+        opacity: highlightActive && !isHighlighted ? 0.22 : undefined,
         borderRadius: 6,
         border: isSelected
           ? '1px solid var(--mantine-color-indigo-filled)'
           : hasPlacementWarning
             ? '1px dashed var(--mantine-color-orange-filled)'
             : '1px solid var(--mantine-color-default-border)',
-        borderLeft: `4px solid var(--mantine-color-${color}-filled)`,
-        backgroundColor: `var(--mantine-color-${color}-light)`,
+        borderLeft: `4px solid ${colour.accent}`,
+        backgroundColor: colour.fill,
         boxShadow: isSelected
           ? '0 0 0 2px var(--mantine-color-indigo-filled)'
           : isHighlighted
@@ -300,21 +339,15 @@ function MatchCard({
               {timeLabel}
               {statusIndicator}
             </Flex>
-            {contextRows.length === 0 && contextParts.length > 0
-              ? contextBadge(contextParts.join(' · '))
-              : null}
+            {badgeLabel != null ? fullBadge(badgeLabel) : null}
             {placementWarningIcon}
             {shortBreakIcon}
             {violationIcon}
           </Flex>
         )}
-        {contextRows.map((label) => (
-          <Flex key={label} mt={2} wrap="nowrap">
-            {contextBadge(label)}
-          </Flex>
-        ))}
         <Flex gap={6} align="center" wrap="nowrap">
-          {rows < 3 && showTime && timeLabel}
+          {rows === 2 && coreShort != null && fullBadge(coreShort)}
+          {rows === 1 && coreShort != null && inlineBadge(coreShort)}
           {rows < 3 && statusIndicator}
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
           {rows < 3 && placementWarningIcon}
@@ -328,11 +361,12 @@ function MatchCard({
             {rows === 1 ? `${input1} – ${input2}` : input1}
           </Text>
           {showScore &&
-            scoreText(
-              rows === 1
-                ? `${match.stage_item_input1_score}–${match.stage_item_input2_score}`
-                : `${match.stage_item_input1_score}`
-            )}
+            (rows === 1
+              ? pinnedScores(
+                  scoreChip(match.stage_item_input1_score, score1Colour),
+                  scoreChip(match.stage_item_input2_score, score2Colour)
+                )
+              : pinnedScores(scoreChip(match.stage_item_input1_score, score1Colour)))}
           {rows < 3 && violationIcon}
         </Flex>
         {rows > 1 && (
@@ -341,7 +375,7 @@ function MatchCard({
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>
-            {showScore && scoreText(`${match.stage_item_input2_score}`)}
+            {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
           </Flex>
         )}
       </Box>
@@ -350,9 +384,10 @@ function MatchCard({
 }
 
 /**
- * Overview rendering of a match: a colored block without text. Colour carries
- * the level, opacity (plus a check) carries the status. Pointer events pass
- * through to the column, whose taps navigate instead of selecting.
+ * Overview rendering of a match: a colored block without text. The fill carries
+ * the level/stage/item (same tint as the cards), opacity plus a glyph carries the
+ * status. Pointer events pass through to the column, whose taps navigate instead
+ * of selecting.
  */
 function OverviewBlock({
   block,
@@ -364,7 +399,7 @@ function OverviewBlock({
 }: {
   block: MatchBlock<MatchWithDetails>;
   pxPerMinute: number;
-  colour: string;
+  colour: StageItemColour;
   isSelected: boolean;
   highlightActive: boolean;
   isHighlighted: boolean;
@@ -372,8 +407,10 @@ function OverviewBlock({
   const blockHeightPx = block.durationMinutes * pxPerMinute;
   const isCompleted = block.match.state === 'COMPLETED';
   const isInProgress = block.match.state === 'IN_PROGRESS';
-  const opacity =
-    highlightActive && !isHighlighted ? 0.18 : isCompleted ? 0.35 : isInProgress ? 1 : 0.85;
+  // The fill is the same capped-light tint the cards use, so a level/stage keeps
+  // its colour when zooming out. Blocks render at full opacity (status is carried
+  // by the check/live-dot glyphs); only the highlight-dim fades the rest.
+  const opacity = highlightActive && !isHighlighted ? 0.25 : undefined;
 
   return (
     <Box
@@ -387,7 +424,7 @@ function OverviewBlock({
         left: 1,
         right: 1,
         borderRadius: 2,
-        backgroundColor: `var(--mantine-color-${colour}-filled)`,
+        backgroundColor: colour.fill,
         opacity,
         boxShadow: isSelected
           ? '0 0 0 2px var(--mantine-color-indigo-filled)'
@@ -402,7 +439,7 @@ function OverviewBlock({
       }}
     >
       {isCompleted && blockHeightPx >= 12 && (
-        <Text c="white" fz={Math.min(blockHeightPx - 2, 12)} lh={1}>
+        <Text c="var(--mantine-color-text)" fz={Math.min(blockHeightPx - 2, 12)} fw={700} lh={1}>
           ✓
         </Text>
       )}
@@ -410,7 +447,7 @@ function OverviewBlock({
         <Box
           component="span"
           className={classes.liveDot}
-          style={{ backgroundColor: 'var(--mantine-color-white)' }}
+          style={{ backgroundColor: colour.accent }}
         />
       )}
     </Box>
@@ -728,7 +765,7 @@ export default function ScheduleGrid({
   conflictPreview,
   stageItemsLookup,
   matchesLookup,
-  levels,
+  stageItemColours,
   selection,
   highlightTarget,
   zoom,
@@ -742,7 +779,7 @@ export default function ScheduleGrid({
   conflictPreview: ConflictPreview;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
-  levels: LevelResponse[];
+  stageItemColours: Record<number, StageItemColour>;
   selection: SelectionState;
   highlightTarget: HighlightTarget | null;
   zoom: ZoomLevel;
@@ -997,13 +1034,17 @@ export default function ScheduleGrid({
                   highlightTarget,
                   matchesLookup
                 );
+                const entry = matchesLookup[block.match.id];
+                const colour =
+                  (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
+                  NEUTRAL_STAGE_ITEM_COLOUR;
                 if (isOverview) {
                   return (
                     <OverviewBlock
                       key={block.match.id}
                       block={block}
                       pxPerMinute={pxPerMinute}
-                      colour={matchColour(block.match, matchesLookup[block.match.id], levels)}
+                      colour={colour}
                       isSelected={selectedMatch?.matchId === block.match.id}
                       highlightActive={highlightActive}
                       isHighlighted={isHighlighted}
@@ -1029,7 +1070,7 @@ export default function ScheduleGrid({
                     isHighlighted={isHighlighted}
                     stageItemsLookup={stageItemsLookup}
                     matchesLookup={matchesLookup}
-                    levels={levels}
+                    colour={colour}
                     onTap={() => onSelectionEvent({ type: 'tap-match', match: matchRef })}
                   />
                 );

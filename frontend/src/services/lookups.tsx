@@ -96,6 +96,12 @@ export type MatchLookupEntry = {
   match: MatchWithDetails;
   stageItem: StageItemWithRounds;
   stage: StageWithStageItems;
+  /**
+   * 1-based running position of the match within its stage item, counted across
+   * rounds in tree order. A stable identity ("match 3 of Group C") independent of
+   * where the match sits on the schedule.
+   */
+  matchNumber: number;
 };
 
 /**
@@ -107,9 +113,11 @@ export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, M
 
   for (const stage of swrStagesResponse.data.data as StageWithStageItems[]) {
     for (const stageItem of stage.stage_items) {
+      let matchNumber = 0;
       for (const round of stageItem.rounds) {
         for (const match of round.matches) {
-          result.push([match.id, { match, stageItem, stage }]);
+          matchNumber += 1;
+          result.push([match.id, { match, stageItem, stage, matchNumber }]);
         }
       }
     }
@@ -117,27 +125,10 @@ export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, M
   return Object.fromEntries(result);
 }
 
-export function stringToColour(input: string) {
-  let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    // eslint-disable-next-line no-bitwise
-    hash = input.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const colors = [
-    'pink',
-    'violet',
-    'green',
-    'blue',
-    'red',
-    'grape',
-    'indigo',
-    'cyan',
-    'orange',
-    'yellow',
-    'teal',
-  ];
-  return colors[Math.abs(hash) % colors.length];
-}
+// The single source of truth lives in the logic layer (dependency-free, so the
+// schedule colour engine and its tests can share it); re-exported here for the
+// many call sites that already import it from the lookups module.
+export { stringToColour } from '@logic/string_to_colour';
 
 export function getMatchLookupByCourt(swrStagesResponse: SWRResponse) {
   const matches = Object.values(getMatchLookup(swrStagesResponse)).map((x) => x.match);

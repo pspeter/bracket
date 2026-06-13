@@ -23,6 +23,7 @@ import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
+import { computeStageItemColours, levelSwatchColour } from '@logic/planning/colours';
 import { computeConflictPreview } from '@logic/planning/conflict_preview';
 import { stageHighlightOptions } from '@logic/planning/highlight';
 import { computeScheduleLayout } from '@logic/planning/layout';
@@ -43,7 +44,7 @@ import {
   plannerReducer,
 } from '@logic/planning/selection';
 import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tray';
-import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel, levelColour } from '@logic/planning/zoom';
+import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel } from '@logic/planning/zoom';
 import { Court, LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
@@ -166,6 +167,9 @@ export default function SchedulePage() {
   const courts: Court[] = swrCourtsResponse.data?.data ?? [];
   const rawStages: StageWithStageItems[] = swrStagesResponse.data?.data ?? [];
   const levels: LevelResponse[] = tournament.levels ?? [];
+  // Level → hue, stage → hue cluster, stage item → shade; shared by every
+  // schedule view so a match keeps its colour identity across zoom levels.
+  const stageItemColours = computeStageItemColours(rawStages, levels);
   const highlightOptions = stageHighlightOptions(rawStages);
   const highlightTarget =
     highlightOptions.find((option) => option.value === highlightValue)?.target ?? null;
@@ -399,12 +403,15 @@ export default function SchedulePage() {
             // schedule hugs the same available width at every zoom level.
             style={{ containerType: 'inline-size' }}
           >
-            {isOverview && levels.length > 0 && (
+            {/* Colour legend: the level name lives only in the hue, so a compact
+                key maps each level's colour back to its name. Stages (hue
+                clusters) and items (shades) stay readable from the badge text. */}
+            {levels.length > 0 && (
               <Group gap="xs" mb="xs">
                 {[...levels]
                   .sort((a, b) => a.position - b.position)
                   .map((level) => (
-                    <Badge key={level.id} color={levelColour(level.id, levels)} variant="filled">
+                    <Badge key={level.id} color={levelSwatchColour(level.id)} variant="filled">
                       {level.name}
                     </Badge>
                   ))}
@@ -416,7 +423,7 @@ export default function SchedulePage() {
               conflictPreview={conflictPreview}
               stageItemsLookup={stageItemsLookup}
               matchesLookup={matchesLookup}
-              levels={levels}
+              stageItemColours={stageItemColours}
               selection={planner.selection}
               highlightTarget={highlightTarget}
               zoom={planner.zoom}
@@ -430,6 +437,7 @@ export default function SchedulePage() {
               stageItemsLookup={stageItemsLookup}
               matchesLookup={matchesLookup}
               levels={levels}
+              stageItemColours={stageItemColours}
               opened={trayOpened}
               onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
