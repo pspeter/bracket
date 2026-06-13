@@ -1001,6 +1001,41 @@ export type RoundWithMatches = {
 };
 
 /**
+ * SchedulerWeights
+ *
+ * Objective weights for the auto-scheduler's weighted-sum CP-SAT objective.
+ *
+ * Defaults are the empirically tuned constants from PRD #73. Every term is measured in
+ * minutes (court locality in court-count, scaled up so it can matter against the
+ * minute-sized terms), so the ratios between these weights are what set the priorities:
+ * makespan and team rest lead, locality and group sync only bend a schedule that is
+ * otherwise free. ``comfortable_rest_minutes`` is the gap below which a team's consecutive
+ * matches are penalised; longer gaps are free.
+ */
+export type SchedulerWeights = {
+  /**
+   * Comfortable Rest Minutes
+   */
+  comfortable_rest_minutes: number;
+  /**
+   * Court Locality
+   */
+  court_locality: number;
+  /**
+   * Group Sync
+   */
+  group_sync: number;
+  /**
+   * Makespan
+   */
+  makespan: number;
+  /**
+   * Team Rest
+   */
+  team_rest: number;
+};
+
+/**
  * ScoreTrackingInfo
  */
 export type ScoreTrackingInfo = {
@@ -3562,7 +3597,7 @@ export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponse
   UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses[keyof UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses];
 
 export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData = {
-  body?: never;
+  body?: SchedulerWeights;
   path: {
     /**
      * Tournament Id
@@ -3698,7 +3733,7 @@ export type UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponse =
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses[keyof UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses];
 
 export type ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData = {
-  body?: never;
+  body?: SchedulerWeights;
   path: {
     /**
      * Tournament Id

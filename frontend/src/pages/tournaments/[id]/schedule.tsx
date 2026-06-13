@@ -45,7 +45,13 @@ import {
 } from '@logic/planning/selection';
 import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tray';
 import { ZOOM_TICK_INTERVAL_MINUTES, defaultZoomLevel } from '@logic/planning/zoom';
-import { Court, LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
+import {
+  Court,
+  LevelResponse,
+  MatchWithDetails,
+  SchedulerWeights,
+  StageWithStageItems,
+} from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
   getCourts,
@@ -73,6 +79,9 @@ import {
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import MatchActionSheet from '@components/scheduling/match_action_sheet';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
+import SchedulerWeightsForm, {
+  DEFAULT_SCHEDULER_WEIGHTS,
+} from '@components/scheduling/scheduler_weights_form';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
 import ZoomControls from '@components/scheduling/zoom_controls';
@@ -93,6 +102,15 @@ export default function SchedulePage() {
   // Guards "Re-optimize everything": the modal warns that manual placements and
   // adjusted breaks are recomputed, so nothing is sent until the user confirms.
   const [reoptimizeModalOpened, setReoptimizeModalOpened] = useState(false);
+  // Both scheduling actions open a modal whose collapsed "advanced" panel lets the
+  // organizer override the solver's objective weights before the request is sent.
+  const [scheduleModalOpened, setScheduleModalOpened] = useState(false);
+  const [scheduleWeights, setScheduleWeights] =
+    useState<SchedulerWeights>(DEFAULT_SCHEDULER_WEIGHTS);
+  const [scheduleAdvancedOpened, setScheduleAdvancedOpened] = useState(false);
+  const [reoptimizeWeights, setReoptimizeWeights] =
+    useState<SchedulerWeights>(DEFAULT_SCHEDULER_WEIGHTS);
+  const [reoptimizeAdvancedOpened, setReoptimizeAdvancedOpened] = useState(false);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -363,10 +381,7 @@ export default function SchedulePage() {
                   variant="filled"
                   style={{ marginBottom: 10 }}
                   leftSection={<IconCalendarPlus size={24} />}
-                  onClick={async () => {
-                    await scheduleMatches(tournamentData.id);
-                    await swrStagesResponse.mutate();
-                  }}
+                  onClick={() => setScheduleModalOpened(true)}
                 >
                   {t('schedule_description')}
                 </Button>
@@ -472,12 +487,49 @@ export default function SchedulePage() {
               round={null}
             />
             <Modal
+              opened={scheduleModalOpened}
+              onClose={() => setScheduleModalOpened(false)}
+              title={t('schedule_modal_title')}
+            >
+              <Stack>
+                <Text>{t('schedule_modal_body')}</Text>
+                <SchedulerWeightsForm
+                  weights={scheduleWeights}
+                  onChange={setScheduleWeights}
+                  opened={scheduleAdvancedOpened}
+                  onToggle={() => setScheduleAdvancedOpened((o) => !o)}
+                />
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => setScheduleModalOpened(false)}>
+                    {t('schedule_modal_cancel')}
+                  </Button>
+                  <Button
+                    color="indigo"
+                    leftSection={<IconCalendarPlus size={18} />}
+                    onClick={async () => {
+                      setScheduleModalOpened(false);
+                      await scheduleMatches(tournamentData.id, scheduleWeights);
+                      await swrStagesResponse.mutate();
+                    }}
+                  >
+                    {t('schedule_modal_confirm')}
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
+            <Modal
               opened={reoptimizeModalOpened}
               onClose={() => setReoptimizeModalOpened(false)}
               title={t('reoptimize_modal_title')}
             >
               <Stack>
                 <Text>{t('reoptimize_modal_body')}</Text>
+                <SchedulerWeightsForm
+                  weights={reoptimizeWeights}
+                  onChange={setReoptimizeWeights}
+                  opened={reoptimizeAdvancedOpened}
+                  onToggle={() => setReoptimizeAdvancedOpened((o) => !o)}
+                />
                 <Group justify="flex-end">
                   <Button variant="default" onClick={() => setReoptimizeModalOpened(false)}>
                     {t('reoptimize_modal_cancel')}
@@ -487,7 +539,7 @@ export default function SchedulePage() {
                     leftSection={<IconWand size={18} />}
                     onClick={async () => {
                       setReoptimizeModalOpened(false);
-                      await reoptimizeMatches(tournamentData.id);
+                      await reoptimizeMatches(tournamentData.id, reoptimizeWeights);
                       await swrStagesResponse.mutate();
                     }}
                   >

@@ -4,6 +4,7 @@ import {
   MatchRescheduleBody,
   MatchResizeBreakBody,
   MatchSwapBody,
+  SchedulerWeights,
 } from '@openapi';
 import { createAxios, handleRequestError } from './adapter';
 
@@ -82,14 +83,14 @@ export async function resizeMatchBreak(
   return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/resize_break`, body);
 }
 
-export async function scheduleMatches(tournament_id: number) {
+export async function scheduleMatches(tournament_id: number, weights?: SchedulerWeights) {
   return createAxios()
-    .post(`tournaments/${tournament_id}/schedule_matches`)
+    .post(`tournaments/${tournament_id}/schedule_matches`, weights)
     .catch((response: any) => handleRequestError(response));
 }
 
-export async function reoptimizeMatches(tournament_id: number) {
+export async function reoptimizeMatches(tournament_id: number, weights?: SchedulerWeights) {
   return createAxios()
-    .post(`tournaments/${tournament_id}/reoptimize_matches`)
+    .post(`tournaments/${tournament_id}/reoptimize_matches`, weights)
     .catch((response: any) => handleRequestError(response));
 }

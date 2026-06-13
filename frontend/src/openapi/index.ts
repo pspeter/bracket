@@ -382,6 +382,7 @@ export type {
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostErrors,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponse,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponses,
+  SchedulerWeights,
   ScoreTrackingInfo,
   ScoreTrackingInfoResponse,
   ScoreTrackingMatchResponse,

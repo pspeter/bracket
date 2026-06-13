@@ -1113,6 +1113,10 @@ export const reoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPost = <
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/reoptimize_matches',
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**
@@ -1195,6 +1199,10 @@ export const scheduleMatchesTournamentsTournamentIdScheduleMatchesPost = <
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/schedule_matches',
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**
