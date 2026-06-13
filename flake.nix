@@ -37,7 +37,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
 
-        python = pkgs.python314;
+        python = pkgs.python313;
         workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./backend; };
 
         pythonBase = pkgs.callPackage pyproject-nix.build.packages {
