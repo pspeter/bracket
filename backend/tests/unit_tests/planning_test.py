@@ -14,7 +14,11 @@ from bracket.logic.planning.matches import (
 from bracket.models.db.court import Court
 from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.stage_item_inputs import StageItemInputTentative
+from bracket.models.db.stage_item_inputs import (
+    StageItemInput,
+    StageItemInputEmpty,
+    StageItemInputTentative,
+)
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
 from bracket.utils.dummy_records import DUMMY_MOCK_TIME, DUMMY_TOURNAMENT
@@ -53,11 +57,13 @@ def _stage(
     stage_id: int,
     matches_per_item: list[list[MatchWithDetails]],
     level_id: LevelId | None = None,
+    inputs_per_item: list[list[StageItemInput]] | None = None,
 ) -> StageWithStageItems:
     return _stage_with_rounds(
         stage_id,
         [[matches] for matches in matches_per_item],
         level_id=level_id,
+        inputs_per_item=inputs_per_item,
     )
 
 
@@ -65,6 +71,7 @@ def _stage_with_rounds(
     stage_id: int,
     rounds_per_item: list[list[list[MatchWithDetails]]],
     level_id: LevelId | None = None,
+    inputs_per_item: list[list[StageItemInput]] | None = None,
 ) -> StageWithStageItems:
     stage_items = []
     for item_idx, rounds in enumerate(rounds_per_item):
@@ -87,7 +94,7 @@ def _stage_with_rounds(
                 id=StageItemId(item_id),
                 stage_id=StageId(stage_id),
                 rounds=rounds_with_matches,
-                inputs=[],
+                inputs=inputs_per_item[item_idx] if inputs_per_item is not None else [],
                 type_name="Single Elimination",
                 team_count=2,
                 ranking_id=None,
@@ -338,6 +345,80 @@ def test_cross_stage_input_waits_for_source_stage_item_plus_default_break() -> N
     assert target_start >= source_end + timedelta(minutes=MARGIN)
 
 
+def _empty_input(input_id: int, stage_item_id: int) -> StageItemInputEmpty:
+    return StageItemInputEmpty(
+        id=StageItemInputId(input_id),
+        slot=1,
+        tournament_id=TournamentId(-1),
+        stage_item_id=StageItemId(stage_item_id),
+    )
+
+
+def test_open_slot_stage_item_waits_for_full_preceding_stage() -> None:
+    """A later-stage item with an unwired (empty) input waits for its whole preceding stage.
+
+    Mirrors the best-runner-up case: a knockout spot is filled manually only once the
+    group stage is fully played, so the input is left empty and the scheduler cannot
+    place the knockout match before every group match has finished — even though there
+    is no explicit feeder link to follow.
+    """
+    level = LevelId(1)
+    group = [_match(1), _match(2), _match(3)]
+    final = _match(4)
+    final_item_id = 200
+    final_stage = _stage_with_rounds(
+        2,
+        [[[final]]],
+        level_id=level,
+        inputs_per_item=[[_empty_input(500, final_item_id)]],
+    )
+    stages = [_stage(1, [group], level_id=level), final_stage]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    by_id = {op.match.id: op for op in ops}
+    group_end = max(_end_time(by_id[m.id]) for m in group)
+    assert by_id[final.id].start_time >= group_end + timedelta(minutes=MARGIN)
+
+
+def test_fully_wired_later_stage_item_is_not_forced_after_whole_preceding_stage() -> None:
+    """A fully-wired later-stage item keeps its tight feeder dependency and may start early.
+
+    Group A is a single match; group B is four matches in the same first stage. The
+    knockout only consumes group A's winner, so it can slot in alongside group B and the
+    whole tournament finishes in three slots. If the conservative fallback wrongly forced
+    the knockout to wait for the entire preceding stage (group A + group B), it could not
+    start until group B finished, costing an extra slot. Asserting on the makespan pins
+    down that the tight dependency is preserved.
+    """
+    level = LevelId(1)
+    group_a = _match(1)
+    group_b = [_match(2), _match(3), _match(4), _match(5)]
+    source_item_id = StageItemId(100)  # group A is the first stage's first stage item
+    wired_input = StageItemInputTentative(
+        id=StageItemInputId(600),
+        slot=1,
+        tournament_id=TournamentId(-1),
+        stage_item_id=StageItemId(200),
+        winner_from_stage_item_id=source_item_id,
+        winner_position=1,
+    )
+    knockout = _match(6).model_copy(
+        update={"stage_item_input1_id": wired_input.id, "stage_item_input1": wired_input}
+    )
+    first_stage = _stage(1, [[group_a], group_b], level_id=level)
+    second_stage = _stage_with_rounds(
+        2, [[[knockout]]], level_id=level, inputs_per_item=[[wired_input]]
+    )
+    stages = [first_stage, second_stage]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [group_a, *group_b, knockout])
+    # Six matches on two courts with only group A blocking the knockout fit in three slots.
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 2 * SLOT)
+
+
 def test_single_level_no_idle_court_gap_between_stages() -> None:
     """With 1 court, stage 2 starts immediately after stage 1 ends (no idle gap)."""
     m1, m2 = _match(1), _match(2)
@@ -407,6 +488,90 @@ def test_optimizer_uses_shared_courts_without_idle_gaps_in_simple_case() -> None
     _assert_match_ids_scheduled(ops, [a_s1, a_s2, *b_matches])
     _assert_default_break_between_court_matches(ops)
     assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 2 * SLOT)
+
+
+# ── Objective blend: team rest ───────────────────────────────────────────────
+
+
+def _team_input(match: MatchWithDetails, team_id: int) -> MatchWithDetails:
+    return match.model_copy(
+        update={"stage_item_input1_id": StageItemInputId(team_id), "stage_item_input2_id": None}
+    )
+
+
+def test_team_rest_spaces_back_to_back_matches_when_it_is_free() -> None:
+    """A team's two matches get a gap when spacing them costs no makespan.
+
+    One court, three matches: a team plays the first and the last, with an
+    unrelated match available to slot between them. Every ordering finishes in
+    the same three slots, so the rest objective should pull the team's matches
+    apart rather than leave them back-to-back.
+    """
+    m1 = _team_input(_match(1), team_id=1)
+    m2 = _match(2).model_copy(
+        update={"stage_item_input1_id": StageItemInputId(2), "stage_item_input2_id": None}
+    )
+    m3 = _team_input(_match(3), team_id=1)
+    stages = [_stage(1, [[m1, m2, m3]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [m1, m2, m3])
+    by_id = {op.match.id: op for op in ops}
+    earlier, later = sorted((by_id[m1.id], by_id[m3.id]), key=lambda op: op.start_time)
+    # At least one match sits between the team's two matches (a full slot of rest).
+    assert later.start_time - _end_time(earlier) >= timedelta(minutes=SLOT)
+
+
+# ── Objective blend: court locality ──────────────────────────────────────────
+
+
+def _courts_used_by(ops: list[ScheduleOperation], matches: list[MatchWithDetails]) -> set[CourtId]:
+    match_ids = {match.id for match in matches}
+    return {op.court_id for op in ops if op.match.id in match_ids}
+
+
+def test_each_group_stays_on_one_court_when_makespan_allows() -> None:
+    """With two courts and two groups of two matches, each group stays on a single court.
+
+    Both groups fit in two slots either way, so confining each group to one court costs
+    no makespan; the locality objective should prefer that over the naive spread that
+    scatters a group across both courts.
+    """
+    group_a = [_match(10), _match(11)]
+    group_b = [_match(20), _match(21)]
+    stages = [_stage(1, [group_a, group_b])]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, group_a + group_b)
+    _assert_default_break_between_court_matches(ops)
+    assert len(_courts_used_by(ops, group_a)) == 1
+    assert len(_courts_used_by(ops, group_b)) == 1
+
+
+# ── Objective blend: group sync ──────────────────────────────────────────────
+
+
+def test_groups_in_a_stage_progress_round_for_round_when_free() -> None:
+    """Two groups in one stage keep the same round finishing at the same time.
+
+    Each group has two single-match rounds; with two courts every layout finishes in
+    two slots, so keeping the groups in lockstep (round 1 of both, then round 2 of both)
+    costs no makespan. The group-sync objective should pick that over letting one group
+    race a round ahead.
+    """
+    a1, a2 = _match(10), _match(11)
+    b1, b2 = _match(20), _match(21)
+    stages = [_stage_with_rounds(1, [[[a1], [a2]], [[b1], [b2]]])]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [a1, a2, b1, b2])
+    by_id = {op.match.id: op for op in ops}
+    # Each round's matches across the two groups finish at the same time (zero spread).
+    assert _end_time(by_id[a1.id]) == _end_time(by_id[b1.id])
+    assert _end_time(by_id[a2.id]) == _end_time(by_id[b2.id])
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────

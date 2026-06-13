@@ -16,8 +16,9 @@ from bracket.models.db.match import (
     MatchWithDetails,
     MatchWithDetailsDefinitive,
 )
+from bracket.models.db.stage_item_inputs import StageItemInputEmpty
 from bracket.models.db.tournament import Tournament
-from bracket.models.db.util import StageWithStageItems
+from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
     sql_reschedule_match_and_determine_duration,
@@ -25,7 +26,15 @@ from bracket.sql.matches import (
 )
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
-from bracket.utils.id_types import CourtId, MatchId, StageItemId, StageItemInputId, TournamentId
+from bracket.utils.id_types import (
+    CourtId,
+    LevelId,
+    MatchId,
+    StageId,
+    StageItemId,
+    StageItemInputId,
+    TournamentId,
+)
 from bracket.utils.logging import logger
 from bracket.utils.types import assert_some
 
@@ -41,13 +50,37 @@ ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
 SOLVER_TIME_LIMIT_SECONDS = 5.0
 SOLVER_RANDOM_SEED = 77
 
+# Objective blend (PRD #73, issue #78). The schedule minimises a single weighted sum.
+# Makespan is the headline term; team rest keeps a player from going straight from one
+# match into the next; court locality keeps a group on few courts; group sync keeps the
+# stage items of a stage finishing each round at a similar time. The weights are fixed
+# constants (not user-configurable) and intentionally tunable here: every term is measured
+# in minutes (locality in court-count, scaled up to matter against minute-sized terms), so
+# the ratios below are what set the priorities. They were chosen so makespan and team rest
+# lead and locality/sync bend the schedule only where it is otherwise free; retune on a
+# realistic fixture (e.g. the dev-db seed) if the balance feels off.
+WEIGHT_MAKESPAN = 100
+WEIGHT_TEAM_REST = 13
+WEIGHT_GROUP_SYNC = 8
+WEIGHT_COURT_LOCALITY = 5
+
+# A team is considered rested once this many minutes separate the end of one of its matches
+# and the start of the next; gaps shorter than this are penalised, longer gaps are free.
+COMFORTABLE_REST_MINUTES = 30
+
 
 @dataclass(frozen=True)
 class _MatchContext:
     match: ScheduleMatch
+    level_id: LevelId | None
+    stage_id: StageId
     stage_item_id: StageItemId
+    round_index: int
     input_ids: tuple[StageItemInputId, ...]
     cross_stage_source_ids: tuple[StageItemId, ...]
+    # True when the match's stage item has at least one unwired (empty) input slot, e.g. a
+    # knockout place filled manually only once the previous stage is fully played.
+    stage_item_has_open_slot: bool
 
 
 @dataclass(frozen=True)
@@ -81,17 +114,25 @@ def _cross_stage_source_ids(match: ScheduleMatch) -> tuple[StageItemId, ...]:
     return tuple(dict.fromkeys(source_ids))
 
 
+def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
+    return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
+
+
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
     return [
         _MatchContext(
             match=match,
+            level_id=stage.level_id,
+            stage_id=stage.id,
             stage_item_id=stage_item.id,
+            round_index=round_index,
             input_ids=_input_ids(match),
             cross_stage_source_ids=_cross_stage_source_ids(match),
+            stage_item_has_open_slot=_has_open_slot(stage_item),
         )
         for stage in stages
         for stage_item in stage.stage_items
-        for round_ in stage_item.rounds
+        for round_index, round_ in enumerate(stage_item.rounds)
         for match in round_.matches
     ]
 
@@ -186,7 +227,9 @@ def _add_movable_match_variables(
         match = context.match
         match_id = match.id
         start = model.NewIntVar(0, horizon, f"match_{match_id}_start")
-        start_slot = model.NewIntVar(0, horizon // block_minutes + 1, f"match_{match_id}_start_slot")
+        start_slot = model.NewIntVar(
+            0, horizon // block_minutes + 1, f"match_{match_id}_start_slot"
+        )
         model.Add(start == start_slot * block_minutes)
         end = model.NewIntVar(0, horizon + match.duration_minutes, f"match_{match_id}_end")
         model.Add(end == start + match.duration_minutes)
@@ -300,6 +343,39 @@ def _add_movable_vs_pinned_input_constraints(
                 model.AddBoolOr([before, after])
 
 
+def _open_slot_precedence_ids(contexts: list[_MatchContext]) -> set[tuple[MatchId, MatchId]]:
+    """Pair each open-slot stage item's matches with its whole immediately-preceding stage.
+
+    A stage item with an unwired input slot has no explicit feeder to follow, but it still
+    cannot be played before the stage that fills that slot is over. Lacking a specific
+    source, we conservatively make every match of such a stage item wait for every match of
+    the immediately-preceding stage in the same level. Cross-level scheduling is unaffected,
+    and fully-wired stage items keep their tighter, feeder-specific dependencies.
+    """
+    contexts_by_stage: dict[StageId, list[_MatchContext]] = defaultdict(list)
+    stages_by_level: dict[LevelId | None, set[StageId]] = defaultdict(set)
+    for context in contexts:
+        contexts_by_stage[context.stage_id].append(context)
+        stages_by_level[context.level_id].add(context.stage_id)
+
+    ordered_stages_by_level = {
+        level_id: sorted(stage_ids) for level_id, stage_ids in stages_by_level.items()
+    }
+
+    pair_ids = set()
+    for successor in contexts:
+        if not successor.stage_item_has_open_slot:
+            continue
+        ordered_stages = ordered_stages_by_level[successor.level_id]
+        position = ordered_stages.index(successor.stage_id)
+        if position == 0:
+            continue  # first stage in the level — nothing precedes it
+        preceding_stage_id = ordered_stages[position - 1]
+        for feeder in contexts_by_stage[preceding_stage_id]:
+            pair_ids.add((feeder.match.id, successor.match.id))
+    return pair_ids
+
+
 def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext, _MatchContext]]:
     contexts_by_match_id = {context.match.id: context for context in contexts}
     contexts_by_stage_item: dict[StageItemId, list[_MatchContext]] = defaultdict(list)
@@ -319,6 +395,8 @@ def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext
             for feeder in contexts_by_stage_item[source_stage_item_id]:
                 if feeder.match.id != successor.match.id:
                     pair_ids.add((feeder.match.id, successor.match.id))
+
+    pair_ids |= _open_slot_precedence_ids(contexts)
 
     return [
         (contexts_by_match_id[feeder_id], contexts_by_match_id[successor_id])
@@ -354,6 +432,115 @@ def _add_precedence_constraints(
             continue
 
         model.Add(starts[successor.match.id] >= ends[feeder.match.id] + default_break_minutes)
+
+
+def _add_team_rest_penalty(
+    model: Any,
+    movable_contexts: list[_MatchContext],
+    starts: dict[MatchId, Any],
+    ends: dict[MatchId, Any],
+    horizon: int,
+) -> list[Any]:
+    """Penalise how far each team's consecutive matches fall short of a comfortable rest.
+
+    For every pair of a team's movable matches the gap between them (later start minus
+    earlier end) is known to be non-negative because they already cannot overlap. The
+    shortfall ``max(0, COMFORTABLE_REST_MINUTES - gap)`` is summed and minimised, so the
+    solver spreads a team's matches whenever doing so is cheap on the headline terms.
+    """
+    matches_by_input: dict[StageItemInputId, list[MatchId]] = defaultdict(list)
+    for context in movable_contexts:
+        for input_id in set(context.input_ids):
+            matches_by_input[input_id].append(context.match.id)
+
+    shortfalls = []
+    for match_ids in matches_by_input.values():
+        for index, first_id in enumerate(match_ids):
+            for second_id in match_ids[index + 1 :]:
+                gap = model.NewIntVar(-horizon, horizon, f"rest_gap_{first_id}_{second_id}")
+                model.AddMaxEquality(
+                    gap,
+                    [starts[second_id] - ends[first_id], starts[first_id] - ends[second_id]],
+                )
+                shortfall = model.NewIntVar(
+                    0, COMFORTABLE_REST_MINUTES, f"rest_shortfall_{first_id}_{second_id}"
+                )
+                model.Add(shortfall >= COMFORTABLE_REST_MINUTES - gap)
+                shortfalls.append(shortfall)
+    return shortfalls
+
+
+def _add_court_locality_penalty(
+    model: Any,
+    movable_contexts: list[_MatchContext],
+    court_choices: dict[MatchId, dict[CourtId, Any]],
+) -> list[Any]:
+    """Penalise the number of distinct courts each stage item (group/bracket) spreads over.
+
+    For every (stage item, court) pair a boolean is forced on when any of the item's
+    matches is placed on that court, and the sum of those booleans is minimised. A group
+    that fits on one court without hurting the headline terms therefore stays put.
+    """
+    matches_by_item: dict[StageItemId, list[MatchId]] = defaultdict(list)
+    for context in movable_contexts:
+        matches_by_item[context.stage_item_id].append(context.match.id)
+
+    used_court_vars = []
+    for stage_item_id, match_ids in matches_by_item.items():
+        courts_in_item = {
+            court_id for match_id in match_ids for court_id in court_choices[match_id]
+        }
+        for court_id in courts_in_item:
+            used = model.NewBoolVar(f"item_{stage_item_id}_uses_court_{court_id}")
+            for match_id in match_ids:
+                model.Add(used >= court_choices[match_id][court_id])
+            used_court_vars.append(used)
+    return used_court_vars
+
+
+def _add_group_sync_penalty(
+    model: Any,
+    movable_contexts: list[_MatchContext],
+    ends: dict[MatchId, Any],
+    horizon: int,
+) -> list[Any]:
+    """Penalise divergence in round progress across the stage items of a stage.
+
+    Round progress is keyed by (stage, round index): for each round index present in at
+    least two of a stage's items, the spread between the earliest- and latest-finishing
+    item at that round is minimised. Keying on the round index (rather than assuming equal
+    round counts) keeps the term well-defined when stage items have different numbers of
+    rounds — items simply stop contributing once their rounds run out.
+    """
+    ends_by_stage_round_item: dict[tuple[StageId, int], dict[StageItemId, list[Any]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for context in movable_contexts:
+        key = (context.stage_id, context.round_index)
+        ends_by_stage_round_item[key][context.stage_item_id].append(ends[context.match.id])
+
+    spreads = []
+    for (stage_id, round_index), ends_by_item in ends_by_stage_round_item.items():
+        if len(ends_by_item) < 2:
+            continue
+        item_round_ends = []
+        for stage_item_id, match_ends in ends_by_item.items():
+            round_end = model.NewIntVar(
+                0, horizon, f"round_end_stage_{stage_id}_round_{round_index}_item_{stage_item_id}"
+            )
+            model.AddMaxEquality(round_end, match_ends)
+            item_round_ends.append(round_end)
+
+        latest = model.NewIntVar(0, horizon, f"round_latest_stage_{stage_id}_round_{round_index}")
+        earliest = model.NewIntVar(
+            0, horizon, f"round_earliest_stage_{stage_id}_round_{round_index}"
+        )
+        model.AddMaxEquality(latest, item_round_ends)
+        model.AddMinEquality(earliest, item_round_ends)
+        spread = model.NewIntVar(0, horizon, f"round_spread_stage_{stage_id}_round_{round_index}")
+        model.Add(spread == latest - earliest)
+        spreads.append(spread)
+    return spreads
 
 
 def _build_operations_from_solution(
@@ -460,7 +647,18 @@ def build_schedule_plan(
     )
     for context in movable_contexts:
         model.Add(makespan >= ends[context.match.id])
-    model.Minimize(makespan)
+
+    objective = WEIGHT_MAKESPAN * makespan
+    rest_shortfalls = _add_team_rest_penalty(model, movable_contexts, starts, ends, horizon)
+    if rest_shortfalls:
+        objective += WEIGHT_TEAM_REST * sum(rest_shortfalls)
+    used_court_vars = _add_court_locality_penalty(model, movable_contexts, court_choices)
+    if used_court_vars:
+        objective += WEIGHT_COURT_LOCALITY * sum(used_court_vars)
+    sync_spreads = _add_group_sync_penalty(model, movable_contexts, ends, horizon)
+    if sync_spreads:
+        objective += WEIGHT_GROUP_SYNC * sum(sync_spreads)
+    model.Minimize(objective)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
