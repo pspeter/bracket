@@ -1,4 +1,5 @@
 import random
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from heliclockter import datetime_utc
@@ -6,6 +7,14 @@ from pydantic import BaseModel
 
 from bracket.config import Environment, config, environment
 from bracket.database import database, engine
+from bracket.logic.planning.template import (
+    Blueprint,
+    BlueprintInput,
+    BlueprintStage,
+    BlueprintStageItem,
+    TemplateConfig,
+    build_template_blueprint,
+)
 from bracket.logic.ranking.calculation import (
     recalculate_ranking_for_stage_item,
 )
@@ -23,8 +32,10 @@ from bracket.models.db.stage import StageInsertable
 from bracket.models.db.stage_item import (
     StageItemInsertable,
     StageItemWithInputsCreate,
+    StageType,
 )
 from bracket.models.db.stage_item_inputs import (
+    StageItemInputCreateBody,
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
@@ -90,6 +101,7 @@ from bracket.utils.id_types import (
     LevelId,
     PlayerId,
     StageId,
+    StageItemId,
     TeamId,
     TournamentId,
     UserId,
@@ -100,6 +112,311 @@ from bracket.utils.types import assert_some
 
 if TYPE_CHECKING:
     from sqlalchemy import Table
+
+
+type InsertDummy = Callable[[BaseModel, dict[str, Any]], Awaitable[int]]
+
+BIG_DEV_TOURNAMENT_NAME = "Big Unscheduled Tournament"
+
+
+def _team_groups(team_ids: list[TeamId], group_count: int) -> list[list[TeamId]]:
+    base = len(team_ids) // group_count
+    remainder = len(team_ids) % group_count
+    groups: list[list[TeamId]] = []
+    offset = 0
+
+    for group_index in range(group_count):
+        group_size = base + (1 if group_index < remainder else 0)
+        groups.append(team_ids[offset : offset + group_size])
+        offset += group_size
+
+    return groups
+
+
+def _team_inputs(team_ids: list[TeamId]) -> list[StageItemInputCreateBody]:
+    return [
+        StageItemInputCreateBodyFinal(slot=slot, team_id=team_id)
+        for slot, team_id in enumerate(team_ids, start=1)
+    ]
+
+
+def _tentative_inputs(
+    blueprint_inputs: list[BlueprintInput],
+    stage_item_ids_by_name: dict[str, StageItemId],
+) -> list[StageItemInputCreateBody]:
+    inputs: list[StageItemInputCreateBody] = []
+
+    for input_ in blueprint_inputs:
+        if input_.winner_from is None or input_.winner_position is None:
+            raise ValueError("Big dev tournament knockout inputs must reference a stage item")
+
+        inputs.append(
+            StageItemInputCreateBodyTentative(
+                slot=input_.slot,
+                winner_from_stage_item_id=stage_item_ids_by_name[input_.winner_from],
+                winner_position=input_.winner_position,
+            )
+        )
+
+    return inputs
+
+
+def _big_level_a_blueprint() -> Blueprint:
+    return Blueprint(
+        stages=[
+            BlueprintStage(
+                name="Group Phase",
+                items=[
+                    BlueprintStageItem(
+                        name="Group A",
+                        type=StageType.ROUND_ROBIN,
+                        team_count=3,
+                        inputs=[],
+                    ),
+                    BlueprintStageItem(
+                        name="Group B",
+                        type=StageType.ROUND_ROBIN,
+                        team_count=2,
+                        inputs=[],
+                    ),
+                ],
+            ),
+            BlueprintStage(
+                name="Semi-finals",
+                items=[
+                    BlueprintStageItem(
+                        name="Semi-final A",
+                        type=StageType.SINGLE_ELIMINATION,
+                        team_count=2,
+                        inputs=[
+                            BlueprintInput(slot=1, winner_from="Group A", winner_position=1),
+                            BlueprintInput(slot=2, winner_from="Group B", winner_position=2),
+                        ],
+                    ),
+                    BlueprintStageItem(
+                        name="Semi-final B",
+                        type=StageType.SINGLE_ELIMINATION,
+                        team_count=2,
+                        inputs=[
+                            BlueprintInput(slot=1, winner_from="Group B", winner_position=1),
+                            BlueprintInput(slot=2, winner_from="Group A", winner_position=2),
+                        ],
+                    ),
+                ],
+            ),
+            BlueprintStage(
+                name="Finals",
+                items=[
+                    BlueprintStageItem(
+                        name="Final",
+                        type=StageType.SINGLE_ELIMINATION,
+                        team_count=2,
+                        inputs=[
+                            BlueprintInput(slot=1, winner_from="Semi-final A", winner_position=1),
+                            BlueprintInput(slot=2, winner_from="Semi-final B", winner_position=1),
+                        ],
+                    ),
+                    BlueprintStageItem(
+                        name="3rd Place",
+                        type=StageType.SINGLE_ELIMINATION,
+                        team_count=2,
+                        inputs=[
+                            BlueprintInput(slot=1, winner_from="Semi-final A", winner_position=2),
+                            BlueprintInput(slot=2, winner_from="Semi-final B", winner_position=2),
+                        ],
+                    ),
+                ],
+            ),
+        ]
+    )
+
+
+async def _create_big_level_teams(
+    insert_dummy: InsertDummy,
+    tournament_id: TournamentId,
+    level_id: LevelId,
+    level_name: str,
+    team_count: int,
+) -> list[TeamId]:
+    team_ids: list[TeamId] = []
+
+    for team_number in range(1, team_count + 1):
+        team_id = TeamId(
+            await insert_dummy(
+                DUMMY_TEAM1,
+                {
+                    "name": f"{level_name} Team {team_number:02d}",
+                    "tournament_id": tournament_id,
+                    "level_id": level_id,
+                },
+            )
+        )
+        team_ids.append(team_id)
+
+        for player_number in range(1, 3):
+            player_id = PlayerId(
+                await insert_dummy(
+                    DUMMY_PLAYER8,
+                    {
+                        "name": f"{level_name} T{team_number:02d} P{player_number}",
+                        "tournament_id": tournament_id,
+                        "level_id": level_id,
+                    },
+                )
+            )
+            await insert_dummy(DUMMY_PLAYER_X_TEAM, {"player_id": player_id, "team_id": team_id})
+
+    return team_ids
+
+
+async def _create_stage_items_from_blueprint(
+    insert_dummy: InsertDummy,
+    tournament_id: TournamentId,
+    level_id: LevelId,
+    team_ids: list[TeamId],
+    blueprint: Blueprint,
+) -> None:
+    stage_item_ids_by_name: dict[str, StageItemId] = {}
+    grouped_team_ids = _team_groups(team_ids, len(blueprint.stages[0].items))
+
+    for stage_index, blueprint_stage in enumerate(blueprint.stages):
+        stage_id = StageId(
+            await insert_dummy(
+                DUMMY_STAGE1,
+                {
+                    "tournament_id": tournament_id,
+                    "level_id": level_id,
+                    "name": blueprint_stage.name,
+                    "is_active": stage_index == 0,
+                },
+            )
+        )
+
+        for item_index, blueprint_stage_item in enumerate(blueprint_stage.items):
+            if stage_index == 0:
+                inputs = _team_inputs(grouped_team_ids[item_index])
+                team_count = len(inputs)
+            else:
+                inputs = _tentative_inputs(blueprint_stage_item.inputs, stage_item_ids_by_name)
+                team_count = blueprint_stage_item.team_count
+
+            stage_item = await sql_create_stage_item_with_inputs(
+                tournament_id,
+                StageItemWithInputsCreate(
+                    stage_id=stage_id,
+                    name=blueprint_stage_item.name,
+                    team_count=team_count,
+                    type=blueprint_stage_item.type,
+                    inputs=inputs,
+                ),
+            )
+            stage_item_ids_by_name[blueprint_stage_item.name] = stage_item.id
+            await build_matches_for_stage_item(stage_item, tournament_id)
+
+
+async def _create_big_round_robin_level(
+    insert_dummy: InsertDummy,
+    tournament_id: TournamentId,
+    level_id: LevelId,
+    team_ids: list[TeamId],
+) -> None:
+    stage_id = StageId(
+        await insert_dummy(
+            DUMMY_STAGE1,
+            {
+                "tournament_id": tournament_id,
+                "level_id": level_id,
+                "name": "Round Robin",
+                "is_active": True,
+            },
+        )
+    )
+    stage_item = await sql_create_stage_item_with_inputs(
+        tournament_id,
+        StageItemWithInputsCreate(
+            stage_id=stage_id,
+            name="Full Round Robin",
+            team_count=len(team_ids),
+            type=StageType.ROUND_ROBIN,
+            inputs=_team_inputs(team_ids),
+        ),
+    )
+    await build_matches_for_stage_item(stage_item, tournament_id)
+
+
+async def create_big_dev_tournament(club_id: ClubId, insert_dummy: InsertDummy) -> TournamentId:
+    tournament_id = TournamentId(
+        await insert_dummy(
+            DUMMY_TOURNAMENT,
+            {
+                "club_id": club_id,
+                "name": BIG_DEV_TOURNAMENT_NAME,
+                "dashboard_endpoint": "big-unscheduled-tournament",
+                "auto_assign_courts": False,
+            },
+        )
+    )
+
+    level_specs = [
+        ("Level A", 5),
+        ("Level B", 12),
+        ("Level C", 14),
+        ("Level D", 4),
+    ]
+    teams_by_level: dict[str, tuple[LevelId, list[TeamId]]] = {}
+
+    for position, (level_name, team_count) in enumerate(level_specs):
+        level_id = LevelId(
+            await insert_dummy(
+                DUMMY_LEVEL1,
+                {"tournament_id": tournament_id, "name": level_name, "position": position},
+            )
+        )
+        await insert_dummy(
+            DUMMY_RANKING1,
+            {"tournament_id": tournament_id, "level_id": level_id, "position": position},
+        )
+        teams_by_level[level_name] = (
+            level_id,
+            await _create_big_level_teams(
+                insert_dummy, tournament_id, level_id, level_name, team_count
+            ),
+        )
+
+    for court_number in range(1, 11):
+        await insert_dummy(
+            DUMMY_COURT1,
+            {"name": f"Court {court_number}", "tournament_id": tournament_id},
+        )
+
+    level_a_id, level_a_teams = teams_by_level["Level A"]
+    await _create_stage_items_from_blueprint(
+        insert_dummy,
+        tournament_id,
+        level_a_id,
+        level_a_teams,
+        _big_level_a_blueprint(),
+    )
+
+    for level_name, team_count in [("Level B", 12), ("Level C", 14)]:
+        level_id, level_teams = teams_by_level[level_name]
+        blueprint = build_template_blueprint(
+            TemplateConfig(
+                groups=4,
+                total_teams=team_count,
+                until_rank=8,
+                include_semi_final=True,
+                group_stage_type=StageType.ROUND_ROBIN,
+            )
+        )
+        await _create_stage_items_from_blueprint(
+            insert_dummy, tournament_id, level_id, level_teams, blueprint
+        )
+
+    level_d_id, level_d_teams = teams_by_level["Level D"]
+    await _create_big_round_robin_level(insert_dummy, tournament_id, level_d_id, level_d_teams)
+
+    return tournament_id
 
 
 async def create_admin_user() -> UserId:
@@ -549,5 +866,7 @@ async def sql_create_dev_db() -> UserId:
     for _stage_item in (b_stage_item, a_stage_item):
         stage_item_with_rounds = await get_stage_item(tournament_id_2, _stage_item.id)
         await recalculate_ranking_for_stage_item(tournament_id_2, stage_item_with_rounds)
+
+    await create_big_dev_tournament(club_id_1, insert_dummy)
 
     return user_id_1
