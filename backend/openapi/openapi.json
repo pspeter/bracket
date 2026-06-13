@@ -1871,6 +1871,50 @@
         "title": "RoundWithMatches",
         "type": "object"
       },
+      "SchedulerWeights": {
+        "description": "Objective weights for the auto-scheduler's weighted-sum CP-SAT objective.\n\nDefaults are the empirically tuned constants from PRD #73. Every term is measured in\nminutes (court locality in court-count, scaled up so it can matter against the\nminute-sized terms), so the ratios between these weights are what set the priorities:\nmakespan and team rest lead, locality and group sync only bend a schedule that is\notherwise free. ``comfortable_rest_minutes`` is the gap below which a team's consecutive\nmatches are penalised; longer gaps are free.",
+        "properties": {
+          "comfortable_rest_minutes": {
+            "default": 30,
+            "minimum": 0.0,
+            "title": "Comfortable Rest Minutes",
+            "type": "integer"
+          },
+          "court_locality": {
+            "default": 4,
+            "minimum": 0.0,
+            "title": "Court Locality",
+            "type": "integer"
+          },
+          "group_sync": {
+            "default": 8,
+            "minimum": 0.0,
+            "title": "Group Sync",
+            "type": "integer"
+          },
+          "makespan": {
+            "default": 150,
+            "minimum": 0.0,
+            "title": "Makespan",
+            "type": "integer"
+          },
+          "team_rest": {
+            "default": 13,
+            "minimum": 0.0,
+            "title": "Team Rest",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "makespan",
+          "team_rest",
+          "group_sync",
+          "court_locality",
+          "comfortable_rest_minutes"
+        ],
+        "title": "SchedulerWeights",
+        "type": "object"
+      },
       "ScoreTrackingInfo": {
         "properties": {
           "courts": {
@@ -6156,6 +6200,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulerWeights",
+                "default": {
+                  "comfortable_rest_minutes": 30,
+                  "court_locality": 4,
+                  "group_sync": 8,
+                  "makespan": 150,
+                  "team_rest": 13
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -6380,6 +6440,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulerWeights",
+                "default": {
+                  "comfortable_rest_minutes": 30,
+                  "court_locality": 4,
+                  "group_sync": 8,
+                  "makespan": 150,
+                  "team_rest": 13
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

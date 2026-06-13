@@ -724,12 +724,18 @@ def build_schedule_plan(
 
 
 async def _apply_schedule_plan(
-    tournament_id: TournamentId, stages: list[StageWithStageItems], *, reoptimize: bool
+    tournament_id: TournamentId,
+    stages: list[StageWithStageItems],
+    *,
+    reoptimize: bool,
+    weights: SchedulerWeights,
 ) -> None:
     tournament = await sql_get_tournament(tournament_id)
     courts = await get_all_courts_in_tournament(tournament_id)
 
-    for op in build_schedule_plan(stages, courts, tournament, reoptimize=reoptimize):
+    for op in build_schedule_plan(
+        stages, courts, tournament, reoptimize=reoptimize, weights=weights
+    ):
         await sql_reschedule_match_and_determine_duration(
             op.court_id,
             op.start_time,
@@ -739,16 +745,20 @@ async def _apply_schedule_plan(
 
 
 async def schedule_all_unscheduled_matches(
-    tournament_id: TournamentId, stages: list[StageWithStageItems]
+    tournament_id: TournamentId,
+    stages: list[StageWithStageItems],
+    weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
 ) -> None:
-    await _apply_schedule_plan(tournament_id, stages, reoptimize=False)
+    await _apply_schedule_plan(tournament_id, stages, reoptimize=False, weights=weights)
 
 
 async def reoptimize_all_matches(
-    tournament_id: TournamentId, stages: list[StageWithStageItems]
+    tournament_id: TournamentId,
+    stages: list[StageWithStageItems],
+    weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
 ) -> None:
     """Re-flow every not-started match, keeping in-progress and completed matches fixed."""
-    await _apply_schedule_plan(tournament_id, stages, reoptimize=True)
+    await _apply_schedule_plan(tournament_id, stages, reoptimize=True, weights=weights)
 
 
 class MatchPosition(NamedTuple):

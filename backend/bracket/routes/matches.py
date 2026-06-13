@@ -34,6 +34,7 @@ from bracket.models.db.match import (
     MatchScoreTrackingBody,
     MatchState,
     MatchSwapBody,
+    SchedulerWeights,
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
@@ -227,11 +228,12 @@ async def create_match(
 @router.post("/tournaments/{tournament_id}/schedule_matches", response_model=SuccessResponse)
 async def schedule_matches(
     tournament_id: TournamentId,
+    weights: SchedulerWeights = SchedulerWeights(),
     _: UserPublic = Depends(user_authenticated_for_tournament),
     tournament: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
-    await schedule_all_unscheduled_matches(tournament_id, stages)
+    await schedule_all_unscheduled_matches(tournament_id, stages, weights)
     await handle_conflicts(
         await get_full_tournament_details(tournament_id), tournament.margin_minutes
     )
@@ -241,11 +243,12 @@ async def schedule_matches(
 @router.post("/tournaments/{tournament_id}/reoptimize_matches", response_model=SuccessResponse)
 async def reoptimize_matches(
     tournament_id: TournamentId,
+    weights: SchedulerWeights = SchedulerWeights(),
     _: UserPublic = Depends(user_authenticated_for_tournament),
     tournament: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
-    await reoptimize_all_matches(tournament_id, stages)
+    await reoptimize_all_matches(tournament_id, stages, weights)
     await handle_conflicts(
         await get_full_tournament_details(tournament_id), tournament.margin_minutes
     )

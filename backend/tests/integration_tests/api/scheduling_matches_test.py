@@ -630,3 +630,57 @@ async def test_reoptimize_keeps_started_matches_fixed_and_reflows_the_rest(
     assert set(matches_after) == {match.id for match in _all_matches(stages_after)}
     # The re-flowed schedule is conflict-free on every court.
     _assert_courts_have_no_overlaps(stages_after, auth_context.tournament.margin_minutes)
+
+
+@pytest.mark.parametrize("endpoint", ["schedule_matches", "reoptimize_matches"])
+@pytest.mark.asyncio(loop_scope="session")
+async def test_schedule_endpoints_accept_custom_weights_body(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext, endpoint: str
+) -> None:
+    """Both scheduling endpoints take an optional objective-weights body and validate it.
+
+    A valid weights body schedules the matches as usual; a body with a negative weight is
+    rejected by validation rather than silently ignored.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tid})) as stage,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tid})) as t2,
+    ):
+        si = await sql_create_stage_item_with_inputs(
+            tid,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Group A",
+                team_count=2,
+                type=DUMMY_STAGE_ITEM1.type,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(si, tid)
+
+        valid_weights = {
+            "makespan": 200,
+            "team_rest": 5,
+            "group_sync": 2,
+            "court_locality": 1,
+            "comfortable_rest_minutes": 45,
+        }
+        valid_response = await send_tournament_request(
+            HTTPMethod.POST, endpoint, auth_context, json=valid_weights
+        )
+        invalid_response = await send_tournament_request(
+            HTTPMethod.POST, endpoint, auth_context, json={"makespan": -1}
+        )
+        stages = await get_full_tournament_details(tid)
+
+        await sql_delete_stage_item_with_foreign_keys(si.id)
+
+    assert valid_response == SUCCESS_RESPONSE
+    assert len(_scheduled_matches(stages)) > 0
+    assert "detail" in invalid_response
