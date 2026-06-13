@@ -3561,6 +3561,38 @@ export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponse
 export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponse =
   UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses[keyof UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses];
 
+export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/reoptimize_matches';
+};
+
+export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostError =
+  ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors[keyof ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors];
+
+export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponse =
+  ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses[keyof ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses];
+
 export type CreateRoundTournamentsTournamentIdRoundsPostData = {
   body: RoundCreateBody;
   path: {

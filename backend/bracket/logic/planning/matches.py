@@ -7,6 +7,7 @@ from heliclockter import datetime_utc, timedelta
 from ortools.sat.python import cp_model
 from starlette import status
 
+from bracket.config import currently_testing
 from bracket.models.db.court import Court
 from bracket.models.db.match import (
     Match,
@@ -48,7 +49,8 @@ class ScheduleOperation(NamedTuple):
 
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
 SOLVER_TIME_LIMIT_SECONDS = 5.0
-SOLVER_RANDOM_SEED = 77
+SOLVER_RANDOM_SEED = 77  # Applied only under tests (see currently_testing); prod runs unseeded.
+SOLVER_SEARCH_WORKERS = 8
 
 # Objective blend (PRD #73, issue #78). The schedule minimises a single weighted sum.
 # Makespan is the headline term; team rest keeps a player from going straight from one
@@ -62,7 +64,7 @@ SOLVER_RANDOM_SEED = 77
 WEIGHT_MAKESPAN = 100
 WEIGHT_TEAM_REST = 13
 WEIGHT_GROUP_SYNC = 8
-WEIGHT_COURT_LOCALITY = 5
+WEIGHT_COURT_LOCALITY = 4
 
 # A team is considered rested once this many minutes separate the end of one of its matches
 # and the start of the next; gaps shorter than this are penalised, longer gaps are free.
@@ -94,8 +96,29 @@ def _minute_offset(tournament: Tournament, start_time: datetime_utc) -> int:
     return round((start_time - tournament.start_time).total_seconds() / 60)
 
 
-def _is_pinned(context: _MatchContext) -> bool:
+def _is_scheduled(context: _MatchContext) -> bool:
     return context.match.start_time is not None and context.match.court_id is not None
+
+
+def _pinned_match_ids(contexts: list[_MatchContext], reoptimize: bool) -> frozenset[MatchId]:
+    """IDs of matches held fixed at their current court/time during the solve.
+
+    In the default mode every scheduled match is pinned, so "Schedule unscheduled matches"
+    only ever places matches that have no slot yet. In re-optimize mode only in-progress and
+    completed matches are pinned, so every not-started match — including manually placed ones
+    and manually adjusted breaks around them — is free to be re-flowed by the solver.
+    """
+    pinned = set()
+    for context in contexts:
+        if not _is_scheduled(context):
+            continue
+        if reoptimize and context.match.state not in (
+            MatchState.IN_PROGRESS,
+            MatchState.COMPLETED,
+        ):
+            continue
+        pinned.add(context.match.id)
+    return frozenset(pinned)
 
 
 def _input_ids(match: ScheduleMatch) -> tuple[StageItemInputId, ...]:
@@ -138,7 +161,10 @@ def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext
 
 
 def _planning_horizon_minutes(
-    contexts: list[_MatchContext], tournament: Tournament, movable_contexts: list[_MatchContext]
+    contexts: list[_MatchContext],
+    tournament: Tournament,
+    movable_contexts: list[_MatchContext],
+    pinned_ids: frozenset[MatchId],
 ) -> int:
     movable_minutes = sum(
         context.match.duration_minutes + tournament.margin_minutes for context in movable_contexts
@@ -152,7 +178,7 @@ def _planning_horizon_minutes(
                 + tournament.margin_minutes,
             )
             for context in contexts
-            if _is_pinned(context)
+            if context.match.id in pinned_ids
         ),
         default=0,
     )
@@ -164,11 +190,11 @@ def _planning_horizon_minutes(
 
 
 def _pinned_matches_by_court(
-    contexts: list[_MatchContext], tournament: Tournament
+    contexts: list[_MatchContext], tournament: Tournament, pinned_ids: frozenset[MatchId]
 ) -> dict[CourtId, list[_PinnedMatch]]:
     pinned_by_court: dict[CourtId, list[_PinnedMatch]] = defaultdict(list)
     for context in contexts:
-        if not _is_pinned(context):
+        if context.match.id not in pinned_ids:
             continue
         start_minutes = _minute_offset(tournament, assert_some(context.match.start_time))
         pinned_by_court[assert_some(context.match.court_id)].append(
@@ -182,11 +208,11 @@ def _pinned_matches_by_court(
 
 
 def _pinned_matches_by_input(
-    contexts: list[_MatchContext], tournament: Tournament
+    contexts: list[_MatchContext], tournament: Tournament, pinned_ids: frozenset[MatchId]
 ) -> dict[StageItemInputId, list[_PinnedMatch]]:
     pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]] = defaultdict(list)
     for context in contexts:
-        if not _is_pinned(context):
+        if context.match.id not in pinned_ids:
             continue
         start_minutes = _minute_offset(tournament, assert_some(context.match.start_time))
         pinned = _PinnedMatch(
@@ -411,10 +437,11 @@ def _add_precedence_constraints(
     starts: dict[MatchId, Any],
     ends: dict[MatchId, Any],
     default_break_minutes: int,
+    pinned_ids: frozenset[MatchId],
 ) -> None:
     for feeder, successor in _precedence_pairs(contexts):
-        feeder_pinned = _is_pinned(feeder)
-        successor_pinned = _is_pinned(successor)
+        feeder_pinned = feeder.match.id in pinned_ids
+        successor_pinned = successor.match.id in pinned_ids
         if feeder_pinned and successor_pinned:
             continue
 
@@ -590,21 +617,25 @@ def build_schedule_plan(
     stages: list[StageWithStageItems],
     courts: list[Court],
     tournament: Tournament,
+    reoptimize: bool = False,
 ) -> list[ScheduleOperation]:
     """
-    Pure function: place every unscheduled match without introducing court, team, or
-    dependency conflicts. Already scheduled matches are pinned at their current court/time.
+    Pure function: place movable matches without introducing court, team, or dependency
+    conflicts. With ``reoptimize`` false every scheduled match is pinned and only matches
+    without a slot are placed; with ``reoptimize`` true only in-progress and completed
+    matches are pinned, so every not-started match is re-flowed around them.
     """
     if not stages or not courts:
         return []
 
     contexts = _get_match_contexts(stages)
-    movable_contexts = [context for context in contexts if not _is_pinned(context)]
+    pinned_ids = _pinned_match_ids(contexts, reoptimize)
+    movable_contexts = [context for context in contexts if context.match.id not in pinned_ids]
     if not movable_contexts:
         return []
 
-    pinned_contexts = [context for context in contexts if _is_pinned(context)]
-    horizon = _planning_horizon_minutes(contexts, tournament, movable_contexts)
+    pinned_contexts = [context for context in contexts if context.match.id in pinned_ids]
+    horizon = _planning_horizon_minutes(contexts, tournament, movable_contexts, pinned_ids)
 
     model = cp_model.CpModel()
     starts, ends, court_choices, court_intervals, input_intervals = _add_movable_match_variables(
@@ -621,7 +652,7 @@ def build_schedule_plan(
         starts,
         ends,
         court_choices,
-        _pinned_matches_by_court(contexts, tournament),
+        _pinned_matches_by_court(contexts, tournament, pinned_ids),
         tournament.margin_minutes,
     )
     _add_movable_vs_pinned_input_constraints(
@@ -629,7 +660,7 @@ def build_schedule_plan(
         movable_contexts,
         starts,
         ends,
-        _pinned_matches_by_input(contexts, tournament),
+        _pinned_matches_by_input(contexts, tournament, pinned_ids),
     )
     _add_precedence_constraints(
         model,
@@ -638,6 +669,7 @@ def build_schedule_plan(
         starts,
         ends,
         tournament.margin_minutes,
+        pinned_ids,
     )
 
     makespan = model.NewIntVar(
@@ -662,8 +694,16 @@ def build_schedule_plan(
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
-    solver.parameters.random_seed = SOLVER_RANDOM_SEED
-    solver.parameters.num_search_workers = 1
+    if currently_testing():
+        # Pin the seed only under tests, for reproducible runs. In production a fixed seed
+        # would bake the same pseudo-random tie-breaking into every tournament's schedule.
+        solver.parameters.random_seed = SOLVER_RANDOM_SEED
+    # Use CP-SAT's parallel portfolio search. With a single worker the solver explores far
+    # too little within the few-second wall limit on realistic fixtures and returns a poor
+    # feasible solution (matches crammed onto one court, others left idle); the makespan
+    # objective never gets a chance to matter. Multiple workers find a near-optimal layout
+    # in the same wall time. (Auto/0 segfaults with this ortools build, so pin a count.)
+    solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
     status_code = solver.Solve(model)
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         # Never fail the request: the action must always succeed. Leave the unscheduled
@@ -686,19 +726,32 @@ def build_schedule_plan(
     )
 
 
-async def schedule_all_unscheduled_matches(
-    tournament_id: TournamentId, stages: list[StageWithStageItems]
+async def _apply_schedule_plan(
+    tournament_id: TournamentId, stages: list[StageWithStageItems], *, reoptimize: bool
 ) -> None:
     tournament = await sql_get_tournament(tournament_id)
     courts = await get_all_courts_in_tournament(tournament_id)
 
-    for op in build_schedule_plan(stages, courts, tournament):
+    for op in build_schedule_plan(stages, courts, tournament, reoptimize=reoptimize):
         await sql_reschedule_match_and_determine_duration(
             op.court_id,
             op.start_time,
             op.match,
             tournament,
         )
+
+
+async def schedule_all_unscheduled_matches(
+    tournament_id: TournamentId, stages: list[StageWithStageItems]
+) -> None:
+    await _apply_schedule_plan(tournament_id, stages, reoptimize=False)
+
+
+async def reoptimize_all_matches(
+    tournament_id: TournamentId, stages: list[StageWithStageItems]
+) -> None:
+    """Re-flow every not-started match, keeping in-progress and completed matches fixed."""
+    await _apply_schedule_plan(tournament_id, stages, reoptimize=True)
 
 
 class MatchPosition(NamedTuple):
