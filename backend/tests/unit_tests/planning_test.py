@@ -7,12 +7,14 @@ from heliclockter import datetime_utc
 from bracket.logic.planning import matches as planning_matches
 from bracket.logic.planning.matches import (
     MatchPosition,
+    ScheduleOperation,
     build_schedule_plan,
     reorder_all_matches,
 )
 from bracket.models.db.court import Court
 from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageType
+from bracket.models.db.stage_item_inputs import StageItemInputTentative
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
 from bracket.utils.dummy_records import DUMMY_MOCK_TIME, DUMMY_TOURNAMENT
@@ -23,6 +25,7 @@ from bracket.utils.id_types import (
     RoundId,
     StageId,
     StageItemId,
+    StageItemInputId,
     TournamentId,
 )
 
@@ -112,6 +115,51 @@ def _tournament() -> Tournament:
     return Tournament(**DUMMY_TOURNAMENT.model_dump(), id=TournamentId(-1))
 
 
+def _end_time(op: ScheduleOperation) -> datetime_utc:
+    return op.start_time + timedelta(minutes=op.match.duration_minutes)
+
+
+def _assert_match_ids_scheduled(
+    ops: list[ScheduleOperation], matches: list[MatchWithDetails]
+) -> None:
+    assert {op.match.id for op in ops} == {match.id for match in matches}
+
+
+def _assert_starts_on_whole_minute(ops: list[ScheduleOperation]) -> None:
+    for op in ops:
+        offset = op.start_time - T0
+        assert offset.total_seconds() >= 0
+        assert offset.total_seconds() % 60 == 0
+
+
+def _assert_default_break_between_court_matches(ops: list[ScheduleOperation]) -> None:
+    ops_by_court: dict[CourtId, list[ScheduleOperation]] = defaultdict(list)
+    for op in ops:
+        ops_by_court[op.court_id].append(op)
+
+    for court_ops in ops_by_court.values():
+        scheduled = sorted(court_ops, key=lambda op: (op.start_time, op.match.id))
+        for previous, op in zip(scheduled, scheduled[1:], strict=False):
+            assert op.start_time >= _end_time(previous) + timedelta(minutes=MARGIN)
+
+
+def _assert_no_input_overlap(ops: list[ScheduleOperation]) -> None:
+    for index, first in enumerate(ops):
+        first_input_ids = {first.match.stage_item_input1_id, first.match.stage_item_input2_id}
+        first_input_ids.discard(None)
+        if not first_input_ids:
+            continue
+        for second in ops[index + 1 :]:
+            second_input_ids = {
+                second.match.stage_item_input1_id,
+                second.match.stage_item_input2_id,
+            }
+            second_input_ids.discard(None)
+            if not first_input_ids.intersection(second_input_ids):
+                continue
+            assert first.start_time >= _end_time(second) or second.start_time >= _end_time(first)
+
+
 # ── Tracer bullet ────────────────────────────────────────────────────────────
 
 
@@ -129,30 +177,39 @@ def test_single_level_single_stage_one_court() -> None:
     assert ops[1].position == 1
 
 
+def test_schedule_avoids_team_overlap_across_courts() -> None:
+    """Matches sharing a stage-item input never overlap, even when another court is free."""
+    m1 = _match(1).model_copy(update={"stage_item_input1_id": 1, "stage_item_input2_id": 2})
+    m2 = _match(2).model_copy(update={"stage_item_input1_id": 3, "stage_item_input2_id": 4})
+    m3 = _match(3).model_copy(update={"stage_item_input1_id": 1, "stage_item_input2_id": 5})
+    stages = [_stage(1, [[m1, m2, m3]])]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [m1, m2, m3])
+    _assert_no_input_overlap(ops)
+    _assert_default_break_between_court_matches(ops)
+
+
 # ── Cross-stage-item interleaving on one court ───────────────────────────────
 
 
-def test_one_court_two_equal_sis_alternate() -> None:
-    """1 court, 2 stage items × 2 matches → matches alternate by stage item."""
-    a1, a2 = _match(1), _match(2)  # SI "Group 0"
-    b1, b2 = _match(3), _match(4)  # SI "Group 1"
+def test_one_court_two_equal_sis_are_scheduled_with_default_breaks() -> None:
+    """1 court, 2 stage items × 2 matches → all matches are placed on playable times."""
+    a1, a2 = _match(1), _match(2)
+    b1, b2 = _match(3), _match(4)
     stages = [_stage(1, [[a1, a2], [b1, b2]])]
+
     ops = build_schedule_plan(stages, [_court(1)], _tournament())
 
-    assert len(ops) == 4
+    _assert_match_ids_scheduled(ops, [a1, a2, b1, b2])
     assert all(op.court_id == CourtId(1) for op in ops)
-    ids_by_position = [op.match.id for op in sorted(ops, key=lambda o: o.position)]
-    assert ids_by_position == [a1.id, b1.id, a2.id, b2.id], (
-        f"Expected alternating SI pattern A,B,A,B but got {ids_by_position}"
-    )
+    _assert_starts_on_whole_minute(ops)
+    _assert_default_break_between_court_matches(ops)
 
 
-def test_two_courts_two_levels_two_sis_each_no_level_waits() -> None:
-    """
-    The original bug: 2 courts, 2 levels × 2 stage items × 2 matches.
-    Before the fix, C1 ran all of Level A's SIs before any of Level B's.
-    Now both levels must start at T0, and each court should interleave levels.
-    """
+def test_two_courts_two_levels_minimizes_makespan_without_court_conflicts() -> None:
+    """Matches from multiple levels share courts while keeping the shortest possible finish."""
     level_a = LevelId(1)
     level_b = LevelId(2)
     a1 = [_match(10), _match(11)]
@@ -163,109 +220,56 @@ def test_two_courts_two_levels_two_sis_each_no_level_waits() -> None:
         _stage(1, [a1, a2], level_id=level_a),
         _stage(2, [b1, b2], level_id=level_b),
     ]
+
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 8
-
-    level_a_ids = {m.id for m in a1 + a2}
-    level_b_ids = {m.id for m in b1 + b2}
-
-    # Both levels must have at least one match scheduled at T0
-    levels_at_t0 = set()
-    for op in ops:
-        if op.start_time == T0:
-            if op.match.id in level_a_ids:
-                levels_at_t0.add(level_a)
-            elif op.match.id in level_b_ids:
-                levels_at_t0.add(level_b)
-    assert levels_at_t0 == {level_a, level_b}, f"Both levels must start at T0, got {levels_at_t0}"
-
-    # Each court gets one SI from each level and alternates them.
-    for court_id in (CourtId(1), CourtId(2)):
-        court_seq = [
-            op.match.id for op in sorted(ops, key=lambda o: o.position) if op.court_id == court_id
-        ]
-        level_seq = [
-            level_a if mid in level_a_ids else level_b if mid in level_b_ids else None
-            for mid in court_seq
-        ]
-        assert level_seq.count(level_a) == 2
-        assert level_seq.count(level_b) == 2
-        assert level_seq in (
-            [level_a, level_b, level_a, level_b],
-            [level_b, level_a, level_b, level_a],
-        )
+    _assert_match_ids_scheduled(ops, a1 + a2 + b1 + b2)
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 3 * SLOT)
 
 
-def test_two_courts_two_equal_sis_stay_on_separate_courts() -> None:
-    """2 courts, 2 equal SIs → each SI stays on its own court (no within-court interleave)."""
+def test_two_courts_two_equal_sis_finish_in_three_match_slots() -> None:
+    """2 courts, 6 independent matches → the makespan objective uses both courts."""
     a_matches = [_match(10), _match(11), _match(12)]
     b_matches = [_match(20), _match(21), _match(22)]
     stages = [_stage(1, [a_matches, b_matches])]
+
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 6
-    a_ids = {m.id for m in a_matches}
-    b_ids = {m.id for m in b_matches}
-
-    by_court: dict[CourtId, set[MatchId]] = defaultdict(set)
-    for op in ops:
-        by_court[op.court_id].add(op.match.id)
-
-    # Each court must contain only one SI's matches
-    courts_with_a = [c for c, ids in by_court.items() if ids & a_ids]
-    courts_with_b = [c for c, ids in by_court.items() if ids & b_ids]
-    assert len(courts_with_a) == 1, f"SI A split across courts: {courts_with_a}"
-    assert len(courts_with_b) == 1, f"SI B split across courts: {courts_with_b}"
-    assert courts_with_a != courts_with_b, "Both SIs on the same court"
+    _assert_match_ids_scheduled(ops, a_matches + b_matches)
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 2 * SLOT)
 
 
-def test_one_court_unequal_sis_interleave_smoothly() -> None:
-    """1 court, SI sizes [4, 2] → smoothly interleaved, no 3 consecutive larger-SI matches."""
-    a_matches = [_match(10 + i) for i in range(4)]  # SI "Group 0", size 4
-    b_matches = [_match(20 + i) for i in range(2)]  # SI "Group 1", size 2
+def test_one_court_schedules_all_matches_at_shortest_possible_finish() -> None:
+    """With 1 court, 6 independent matches occupy 6 separated slots."""
+    a_matches = [_match(10 + i) for i in range(4)]
+    b_matches = [_match(20 + i) for i in range(2)]
     stages = [_stage(1, [a_matches, b_matches])]
+
     ops = build_schedule_plan(stages, [_court(1)], _tournament())
 
-    assert len(ops) == 6
-    a_ids = {m.id for m in a_matches}
-    b_ids = {m.id for m in b_matches}
-    sequence = [op.match.id for op in sorted(ops, key=lambda o: o.position)]
-
-    # No 3 consecutive matches from the larger SI (smooth distribution)
-    for i in range(len(sequence) - 2):
-        from_a = sum(1 for mid in sequence[i : i + 3] if mid in a_ids)
-        assert from_a < 3, f"3 consecutive A matches at index {i}: {sequence}"
-
-    # B matches not bunched — at least one in first half, one in second half
-    b_positions = [i for i, mid in enumerate(sequence) if mid in b_ids]
-    assert any(p < 3 for p in b_positions), f"No B in first half: {b_positions}"
-    assert any(p >= 3 for p in b_positions), f"No B in second half: {b_positions}"
+    _assert_match_ids_scheduled(ops, a_matches + b_matches)
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 5 * SLOT)
 
 
-def test_two_courts_imbalanced_sis_split_to_tight_loads() -> None:
-    """2 courts, SI sizes [8, 2, 2] -> smart split balances court loads within one match."""
+def test_two_courts_imbalanced_sis_still_minimize_makespan() -> None:
+    """2 courts, 12 independent matches finish in 6 slots regardless of group sizes."""
     large = [_match(10 + i) for i in range(8)]
     small_a = [_match(20 + i) for i in range(2)]
     small_b = [_match(30 + i) for i in range(2)]
     stages = [_stage(1, [large, small_a, small_b])]
+
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 12
-    by_court: dict[CourtId, int] = defaultdict(int)
-    large_courts: set[CourtId] = set()
-    large_ids = {match.id for match in large}
-    for op in ops:
-        by_court[op.court_id] += 1
-        if op.match.id in large_ids:
-            large_courts.add(op.court_id)
-
-    assert max(by_court.values()) - min(by_court.values()) <= 1
-    assert large_courts == {CourtId(1), CourtId(2)}
+    _assert_match_ids_scheduled(ops, large + small_a + small_b)
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 5 * SLOT)
 
 
-def test_two_courts_multi_level_imbalanced_sis_split_to_tight_loads() -> None:
-    """Smart split still applies when active levels have uneven current-stage SI sizes."""
+def test_two_courts_multi_level_imbalanced_sis_still_minimize_makespan() -> None:
+    """The makespan objective schedules multiple levels together on shared courts."""
     level_a = LevelId(1)
     level_b = LevelId(2)
     large = [_match(10 + i) for i in range(8)]
@@ -275,62 +279,63 @@ def test_two_courts_multi_level_imbalanced_sis_split_to_tight_loads() -> None:
         _stage(1, [large], level_id=level_a),
         _stage(2, [small_a, small_b], level_id=level_b),
     ]
+
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 12
-    by_court: dict[CourtId, int] = defaultdict(int)
-    large_courts: set[CourtId] = set()
-    large_ids = {match.id for match in large}
-    for op in ops:
-        by_court[op.court_id] += 1
-        if op.match.id in large_ids:
-            large_courts.add(op.court_id)
-
-    assert max(by_court.values()) - min(by_court.values()) <= 1
-    assert large_courts == {CourtId(1), CourtId(2)}
+    _assert_match_ids_scheduled(ops, large + small_a + small_b)
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 5 * SLOT)
 
 
-def test_round_order_preserved_within_interleaved_stage_item() -> None:
-    """An SI's round 1 matches stay before its round 2 matches while interleaving."""
-    a_r1 = [_match(10), _match(11)]
-    a_r2 = [_match(12), _match(13)]
-    b_matches = [_match(20 + i) for i in range(4)]
-    stages = [_stage_with_rounds(1, [[a_r1, a_r2], [b_matches]])]
-    ops = build_schedule_plan(stages, [_court(1)], _tournament())
+def test_winner_of_match_starts_after_feeders_plus_default_break() -> None:
+    """Elimination successors wait for both winner-of feeder matches."""
+    semi1 = _match(10)
+    semi2 = _match(11)
+    final = _match(12).model_copy(
+        update={
+            "stage_item_input1_winner_from_match_id": semi1.id,
+            "stage_item_input2_winner_from_match_id": semi2.id,
+        }
+    )
+    stages = [_stage_with_rounds(1, [[[semi1, semi2], [final]]])]
 
-    positions = {op.match.id: op.position for op in ops}
-    latest_a_r1 = max(positions[match.id] for match in a_r1)
-    earliest_a_r2 = min(positions[match.id] for match in a_r2)
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert latest_a_r1 < earliest_a_r2
+    by_id = {op.match.id: op for op in ops}
+    final_start = by_id[final.id].start_time
+    assert final_start >= _end_time(by_id[semi1.id]) + timedelta(minutes=MARGIN)
+    assert final_start >= _end_time(by_id[semi2.id]) + timedelta(minutes=MARGIN)
 
 
 # ── Single-level stage boundaries ────────────────────────────────────────────
 
 
-def test_single_level_two_stages_stage_boundary_respected() -> None:
-    """Stage 2 starts only after all Stage 1 matches have finished across all courts."""
-    m1, m2, m3, m4 = _match(1), _match(2), _match(3), _match(4)
-    # Stage 1: 1 item with 2 matches; after rebalancing → 1 per court
-    # Stage 2: 1 item with 2 matches
+def test_cross_stage_input_waits_for_source_stage_item_plus_default_break() -> None:
+    """A match consuming a previous stage-item result waits for that source to finish."""
+    source1, source2 = _match(1), _match(2)
+    source_stage_item_id = StageItemId(100)
+    target_input = StageItemInputTentative(
+        id=StageItemInputId(1000),
+        slot=1,
+        tournament_id=TournamentId(-1),
+        stage_item_id=StageItemId(200),
+        winner_from_stage_item_id=source_stage_item_id,
+        winner_position=1,
+    )
+    target = _match(3).model_copy(
+        update={"stage_item_input1_id": target_input.id, "stage_item_input1": target_input}
+    )
+    independent = _match(4)
     stages = [
-        _stage(1, [[m1, m2]]),  # level_id=None
-        _stage(2, [[m3, m4]]),
+        _stage(1, [[source1, source2]]),
+        _stage(2, [[target, independent]]),
     ]
+
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 4
-
-    stage1_match_ids = {m1.id, m2.id}
-    stage2_match_ids = {m3.id, m4.id}
-
-    s1_end = max(
-        op.start_time + timedelta(minutes=SLOT) for op in ops if op.match.id in stage1_match_ids
-    )
-    s2_starts = [op.start_time for op in ops if op.match.id in stage2_match_ids]
-
-    for start in s2_starts:
-        assert start >= s1_end, "Stage 2 must not start before Stage 1 fully ends"
+    source_end = max(_end_time(op) for op in ops if op.match.id in {source1.id, source2.id})
+    target_start = next(op.start_time for op in ops if op.match.id == target.id)
+    assert target_start >= source_end + timedelta(minutes=MARGIN)
 
 
 def test_single_level_no_idle_court_gap_between_stages() -> None:
@@ -363,53 +368,29 @@ def test_two_levels_single_stage_all_matches_scheduled() -> None:
     assert m2.id in scheduled_ids
 
 
-def test_level_a_stage2_starts_before_level_b_stage1_finishes() -> None:
-    """
-    Level A has a short Stage 1 (1 quick match) and a Stage 2.
-    Level B has a long Stage 1 (many matches).
-    Level A's Stage 2 must be able to start on a free court before Level B's Stage 1 finishes,
-    demonstrating per-level independence of stage boundaries.
-    """
+def test_independent_later_stage_can_start_before_unrelated_level_finishes() -> None:
+    """Only explicit feeder dependencies block a match; unrelated levels do not."""
     level_a = LevelId(1)
     level_b = LevelId(2)
-    # Level A: Stage 1 = 1 match, Stage 2 = 1 match
     a_s1 = _match(1)
     a_s2 = _match(2)
-    # Level B: Stage 1 = 4 matches (will occupy court 2 for 4 slots)
     b_s1 = [_match(10 + i) for i in range(4)]
 
     stages = [
-        _stage(1, [[a_s1]], level_id=level_a),  # Level A Stage 1
-        _stage(2, [[a_s2]], level_id=level_a),  # Level A Stage 2
-        _stage(3, [b_s1], level_id=level_b),  # Level B Stage 1
+        _stage(1, [[a_s1]], level_id=level_a),
+        _stage(2, [[a_s2]], level_id=level_a),
+        _stage(3, [b_s1], level_id=level_b),
     ]
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 6
-
-    a_s1_end = next(op.start_time + timedelta(minutes=SLOT) for op in ops if op.match.id == a_s1.id)
+    _assert_match_ids_scheduled(ops, [a_s1, a_s2, *b_s1])
     a_s2_start = next(op.start_time for op in ops if op.match.id == a_s2.id)
-    b_s1_end = max(
-        op.start_time + timedelta(minutes=SLOT) for op in ops if op.match.id in {m.id for m in b_s1}
-    )
-
-    # Level A boundary: Stage 2 must start after Stage 1
-    assert a_s2_start >= a_s1_end, "Level A Stage 2 must follow Level A Stage 1"
-
-    # Per-level independence: Level A Stage 2 can start before Level B Stage 1 finishes
-    assert a_s2_start < b_s1_end, (
-        "Level A Stage 2 should start before Level B Stage 1 finishes "
-        "(different levels don't block each other)"
-    )
+    b_s1_end = max(_end_time(op) for op in ops if op.match.id in {m.id for m in b_s1})
+    assert a_s2_start < b_s1_end
 
 
-def test_level_b_fills_courts_while_level_a_is_between_stages() -> None:
-    """
-    Level A: Stage 1 (1 match on C1), Stage 2 (1 match).
-    Level B: Stage 1 (4 matches).
-    After Level A Stage 1 finishes, courts are busy with Level B matches.
-    Level A Stage 2 runs when courts are available — courts aren't idle during the gap.
-    """
+def test_optimizer_uses_shared_courts_without_idle_gaps_in_simple_case() -> None:
+    """With 6 independent matches and 2 courts, the minimized schedule has 3 slots."""
     level_a = LevelId(1)
     level_b = LevelId(2)
     a_s1 = _match(1)
@@ -423,21 +404,9 @@ def test_level_b_fills_courts_while_level_a_is_between_stages() -> None:
     ]
     ops = build_schedule_plan(stages, [_court(1), _court(2)], _tournament())
 
-    assert len(ops) == 6
-
-    # Every court's timeline should be contiguous — no court is idle while any match is waiting
-    court_times: dict[CourtId, list[tuple[datetime_utc, datetime_utc]]] = defaultdict(list)
-    for op in ops:
-        court_times[op.court_id].append((op.start_time, op.start_time + timedelta(minutes=SLOT)))
-
-    for court_id, slots in court_times.items():
-        slots.sort()
-        for i in range(1, len(slots)):
-            # No gap between consecutive matches on the same court
-            assert slots[i][0] == slots[i - 1][1], (
-                f"Court {court_id} has an idle gap between matches: "
-                f"{slots[i - 1][1]} → {slots[i][0]}"
-            )
+    _assert_match_ids_scheduled(ops, [a_s1, a_s2, *b_matches])
+    _assert_default_break_between_court_matches(ops)
+    assert max(_end_time(op) for op in ops) == T0 + timedelta(minutes=DURATION + 2 * SLOT)
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────
@@ -472,6 +441,35 @@ def test_already_scheduled_matches_are_skipped() -> None:
 
     assert len(ops) == 1
     assert ops[0].match.id == unscheduled.id
+
+
+def test_new_matches_respect_pinned_court_slot_and_default_break() -> None:
+    """Pinned matches keep their slot; unscheduled matches are placed around them."""
+    scheduled = _match(99).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
+    unscheduled = _match(1)
+    stages = [_stage(1, [[scheduled, unscheduled]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament())
+
+    assert len(ops) == 1
+    assert ops[0].match.id == unscheduled.id
+    assert ops[0].court_id == scheduled.court_id
+    assert ops[0].start_time >= scheduled.end_time + timedelta(minutes=MARGIN)
+
+
+def test_conflicting_pinned_matches_stay_pinned_while_new_match_avoids_them() -> None:
+    """Relax-around-pins drops pinned-vs-pinned conflicts but avoids adding new ones."""
+    pinned1 = _match(1).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
+    pinned2 = _match(2).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
+    unscheduled = _match(3)
+    stages = [_stage(1, [[pinned1, pinned2, unscheduled]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament())
+
+    assert len(ops) == 1
+    assert ops[0].match.id == unscheduled.id
+    assert ops[0].start_time >= pinned1.end_time + timedelta(minutes=MARGIN)
+    assert ops[0].start_time >= pinned2.end_time + timedelta(minutes=MARGIN)
 
 
 # ── reorder_all_matches ──────────────────────────────────────────────────────

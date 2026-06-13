@@ -1,12 +1,16 @@
+from datetime import timedelta
+
 import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
+from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
 from bracket.models.db.util import StageWithStageItems
+from bracket.sql.matches import sql_reschedule_match_and_determine_duration
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
@@ -21,6 +25,7 @@ from bracket.utils.dummy_records import (
     DUMMY_TEAM2,
 )
 from bracket.utils.http import HTTPMethod
+from bracket.utils.id_types import MatchId
 from tests.integration_tests.api.shared import (
     SUCCESS_RESPONSE,
     send_tournament_request,
@@ -127,15 +132,48 @@ async def test_schedule_all_matches(
         assert len(round_.matches) == 2
 
 
+ScheduledMatch = MatchWithDetails | MatchWithDetailsDefinitive
+
+
+def _all_matches(stages: list[StageWithStageItems]) -> list[ScheduledMatch]:
+    return [
+        match
+        for stage in stages
+        for stage_item in stage.stage_items
+        for round_ in stage_item.rounds
+        for match in round_.matches
+    ]
+
+
+def _scheduled_matches(stages: list[StageWithStageItems]) -> list[ScheduledMatch]:
+    return [
+        match
+        for match in _all_matches(stages)
+        if match.court_id is not None and match.start_time is not None
+    ]
+
+
 def _count_matches_per_court(stages: list[StageWithStageItems]) -> dict[object, int]:
     counts: dict[object, int] = {}
-    for stage in stages:
-        for stage_item in stage.stage_items:
-            for round_ in stage_item.rounds:
-                for match in round_.matches:
-                    if match.court_id is not None:
-                        counts[match.court_id] = counts.get(match.court_id, 0) + 1
+    for match in _scheduled_matches(stages):
+        counts[match.court_id] = counts.get(match.court_id, 0) + 1
     return counts
+
+
+def _assert_no_new_match_overlaps_pins(
+    stages: list[StageWithStageItems], pinned_match_ids: set[MatchId], default_break_minutes: int
+) -> None:
+    scheduled = _scheduled_matches(stages)
+    pinned = [match for match in scheduled if match.id in pinned_match_ids]
+    new_matches = [match for match in scheduled if match.id not in pinned_match_ids]
+    for new_match in new_matches:
+        assert new_match.start_time is not None
+        for pinned_match in pinned:
+            assert pinned_match.start_time is not None
+            if new_match.court_id == pinned_match.court_id:
+                assert new_match.start_time >= pinned_match.end_time + timedelta(
+                    minutes=default_break_minutes
+                )
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -245,11 +283,67 @@ async def test_schedule_does_not_move_already_scheduled_matches(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_stage2_matches_start_after_all_stage1_matches_finish(
+async def test_schedule_succeeds_with_conflicting_pinned_matches(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Stage 1 has 7 matches (C1=4, C2=3 after rebalancing); stage 2 has matches on both courts.
-    The lighter court (C2) must still wait for the heavier court (C1) to finish before stage 2."""
+    """Pre-existing pinned conflicts stay flagged; new placements avoid those slots."""
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})) as court,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tid})) as stage,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t1,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t3,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t4,
+    ):
+        si = await sql_create_stage_item_with_inputs(
+            tid,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Group A",
+                team_count=4,
+                type=DUMMY_STAGE_ITEM1.type,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(si, tid)
+        stages_before = await get_full_tournament_details(tid)
+        pinned1, pinned2 = _all_matches(stages_before)[:2]
+        await sql_reschedule_match_and_determine_duration(
+            court.id, auth_context.tournament.start_time, pinned1, auth_context.tournament
+        )
+        await sql_reschedule_match_and_determine_duration(
+            court.id, auth_context.tournament.start_time, pinned2, auth_context.tournament
+        )
+        pinned_match_ids = {pinned1.id, pinned2.id}
+
+        response = await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
+        stages_after = await get_full_tournament_details(tid)
+
+        await sql_delete_stage_item_with_foreign_keys(si.id)
+
+    assert response == SUCCESS_RESPONSE
+    matches_after = {match.id: match for match in _scheduled_matches(stages_after)}
+    assert matches_after[pinned1.id].court_id == court.id
+    assert matches_after[pinned1.id].start_time == auth_context.tournament.start_time
+    assert matches_after[pinned2.id].court_id == court.id
+    assert matches_after[pinned2.id].start_time == auth_context.tournament.start_time
+    assert any(matches_after[match_id].short_break_conflict for match_id in pinned_match_ids)
+    _assert_no_new_match_overlaps_pins(
+        stages_after, pinned_match_ids, auth_context.tournament.margin_minutes
+    )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_cross_stage_matches_start_after_their_source_stage_item_finishes(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """The endpoint respects tentative inputs from previous stage items plus the default break."""
     tid = auth_context.tournament.id
     async with (
         inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
@@ -290,7 +384,6 @@ async def test_stage2_matches_start_after_all_stage1_matches_finish(
                 ],
             ),
         )
-        # Stage 2: matches on both courts (one item per court via round-robin)
         si_c = await sql_create_stage_item_with_inputs(
             tid,
             StageItemWithInputsCreate(
@@ -299,8 +392,12 @@ async def test_stage2_matches_start_after_all_stage1_matches_finish(
                 team_count=2,
                 type=DUMMY_STAGE_ITEM1.type,
                 inputs=[
-                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
-                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyTentative(
+                        slot=1, winner_from_stage_item_id=si_a.id, winner_position=1
+                    ),
+                    StageItemInputCreateBodyTentative(
+                        slot=2, winner_from_stage_item_id=si_a.id, winner_position=2
+                    ),
                 ],
             ),
         )
@@ -312,8 +409,12 @@ async def test_stage2_matches_start_after_all_stage1_matches_finish(
                 team_count=2,
                 type=DUMMY_STAGE_ITEM1.type,
                 inputs=[
-                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
-                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyTentative(
+                        slot=1, winner_from_stage_item_id=si_b.id, winner_position=1
+                    ),
+                    StageItemInputCreateBodyTentative(
+                        slot=2, winner_from_stage_item_id=si_b.id, winner_position=2
+                    ),
                 ],
             ),
         )
@@ -329,26 +430,27 @@ async def test_stage2_matches_start_after_all_stage1_matches_finish(
     s1 = next(s for s in stages if s.id == stage_one.id)
     s2 = next(s for s in stages if s.id == stage_two.id)
 
-    stage1_end_times = [
-        match.end_time
+    source_end_times = {
+        stage_item.id: max(
+            match.end_time
+            for round_ in stage_item.rounds
+            for match in round_.matches
+            if match.start_time is not None
+        )
         for stage_item in s1.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
-    ]
-    stage2_start_times = [
-        match.start_time
-        for stage_item in s2.stage_items
-        for round_ in stage_item.rounds
-        for match in round_.matches
-        if match.start_time is not None
-    ]
+    }
 
-    assert stage1_end_times, "stage 1 should have scheduled matches"
-    assert stage2_start_times, "stage 2 should have scheduled matches"
-    max_stage1_end = max(stage1_end_times)
-    for start_time in stage2_start_times:
-        assert start_time >= max_stage1_end
+    for stage_item in s2.stage_items:
+        for round_ in stage_item.rounds:
+            for match in round_.matches:
+                assert match.start_time is not None
+                for input_ in (match.stage_item_input1, match.stage_item_input2):
+                    assert input_ is not None
+                    if input_.winner_from_stage_item_id is None:
+                        continue
+                    assert match.start_time >= source_end_times[
+                        input_.winner_from_stage_item_id
+                    ] + timedelta(minutes=auth_context.tournament.margin_minutes)
 
 
 @pytest.mark.asyncio(loop_scope="session")

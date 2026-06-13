@@ -18,7 +18,7 @@ ARG VITE_API_BASE_URL=/api
 RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build
 
 # Build backend image that also serves frontend (stored in `/app/frontend-dist`)
-FROM python:3.14-alpine3.22
+FROM python:3.13-alpine3.22
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
