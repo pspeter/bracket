@@ -12,7 +12,7 @@ from bracket.logic.planning.matches import (
     reorder_all_matches,
 )
 from bracket.models.db.court import Court
-from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
@@ -635,6 +635,59 @@ def test_conflicting_pinned_matches_stay_pinned_while_new_match_avoids_them() ->
     assert ops[0].match.id == unscheduled.id
     assert ops[0].start_time >= pinned1.end_time + timedelta(minutes=MARGIN)
     assert ops[0].start_time >= pinned2.end_time + timedelta(minutes=MARGIN)
+
+
+# ── Re-optimize everything (reoptimize=True) ─────────────────────────────────
+
+
+def test_reoptimize_reflows_not_started_but_not_in_progress() -> None:
+    """Reoptimize re-flows a scheduled not-started match but leaves an in-progress one pinned."""
+    in_progress = _match(1).model_copy(
+        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.IN_PROGRESS}
+    )
+    not_started = _match(2).model_copy(
+        update={"start_time": T0 + timedelta(minutes=SLOT), "court_id": CourtId(1)}
+    )
+    stages = [_stage(1, [[in_progress, not_started]])]
+
+    # Default mode: both are scheduled, so both are pinned and nothing is re-placed.
+    assert build_schedule_plan(stages, [_court(1)], _tournament()) == []
+
+    # Reoptimize mode: the not-started match becomes movable; the in-progress one stays put.
+    ops = build_schedule_plan(stages, [_court(1)], _tournament(), reoptimize=True)
+    assert {op.match.id for op in ops} == {not_started.id}
+
+
+def test_reoptimize_pins_completed_match() -> None:
+    """A completed match is held fixed too; only not-started matches are re-flowed."""
+    completed = _match(1).model_copy(
+        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.COMPLETED}
+    )
+    not_started = _match(2)
+    stages = [_stage(1, [[completed, not_started]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament(), reoptimize=True)
+
+    assert {op.match.id for op in ops} == {not_started.id}
+
+
+def test_reoptimize_flows_movable_matches_around_pinned_slot() -> None:
+    """Re-flowed not-started matches never overlap a pinned in-progress match's court slot."""
+    in_progress = _match(1).model_copy(
+        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.IN_PROGRESS}
+    )
+    # Two not-started matches sitting on top of the in-progress slot; reoptimize must move them.
+    movable_a = _match(2).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
+    movable_b = _match(3).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
+    stages = [_stage(1, [[in_progress, movable_a, movable_b]])]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament(), reoptimize=True)
+
+    assert {op.match.id for op in ops} == {movable_a.id, movable_b.id}
+    for op in ops:
+        if op.court_id == in_progress.court_id:
+            assert op.start_time >= in_progress.end_time + timedelta(minutes=MARGIN)
+    _assert_default_break_between_court_matches(ops)
 
 
 # ── reorder_all_matches ──────────────────────────────────────────────────────

@@ -2,8 +2,9 @@ from datetime import timedelta
 
 import pytest
 
+from bracket.database import database
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -539,3 +540,93 @@ async def test_schedule_single_court_handles_more_stage_items_than_courts(
     counts = _count_matches_per_court(stages)
     assert len(counts) == 1, "all matches should be on the single court"
     assert sum(counts.values()) == 3, "all 3 matches must be scheduled"
+
+
+def _assert_courts_have_no_overlaps(
+    stages: list[StageWithStageItems], default_break_minutes: int
+) -> None:
+    by_court: dict[object, list[ScheduledMatch]] = {}
+    for match in _scheduled_matches(stages):
+        by_court.setdefault(match.court_id, []).append(match)
+    for court_matches in by_court.values():
+        ordered = sorted(
+            court_matches,
+            key=lambda m: m.start_time,  # type: ignore[arg-type, return-value]
+        )
+        for previous, current in zip(ordered, ordered[1:], strict=False):
+            assert current.start_time is not None
+            assert current.start_time >= previous.end_time + timedelta(
+                minutes=default_break_minutes
+            )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_reoptimize_keeps_started_matches_fixed_and_reflows_the_rest(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Re-optimize never moves an in-progress/completed match but re-flows not-started ones."""
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tid})) as stage,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t1,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t3,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t4,
+    ):
+        si = await sql_create_stage_item_with_inputs(
+            tid,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Group A",
+                team_count=4,
+                type=DUMMY_STAGE_ITEM1.type,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(si, tid)
+
+        # Schedule everything first, then freeze the earliest match as in-progress and the
+        # next one as completed, so re-optimize has both kinds of pin to flow around.
+        await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
+        stages_before = await get_full_tournament_details(tid)
+        scheduled_before = sorted(
+            _scheduled_matches(stages_before),
+            key=lambda m: (m.start_time, m.court_id),
+        )
+        in_progress, completed = scheduled_before[0], scheduled_before[1]
+        await database.execute(
+            "UPDATE matches SET state = :state WHERE id = :match_id",
+            {"state": MatchState.IN_PROGRESS.value, "match_id": in_progress.id},
+        )
+        await database.execute(
+            "UPDATE matches SET state = :state WHERE id = :match_id",
+            {"state": MatchState.COMPLETED.value, "match_id": completed.id},
+        )
+        frozen = {
+            in_progress.id: (in_progress.court_id, in_progress.start_time),
+            completed.id: (completed.court_id, completed.start_time),
+        }
+
+        response = await send_tournament_request(
+            HTTPMethod.POST, "reoptimize_matches", auth_context
+        )
+        stages_after = await get_full_tournament_details(tid)
+
+        await sql_delete_stage_item_with_foreign_keys(si.id)
+
+    assert response == SUCCESS_RESPONSE
+    matches_after = {match.id: match for match in _scheduled_matches(stages_after)}
+    # Started matches are untouched.
+    for match_id, slot in frozen.items():
+        assert (matches_after[match_id].court_id, matches_after[match_id].start_time) == slot
+    # Every match is still scheduled — re-optimize re-flows, it does not drop matches.
+    assert set(matches_after) == {match.id for match in _all_matches(stages_after)}
+    # The re-flowed schedule is conflict-free on every court.
+    _assert_courts_have_no_overlaps(stages_after, auth_context.tournament.margin_minutes)

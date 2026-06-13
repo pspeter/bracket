@@ -10,6 +10,7 @@ from bracket.logic.planning.matches import (
     handle_match_reschedule,
     handle_match_resize_break,
     handle_match_swap,
+    reoptimize_all_matches,
     reorder_all_matches,
     schedule_all_unscheduled_matches,
     validate_match_can_be_unscheduled,
@@ -231,6 +232,20 @@ async def schedule_matches(
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await schedule_all_unscheduled_matches(tournament_id, stages)
+    await handle_conflicts(
+        await get_full_tournament_details(tournament_id), tournament.margin_minutes
+    )
+    return SuccessResponse()
+
+
+@router.post("/tournaments/{tournament_id}/reoptimize_matches", response_model=SuccessResponse)
+async def reoptimize_matches(
+    tournament_id: TournamentId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    tournament: Tournament = Depends(disallow_archived_tournament),
+) -> SuccessResponse:
+    stages = await get_full_tournament_details(tournament_id)
+    await reoptimize_all_matches(tournament_id, stages)
     await handle_conflicts(
         await get_full_tournament_details(tournament_id), tournament.margin_minutes
     )
