@@ -54,6 +54,14 @@
         );
 
         backendEnv = pythonSet.mkVirtualEnv "bracket-backend-env" workspace.deps.all;
+
+        # manylinux wheels installed by `uv` into `.venv` (numpy, ortools) link
+        # libstdc++ / libz at runtime, which aren't on the loader path in a pure
+        # nix shell. Expose them so `uv run` works for the CLI and process-compose.
+        wheelLibraryPath = lib.makeLibraryPath [
+          pkgs.stdenv.cc.cc.lib
+          pkgs.zlib
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
@@ -78,6 +86,8 @@
 
           shellHook = ''
             unset PYTHONPATH
+
+            export LD_LIBRARY_PATH="${wheelLibraryPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
             export PGDATA="$PWD/.pgdata"
             export PGHOST="$PGDATA"  # use unix socket in PGDATA dir
