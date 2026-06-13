@@ -216,6 +216,8 @@
     "save_players_button": "Guardar jugadores",
     "save_ranking_button": "Guardar Clasificación",
     "schedule_description": "Programar todas las partidas no programadas",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Programar",
     "score_of_label": "Puntaje de",
     "search_placeholder": "Buscar...",

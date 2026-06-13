@@ -216,6 +216,8 @@
     "save_players_button": "Salvar jogadores",
     "save_ranking_button": "Salvar Ranking",
     "schedule_description": "Agendar todos os jogos não agendados",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Agendamento",
     "score_of_label": "Pontuação de",
     "search_placeholder": "Pesquisar ...",

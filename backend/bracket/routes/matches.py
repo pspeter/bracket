@@ -225,10 +225,13 @@ async def create_match(
 async def schedule_matches(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
-    __: Tournament = Depends(disallow_archived_tournament),
+    tournament: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await schedule_all_unscheduled_matches(tournament_id, stages)
+    await handle_conflicts(
+        await get_full_tournament_details(tournament_id), tournament.margin_minutes
+    )
     return SuccessResponse()
 
 
@@ -237,14 +240,16 @@ async def schedule_matches(
 )
 async def unschedule_match(
     tournament_id: TournamentId,
-    __: Tournament = Depends(disallow_archived_tournament),
+    tournament: Tournament = Depends(disallow_archived_tournament),
     _: UserPublic = Depends(user_authenticated_for_tournament),
     match_row: Match = Depends(match_dependency),
 ) -> SuccessResponse:
     validate_match_can_be_unscheduled(match_row)
     await sql_unschedule_match(match_row.id)
 
-    await handle_conflicts(await get_full_tournament_details(tournament_id))
+    await handle_conflicts(
+        await get_full_tournament_details(tournament_id), tournament.margin_minutes
+    )
     return SuccessResponse()
 
 
@@ -260,7 +265,9 @@ async def reschedule_match(
 ) -> SuccessResponse:
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     await handle_match_reschedule(tournament, body, match_id)
-    await handle_conflicts(await get_full_tournament_details(tournament_id))
+    await handle_conflicts(
+        await get_full_tournament_details(tournament_id), tournament.margin_minutes
+    )
     return SuccessResponse()
 
 
@@ -274,7 +281,9 @@ async def swap_matches(
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     async with database.transaction():
         await handle_match_swap(tournament, body)
-        await handle_conflicts(await get_full_tournament_details(tournament_id))
+        await handle_conflicts(
+            await get_full_tournament_details(tournament_id), tournament.margin_minutes
+        )
     return SuccessResponse()
 
 
@@ -315,7 +324,9 @@ async def update_match_by_id(
         # The match's new footprint and the shifted start times behind it can
         # create or resolve overlaps with any court, so refresh the persisted
         # conflict flags like the reschedule/swap/unschedule endpoints do.
-        await handle_conflicts(await get_full_tournament_details(tournament_id))
+        await handle_conflicts(
+            await get_full_tournament_details(tournament_id), tournament.margin_minutes
+        )
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})

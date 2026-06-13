@@ -216,6 +216,8 @@
     "save_players_button": "保存玩家",
     "save_ranking_button": "保存排名",
     "schedule_description": "安排所有未安排的比赛",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "安排",
     "score_of_label": "得分",
     "search_placeholder": "搜索...",

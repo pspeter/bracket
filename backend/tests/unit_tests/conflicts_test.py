@@ -2,16 +2,32 @@ from datetime import timedelta
 
 import pytest
 
-from bracket.logic.planning.conflicts import get_conflicting_matches, matches_overlap
-from bracket.models.db.util import StageWithStageItems
+from bracket.logic.planning.conflicts import (
+    get_conflicting_matches,
+    get_match_conflict_flags,
+    matches_overlap,
+)
+from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
+from bracket.models.db.stage_item_inputs import StageItemInputTentative
+from bracket.models.db.util import RoundWithMatches, StageWithStageItems
 from bracket.utils.dummy_records import DUMMY_MOCK_TIME
-from bracket.utils.id_types import StageId, TournamentId
+from bracket.utils.id_types import (
+    CourtId,
+    MatchId,
+    RoundId,
+    StageId,
+    StageItemId,
+    StageItemInputId,
+    TournamentId,
+)
 from tests.integration_tests.mocks import MOCK_NOW
 from tests.unit_tests.mocks import (
+    get_2_definitive_and_2_tentative_matches_mock,
     get_2_definitive_matches_mock,
     get_one_round_with_two_definitive_matches,
     get_stage_item_inputs_mock,
     get_stage_item_mock,
+    get_two_round_with_one_tentative_match_each,
     make_simple_match,
 )
 
@@ -127,3 +143,127 @@ def test_get_conflicting_matches_back_to_back_no_conflict() -> None:
     """Back-to-back matches (end1 == start2) must not be flagged."""
     stage = _make_stage(T, T + timedelta(minutes=90))
     assert get_conflicting_matches([stage]) == ({}, {-1, -2})
+
+
+def test_get_match_conflict_flags_marks_match_before_winner_feeder() -> None:
+    """A match that starts before one of its winner-of feeder matches ends is flagged."""
+    tournament_id = TournamentId(-1)
+    stage_item_inputs = get_stage_item_inputs_mock(tournament_id)
+    feeder1, feeder2, final, consolation = get_2_definitive_and_2_tentative_matches_mock(
+        stage_item_inputs
+    )
+    final = final.model_copy(
+        update={
+            "court_id": CourtId(-3),
+            "start_time": T + timedelta(minutes=30),
+        }
+    )
+    first_round = get_one_round_with_two_definitive_matches(feeder1, feeder2)
+    final_round, _ = get_two_round_with_one_tentative_match_each(final, consolation)
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[get_stage_item_mock(stage_item_inputs, [first_round, final_round])],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=5)
+
+    assert flags[final.id].precedence_conflict is True
+    assert flags[feeder1.id].precedence_conflict is False
+    assert flags[feeder2.id].precedence_conflict is False
+
+
+def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes() -> None:
+    """A match using a previous stage item's ranking waits for that group's last match."""
+    tournament_id = TournamentId(-1)
+    source_inputs = get_stage_item_inputs_mock(tournament_id)
+    source_match1, source_match2 = get_2_definitive_matches_mock(
+        source_inputs,
+        match1_start_time=T,
+        match2_start_time=T + timedelta(minutes=10),
+        duration_minutes=10,
+    )
+    source_round = get_one_round_with_two_definitive_matches(source_match1, source_match2)
+    source_stage_item = get_stage_item_mock(source_inputs, [source_round])
+
+    target_input = StageItemInputTentative(
+        id=StageItemInputId(-10),
+        slot=1,
+        tournament_id=tournament_id,
+        stage_item_id=StageItemId(-2),
+        winner_from_stage_item_id=source_stage_item.id,
+        winner_position=1,
+    )
+    target_match = MatchWithDetailsDefinitive(
+        id=MatchId(-3),
+        stage_item_input1=target_input,
+        stage_item_input2=source_inputs[1],
+        stage_item_input1_id=target_input.id,
+        stage_item_input2_id=source_inputs[1].id,
+        created=T,
+        start_time=T + timedelta(minutes=15),
+        duration_minutes=10,
+        round_id=RoundId(-4),
+        court_id=CourtId(-3),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        state=MatchState.NOT_STARTED,
+        completed_at=None,
+    )
+    target_round = RoundWithMatches(
+        id=RoundId(-4),
+        matches=[target_match],
+        stage_item_id=StageItemId(-2),
+        created=T,
+        is_draft=False,
+        name="",
+    )
+    target_stage_item = get_stage_item_mock(source_inputs, [target_round]).model_copy(
+        update={"id": StageItemId(-2), "inputs": [target_input, source_inputs[1]]}
+    )
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[source_stage_item, target_stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=5)
+
+    assert flags[target_match.id].precedence_conflict is True
+    assert flags[source_match1.id].precedence_conflict is False
+    assert flags[source_match2.id].precedence_conflict is False
+
+
+def test_get_match_conflict_flags_marks_sub_default_break_on_later_match() -> None:
+    """A court gap shorter than the default break flags the later match only."""
+    tournament_id = TournamentId(-1)
+    stage_item_inputs = get_stage_item_inputs_mock(tournament_id)
+    match1, match2 = get_2_definitive_matches_mock(
+        stage_item_inputs,
+        match1_start_time=T,
+        match2_start_time=T + timedelta(minutes=12),
+        duration_minutes=10,
+    )
+    match2 = match2.model_copy(update={"court_id": match1.court_id})
+    round_ = get_one_round_with_two_definitive_matches(match1, match2)
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[get_stage_item_mock(stage_item_inputs, [round_])],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=5)
+
+    assert flags[match1.id].short_break_conflict is False
+    assert flags[match2.id].short_break_conflict is True

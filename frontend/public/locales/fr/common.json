@@ -216,6 +216,8 @@
     "save_players_button": "Enregistrer les joueurs",
     "save_ranking_button": "Enregistrer le barème",
     "schedule_description": "Planifier tous les matchs non programmés",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "Planifier",
     "score_of_label": "Points de",
     "search_placeholder": "Rechercher...",

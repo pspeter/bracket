@@ -216,6 +216,8 @@
     "save_players_button": "ذخیره بازیکنان",
     "save_ranking_button": "ذخیره رتبه‌بندی",
     "schedule_description": "برنامه‌ریزی بازی‌ها",
+    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "short_break_conflict_label": "Break before this match is shorter than the default",
     "schedule_title": "برنامه‌ریزی",
     "score_of_label": "امتیاز",
     "search_placeholder": "جستجو...",
