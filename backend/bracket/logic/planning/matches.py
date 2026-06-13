@@ -16,6 +16,7 @@ from bracket.models.db.match import (
     MatchSwapBody,
     MatchWithDetails,
     MatchWithDetailsDefinitive,
+    SchedulerWeights,
 )
 from bracket.models.db.stage_item_inputs import StageItemInputEmpty
 from bracket.models.db.tournament import Tournament
@@ -55,20 +56,11 @@ SOLVER_SEARCH_WORKERS = 4
 # Objective blend (PRD #73, issue #78). The schedule minimises a single weighted sum.
 # Makespan is the headline term; team rest keeps a player from going straight from one
 # match into the next; court locality keeps a group on few courts; group sync keeps the
-# stage items of a stage finishing each round at a similar time. The weights are fixed
-# constants (not user-configurable) and intentionally tunable here: every term is measured
-# in minutes (locality in court-count, scaled up to matter against minute-sized terms), so
-# the ratios below are what set the priorities. They were chosen so makespan and team rest
-# lead and locality/sync bend the schedule only where it is otherwise free; retune on a
-# realistic fixture (e.g. the dev-db seed) if the balance feels off.
-WEIGHT_MAKESPAN = 150
-WEIGHT_TEAM_REST = 13
-WEIGHT_GROUP_SYNC = 8
-WEIGHT_COURT_LOCALITY = 4
-
-# A team is considered rested once this many minutes separate the end of one of its matches
-# and the start of the next; gaps shorter than this are penalised, longer gaps are free.
-COMFORTABLE_REST_MINUTES = 30
+# stage items of a stage finishing each round at a similar time. The weights and the
+# comfortable-rest threshold default to the empirically tuned constants on SchedulerWeights
+# but are passed in per request, so an organizer can retune the balance for a tournament
+# whose default schedule feels off (e.g. on the dev-db seed) without touching code.
+DEFAULT_SCHEDULER_WEIGHTS = SchedulerWeights()
 
 
 @dataclass(frozen=True)
@@ -467,12 +459,13 @@ def _add_team_rest_penalty(
     starts: dict[MatchId, Any],
     ends: dict[MatchId, Any],
     horizon: int,
+    comfortable_rest_minutes: int,
 ) -> list[Any]:
     """Penalise how far each team's consecutive matches fall short of a comfortable rest.
 
     For every pair of a team's movable matches the gap between them (later start minus
     earlier end) is known to be non-negative because they already cannot overlap. The
-    shortfall ``max(0, COMFORTABLE_REST_MINUTES - gap)`` is summed and minimised, so the
+    shortfall ``max(0, comfortable_rest_minutes - gap)`` is summed and minimised, so the
     solver spreads a team's matches whenever doing so is cheap on the headline terms.
     """
     matches_by_input: dict[StageItemInputId, list[MatchId]] = defaultdict(list)
@@ -490,9 +483,9 @@ def _add_team_rest_penalty(
                     [starts[second_id] - ends[first_id], starts[first_id] - ends[second_id]],
                 )
                 shortfall = model.NewIntVar(
-                    0, COMFORTABLE_REST_MINUTES, f"rest_shortfall_{first_id}_{second_id}"
+                    0, comfortable_rest_minutes, f"rest_shortfall_{first_id}_{second_id}"
                 )
-                model.Add(shortfall >= COMFORTABLE_REST_MINUTES - gap)
+                model.Add(shortfall >= comfortable_rest_minutes - gap)
                 shortfalls.append(shortfall)
     return shortfalls
 
@@ -618,12 +611,14 @@ def build_schedule_plan(
     courts: list[Court],
     tournament: Tournament,
     reoptimize: bool = False,
+    weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
 ) -> list[ScheduleOperation]:
     """
     Pure function: place movable matches without introducing court, team, or dependency
     conflicts. With ``reoptimize`` false every scheduled match is pinned and only matches
     without a slot are placed; with ``reoptimize`` true only in-progress and completed
-    matches are pinned, so every not-started match is re-flowed around them.
+    matches are pinned, so every not-started match is re-flowed around them. ``weights``
+    tunes the objective blend (makespan, team rest, court locality, group sync).
     """
     if not stages or not courts:
         return []
@@ -680,16 +675,18 @@ def build_schedule_plan(
     for context in movable_contexts:
         model.Add(makespan >= ends[context.match.id])
 
-    objective = WEIGHT_MAKESPAN * makespan
-    rest_shortfalls = _add_team_rest_penalty(model, movable_contexts, starts, ends, horizon)
+    objective = weights.makespan * makespan
+    rest_shortfalls = _add_team_rest_penalty(
+        model, movable_contexts, starts, ends, horizon, weights.comfortable_rest_minutes
+    )
     if rest_shortfalls:
-        objective += WEIGHT_TEAM_REST * sum(rest_shortfalls)
+        objective += weights.team_rest * sum(rest_shortfalls)
     used_court_vars = _add_court_locality_penalty(model, movable_contexts, court_choices)
     if used_court_vars:
-        objective += WEIGHT_COURT_LOCALITY * sum(used_court_vars)
+        objective += weights.court_locality * sum(used_court_vars)
     sync_spreads = _add_group_sync_penalty(model, movable_contexts, ends, horizon)
     if sync_spreads:
-        objective += WEIGHT_GROUP_SYNC * sum(sync_spreads)
+        objective += weights.group_sync * sum(sync_spreads)
     model.Minimize(objective)
 
     solver = cp_model.CpSolver()

@@ -8,6 +8,7 @@ from bracket.logic.planning import matches as planning_matches
 from bracket.logic.planning.matches import (
     MatchPosition,
     ScheduleOperation,
+    SchedulerWeights,
     build_schedule_plan,
     reorder_all_matches,
 )
@@ -548,6 +549,52 @@ def test_each_group_stays_on_one_court_when_makespan_allows() -> None:
     _assert_default_break_between_court_matches(ops)
     assert len(_courts_used_by(ops, group_a)) == 1
     assert len(_courts_used_by(ops, group_b)) == 1
+
+
+# ── Configurable objective weights ───────────────────────────────────────────
+
+
+def test_court_locality_weight_concentrates_a_group_on_one_court() -> None:
+    """Cranking court locality (and zeroing makespan) keeps a stage item's matches on one
+    court, even though spreading them across both courts would finish sooner.
+
+    A single stage item of two non-conflicting matches parallelises across both courts under
+    the makespan-dominant default; raising the locality weight flips that to one court.
+    """
+    group = [_match(1), _match(2)]
+    stages = [_stage(1, [group])]
+    courts = [_court(1), _court(2)]
+
+    default_ops = build_schedule_plan(stages, courts, _tournament())
+    assert len(_courts_used_by(default_ops, group)) == 2
+
+    weights = SchedulerWeights(makespan=0, court_locality=1000)
+    local_ops = build_schedule_plan(stages, courts, _tournament(), weights=weights)
+    assert len(_courts_used_by(local_ops, group)) == 1
+
+
+def test_higher_comfortable_rest_spaces_a_team_further() -> None:
+    """Raising the comfortable-rest threshold (and the rest weight) pulls a team's two
+    consecutive matches further apart than the makespan-dominant default does.
+
+    Both matches share a team and sit on one court, so the default packs them a single break
+    apart; a rest-dominant blend with a larger comfortable-rest target stretches the gap.
+    """
+    m1 = _team_input(_match(1), team_id=1)
+    m2 = _team_input(_match(2), team_id=1)
+    stages = [_stage(1, [[m1, m2]])]
+    courts = [_court(1)]
+
+    def _team_gap(ops: list[ScheduleOperation]) -> timedelta:
+        by_id = {op.match.id: op for op in ops}
+        earlier, later = sorted((by_id[m1.id], by_id[m2.id]), key=lambda op: op.start_time)
+        return later.start_time - _end_time(earlier)
+
+    default_gap = _team_gap(build_schedule_plan(stages, courts, _tournament()))
+    weights = SchedulerWeights(makespan=1, team_rest=1000, comfortable_rest_minutes=60)
+    rested_gap = _team_gap(build_schedule_plan(stages, courts, _tournament(), weights=weights))
+
+    assert rested_gap > default_gap
 
 
 # ── Objective blend: group sync ──────────────────────────────────────────────

@@ -149,6 +149,24 @@ class MatchSwapBody(BaseModelORM):
     match2_id: MatchId
 
 
+class SchedulerWeights(BaseModelORM):
+    """Objective weights for the auto-scheduler's weighted-sum CP-SAT objective.
+
+    Defaults are the empirically tuned constants from PRD #73. Every term is measured in
+    minutes (court locality in court-count, scaled up so it can matter against the
+    minute-sized terms), so the ratios between these weights are what set the priorities:
+    makespan and team rest lead, locality and group sync only bend a schedule that is
+    otherwise free. ``comfortable_rest_minutes`` is the gap below which a team's consecutive
+    matches are penalised; longer gaps are free.
+    """
+
+    makespan: int = Field(default=150, ge=0)
+    team_rest: int = Field(default=13, ge=0)
+    group_sync: int = Field(default=8, ge=0)
+    court_locality: int = Field(default=4, ge=0)
+    comfortable_rest_minutes: int = Field(default=30, ge=0)
+
+
 class MatchResizeBreakBody(BaseModelORM):
     # The break sits before this match on its court: the gap between the previous
     # match's end (or the tournament start, for the first match) and this match's
