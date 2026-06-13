@@ -70,6 +70,28 @@ export function abbreviateTeamName(name: string, maxLength: number = 12): string
 }
 
 /**
+ * Shorten a stage-item name for a cramped badge: a trailing letter/number wins
+ * ("Group C" → "C", "Group 10" → "10"); otherwise initials of the words, or a
+ * truncated prefix for a single long word.
+ */
+export function abbreviateStageItem(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+  if (words.length === 0) return '';
+  const last = words[words.length - 1];
+  if (words.length > 1 && last.length <= 3) return last;
+  if (words.length > 1) {
+    return words
+      .map((word) => word[0].toUpperCase())
+      .join('')
+      .slice(0, 3);
+  }
+  return name.length <= 4 ? name : `${name.slice(0, 3)}`;
+}
+
+/**
  * Squeeze a court name into the few pixels of an overview column header:
  * trailing number if the court is numbered, otherwise initials or a prefix.
  */
@@ -86,39 +108,4 @@ export function shortCourtLabel(name: string): string {
       .join('');
   }
   return trimmed.slice(0, 2);
-}
-
-export interface ColourableLevel {
-  id: number;
-  name: string;
-  position: number;
-}
-
-/**
- * Distinct from each other and from the indigo used for selection highlights.
- */
-const LEVEL_COLOURS = [
-  'blue',
-  'red',
-  'green',
-  'orange',
-  'grape',
-  'teal',
-  'pink',
-  'cyan',
-  'violet',
-  'lime',
-  'yellow',
-];
-
-/**
- * Stable colour per level, assigned by the level's position so neighbouring
- * levels contrast. Matches without a level degrade to gray.
- */
-export function levelColour(levelId: number | null, levels: ColourableLevel[]): string {
-  if (levelId == null) return 'gray';
-  const index = [...levels]
-    .sort((a, b) => a.position - b.position)
-    .findIndex((level) => level.id === levelId);
-  return index < 0 ? 'gray' : LEVEL_COLOURS[index % LEVEL_COLOURS.length];
 }

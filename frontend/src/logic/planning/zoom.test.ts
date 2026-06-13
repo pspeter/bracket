@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ZOOM_LEVELS,
+  abbreviateStageItem,
   abbreviateTeamName,
   defaultZoomLevel,
-  levelColour,
   shortCourtLabel,
   zoomIn,
   zoomOut,
@@ -82,29 +82,21 @@ describe('shortCourtLabel', () => {
   });
 });
 
-describe('levelColour', () => {
-  const levels = [
-    { id: 7, name: 'Beginners', position: 0 },
-    { id: 3, name: 'Intermediate', position: 1 },
-    { id: 9, name: 'Pros', position: 2 },
-  ];
-
-  it('assigns distinct, stable colours by level position', () => {
-    const colours = levels.map((level) => levelColour(level.id, levels));
-    expect(new Set(colours).size).toBe(3);
-    expect(levelColour(3, levels)).toBe(levelColour(3, levels));
+describe('abbreviateStageItem', () => {
+  it('keeps a short trailing letter or number', () => {
+    expect(abbreviateStageItem('Group C')).toBe('C');
+    expect(abbreviateStageItem('Group 10')).toBe('10');
   });
 
-  it('ignores list order, keyed by position', () => {
-    const shuffled = [levels[2], levels[0], levels[1]];
-    expect(levelColour(7, shuffled)).toBe(levelColour(7, levels));
+  it('uses word initials when the trailing word is long', () => {
+    expect(abbreviateStageItem('Winners Bracket')).toBe('WB');
   });
 
-  it('degrades to gray for matches without a level', () => {
-    expect(levelColour(null, levels)).toBe('gray');
+  it('truncates a single long word', () => {
+    expect(abbreviateStageItem('Quarterfinals')).toBe('Qua');
   });
 
-  it('degrades to gray for unknown levels', () => {
-    expect(levelColour(42, levels)).toBe('gray');
+  it('leaves a single short word intact', () => {
+    expect(abbreviateStageItem('Pool')).toBe('Pool');
   });
 });
