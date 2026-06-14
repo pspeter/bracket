@@ -25,6 +25,7 @@ import { Time, formatTime } from '@components/utils/datetime';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
+import { scoreColour } from '@logic/colors';
 import { MatchWithDetails } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getCourts, getStages, getTournamentById } from '@services/adapter';
@@ -42,21 +43,14 @@ function ScheduleRow({
   matchesLookup: any;
 }) {
   const { t } = useTranslation();
-  const winColor = '#2a8f37';
-  const drawColor = '#656565';
-  const loseColor = '#af4034';
-  const team1_color =
-    data.match.stage_item_input1_score > data.match.stage_item_input2_score
-      ? winColor
-      : data.match.stage_item_input1_score === data.match.stage_item_input2_score
-        ? drawColor
-        : loseColor;
-  const team2_color =
-    data.match.stage_item_input2_score > data.match.stage_item_input1_score
-      ? winColor
-      : data.match.stage_item_input1_score === data.match.stage_item_input2_score
-        ? drawColor
-        : loseColor;
+  const team1_color = scoreColour(
+    data.match.stage_item_input1_score,
+    data.match.stage_item_input2_score
+  );
+  const team2_color = scoreColour(
+    data.match.stage_item_input2_score,
+    data.match.stage_item_input1_score
+  );
 
   return (
     <UnstyledButton style={{ width: '48rem' }}>

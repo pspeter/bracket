@@ -12,11 +12,11 @@ import { Time } from '@components/utils/datetime';
 import {
   formatMatchInput1,
   formatMatchInput2,
-  getScoreColors,
   isMatchCompletedRecently,
 } from '@components/utils/match';
 import { Translator } from '@components/utils/types';
 import { responseIsValid, setTitle } from '@components/utils/util';
+import { getScoreColors } from '@logic/colors';
 import { LevelResponse } from '@openapi';
 import { getStagesLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';

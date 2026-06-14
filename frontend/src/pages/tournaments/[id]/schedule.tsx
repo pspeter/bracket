@@ -25,7 +25,7 @@ import MatchModal from '@components/modals/match_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
-import { computeStageItemColours, levelSwatchColour } from '@logic/planning/colours';
+import { computeStageItemColours, levelSwatchColour } from '@logic/colors';
 import { computeConflictPreview } from '@logic/planning/conflict_preview';
 import { stageHighlightOptions } from '@logic/planning/highlight';
 import { computeScheduleLayout } from '@logic/planning/layout';
@@ -437,7 +437,11 @@ export default function SchedulePage() {
                 {[...levels]
                   .sort((a, b) => a.position - b.position)
                   .map((level) => (
-                    <Badge key={level.id} color={levelSwatchColour(level.id)} variant="filled">
+                    <Badge
+                      key={level.id}
+                      color={levelSwatchColour(level.id, levels)}
+                      variant="light"
+                    >
                       {level.name}
                     </Badge>
                   ))}

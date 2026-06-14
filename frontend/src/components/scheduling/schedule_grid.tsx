@@ -15,11 +15,11 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
-import { NEUTRAL_STAGE_ITEM_COLOUR, type StageItemColour } from '@logic/planning/colours';
+import { NEUTRAL_STAGE_ITEM_COLOUR, scoreColour, type StageItemColour } from '@logic/colors';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
@@ -57,21 +57,6 @@ const INSERTION_HIT_AREA_PX = 32;
  * an easy tap.
  */
 const GRID_TOP_INSET_PX = 32;
-
-/**
- * Winner / draw / loser score colours, matching the results page. Used as solid
- * chip backgrounds with white text so the score keeps strong contrast on top of
- * any stage-item tint.
- */
-const SCORE_WIN_COLOUR = '#2a8f37';
-const SCORE_DRAW_COLOUR = '#656565';
-const SCORE_LOSE_COLOUR = '#af4034';
-
-function scoreColour(own: number, other: number): string {
-  if (own > other) return SCORE_WIN_COLOUR;
-  if (own < other) return SCORE_LOSE_COLOUR;
-  return SCORE_DRAW_COLOUR;
-}
 
 /**
  * Court column width per zoom level, in container-query units of the grid's
