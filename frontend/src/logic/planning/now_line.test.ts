@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { currentTimeOffsetMinutes, nowLineScrollTop } from './now_line';
+import { currentTimeOffsetMinutes } from './now_line';
 
 describe('currentTimeOffsetMinutes', () => {
   const tournamentStartTime = '2026-06-10T09:00:00Z';
@@ -47,31 +47,5 @@ describe('currentTimeOffsetMinutes', () => {
         now: new Date('2026-06-10T11:01:00Z'),
       })
     ).toBeNull();
-  });
-});
-
-describe('nowLineScrollTop', () => {
-  it('centers the current-time line in the scroll viewport', () => {
-    expect(
-      nowLineScrollTop({
-        offsetMinutes: 45,
-        pxPerMinute: 3,
-        viewportHeightPx: 300,
-        headerHeightPx: 40,
-        gridTopInsetPx: 32,
-      })
-    ).toBe(57);
-  });
-
-  it('clamps above-the-top scroll targets to zero', () => {
-    expect(
-      nowLineScrollTop({
-        offsetMinutes: 0,
-        pxPerMinute: 3,
-        viewportHeightPx: 300,
-        headerHeightPx: 40,
-        gridTopInsetPx: 32,
-      })
-    ).toBe(0);
   });
 });

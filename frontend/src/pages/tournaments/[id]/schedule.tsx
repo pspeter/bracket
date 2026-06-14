@@ -15,7 +15,7 @@ import {
   Title,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { IconCalendarPlus, IconClock, IconWand } from '@tabler/icons-react';
+import { IconCalendarPlus, IconWand } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -95,7 +95,6 @@ export default function SchedulePage() {
   );
   const [highlightValue, setHighlightValue] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [nowScrollNonce, setNowScrollNonce] = useState(0);
   const [trayOpened, setTrayOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
   // Details modal opened from the action sheet; holds the match id (not the
@@ -386,17 +385,6 @@ export default function SchedulePage() {
                 courts={courts}
                 matchesByCourtId={matchesByCourtId}
               />
-              <Button
-                color="red"
-                size="sm"
-                variant="light"
-                style={{ marginBottom: 10 }}
-                leftSection={<IconClock size={18} />}
-                disabled={nowOffsetMinutes == null}
-                onClick={() => setNowScrollNonce((nonce) => nonce + 1)}
-              >
-                {t('jump_to_now_label', 'Now')}
-              </Button>
               {courts.length < 1 ? null : (
                 <Button
                   color="indigo"
@@ -467,7 +455,6 @@ export default function SchedulePage() {
               zoom={planner.zoom}
               focus={focus}
               nowOffsetMinutes={nowOffsetMinutes}
-              nowScrollNonce={nowScrollNonce}
               onSelectionEvent={handlePlannerEvent}
             />
             <UnscheduledSheet
