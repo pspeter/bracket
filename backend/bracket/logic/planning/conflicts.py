@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from heliclockter import datetime_utc
 
 from bracket.database import database
+from bracket.logic.planning.team_windows import PlayingWindow, get_team_playing_windows
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.util import StageWithStageItems
 from bracket.utils.id_types import CourtId, MatchId, StageItemId
@@ -14,7 +15,27 @@ def matches_overlap(match1: Match, match2: Match) -> bool:
         return False
 
     # Half-open intervals [start, end): back-to-back matches (end1 == start2) do not conflict.
-    return match1.start_time < match2.end_time and match2.start_time < match1.end_time
+    return _time_ranges_overlap(
+        match1.start_time, match1.end_time, match2.start_time, match2.end_time
+    )
+
+
+def _time_ranges_overlap(
+    start1: datetime_utc,
+    end1: datetime_utc,
+    start2: datetime_utc,
+    end2: datetime_utc,
+) -> bool:
+    return start1 < end2 and start2 < end1
+
+
+def _windows_overlap(window1: PlayingWindow, window2: PlayingWindow) -> bool:
+    return _time_ranges_overlap(
+        window1.start_time,
+        window1.end_time,
+        window2.start_time,
+        window2.end_time,
+    )
 
 
 @dataclass
@@ -38,34 +59,36 @@ def _get_all_matches(
 
 
 def _set_team_overlap_conflicts(
-    matches: list[MatchWithDetailsDefinitive | MatchWithDetails],
+    stages: list[StageWithStageItems],
     flags: dict[MatchId, MatchConflictFlags],
 ) -> None:
-    definitive_matches = [
-        match for match in matches if isinstance(match, MatchWithDetailsDefinitive)
-    ]
+    for team_windows in get_team_playing_windows(stages).values():
+        definitive_windows = [
+            (match, window)
+            for match, window in team_windows
+            if isinstance(match, MatchWithDetailsDefinitive)
+        ]
+        for i, (match1, window1) in enumerate(definitive_windows):
+            for match2, window2 in definitive_windows[i + 1 :]:
+                if match1.id == match2.id or not _windows_overlap(window1, window2):
+                    continue
+                _set_stage_item_input_conflict(match1, window1, flags)
+                _set_stage_item_input_conflict(match2, window2, flags)
 
-    for i, match1 in enumerate(definitive_matches):
-        for match2 in definitive_matches[i + 1 :]:
-            conflicting_input_ids = []
 
-            if match2.stage_item_input1_id in match1.stage_item_input_ids:
-                conflicting_input_ids.append(match2.stage_item_input1_id)
-            if match2.stage_item_input2_id in match1.stage_item_input_ids:
-                conflicting_input_ids.append(match2.stage_item_input2_id)
+def _set_stage_item_input_conflict(
+    match: MatchWithDetailsDefinitive,
+    window: PlayingWindow,
+    flags: dict[MatchId, MatchConflictFlags],
+) -> None:
+    if window.stage_item_input_id == match.stage_item_input1_id:
+        flags[match.id].stage_item_input1_conflict = True
+        return
+    if window.stage_item_input_id == match.stage_item_input2_id:
+        flags[match.id].stage_item_input2_conflict = True
+        return
 
-            if len(conflicting_input_ids) < 1 or not matches_overlap(match1, match2):
-                continue
-
-            for match in (match1, match2):
-                flags[match.id].stage_item_input1_conflict = (
-                    flags[match.id].stage_item_input1_conflict
-                    or match.stage_item_input1_id in conflicting_input_ids
-                )
-                flags[match.id].stage_item_input2_conflict = (
-                    flags[match.id].stage_item_input2_conflict
-                    or match.stage_item_input2_id in conflicting_input_ids
-                )
+    raise ValueError("Playing window input does not belong to match")
 
 
 def _set_winner_of_precedence_conflicts(
@@ -158,7 +181,7 @@ def get_match_conflict_flags(
     matches = _get_all_matches(stages)
     flags = {match.id: MatchConflictFlags() for match in matches}
 
-    _set_team_overlap_conflicts(matches, flags)
+    _set_team_overlap_conflicts(stages, flags)
     _set_winner_of_precedence_conflicts(matches, flags)
     _set_cross_stage_precedence_conflicts(stages, flags)
     _set_short_break_conflicts(matches, default_break_minutes, flags)

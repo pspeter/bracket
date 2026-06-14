@@ -7,6 +7,7 @@ from bracket.logic.planning.conflicts import (
     get_match_conflict_flags,
     matches_overlap,
 )
+from bracket.logic.planning.team_windows import get_team_playing_windows
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item_inputs import StageItemInputTentative
 from bracket.models.db.util import RoundWithMatches, StageWithStageItems
@@ -18,6 +19,7 @@ from bracket.utils.id_types import (
     StageId,
     StageItemId,
     StageItemInputId,
+    TeamId,
     TournamentId,
 )
 from tests.integration_tests.mocks import MOCK_NOW
@@ -54,6 +56,57 @@ def _make_stage(
         is_active=False,
         stage_items=[get_stage_item_mock(stage_item_inputs, [rounds])],
     )
+
+
+# ---------------------------------------------------------------------------
+# get_team_playing_windows tests
+# ---------------------------------------------------------------------------
+
+
+def test_get_team_playing_windows_maps_stage_matches_by_team_id() -> None:
+    """Scheduled definitive matches are grouped by player team, not input id."""
+    tournament_id = TournamentId(-1)
+    stage_item_inputs = get_stage_item_inputs_mock(tournament_id)
+    second_team1_input = stage_item_inputs[2].model_copy(
+        update={"id": StageItemInputId(-3), "team_id": TeamId(-1)}
+    )
+    stage_item_inputs = [
+        stage_item_inputs[0],
+        stage_item_inputs[1],
+        second_team1_input,
+        stage_item_inputs[3],
+    ]
+    match1, match2 = get_2_definitive_matches_mock(
+        stage_item_inputs,
+        match1_start_time=T,
+        match2_start_time=T + timedelta(minutes=90),
+        duration_minutes=90,
+    )
+    round_ = get_one_round_with_two_definitive_matches(match1, match2)
+    stage_item = get_stage_item_mock(stage_item_inputs, [round_]).model_copy(
+        update={"inputs": stage_item_inputs}
+    )
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+    windows = get_team_playing_windows([stage])
+
+    assert [
+        (match.id, window.stage_item_input_id, window.start_time, window.end_time)
+        for match, window in windows[TeamId(-1)]
+    ] == [
+        (match1.id, stage_item_inputs[0].id, T, T + timedelta(minutes=90)),
+        (match2.id, second_team1_input.id, T + timedelta(minutes=90), T + timedelta(minutes=180)),
+    ]
+    assert [(match.id, window.stage_item_input_id) for match, window in windows[TeamId(-2)]] == [
+        (match1.id, stage_item_inputs[1].id)
+    ]
 
 
 # ---------------------------------------------------------------------------
