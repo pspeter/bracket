@@ -6,6 +6,10 @@ import {
   levelColour,
   levelHue,
   levelSwatchColour,
+  SCORE_DRAW_COLOUR,
+  SCORE_LOSE_COLOUR,
+  SCORE_WIN_COLOUR,
+  scoreColour,
   stringToColour,
 } from './colors';
 
@@ -136,5 +140,23 @@ describe('levelSwatchColour', () => {
 describe('stringToColour', () => {
   it('is deterministic for a given key', () => {
     expect(stringToColour('team-5')).toBe(stringToColour('team-5'));
+  });
+});
+
+describe('scoreColour', () => {
+  it('maps higher / lower / equal scores to win / loss / draw', () => {
+    expect(scoreColour(2, 1)).toBe(SCORE_WIN_COLOUR);
+    expect(scoreColour(1, 2)).toBe(SCORE_LOSE_COLOUR);
+    expect(scoreColour(1, 1)).toBe(SCORE_DRAW_COLOUR);
+  });
+
+  it('uses a colourblind-safe win/loss pair, not a pure red/green one', () => {
+    // The three outcomes must be mutually distinct…
+    const colours = [SCORE_WIN_COLOUR, SCORE_LOSE_COLOUR, SCORE_DRAW_COLOUR];
+    expect(new Set(colours).size).toBe(3);
+    // …and win/loss are the Okabe-Ito bluish-green / vermillion pair, chosen to
+    // stay apart under red–green colour-vision deficiency.
+    expect(SCORE_WIN_COLOUR).toBe('#009e73');
+    expect(SCORE_LOSE_COLOUR).toBe('#d55e00');
   });
 });
