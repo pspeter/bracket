@@ -414,6 +414,46 @@ export default function SchedulePage() {
         selection: planner.selection,
       });
 
+  // Pieces of the selection pill, extracted so the mobile (stacked) and desktop
+  // (single row) layouts can compose them without duplicating the markup.
+  const matchTitle =
+    selectedEntry != null ? (
+      <Text size="sm" fw={600} truncate>
+        {formatMatchInput1(t, stageItemsLookup, matchesLookup, selectedEntry.match)} –{' '}
+        {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
+      </Text>
+    ) : null;
+  const placeHint = (
+    <Text size="xs" c="dimmed">
+      {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
+    </Text>
+  );
+  const detailsButton = (
+    <Button
+      size="compact-sm"
+      variant="light"
+      color="blue"
+      leftSection={<IconListDetails size={16} />}
+      onClick={() => {
+        if (selectedMatchId != null) setDetailsMatchId(selectedMatchId);
+      }}
+    >
+      {t('details_button')}
+    </Button>
+  );
+  const unscheduleButton =
+    activeSelection?.kind === 'match-selected' && selectedEntry?.match.state === 'NOT_STARTED' ? (
+      <Button
+        size="compact-sm"
+        variant="light"
+        color="orange"
+        leftSection={<IconCalendarOff size={16} />}
+        onClick={() => handlePlannerEvent({ type: 'unschedule' })}
+      >
+        {t('unschedule_button')}
+      </Button>
+    ) : null;
+
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
       <Box ref={pinchRef} style={{ touchAction: 'pan-x pan-y' }}>
@@ -542,6 +582,11 @@ export default function SchedulePage() {
               levels={levels}
               stageItemColours={stageItemColours}
               opened={trayOpened}
+              // On phones a live selection shows the placement pill at the
+              // bottom; slide the whole tray off the bottom of the screen while
+              // one is active so it's out of the way during tap-to-place. It's
+              // derived (not stored), so the tray returns once selection clears.
+              hidden={isMobile && activeSelection != null}
               onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
               rightSection={
@@ -686,7 +731,10 @@ export default function SchedulePage() {
             {selectedEntry != null ? (
               // Below modals, so the selection pill never covers them on small
               // screens; above the tray (150), which sits underneath it.
-              <Affix position={{ bottom: 70, left: '50%' }} zIndex={180}>
+              // On phones the tray slides away while a match is selected, so drop
+              // the pill near the bottom edge; on desktop keep it clear of the
+              // tray header that stays visible underneath it.
+              <Affix position={{ bottom: isMobile ? 16 : 70, left: '50%' }} zIndex={180}>
                 <Paper
                   {...{ [PLANNER_DESELECT_IGNORE_ATTRIBUTE]: true }}
                   shadow="md"
@@ -696,44 +744,36 @@ export default function SchedulePage() {
                   py={6}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
+                    // On phones the hint text and buttons cannot share one row
+                    // without the text wrapping awkwardly in a narrow column, so
+                    // stack them: title, then a full-width button row, then hint.
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    gap: isMobile ? 8 : 12,
+                    width: isMobile ? 'calc(100vw - 1rem)' : undefined,
                     maxWidth: 'calc(100vw - 1rem)',
                     transform: 'translateX(-50%)',
                   }}
                 >
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="sm" fw={600} truncate>
-                      {formatMatchInput1(t, stageItemsLookup, matchesLookup, selectedEntry.match)} –{' '}
-                      {formatMatchInput2(t, stageItemsLookup, matchesLookup, selectedEntry.match)}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
-                    </Text>
-                  </Box>
-                  <Button
-                    size="compact-sm"
-                    variant="light"
-                    color="blue"
-                    leftSection={<IconListDetails size={16} />}
-                    onClick={() => {
-                      if (selectedMatchId != null) setDetailsMatchId(selectedMatchId);
-                    }}
-                  >
-                    {t('details_button')}
-                  </Button>
-                  {activeSelection?.kind === 'match-selected' &&
-                    selectedEntry.match.state === 'NOT_STARTED' && (
-                      <Button
-                        size="compact-sm"
-                        variant="light"
-                        color="orange"
-                        leftSection={<IconCalendarOff size={16} />}
-                        onClick={() => handlePlannerEvent({ type: 'unschedule' })}
-                      >
-                        {t('unschedule_button')}
-                      </Button>
-                    )}
+                  {isMobile ? (
+                    <>
+                      {matchTitle}
+                      <Group gap="xs" grow>
+                        {detailsButton}
+                        {unscheduleButton}
+                      </Group>
+                      {placeHint}
+                    </>
+                  ) : (
+                    <>
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        {matchTitle}
+                        {placeHint}
+                      </Box>
+                      {detailsButton}
+                      {unscheduleButton}
+                    </>
+                  )}
                 </Paper>
               </Affix>
             ) : null}
