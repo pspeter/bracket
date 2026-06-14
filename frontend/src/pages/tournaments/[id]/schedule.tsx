@@ -85,6 +85,7 @@ import SchedulerWeightsForm, {
   DEFAULT_SCHEDULER_WEIGHTS,
 } from '@components/scheduling/scheduler_weights_form';
 import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
+import { useLockViewportZoom } from '@components/scheduling/use_lock_viewport_zoom';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
 import ZoomControls from '@components/scheduling/zoom_controls';
 
@@ -119,6 +120,10 @@ export default function SchedulePage() {
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
+  // Lock the browser's page zoom on mobile so the planner's own zoom levels are
+  // the only thing that changes scale; otherwise the page drifts zoomed-in and
+  // the content pinch handler leaves no way to zoom back out.
+  useLockViewportZoom();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
