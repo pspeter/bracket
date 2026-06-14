@@ -223,11 +223,23 @@ export { NEUTRAL as NEUTRAL_STAGE_ITEM_COLOUR };
 
 // ── Score colours ───────────────────────────────────────────────────────────
 
-/** Winner / draw / loser score colours, used as solid chip backgrounds with
- * white text so the score keeps strong contrast on top of any stage-item tint. */
-export const SCORE_WIN_COLOUR = '#2a8f37';
+/**
+ * Winner / draw / loser score colours, used as solid chip backgrounds with
+ * white text so the score keeps strong contrast on top of any stage-item tint.
+ *
+ * Colourblind-safe by construction: win/loss are the Okabe-Ito bluish-green and
+ * vermillion, a pair designed to stay distinct under deuteranopia/protanopia
+ * (red–green deficiency, ~8% of men) while still reading as "green-ish good /
+ * red-ish bad" to everyone. We deliberately avoid a pure red/green pair, which
+ * collapses to near-identical khaki under those deficiencies. Draw stays a
+ * neutral grey that is darker than both, so it separates by lightness (the cue
+ * every CVD type keeps) as well as by chroma. Colour is never the only signal —
+ * the score number sits inside the chip — so this only sharpens the at-a-glance
+ * read; it isn't load-bearing for correctness.
+ */
+export const SCORE_WIN_COLOUR = '#009e73';
 export const SCORE_DRAW_COLOUR = '#656565';
-export const SCORE_LOSE_COLOUR = '#af4034';
+export const SCORE_LOSE_COLOUR = '#d55e00';
 /** Live (in-progress) and pending (not-started) score chip backgrounds. */
 const SCORE_LIVE_COLOUR = '#74c0fc';
 const SCORE_PENDING_COLOUR = '#868e96';
