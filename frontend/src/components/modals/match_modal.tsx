@@ -14,6 +14,7 @@ import {
   RoundWithMatches,
   StagesWithStageItemsResponse,
 } from '@openapi';
+import { getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 import { deleteMatch, updateMatch } from '@services/match';
 
@@ -94,6 +95,10 @@ function MatchModalForm({
   });
 
   const [durationIsCustom, setDurationIsCustom] = useState(match.custom_duration_minutes != null);
+
+  const swrTournamentResponse = getTournamentById(tournamentData.id);
+  const defaultDurationMinutes =
+    swrTournamentResponse.data?.data.duration_minutes ?? match.duration_minutes;
 
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
   const matchesLookup = getMatchLookup(swrStagesResponse);
@@ -203,7 +208,7 @@ function MatchModalForm({
             variant="light"
             disabled={!durationIsCustom}
             onClick={() => {
-              form.setFieldValue('custom_duration_minutes', match.duration_minutes);
+              form.setFieldValue('custom_duration_minutes', defaultDurationMinutes);
               setDurationIsCustom(false);
             }}
           >
