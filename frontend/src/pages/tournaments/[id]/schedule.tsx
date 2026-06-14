@@ -5,6 +5,8 @@ import {
   Button,
   Grid,
   Group,
+  Loader,
+  LoadingOverlay,
   Modal,
   Paper,
   Select,
@@ -111,6 +113,9 @@ export default function SchedulePage() {
   const [reoptimizeWeights, setReoptimizeWeights] =
     useState<SchedulerWeights>(DEFAULT_SCHEDULER_WEIGHTS);
   const [reoptimizeAdvancedOpened, setReoptimizeAdvancedOpened] = useState(false);
+  // Set while an optimize-all / schedule-unscheduled SAT run is in flight; dims
+  // the planning view behind a spinner so the long solve reads as deliberate.
+  const [isOptimizing, setIsOptimizing] = useState(false);
   // Captures pinch and ctrl+wheel over the whole planning content, so a pinch
   // that starts next to the grid zooms the schedule instead of the page.
   const pinchRef = usePinchZoom(handlePlannerEvent);
@@ -337,7 +342,22 @@ export default function SchedulePage() {
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
-      <Box ref={pinchRef} style={{ touchAction: 'pan-x pan-y' }}>
+      <Box ref={pinchRef} pos="relative" style={{ touchAction: 'pan-x pan-y' }}>
+        <LoadingOverlay
+          visible={isOptimizing}
+          zIndex={500}
+          overlayProps={{ blur: 1, backgroundOpacity: 0.55, color: '#000' }}
+          loaderProps={{
+            children: (
+              <Stack align="center" gap="sm">
+                <Loader size="lg" />
+                <Text c="white" fw={600}>
+                  {t('optimizing_schedule_label', 'Optimizing schedule …')}
+                </Text>
+              </Stack>
+            ),
+          }}
+        />
         <Grid grow>
           <Grid.Col span={6}>
             <Title>{t('planning_title')}</Title>
@@ -508,8 +528,13 @@ export default function SchedulePage() {
                     leftSection={<IconCalendarPlus size={18} />}
                     onClick={async () => {
                       setScheduleModalOpened(false);
-                      await scheduleMatches(tournamentData.id, scheduleWeights);
-                      await swrStagesResponse.mutate();
+                      setIsOptimizing(true);
+                      try {
+                        await scheduleMatches(tournamentData.id, scheduleWeights);
+                        await swrStagesResponse.mutate();
+                      } finally {
+                        setIsOptimizing(false);
+                      }
                     }}
                   >
                     {t('schedule_modal_confirm')}
@@ -539,8 +564,13 @@ export default function SchedulePage() {
                     leftSection={<IconWand size={18} />}
                     onClick={async () => {
                       setReoptimizeModalOpened(false);
-                      await reoptimizeMatches(tournamentData.id, reoptimizeWeights);
-                      await swrStagesResponse.mutate();
+                      setIsOptimizing(true);
+                      try {
+                        await reoptimizeMatches(tournamentData.id, reoptimizeWeights);
+                        await swrStagesResponse.mutate();
+                      } finally {
+                        setIsOptimizing(false);
+                      }
                     }}
                   >
                     {t('reoptimize_modal_confirm')}
