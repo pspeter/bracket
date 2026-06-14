@@ -13,7 +13,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { IconCheck, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
@@ -43,6 +43,7 @@ export default function UnscheduledSheet({
   opened,
   onToggle,
   onSelectMatch,
+  rightSection,
 }: {
   unscheduledMatches: MatchWithDetails[];
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
@@ -52,6 +53,9 @@ export default function UnscheduledSheet({
   opened: boolean;
   onToggle: () => void;
   onSelectMatch: (m: MatchWithDetails) => void;
+  // Optional control rendered to the right of the toggle (the mobile tools
+  // button); it sits outside the toggle so tapping it doesn't expand the tray.
+  rightSection?: ReactNode;
 }) {
   const { t } = useTranslation();
   const groups = groupUnscheduledMatchesForTray(unscheduledMatches, matchesLookup, levels);
@@ -171,17 +175,20 @@ export default function UnscheduledSheet({
         borderBottom: 'none',
       }}
     >
-      <UnstyledButton onClick={onToggle} w="100%" p="sm" aria-expanded={opened}>
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="xs" wrap="nowrap">
-            <Text fw={600}>{t('unscheduled_title')}</Text>
-            <Badge color={unscheduledMatches.length > 0 ? 'indigo' : 'green'} variant="filled">
-              {unscheduledMatches.length}
-            </Badge>
+      <Group justify="space-between" wrap="nowrap" gap="xs" p="sm">
+        <UnstyledButton onClick={onToggle} style={{ flex: 1, minWidth: 0 }} aria-expanded={opened}>
+          <Group justify="space-between" wrap="nowrap">
+            <Group gap="xs" wrap="nowrap">
+              <Text fw={600}>{t('unscheduled_title')}</Text>
+              <Badge color={unscheduledMatches.length > 0 ? 'indigo' : 'green'} variant="filled">
+                {unscheduledMatches.length}
+              </Badge>
+            </Group>
+            {opened ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
           </Group>
-          {opened ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
-        </Group>
-      </UnstyledButton>
+        </UnstyledButton>
+        {rightSection}
+      </Group>
       <Collapse in={opened}>
         <ScrollArea.Autosize mah="45dvh">
           <Box px="sm" pb="sm">
