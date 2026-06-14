@@ -111,9 +111,10 @@ export function stageHighlightOptions(stages: StageLike[]): HighlightOption[] {
     }
   }
 
-  return [...byTeamId.values(), ...byInputId.values()].sort((a, b) =>
-    a.label.localeCompare(b.label)
-  );
+  const byLabel = (a: HighlightOption, b: HighlightOption) => a.label.localeCompare(b.label);
+  // Teams first, then placeholder inputs ("1st of group A"), each sorted alphabetically.
+  // Actual teams are what users usually want to find, so they take precedence.
+  return [...[...byTeamId.values()].sort(byLabel), ...[...byInputId.values()].sort(byLabel)];
 }
 
 function positionName(position: number): string {

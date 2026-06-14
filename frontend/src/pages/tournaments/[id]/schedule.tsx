@@ -374,7 +374,7 @@ export default function SchedulePage() {
                 onChange={setHighlightValue}
                 searchable
                 clearable
-                limit={24}
+                limit={100}
                 w={220}
                 size="sm"
                 mb={10}
