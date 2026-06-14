@@ -13,7 +13,11 @@ const MATCH: GridMatchRef = { matchId: 10, courtId: 1, position: 2 };
 
 const MATCH_SELECTED: SelectionState = { kind: 'match-selected', match: MATCH };
 const TRAY_SELECTED: SelectionState = { kind: 'tray-match-selected', matchId: 10 };
-const SHEET_OPEN: SelectionState = { kind: 'action-sheet-open', match: MATCH };
+const CONFIRM_MOVE: SelectionState = {
+  kind: 'confirm-move',
+  previous: MATCH_SELECTED,
+  action: { type: 'swap', matchId1: 10, matchId2: 20 },
+};
 
 describe('pollingPaused', () => {
   it('polls while idle', () => {
@@ -28,8 +32,8 @@ describe('pollingPaused', () => {
     expect(pollingPaused(TRAY_SELECTED)).toBe(true);
   });
 
-  it('pauses while the action sheet is open', () => {
-    expect(pollingPaused(SHEET_OPEN)).toBe(true);
+  it('pauses while move confirmation is pending', () => {
+    expect(pollingPaused(CONFIRM_MOVE)).toBe(true);
   });
 });
 
@@ -41,7 +45,7 @@ describe('scheduleRefreshInterval', () => {
   it('disables polling while a selection is active', () => {
     expect(scheduleRefreshInterval(MATCH_SELECTED)).toBe(0);
     expect(scheduleRefreshInterval(TRAY_SELECTED)).toBe(0);
-    expect(scheduleRefreshInterval(SHEET_OPEN)).toBe(0);
+    expect(scheduleRefreshInterval(CONFIRM_MOVE)).toBe(0);
   });
 });
 
@@ -49,7 +53,7 @@ describe('shouldRefreshOnSelectionChange', () => {
   it('refreshes when a selection clears', () => {
     expect(shouldRefreshOnSelectionChange(MATCH_SELECTED, IDLE_SELECTION)).toBe(true);
     expect(shouldRefreshOnSelectionChange(TRAY_SELECTED, IDLE_SELECTION)).toBe(true);
-    expect(shouldRefreshOnSelectionChange(SHEET_OPEN, IDLE_SELECTION)).toBe(true);
+    expect(shouldRefreshOnSelectionChange(CONFIRM_MOVE, IDLE_SELECTION)).toBe(true);
   });
 
   it('does not refresh while idle stays idle', () => {
@@ -61,9 +65,9 @@ describe('shouldRefreshOnSelectionChange', () => {
   });
 
   it('does not refresh while the pause continues across selection changes', () => {
-    // E.g. selected match -> action sheet, or switching tray selections.
-    expect(shouldRefreshOnSelectionChange(MATCH_SELECTED, SHEET_OPEN)).toBe(false);
-    expect(shouldRefreshOnSelectionChange(SHEET_OPEN, MATCH_SELECTED)).toBe(false);
+    // E.g. selected match -> confirmation, or switching tray selections.
+    expect(shouldRefreshOnSelectionChange(MATCH_SELECTED, CONFIRM_MOVE)).toBe(false);
+    expect(shouldRefreshOnSelectionChange(CONFIRM_MOVE, MATCH_SELECTED)).toBe(false);
     expect(shouldRefreshOnSelectionChange(TRAY_SELECTED, TRAY_SELECTED)).toBe(false);
   });
 });

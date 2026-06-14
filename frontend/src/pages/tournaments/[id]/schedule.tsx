@@ -17,7 +17,14 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { IconCalendarPlus, IconTools, IconWand } from '@tabler/icons-react';
+import {
+  IconArrowsMove,
+  IconCalendarOff,
+  IconCalendarPlus,
+  IconListDetails,
+  IconTools,
+  IconWand,
+} from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +46,7 @@ import {
   shouldRefreshOnSelectionChange,
 } from '@logic/planning/polling';
 import {
+  ActiveSelectionState,
   FocusTarget,
   IDLE_SELECTION,
   PlannerEvent,
@@ -81,7 +89,10 @@ import {
 } from '@services/match';
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
-import MatchActionSheet from '@components/scheduling/match_action_sheet';
+import {
+  PLANNER_DESELECT_IGNORE_ATTRIBUTE,
+  PLANNER_GRID_ATTRIBUTE,
+} from '@components/scheduling/planner_anchor';
 import PlannerToolsSheet from '@components/scheduling/planner_tools_sheet';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import SchedulerWeightsForm, {
@@ -91,6 +102,18 @@ import UnscheduledSheet from '@components/scheduling/unscheduled_sheet';
 import { useLockViewportZoom } from '@components/scheduling/use_lock_viewport_zoom';
 import { usePinchZoom } from '@components/scheduling/use_pinch_zoom';
 import ZoomControls from '@components/scheduling/zoom_controls';
+
+function activeSelectionFrom(selection: PlannerState['selection']): ActiveSelectionState | null {
+  switch (selection.kind) {
+    case 'match-selected':
+    case 'tray-match-selected':
+      return selection;
+    case 'confirm-move':
+      return selection.previous;
+    default:
+      return null;
+  }
+}
 
 export default function SchedulePage() {
   const [planner, setPlanner] = useState<PlannerState>(() =>
@@ -105,7 +128,7 @@ export default function SchedulePage() {
   const isMobile = useMediaQuery('(max-width: 768px)') ?? false;
   const [toolsOpened, setToolsOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
-  // Details modal opened from the action sheet; holds the match id (not the
+  // Details modal opened from the selection pill; holds the match id (not the
   // match) so a background revalidation refreshes the modal's data instead of
   // detaching it.
   const [detailsMatchId, setDetailsMatchId] = useState<number | null>(null);
@@ -132,20 +155,21 @@ export default function SchedulePage() {
   // the content pinch handler leaves no way to zoom back out.
   useLockViewportZoom();
 
+  const activeSelection = activeSelectionFrom(planner.selection);
+
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
-  // Escape cancels an active match selection, the keyboard equivalent of the
-  // selection pill's "cancel" button. The action sheet and details modal own
-  // Escape while they're open (Mantine closes them first), so only act on the
-  // plain selected states here.
+  // Escape cancels an active match selection. Confirmation and details modals
+  // own Escape while they're open (Mantine closes them first), so only act on
+  // the plain selected states here.
   useEffect(() => {
     if (
       detailsMatchId != null ||
-      (planner.selection.kind !== 'match-selected' &&
-        planner.selection.kind !== 'tray-match-selected')
+      planner.selection.kind === 'confirm-move' ||
+      activeSelection == null
     ) {
       return undefined;
     }
@@ -156,12 +180,50 @@ export default function SchedulePage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [planner.selection, detailsMatchId]);
+  }, [planner.selection, activeSelection, detailsMatchId]);
+
+  useEffect(() => {
+    if (
+      detailsMatchId != null ||
+      planner.selection.kind === 'confirm-move' ||
+      activeSelection == null
+    ) {
+      return undefined;
+    }
+
+    const ignoredSelector = [
+      `[${PLANNER_GRID_ATTRIBUTE}]`,
+      `[${PLANNER_DESELECT_IGNORE_ATTRIBUTE}]`,
+      '[role="dialog"]',
+      '[role="menu"]',
+      '[role="menuitem"]',
+      '[role="button"]',
+      'button',
+      'a',
+      'input',
+      'textarea',
+      'select',
+      '.mantine-Modal-root',
+      '.mantine-Drawer-root',
+      '.mantine-Popover-dropdown',
+    ].join(',');
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(ignoredSelector) != null) return;
+      handlePlannerEvent({ type: 'cancel' });
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [planner.selection, activeSelection, detailsMatchId]);
 
   const { t } = useTranslation();
   const { tournamentData } = getTournamentIdFromRouter();
   // The schedule polls so co-organizers' changes show up, but holds still
-  // (interval 0) while a selection or the action sheet is active.
+  // (interval 0) while a selection or move confirmation is active.
   const swrStagesResponse = getStagesWithPolling(
     tournamentData.id,
     scheduleRefreshInterval(planner.selection)
@@ -258,7 +320,9 @@ export default function SchedulePage() {
   }
 
   async function handlePlannerEvent(event: PlannerEvent) {
-    const wasTraySelection = planner.selection.kind === 'tray-match-selected';
+    const previousSelectionForTray =
+      planner.selection.kind === 'confirm-move' ? planner.selection.previous : planner.selection;
+    const wasTraySelection = previousSelectionForTray.kind === 'tray-match-selected';
     const { state, actions, focus: focusTarget } = plannerReducer(planner, event);
     setPlanner(state);
     if (focusTarget != null) {
@@ -269,7 +333,7 @@ export default function SchedulePage() {
       setTrayOpened((opened) =>
         nextTrayOpenedAfterPlannerEvent({
           opened,
-          previousSelection: planner.selection,
+          previousSelection: previousSelectionForTray,
           nextSelection: state.selection,
           event,
           actions,
@@ -333,14 +397,12 @@ export default function SchedulePage() {
   }
 
   const selectedMatchId =
-    planner.selection.kind === 'match-selected'
-      ? planner.selection.match.matchId
-      : planner.selection.kind === 'tray-match-selected'
-        ? planner.selection.matchId
+    activeSelection?.kind === 'match-selected'
+      ? activeSelection.match.matchId
+      : activeSelection?.kind === 'tray-match-selected'
+        ? activeSelection.matchId
         : null;
   const selectedEntry = selectedMatchId != null ? matchesLookup[selectedMatchId] : null;
-  const sheetMatchRef =
-    planner.selection.kind === 'action-sheet-open' ? planner.selection.match : null;
   const detailsMatch =
     detailsMatchId != null ? (matchesLookup[detailsMatchId]?.match ?? null) : null;
   const isOverview = planner.zoom === 'overview';
@@ -510,24 +572,29 @@ export default function SchedulePage() {
                 onReoptimize={() => setReoptimizeModalOpened(true)}
               />
             )}
-            <MatchActionSheet
-              opened={sheetMatchRef != null}
-              match={
-                sheetMatchRef != null ? (matchesLookup[sheetMatchRef.matchId]?.match ?? null) : null
-              }
-              locked={sheetMatchRef?.locked ?? false}
-              stageItemsLookup={stageItemsLookup}
-              matchesLookup={matchesLookup}
-              onDismiss={() => handlePlannerEvent({ type: 'dismiss-action-sheet' })}
-              onOpenDetails={() => {
-                if (sheetMatchRef != null) {
-                  setDetailsMatchId(sheetMatchRef.matchId);
-                }
-                handlePlannerEvent({ type: 'dismiss-action-sheet' });
-              }}
-              onUnschedule={() => handlePlannerEvent({ type: 'unschedule' })}
-              onMoveAnyway={() => handlePlannerEvent({ type: 'move-anyway' })}
-            />
+            <Modal
+              opened={planner.selection.kind === 'confirm-move'}
+              onClose={() => handlePlannerEvent({ type: 'cancel' })}
+              title={t('move_confirmation_title')}
+              centered
+              zIndex={500}
+            >
+              <Stack>
+                <Text>{t('move_confirmation_body')}</Text>
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => handlePlannerEvent({ type: 'cancel' })}>
+                    {t('move_confirmation_cancel')}
+                  </Button>
+                  <Button
+                    color="orange"
+                    leftSection={<IconArrowsMove size={18} />}
+                    onClick={() => handlePlannerEvent({ type: 'confirm' })}
+                  >
+                    {t('move_confirmation_confirm')}
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
             <MatchModal
               tournamentData={tournamentData}
               match={detailsMatch}
@@ -538,6 +605,7 @@ export default function SchedulePage() {
                 if (!value) setDetailsMatchId(null);
               }}
               round={null}
+              levels={levels}
             />
             <Modal
               opened={scheduleModalOpened}
@@ -611,17 +679,16 @@ export default function SchedulePage() {
                 </Group>
               </Stack>
             </Modal>
-            {/* Like the selection pill below: above the tray (150), below the
-                modals (200) and the action sheet (400). */}
+            {/* Like the selection pill below: above the tray (150), below modals. */}
             <Affix position={{ right: 8, top: '45%' }} zIndex={180}>
               <ZoomControls zoom={planner.zoom} onZoomEvent={handlePlannerEvent} />
             </Affix>
             {selectedEntry != null ? (
-              // Below the action sheet (400) and the details modal (Mantine's
-              // default 200), so the selection pill never covers them on small
+              // Below modals, so the selection pill never covers them on small
               // screens; above the tray (150), which sits underneath it.
               <Affix position={{ bottom: 70, left: '50%' }} zIndex={180}>
                 <Paper
+                  {...{ [PLANNER_DESELECT_IGNORE_ATTRIBUTE]: true }}
                   shadow="md"
                   radius="xl"
                   withBorder
@@ -644,27 +711,29 @@ export default function SchedulePage() {
                       {isOverview ? t('zoom_in_to_place_hint') : t('tap_to_place_hint')}
                     </Text>
                   </Box>
-                  {planner.selection.kind === 'match-selected' &&
-                    // Played matches can't be unscheduled (the backend rejects
-                    // it), so a move-anyway selection only offers placement.
+                  <Button
+                    size="compact-sm"
+                    variant="light"
+                    color="blue"
+                    leftSection={<IconListDetails size={16} />}
+                    onClick={() => {
+                      if (selectedMatchId != null) setDetailsMatchId(selectedMatchId);
+                    }}
+                  >
+                    {t('details_button')}
+                  </Button>
+                  {activeSelection?.kind === 'match-selected' &&
                     selectedEntry.match.state === 'NOT_STARTED' && (
                       <Button
                         size="compact-sm"
                         variant="light"
                         color="orange"
+                        leftSection={<IconCalendarOff size={16} />}
                         onClick={() => handlePlannerEvent({ type: 'unschedule' })}
                       >
                         {t('unschedule_button')}
                       </Button>
                     )}
-                  <Button
-                    size="compact-sm"
-                    variant="light"
-                    color="red"
-                    onClick={() => handlePlannerEvent({ type: 'cancel' })}
-                  >
-                    {t('cancel_button')}
-                  </Button>
                 </Paper>
               </Affix>
             ) : null}

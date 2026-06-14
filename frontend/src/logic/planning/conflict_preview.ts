@@ -388,6 +388,11 @@ export function computeConflictPreview({
     return actions.some((action) => planningActionCreatesConflict(preparedPreview, action));
   }
 
+  function transitionActions(transition: ReturnType<typeof selectionReducer>): PlanningAction[] {
+    if (transition.actions.length > 0) return transition.actions;
+    return transition.state.kind === 'confirm-move' ? [transition.state.action] : [];
+  }
+
   for (const { court, blocks } of layout.courts) {
     const lines: InsertionLine[] = computeInsertionLines(blocks);
     for (const line of lines) {
@@ -396,7 +401,7 @@ export function computeConflictPreview({
         courtId: court.id,
         index: line.index,
       });
-      if (hasConflict(transition.actions)) {
+      if (hasConflict(transitionActions(transition))) {
         preview.insertionLines.add(insertionLineKey(court.id, line.index));
       }
     }
@@ -410,7 +415,7 @@ export function computeConflictPreview({
           position: blockIndex,
         },
       });
-      if (hasConflict(transition.actions)) {
+      if (hasConflict(transitionActions(transition))) {
         preview.swapTargets.add(block.match.id);
       }
     });

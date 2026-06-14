@@ -3,8 +3,8 @@
  *
  * The schedule revalidates periodically so a co-organizer's moves and score
  * entries appear without a manual refresh. Polling is suspended whenever a
- * selection is active (match selected, tray match selected, or the action
- * sheet open) so the grid never shifts under the user's finger mid-placement,
+ * selection is active (match selected, tray match selected, or confirmation
+ * pending) so the grid never shifts under the user's finger mid-placement,
  * and resumes — with an immediate refresh — once the selection clears.
  *
  * A placement can still race a move made on another device while polling is

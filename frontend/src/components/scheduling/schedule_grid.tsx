@@ -282,8 +282,8 @@ function MatchCard({
         left: 3,
         right: 3,
         overflow: 'hidden',
-        // Every card is tappable: unlocked ones select for placement, locked
-        // (played) ones open the action sheet with the move-anyway override.
+        // Every card is tappable: played and frozen-past moves are gated later
+        // by the confirmation popup, not by blocking selection here.
         cursor: 'pointer',
         // Completed matches are no longer dimmed (which muddied the tint); the
         // winner/loser-coloured scores carry that they are finished instead.
@@ -776,11 +776,13 @@ export default function ScheduleGrid({
   // switches to a centered modal at the same breakpoint as the default zoom.
   const editBreaksInModal = useMediaQuery('(max-width: 768px)') ?? false;
   const selectedMatch =
-    selection.kind === 'match-selected' || selection.kind === 'action-sheet-open'
+    selection.kind === 'match-selected'
       ? selection.match
-      : null;
-  // Insertion lines only make sense while a match is being placed; with the
-  // action sheet open the grid is inert behind the sheet's overlay.
+      : selection.kind === 'confirm-move' && selection.previous.kind === 'match-selected'
+        ? selection.previous.match
+        : null;
+  // Insertion lines only make sense while a match is being placed; with a move
+  // confirmation pending, the grid is inert behind the modal overlay.
   const placing = selection.kind === 'match-selected' || selection.kind === 'tray-match-selected';
   const isOverview = zoom === 'overview';
   const highlightActive = highlightTarget != null;
@@ -1020,6 +1022,7 @@ export default function ScheduleGrid({
                   matchId: block.match.id,
                   courtId: court.id,
                   position: blockIndex,
+                  played: block.match.state !== 'NOT_STARTED',
                   locked: block.locked,
                 };
                 return (

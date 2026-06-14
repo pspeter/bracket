@@ -25,6 +25,7 @@ import {
 } from '@logic/planning/unscheduled_tray';
 import type { LevelResponse, MatchWithDetails } from '@openapi';
 import { getStageItemLookup, type MatchLookupEntry } from '@services/lookups';
+import { PLANNER_DESELECT_IGNORE_ATTRIBUTE } from './planner_anchor';
 
 /**
  * Collapsible bottom sheet listing matches that are not on the schedule yet.
@@ -162,6 +163,7 @@ export default function UnscheduledSheet({
     // pin this sheet to the (often short) grid's bottom instead of the screen.
     <Portal>
       <Paper
+        {...{ [PLANNER_DESELECT_IGNORE_ATTRIBUTE]: true }}
         shadow="lg"
         radius={0}
         withBorder

@@ -11,6 +11,8 @@ import { FocusTarget } from '@logic/planning/selection';
 export const PLANNER_GRID_ATTRIBUTE = 'data-planner-grid';
 /** Marks each court column's time area (the box spanning the whole schedule). */
 export const COURT_CONTENT_ATTRIBUTE = 'data-court-content';
+/** Marks planner UI surfaces whose clicks should not count as page-empty deselects. */
+export const PLANNER_DESELECT_IGNORE_ATTRIBUTE = 'data-planner-deselect-ignore';
 
 /**
  * Anchor for the court/time region at a point on screen. Points left or right

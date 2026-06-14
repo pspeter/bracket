@@ -270,6 +270,7 @@ export default function ResultsPage() {
         opened={modalOpened}
         setOpened={modalSetOpenedAndUpdateMatch}
         round={null}
+        levels={levels}
       />
       <Group justify="space-between" align="center">
         <Title>{t('results_title')}</Title>
