@@ -1661,6 +1661,95 @@ async def test_resize_break_shifts_later_matches(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_resize_break_updates_short_break_conflicts_with_tournament_margin(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament = auth_context.tournament
+    second_start = tournament.start_time + timedelta(minutes=15)
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team2,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2.id,
+                tournament_id=tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as input2,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament.id})
+        ) as court_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": tournament.start_time,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as first_match,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": court_inserted.id,
+                    "state": MatchState.NOT_STARTED,
+                    "start_time": second_start,
+                    "stage_item_input1_score": 0,
+                    "stage_item_input2_score": 0,
+                    "completed_at": None,
+                }
+            )
+        ) as second_match,
+    ):
+        body = MatchResizeBreakBody(new_duration_minutes=tournament.margin_minutes - 2)
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{second_match.id}/resize_break",
+                auth_context,
+                json=body.model_dump(mode="json"),
+            )
+            == SUCCESS_RESPONSE
+        )
+        first = await sql_get_match(first_match.id)
+        second = await sql_get_match(second_match.id)
+        await assert_row_count_and_clear(matches, 0)
+
+    assert first.short_break_conflict is False
+    assert second.short_break_conflict is True
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_resize_break_compacts_leftover_pause(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

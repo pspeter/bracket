@@ -6,7 +6,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
-from bracket.logic.planning.conflicts import handle_conflicts
+from bracket.logic.planning.conflicts import reconcile_conflicts
 from bracket.logic.planning.matches import update_start_times_of_matches
 from bracket.logic.planning.rounds import (
     MatchTimingAdjustmentInfeasible,
@@ -579,5 +579,5 @@ async def start_next_round(
         ) from exc
 
     await set_round_active_or_draft(draft_round.id, tournament_id, is_draft=False)
-    await handle_conflicts(await get_full_tournament_details(tournament_id))
+    await reconcile_conflicts(tournament_id)
     return SuccessResponse()

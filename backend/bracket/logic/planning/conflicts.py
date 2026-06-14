@@ -7,7 +7,7 @@ from bracket.database import database
 from bracket.logic.planning.team_windows import PlayingWindow, get_team_playing_windows
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.util import StageWithStageItems
-from bracket.utils.id_types import CourtId, MatchId, StageItemId
+from bracket.utils.id_types import CourtId, MatchId, StageItemId, TournamentId
 
 
 def matches_overlap(match1: Match, match2: Match) -> bool:
@@ -234,16 +234,17 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
         )
 
 
-async def handle_conflicts(
-    stages: list[StageWithStageItems], default_break_minutes: int | None = None
-) -> None:
+async def reconcile_conflicts(tournament_id: TournamentId) -> None:
+    from bracket.sql.stages import get_full_tournament_details
+    from bracket.sql.tournaments import sql_get_tournament
+
+    stages = await get_full_tournament_details(tournament_id)
     if len(stages) < 1:
         return
 
-    if default_break_minutes is None:
-        from bracket.sql.tournaments import sql_get_tournament
+    tournament = await sql_get_tournament(tournament_id)
+    await handle_conflicts(stages, tournament.margin_minutes)
 
-        tournament = await sql_get_tournament(stages[0].tournament_id)
-        default_break_minutes = tournament.margin_minutes
 
+async def handle_conflicts(stages: list[StageWithStageItems], default_break_minutes: int) -> None:
     await set_conflicts(get_match_conflict_flags(stages, default_break_minutes))
