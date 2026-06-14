@@ -30,7 +30,6 @@ import {
   computeBreaks,
   computeInsertionLines,
 } from '@logic/planning/layout';
-import { nowLineScrollTop } from '@logic/planning/now_line';
 import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
 import {
   ZOOM_PX_PER_MINUTE,
@@ -771,7 +770,6 @@ export default function ScheduleGrid({
   zoom,
   focus,
   nowOffsetMinutes,
-  nowScrollNonce,
   onSelectionEvent,
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
@@ -785,7 +783,6 @@ export default function ScheduleGrid({
   zoom: ZoomLevel;
   focus: (FocusTarget & { nonce: number }) | null;
   nowOffsetMinutes: number | null;
-  nowScrollNonce: number;
   onSelectionEvent: (event: PlannerEvent) => void;
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
@@ -841,23 +838,6 @@ export default function ScheduleGrid({
     // Only re-run per navigation event; gridHeight is already the post-zoom scale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
-
-  useEffect(() => {
-    if (nowScrollNonce === 0 || nowOffsetMinutes == null) return;
-    const container = containerRef.current;
-    if (container == null) return;
-
-    container.scrollTo({
-      top: nowLineScrollTop({
-        offsetMinutes: nowOffsetMinutes,
-        pxPerMinute,
-        viewportHeightPx: container.clientHeight,
-        headerHeightPx: HEADER_HEIGHT_PX,
-        gridTopInsetPx: GRID_TOP_INSET_PX,
-      }),
-      behavior: 'smooth',
-    });
-  }, [nowOffsetMinutes, nowScrollNonce, pxPerMinute]);
 
   return (
     <Box
