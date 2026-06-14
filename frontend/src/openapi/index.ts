@@ -349,6 +349,7 @@ export type {
   RankingBody,
   RankingCreateBody,
   RankingsResponse,
+  Referee,
   RegisterDemoUserUsersRegisterDemoPostData,
   RegisterDemoUserUsersRegisterDemoPostError,
   RegisterDemoUserUsersRegisterDemoPostErrors,

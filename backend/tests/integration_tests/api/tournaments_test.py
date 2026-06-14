@@ -49,6 +49,7 @@ async def test_tournaments_endpoint(
                 "score_tracking_enabled": False,
                 "score_tracking_token": None,
                 "rules": None,
+                "referees_enabled": False,
                 "levels": [],
             }
         ],
@@ -83,6 +84,7 @@ async def test_tournament_endpoint(
             "score_tracking_enabled": False,
             "score_tracking_token": None,
             "rules": None,
+            "referees_enabled": False,
             "levels": [],
         },
     }
@@ -167,6 +169,52 @@ async def test_update_tournament(
     )
     assert updated_tournament.name == body["name"]
     assert updated_tournament.dashboard_public == body["dashboard_public"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_tournament_referees_enabled_round_trip(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    base_body = {
+        "name": "Some Cool Tournament",
+        "start_time": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),
+        "dashboard_public": True,
+        "players_can_be_in_multiple_teams": True,
+        "auto_assign_courts": True,
+        "duration_minutes": 10,
+        "margin_minutes": 5,
+        "signup_enabled": False,
+        "max_team_size": 4,
+        "signup_team_choice_enabled": True,
+    }
+
+    # Enable referees.
+    assert (
+        await send_tournament_request(
+            HTTPMethod.PUT, "", auth_context, json={**base_body, "referees_enabled": True}
+        )
+        == SUCCESS_RESPONSE
+    )
+    updated = await fetch_one_parsed_certain(
+        database,
+        Tournament,
+        query=tournaments.select().where(tournaments.c.id == auth_context.tournament.id),
+    )
+    assert updated.referees_enabled is True
+
+    # Disable it again.
+    assert (
+        await send_tournament_request(
+            HTTPMethod.PUT, "", auth_context, json={**base_body, "referees_enabled": False}
+        )
+        == SUCCESS_RESPONSE
+    )
+    updated = await fetch_one_parsed_certain(
+        database,
+        Tournament,
+        query=tournaments.select().where(tournaments.c.id == auth_context.tournament.id),
+    )
+    assert updated.referees_enabled is False
 
 
 @pytest.mark.asyncio(loop_scope="session")

@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
+import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { format } from 'date-fns';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -95,6 +96,7 @@ function MatchCard({
   stageItemsLookup,
   matchesLookup,
   colour,
+  refereesEnabled,
   onTap,
 }: {
   block: MatchBlock<MatchWithDetails>;
@@ -108,6 +110,7 @@ function MatchCard({
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
   matchesLookup: Record<number, MatchLookupEntry>;
   colour: StageItemColour;
+  refereesEnabled: boolean;
   onTap: () => void;
 }) {
   const { t } = useTranslation();
@@ -124,6 +127,8 @@ function MatchCard({
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
   const mergeConflictIcons = rows === 1;
+
+  const refereeName = match.referee?.name ?? match.referee?.team_name ?? null;
 
   let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
@@ -360,6 +365,14 @@ function MatchCard({
               {input2}
             </Text>
             {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
+          </Flex>
+        )}
+        {refereesEnabled && refereeName != null && rows >= 2 && (
+          <Flex gap={4} align="center" wrap="nowrap" c="dimmed">
+            <GiWhistle size={fontSize ?? 13} style={{ flexShrink: 0 }} />
+            <Text size="xs" fz={fontSize} lh={1.3} c="dimmed" truncate>
+              {refereeName}
+            </Text>
           </Flex>
         )}
       </Box>
@@ -755,6 +768,7 @@ export default function ScheduleGrid({
   zoom,
   focus,
   nowOffsetMinutes,
+  refereesEnabled = false,
   onSelectionEvent,
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
@@ -768,6 +782,7 @@ export default function ScheduleGrid({
   zoom: ZoomLevel;
   focus: (FocusTarget & { nonce: number }) | null;
   nowOffsetMinutes: number | null;
+  refereesEnabled?: boolean;
   onSelectionEvent: (event: PlannerEvent) => void;
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
@@ -1039,6 +1054,7 @@ export default function ScheduleGrid({
                     stageItemsLookup={stageItemsLookup}
                     matchesLookup={matchesLookup}
                     colour={colour}
+                    refereesEnabled={refereesEnabled}
                     onTap={() => onSelectionEvent({ type: 'tap-match', match: matchRef })}
                   />
                 );

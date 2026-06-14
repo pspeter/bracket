@@ -14,6 +14,7 @@ export async function createTournament(
   max_team_size: number = 4,
   signup_team_choice_enabled: boolean = true,
   score_tracking_enabled: boolean = false,
+  referees_enabled: boolean = false,
   levels: string[] | null = null
 ) {
   return createAxios()
@@ -31,6 +32,7 @@ export async function createTournament(
       max_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
+      referees_enabled,
       levels,
     })
     .catch((response: any) => handleRequestError(response));
@@ -62,6 +64,7 @@ export async function updateTournament(
   max_team_size: number,
   signup_team_choice_enabled: boolean,
   score_tracking_enabled: boolean,
+  referees_enabled: boolean,
   rules: string | null
 ) {
   return createAxios()
@@ -78,6 +81,7 @@ export async function updateTournament(
       max_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
+      referees_enabled,
       rules,
     })
     .catch((response: any) => handleRequestError(response));

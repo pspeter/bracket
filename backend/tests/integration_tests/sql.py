@@ -13,6 +13,7 @@ from bracket.models.db.match import Match, MatchInsertable
 from bracket.models.db.player import Player, PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import Ranking, RankingInsertable
+from bracket.models.db.referee import Referee, RefereeInsertable
 from bracket.models.db.round import Round, RoundInsertable
 from bracket.models.db.stage import Stage, StageInsertable
 from bracket.models.db.stage_item import StageItem, StageItemInsertable
@@ -34,6 +35,7 @@ from bracket.schema import (
     players,
     players_x_teams,
     rankings,
+    referees,
     rounds,
     stage_item_inputs,
     stage_items,
@@ -171,6 +173,12 @@ async def inserted_round(round_: RoundInsertable) -> AsyncIterator[Round]:
 async def inserted_match(match: MatchInsertable) -> AsyncIterator[Match]:
     async with inserted_generic(match, matches, Match) as row_inserted:
         yield cast("Match", row_inserted)
+
+
+@asynccontextmanager
+async def inserted_referee(referee: RefereeInsertable) -> AsyncIterator[Referee]:
+    async with inserted_generic(referee, referees, Referee) as row_inserted:
+        yield cast("Referee", row_inserted)
 
 
 @asynccontextmanager

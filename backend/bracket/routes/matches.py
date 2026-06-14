@@ -55,6 +55,7 @@ from bracket.sql.matches import (
     sql_unschedule_match,
     sql_update_match,
 )
+from bracket.sql.referees import sql_set_match_referee, sql_upsert_referee_by_team
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
@@ -326,9 +327,22 @@ async def update_match_by_id(
     await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
     tournament = await sql_get_tournament(tournament_id)
     await validate_match_can_be_started(tournament_id, match, match_body.state)
+
+    # Only touch the referee when the client explicitly sent the field, so other
+    # match edits (scores, duration, ...) never clear an existing assignment.
+    referee_provided = "referee_team_id" in match_body.model_fields_set
+    referee_team_id = match_body.referee_team_id
+
     match_body = get_match_body_with_state_updates(match, match_body)
 
     await sql_update_match(match_id, match_body, tournament)
+
+    if referee_provided:
+        if referee_team_id is None:
+            await sql_set_match_referee(match_id, None)
+        else:
+            referee = await sql_upsert_referee_by_team(tournament_id, referee_team_id)
+            await sql_set_match_referee(match_id, referee.id)
 
     round_ = await get_round_by_id(tournament_id, match.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)

@@ -34,6 +34,7 @@ class TournamentInsertable(BaseModelORM):
     score_tracking_enabled: bool = False
     score_tracking_token: str | None = None
     rules: str | None = None
+    referees_enabled: bool = False
 
 
 class Tournament(TournamentInsertable):
@@ -64,6 +65,7 @@ class TournamentUpdateBody(BaseModelORM):
     max_team_size: int = Field(..., ge=1)
     signup_team_choice_enabled: bool
     score_tracking_enabled: bool = False
+    referees_enabled: bool = False
     rules: str | None = Field(None, max_length=50_000)
 
     @model_validator(mode="before")

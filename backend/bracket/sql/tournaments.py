@@ -96,6 +96,7 @@ async def sql_update_tournament(
             max_team_size = :max_team_size,
             signup_team_choice_enabled = :signup_team_choice_enabled,
             score_tracking_enabled = :score_tracking_enabled,
+            referees_enabled = :referees_enabled,
             rules = :rules
             {token_clause}
         WHERE tournaments.id = :tournament_id
@@ -138,7 +139,8 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             max_team_size,
             signup_team_choice_enabled,
             score_tracking_enabled,
-            score_tracking_token
+            score_tracking_token,
+            referees_enabled
         )
         VALUES (
             :name,
@@ -156,7 +158,8 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
             :max_team_size,
             :signup_team_choice_enabled,
             :score_tracking_enabled,
-            :score_tracking_token
+            :score_tracking_token,
+            :referees_enabled
         )
         RETURNING id
         """
@@ -164,5 +167,6 @@ async def sql_create_tournament(tournament: TournamentBody) -> TournamentId:
     values.setdefault("signup_token", None)
     values.setdefault("score_tracking_enabled", False)
     values.setdefault("score_tracking_token", None)
+    values.setdefault("referees_enabled", False)
     new_id = await database.fetch_val(query=query, values=values)
     return TournamentId(new_id)

@@ -463,6 +463,17 @@
             "title": "Precedence Conflict",
             "type": "boolean"
           },
+          "referee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Id"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
@@ -592,6 +603,7 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
+          "referee_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -645,6 +657,17 @@
             ],
             "title": "Custom Duration Minutes"
           },
+          "referee_team_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Team Id"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
@@ -669,6 +692,7 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
+          "referee_team_id",
           "custom_duration_minutes",
           "state",
           "completed_at"
@@ -933,6 +957,27 @@
             "title": "Precedence Conflict",
             "type": "boolean"
           },
+          "referee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Referee"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "referee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Id"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
@@ -1062,6 +1107,7 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
+          "referee_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -1076,6 +1122,7 @@
           "stage_item_input1",
           "stage_item_input2",
           "court",
+          "referee",
           "level_id"
         ],
         "title": "MatchWithDetails",
@@ -1156,6 +1203,27 @@
             "title": "Precedence Conflict",
             "type": "boolean"
           },
+          "referee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Referee"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "referee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Id"
+          },
           "round_id": {
             "title": "Round Id",
             "type": "integer"
@@ -1279,6 +1347,7 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
+          "referee_id",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -1293,7 +1362,8 @@
           "stage_item_input1",
           "stage_item_input2",
           "level_id",
-          "court"
+          "court",
+          "referee"
         ],
         "title": "MatchWithDetailsDefinitive",
         "type": "object"
@@ -1777,6 +1847,66 @@
           "data"
         ],
         "title": "RankingsResponse",
+        "type": "object"
+      },
+      "Referee": {
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          },
+          "tournament_id": {
+            "title": "Tournament Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tournament_id",
+          "team_id",
+          "name",
+          "created",
+          "id",
+          "team_name"
+        ],
+        "title": "Referee",
         "type": "object"
       },
       "RoundCreateBody": {
@@ -3372,6 +3502,11 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "referees_enabled": {
+            "default": false,
+            "title": "Referees Enabled",
+            "type": "boolean"
+          },
           "rules": {
             "anyOf": [
               {
@@ -3416,6 +3551,7 @@
           "max_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
+          "referees_enabled",
           "rules",
           "club_id",
           "levels"
@@ -3497,6 +3633,11 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "referees_enabled": {
+            "default": false,
+            "title": "Referees Enabled",
+            "type": "boolean"
+          },
           "rules": {
             "anyOf": [
               {
@@ -3541,6 +3682,7 @@
           "max_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
+          "referees_enabled",
           "rules"
         ],
         "title": "TournamentUpdateBody",
@@ -3623,6 +3765,11 @@
             "title": "Players Can Be In Multiple Teams",
             "type": "boolean"
           },
+          "referees_enabled": {
+            "default": false,
+            "title": "Referees Enabled",
+            "type": "boolean"
+          },
           "rules": {
             "anyOf": [
               {
@@ -3701,6 +3848,7 @@
           "score_tracking_enabled",
           "score_tracking_token",
           "rules",
+          "referees_enabled",
           "id",
           "levels"
         ],

@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     ForeignKey,
     Index,
@@ -57,6 +58,7 @@ tournaments = Table(
     Column("score_tracking_enabled", Boolean, nullable=False, server_default="false"),
     Column("score_tracking_token", String, nullable=True),
     Column("rules", Text, nullable=True),
+    Column("referees_enabled", Boolean, nullable=False, server_default="false"),
 )
 
 levels = Table(
@@ -177,6 +179,12 @@ matches = Table(
         nullable=True,
     ),
     Column("court_id", BigInteger, ForeignKey("courts.id"), nullable=True),
+    Column(
+        "referee_id",
+        BigInteger,
+        ForeignKey("referees.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
     Column("stage_item_input1_score", Integer, nullable=False),
     Column("stage_item_input2_score", Integer, nullable=False),
     Column(
@@ -209,6 +217,26 @@ teams = Table(
     Column("losses", Integer, nullable=False, server_default="0"),
     Column("logo_path", String, nullable=True),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
+)
+
+referees = Table(
+    "referees",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), index=True, nullable=False),
+    Column(
+        "team_id",
+        BigInteger,
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    ),
+    Column("name", String, nullable=True),
+    Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
+    CheckConstraint(
+        "(team_id IS NULL) != (name IS NULL)",
+        name="referees_exactly_one_of_team_or_name",
+    ),
 )
 
 players = Table(

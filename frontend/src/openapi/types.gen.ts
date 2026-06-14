@@ -290,6 +290,10 @@ export type Match = {
    */
   precedence_conflict: boolean;
   /**
+   * Referee Id
+   */
+  referee_id: number | null;
+  /**
    * Round Id
    */
   round_id: number;
@@ -360,6 +364,10 @@ export type MatchBody = {
    * Custom Duration Minutes
    */
   custom_duration_minutes: number | null;
+  /**
+   * Referee Team Id
+   */
+  referee_team_id: number | null;
   /**
    * Round Id
    */
@@ -510,6 +518,11 @@ export type MatchWithDetails = {
    * Precedence Conflict
    */
   precedence_conflict: boolean;
+  referee: Referee | null;
+  /**
+   * Referee Id
+   */
+  referee_id: number | null;
   /**
    * Round Id
    */
@@ -602,6 +615,11 @@ export type MatchWithDetailsDefinitive = {
    * Precedence Conflict
    */
   precedence_conflict: boolean;
+  referee: Referee | null;
+  /**
+   * Referee Id
+   */
+  referee_id: number | null;
   /**
    * Round Id
    */
@@ -940,6 +958,36 @@ export type RankingsResponse = {
    * Data
    */
   data: Array<Ranking>;
+};
+
+/**
+ * Referee
+ */
+export type Referee = {
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Team Id
+   */
+  team_id: number | null;
+  /**
+   * Team Name
+   */
+  team_name: string | null;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
 };
 
 /**
@@ -1895,6 +1943,10 @@ export type TournamentBody = {
    */
   players_can_be_in_multiple_teams: boolean;
   /**
+   * Referees Enabled
+   */
+  referees_enabled: boolean;
+  /**
    * Rules
    */
   rules: string | null;
@@ -1971,6 +2023,10 @@ export type TournamentUpdateBody = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Referees Enabled
+   */
+  referees_enabled: boolean;
   /**
    * Rules
    */
@@ -2049,6 +2105,10 @@ export type TournamentWithLevels = {
    * Players Can Be In Multiple Teams
    */
   players_can_be_in_multiple_teams: boolean;
+  /**
+   * Referees Enabled
+   */
+  referees_enabled: boolean;
   /**
    * Rules
    */

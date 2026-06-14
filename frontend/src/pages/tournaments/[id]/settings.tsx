@@ -197,6 +197,7 @@ function GeneralTournamentForm({
       max_team_size: tournament.max_team_size,
       signup_team_choice_enabled: tournament.signup_team_choice_enabled ?? true,
       score_tracking_enabled: tournament.score_tracking_enabled ?? false,
+      referees_enabled: tournament.referees_enabled ?? false,
       rules: tournament.rules ?? '',
     },
 
@@ -235,6 +236,7 @@ function GeneralTournamentForm({
           maxTeamSize,
           values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true,
           values.score_tracking_enabled ?? tournament.score_tracking_enabled ?? false,
+          values.referees_enabled ?? tournament.referees_enabled ?? false,
           values.rules.trim() === '' ? null : values.rules
         );
 
@@ -492,6 +494,12 @@ function GeneralTournamentForm({
             />
           </Stack>
         ) : null}
+      </Fieldset>
+      <Fieldset legend={t('referees_title')} mt="lg" radius="md">
+        <Checkbox
+          label={t('referees_enabled_label')}
+          {...form.getInputProps('referees_enabled', { type: 'checkbox' })}
+        />
       </Fieldset>
       <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
         <NumberInput
