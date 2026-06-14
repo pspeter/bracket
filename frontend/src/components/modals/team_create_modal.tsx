@@ -19,6 +19,7 @@ import { mutate, SWRResponse } from 'swr';
 
 import SaveButton from '@components/buttons/save';
 import { MultiTeamsInput } from '@components/forms/player_create_csv_input';
+import { levelColour } from '@logic/colors';
 import { LevelResponse, Player, TeamsWithPlayersResponse } from '@openapi';
 import {
   getPlayers,
@@ -26,7 +27,6 @@ import {
   getTournamentById,
   handleRequestError,
 } from '@services/adapter';
-import { stringToColour } from '@services/lookups';
 import { createTeam, createTeams } from '@services/team';
 
 type PlayerOption = {
@@ -45,12 +45,12 @@ function playerSelectData(players: Player[], levelNameById: Map<number, string>)
   }));
 }
 
-function PlayerSelectOption({ option }: { option: PlayerOption }) {
+function PlayerSelectOption({ option, levels }: { option: PlayerOption; levels: LevelResponse[] }) {
   return (
     <Group gap="xs" wrap="nowrap">
       <Text size="sm">{option.label}</Text>
       {option.level_id != null && (
-        <Badge size="xs" color={stringToColour(`level-${option.level_id}`)} variant="light">
+        <Badge size="xs" color={levelColour(option.level_id, levels)} variant="light">
           {option.level_name ?? `Level ${option.level_id}`}
         </Badge>
       )}
@@ -204,7 +204,9 @@ function SingleTeamTab({
 
       <MultiSelect
         data={playerOptions}
-        renderOption={({ option }) => <PlayerSelectOption option={option as PlayerOption} />}
+        renderOption={({ option }) => (
+          <PlayerSelectOption option={option as PlayerOption} levels={levels} />
+        )}
         label={t('team_member_select_title')}
         placeholder={t('team_member_select_placeholder')}
         maxDropdownHeight={160}

@@ -128,7 +128,7 @@ export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, M
 // The single source of truth lives in the logic layer (dependency-free, so the
 // schedule colour engine and its tests can share it); re-exported here for the
 // many call sites that already import it from the lookups module.
-export { stringToColour } from '@logic/string_to_colour';
+export { stringToColour } from '@logic/colors';
 
 export function getMatchLookupByCourt(swrStagesResponse: SWRResponse) {
   const matches = Object.values(getMatchLookup(swrStagesResponse)).map((x) => x.match);

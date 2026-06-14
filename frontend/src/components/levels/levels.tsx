@@ -1,7 +1,7 @@
 import { Badge, Select } from '@mantine/core';
 
+import { levelColour } from '@logic/colors';
 import type { LevelResponse } from '@openapi';
-import { stringToColour } from '@services/lookups';
 
 export function getLevel(levels: LevelResponse[], levelId: number | null | undefined) {
   if (levelId == null) return null;
@@ -26,7 +26,7 @@ export function LevelBadge({
   if (level == null) return null;
 
   return (
-    <Badge color={stringToColour(`level-${level.id}`)} variant="light">
+    <Badge color={levelColour(level.id, levels)} variant="light">
       {level.name}
     </Badge>
   );

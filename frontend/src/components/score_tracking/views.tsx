@@ -22,8 +22,9 @@ import { SWRResponse } from 'swr';
 import { LevelBadge, LevelFilterSelect } from '@components/levels/levels';
 import { Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
-import { formatMatchInput1, formatMatchInput2, getScoreColors } from '@components/utils/match';
+import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { responseIsValid } from '@components/utils/util';
+import { getScoreColors } from '@logic/colors';
 import {
   LevelResponse,
   MatchWithDetails,

@@ -9,8 +9,8 @@ import { DateTime } from '@components/utils/datetime';
 import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { TournamentMinimal } from '@components/utils/tournament';
+import { levelColour } from '@logic/colors';
 import { LevelResponse, PlayerWithTeams, PlayersResponse } from '@openapi';
-import { stringToColour } from '@services/lookups';
 import { deletePlayer } from '@services/player';
 import TableLayout, { TableState, ThNotSortable, ThSortable, sortTableEntries } from './table';
 
@@ -81,7 +81,7 @@ export default function PlayersTable({
               {player.teams.map((team) => (
                 <Badge
                   key={team.id}
-                  color={team.level_id != null ? stringToColour(`level-${team.level_id}`) : 'blue'}
+                  color={team.level_id != null ? levelColour(team.level_id, levels) : 'blue'}
                   variant="light"
                 >
                   {team.name}
@@ -96,7 +96,7 @@ export default function PlayersTable({
         </Table.Td>
         <Table.Td>
           {player.level_id != null ? (
-            <Badge color={stringToColour(`level-${player.level_id}`)} variant="light">
+            <Badge color={levelColour(player.level_id, levels)} variant="light">
               {levelNameById.get(player.level_id) ?? `Level ${player.level_id}`}
             </Badge>
           ) : (

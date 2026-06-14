@@ -17,11 +17,7 @@ import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
-import {
-  levelSwatchColour,
-  NEUTRAL_STAGE_ITEM_COLOUR,
-  type StageItemColour,
-} from '@logic/planning/colours';
+import { levelSwatchColour, NEUTRAL_STAGE_ITEM_COLOUR, type StageItemColour } from '@logic/colors';
 import {
   groupUnscheduledMatchesForTray,
   type TrayMatchGroups,
@@ -127,7 +123,7 @@ export default function UnscheduledSheet({
               </Text>
               <Badge
                 size="sm"
-                color={level.id != null ? levelSwatchColour(level.id) : undefined}
+                color={level.id != null ? levelSwatchColour(level.id, levels) : undefined}
                 variant="light"
               >
                 {level.stages.reduce((count, stage) => count + stage.matches.length, 0)}
