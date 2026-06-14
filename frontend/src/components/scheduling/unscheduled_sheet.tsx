@@ -6,6 +6,7 @@ import {
   Flex,
   Group,
   Paper,
+  Portal,
   ScrollArea,
   Stack,
   Text,
@@ -159,59 +160,69 @@ export default function UnscheduledSheet({
   }
 
   return (
-    <Paper
-      shadow="lg"
-      radius={0}
-      withBorder
-      style={{
-        position: 'fixed',
-        bottom: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: `min(100%, ${preferredTrayWidthRem}rem)`,
-        zIndex: 150,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        borderBottom: 'none',
-      }}
-    >
-      <Group justify="space-between" wrap="nowrap" gap="xs" p="sm">
-        <UnstyledButton onClick={onToggle} style={{ flex: 1, minWidth: 0 }} aria-expanded={opened}>
-          <Group justify="space-between" wrap="nowrap">
-            <Group gap="xs" wrap="nowrap">
-              <Text fw={600}>{t('unscheduled_title')}</Text>
-              <Badge color={unscheduledMatches.length > 0 ? 'indigo' : 'green'} variant="filled">
-                {unscheduledMatches.length}
-              </Badge>
-            </Group>
-            {opened ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
-          </Group>
-        </UnstyledButton>
-        {rightSection}
-      </Group>
-      <Collapse in={opened}>
-        <ScrollArea.Autosize mah="45dvh">
-          <Box px="sm" pb="sm">
-            {unscheduledMatches.length === 0 ? (
-              <Group gap="sm" py="xs" wrap="nowrap">
-                <ThemeIcon color="green" variant="light" radius="xl">
-                  <IconCheck size={18} />
-                </ThemeIcon>
-                <Box>
-                  <Text size="sm" fw={600}>
-                    {t('all_matches_scheduled_title')}
-                  </Text>
-                  <Text c="dimmed" size="sm">
-                    {t('unscheduled_column_empty_description')}
-                  </Text>
-                </Box>
+    // Portal to the body so the fixed positioning is viewport-relative: the
+    // planning page wraps the grid in a `container-type: inline-size` box, which
+    // establishes a containing block for fixed descendants and would otherwise
+    // pin this sheet to the (often short) grid's bottom instead of the screen.
+    <Portal>
+      <Paper
+        shadow="lg"
+        radius={0}
+        withBorder
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: `min(100%, ${preferredTrayWidthRem}rem)`,
+          zIndex: 150,
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          borderBottom: 'none',
+        }}
+      >
+        <Group justify="space-between" wrap="nowrap" gap="xs" p="sm">
+          <UnstyledButton
+            onClick={onToggle}
+            style={{ flex: 1, minWidth: 0 }}
+            aria-expanded={opened}
+          >
+            <Group justify="space-between" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap">
+                <Text fw={600}>{t('unscheduled_title')}</Text>
+                <Badge color={unscheduledMatches.length > 0 ? 'indigo' : 'green'} variant="filled">
+                  {unscheduledMatches.length}
+                </Badge>
               </Group>
-            ) : (
-              renderGroups(groups)
-            )}
-          </Box>
-        </ScrollArea.Autosize>
-      </Collapse>
-    </Paper>
+              {opened ? <IconChevronDown size={20} /> : <IconChevronUp size={20} />}
+            </Group>
+          </UnstyledButton>
+          {rightSection}
+        </Group>
+        <Collapse in={opened}>
+          <ScrollArea.Autosize mah="45dvh">
+            <Box px="sm" pb="sm">
+              {unscheduledMatches.length === 0 ? (
+                <Group gap="sm" py="xs" wrap="nowrap">
+                  <ThemeIcon color="green" variant="light" radius="xl">
+                    <IconCheck size={18} />
+                  </ThemeIcon>
+                  <Box>
+                    <Text size="sm" fw={600}>
+                      {t('all_matches_scheduled_title')}
+                    </Text>
+                    <Text c="dimmed" size="sm">
+                      {t('unscheduled_column_empty_description')}
+                    </Text>
+                  </Box>
+                </Group>
+              ) : (
+                renderGroups(groups)
+              )}
+            </Box>
+          </ScrollArea.Autosize>
+        </Collapse>
+      </Paper>
+    </Portal>
   );
 }
