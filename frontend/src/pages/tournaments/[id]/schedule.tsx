@@ -6,8 +6,8 @@ import {
   Grid,
   Group,
   Loader,
-  LoadingOverlay,
   Modal,
+  Overlay,
   Paper,
   Select,
   Stack,
@@ -342,22 +342,20 @@ export default function SchedulePage() {
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
-      <Box ref={pinchRef} pos="relative" style={{ touchAction: 'pan-x pan-y' }}>
-        <LoadingOverlay
-          visible={isOptimizing}
-          zIndex={500}
-          overlayProps={{ blur: 1, backgroundOpacity: 0.55, color: '#000' }}
-          loaderProps={{
-            children: (
-              <Stack align="center" gap="sm">
-                <Loader size="lg" />
-                <Text c="white" fw={600}>
-                  {t('optimizing_schedule_label', 'Optimizing schedule …')}
-                </Text>
-              </Stack>
-            ),
-          }}
-        />
+      <Box ref={pinchRef} style={{ touchAction: 'pan-x pan-y' }}>
+        {/* A SAT solve is a single synchronous request, so dim the whole
+            viewport — header and navbar included — behind a spinner to make the
+            wait read as deliberate and discourage navigating away mid-solve. */}
+        {isOptimizing && (
+          <Overlay fixed color="#000" backgroundOpacity={0.55} blur={1} zIndex={1000} center>
+            <Stack align="center" gap="sm">
+              <Loader size="lg" />
+              <Text c="white" fw={600}>
+                {t('optimizing_schedule_label', 'Optimizing schedule …')}
+              </Text>
+            </Stack>
+          </Overlay>
+        )}
         <Grid grow>
           <Grid.Col span={6}>
             <Title>{t('planning_title')}</Title>
