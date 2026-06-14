@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Affix,
   Badge,
   Box,
@@ -14,8 +15,9 @@ import {
   Text,
   Title,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { IconCalendarPlus, IconWand } from '@tabler/icons-react';
+import { IconCalendarPlus, IconTools, IconWand } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -80,6 +82,7 @@ import {
 
 import CourtsToolbar from '@components/scheduling/courts_toolbar';
 import MatchActionSheet from '@components/scheduling/match_action_sheet';
+import PlannerToolsSheet from '@components/scheduling/planner_tools_sheet';
 import ScheduleGrid from '@components/scheduling/schedule_grid';
 import SchedulerWeightsForm, {
   DEFAULT_SCHEDULER_WEIGHTS,
@@ -96,6 +99,11 @@ export default function SchedulePage() {
   const [highlightValue, setHighlightValue] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [trayOpened, setTrayOpened] = useState(false);
+  // On phones the inline top toolbar (team search, courts, auto-schedule) is
+  // awkward, so it collapses into a tools sheet reached from a button beside the
+  // unscheduled tray. Same breakpoint the grid uses for its mobile affordances.
+  const isMobile = useMediaQuery('(max-width: 768px)') ?? false;
+  const [toolsOpened, setToolsOpened] = useState(false);
   const [focus, setFocus] = useState<(FocusTarget & { nonce: number }) | null>(null);
   // Details modal opened from the action sheet; holds the match id (not the
   // match) so a background revalidation refreshes the modal's data instead of
@@ -364,53 +372,57 @@ export default function SchedulePage() {
           <Grid.Col span={6}>
             <Title>{t('planning_title')}</Title>
           </Grid.Col>
-          <Grid.Col span={6}>
-            <Group justify="right">
-              <Select
-                aria-label={t('team_highlight_label', 'Highlight team or input')}
-                placeholder={t('team_highlight_placeholder', 'Find team or input')}
-                data={highlightOptions}
-                value={highlightValue}
-                onChange={setHighlightValue}
-                searchable
-                clearable
-                limit={100}
-                w={220}
-                size="sm"
-                mb={10}
-              />
-              <CourtsToolbar
-                tournamentId={tournamentData.id}
-                swrCourtsResponse={swrCourtsResponse}
-                courts={courts}
-                matchesByCourtId={matchesByCourtId}
-              />
-              {courts.length < 1 ? null : (
-                <Button
-                  color="indigo"
-                  size="md"
-                  variant="filled"
-                  style={{ marginBottom: 10 }}
-                  leftSection={<IconCalendarPlus size={24} />}
-                  onClick={() => setScheduleModalOpened(true)}
-                >
-                  {t('schedule_description')}
-                </Button>
-              )}
-              {courts.length < 1 ? null : (
-                <Button
-                  color="grape"
-                  size="md"
-                  variant="light"
-                  style={{ marginBottom: 10 }}
-                  leftSection={<IconWand size={24} />}
-                  onClick={() => setReoptimizeModalOpened(true)}
-                >
-                  {t('reoptimize_description')}
-                </Button>
-              )}
-            </Group>
-          </Grid.Col>
+          {/* On mobile these controls move into the tools sheet reached from the
+              unscheduled tray, leaving the header uncluttered. */}
+          {!isMobile && (
+            <Grid.Col span={6}>
+              <Group justify="right">
+                <Select
+                  aria-label={t('team_highlight_label', 'Highlight team or input')}
+                  placeholder={t('team_highlight_placeholder', 'Find team or input')}
+                  data={highlightOptions}
+                  value={highlightValue}
+                  onChange={setHighlightValue}
+                  searchable
+                  clearable
+                  limit={100}
+                  w={220}
+                  size="sm"
+                  mb={10}
+                />
+                <CourtsToolbar
+                  tournamentId={tournamentData.id}
+                  swrCourtsResponse={swrCourtsResponse}
+                  courts={courts}
+                  matchesByCourtId={matchesByCourtId}
+                />
+                {courts.length < 1 ? null : (
+                  <Button
+                    color="indigo"
+                    size="md"
+                    variant="filled"
+                    style={{ marginBottom: 10 }}
+                    leftSection={<IconCalendarPlus size={24} />}
+                    onClick={() => setScheduleModalOpened(true)}
+                  >
+                    {t('schedule_description')}
+                  </Button>
+                )}
+                {courts.length < 1 ? null : (
+                  <Button
+                    color="grape"
+                    size="md"
+                    variant="light"
+                    style={{ marginBottom: 10 }}
+                    leftSection={<IconWand size={24} />}
+                    onClick={() => setReoptimizeModalOpened(true)}
+                  >
+                    {t('reoptimize_description')}
+                  </Button>
+                )}
+              </Group>
+            </Grid.Col>
+          )}
         </Grid>
         {courts.length < 1 ? (
           <Stack align="center" mt="1rem">
@@ -470,7 +482,34 @@ export default function SchedulePage() {
               opened={trayOpened}
               onToggle={() => setTrayOpened((opened) => !opened)}
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
+              rightSection={
+                isMobile ? (
+                  <ActionIcon
+                    variant="default"
+                    size="lg"
+                    aria-label={t('planner_tools_title')}
+                    onClick={() => setToolsOpened(true)}
+                  >
+                    <IconTools size={20} />
+                  </ActionIcon>
+                ) : null
+              }
             />
+            {isMobile && (
+              <PlannerToolsSheet
+                opened={toolsOpened}
+                onClose={() => setToolsOpened(false)}
+                tournamentId={tournamentData.id}
+                swrCourtsResponse={swrCourtsResponse}
+                courts={courts}
+                matchesByCourtId={matchesByCourtId}
+                highlightOptions={highlightOptions}
+                highlightValue={highlightValue}
+                onHighlightChange={setHighlightValue}
+                onSchedule={() => setScheduleModalOpened(true)}
+                onReoptimize={() => setReoptimizeModalOpened(true)}
+              />
+            )}
             <MatchActionSheet
               opened={sheetMatchRef != null}
               match={

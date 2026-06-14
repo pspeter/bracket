@@ -1,13 +1,12 @@
-import { ActionIcon, Badge, Button, Group, Menu, Modal, Stack, Text } from '@mantine/core';
+import { Button, Menu } from '@mantine/core';
 import { IconAdjustmentsHorizontal, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
 import CourtModal from '@components/modals/create_court_modal';
-import { buildCourtManagementList } from '@logic/planning/courts';
+import CourtDeleteModal from '@components/scheduling/court_delete_modal';
 import { Court, CourtsResponse, MatchWithDetails } from '@openapi';
-import { deleteCourt } from '@services/court';
 
 /**
  * Toolbar menu for managing courts from the planning view. Court add/delete
@@ -28,7 +27,6 @@ export default function CourtsToolbar({
   const { t } = useTranslation();
   const [addOpened, setAddOpened] = useState(false);
   const [deleteOpened, setDeleteOpened] = useState(false);
-  const entries = buildCourtManagementList(courts, matchesByCourtId);
 
   return (
     <>
@@ -38,46 +36,14 @@ export default function CourtsToolbar({
         opened={addOpened}
         setOpened={setAddOpened}
       />
-      <Modal
+      <CourtDeleteModal
+        tournamentId={tournamentId}
+        swrCourtsResponse={swrCourtsResponse}
+        courts={courts}
+        matchesByCourtId={matchesByCourtId}
         opened={deleteOpened}
-        onClose={() => setDeleteOpened(false)}
-        title={t('delete_court_button')}
-      >
-        {entries.length < 1 ? (
-          <Text c="dimmed">{t('no_courts_title')}</Text>
-        ) : (
-          <Stack gap="xs">
-            {entries.map(({ court, matchCount }) => (
-              <Group key={court.id} justify="space-between" wrap="nowrap">
-                <Text fw={500} truncate>
-                  {court.name}
-                </Text>
-                <Group gap="xs" wrap="nowrap">
-                  {matchCount > 0 && (
-                    <Badge color="orange" variant="light">
-                      {t('court_match_count_badge', { count: matchCount })}
-                    </Badge>
-                  )}
-                  <ActionIcon
-                    color="red"
-                    variant="light"
-                    size="lg"
-                    aria-label={`${t('delete_court_button')} ${court.name}`}
-                    onClick={async () => {
-                      // Courts still used by matches are rejected by the backend
-                      // with an error notification; the badge warns up front.
-                      await deleteCourt(tournamentId, court.id);
-                      await swrCourtsResponse.mutate();
-                    }}
-                  >
-                    <IconTrash size={18} />
-                  </ActionIcon>
-                </Group>
-              </Group>
-            ))}
-          </Stack>
-        )}
-      </Modal>
+        setOpened={setDeleteOpened}
+      />
       <Menu shadow="md" position="bottom-end">
         <Menu.Target>
           <Button
