@@ -212,6 +212,7 @@
     "number_required": "Includes number",
     "only_recommended_input_group_label": "Only show teams that played less matches",
     "only_recommended_radio_label": "Only recommended",
+    "optimizing_schedule_label": "Optimizing schedule …",
     "password_input_label": "Password",
     "password_input_placeholder": "Your password",
     "placement_conflict_preview_label": "Would double-book a team",

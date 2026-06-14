@@ -163,6 +163,11 @@ Alembic migrations live in `backend/alembic/versions/`. Migrations auto-run on s
 - **`openapi/`** — Auto-generated TypeScript types from backend OpenAPI schema (via `@hey-api/openapi-ts`). Regenerate with `pnpm run openapi-ts`
 - **`components/`** — UI components organized by feature (brackets, builder, dashboard, scheduling, etc.)
 - **`pages/`** — Route pages. Tournament pages under `pages/tournaments/[id]/`
+- **`public/locales/<lang>/common.json`** — i18n translation strings, one file per language
+
+#### Translations
+
+When you add a user-facing string, always add the new translation key to **both** the English (`public/locales/en/common.json`) and German (`public/locales/de/common.json`) locales. Keys are kept in alphabetical order within each file.
 
 ### Data Model Hierarchy
 
