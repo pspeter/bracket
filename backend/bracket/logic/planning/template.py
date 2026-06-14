@@ -205,7 +205,9 @@ def _build_3group_stages(until_rank: int) -> tuple[BlueprintStage, BlueprintStag
         finals_items.append(
             _item("3rd Place", [_t(1, "Semi-final A", 2), _t(2, "Semi-final B", 2)])
         )
-    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(name="Finals", items=finals_items)
+    return BlueprintStage(name="Semi-finals", items=semis_items), BlueprintStage(
+        name="Finals", items=finals_items
+    )
 
 
 def _build_2group_nosf_finals(until_rank: int, teams_per_group: int) -> BlueprintStage:
