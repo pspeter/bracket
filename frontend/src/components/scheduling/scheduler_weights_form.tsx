@@ -38,7 +38,7 @@ export default function SchedulerWeightsForm({
         type="button"
         onClick={onToggle}
         size="sm"
-        c="rgba(255, 255, 255, 0.5)"
+        c="dimmed"
         style={{ alignSelf: 'flex-start' }}
       >
         {opened ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}{' '}
