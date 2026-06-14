@@ -39,6 +39,7 @@ export default function UnscheduledSheet({
   levels,
   stageItemColours,
   opened,
+  hidden = false,
   onToggle,
   onSelectMatch,
   rightSection,
@@ -49,6 +50,10 @@ export default function UnscheduledSheet({
   levels: LevelResponse[];
   stageItemColours: Record<number, StageItemColour>;
   opened: boolean;
+  // When true, slide the entire sheet down off the bottom of the screen (kept
+  // mounted so the slide animates). Used to clear it out of the way on phones
+  // while a match is being placed.
+  hidden?: boolean;
   onToggle: () => void;
   onSelectMatch: (m: MatchWithDetails) => void;
   // Optional control rendered to the right of the toggle (the mobile tools
@@ -171,7 +176,10 @@ export default function UnscheduledSheet({
           position: 'fixed',
           bottom: 0,
           left: '50%',
-          transform: 'translateX(-50%)',
+          // `calc(100% + 1px)` clears the shadow's top edge too, so nothing
+          // peeks above the screen bottom while hidden.
+          transform: hidden ? 'translate(-50%, calc(100% + 1px))' : 'translateX(-50%)',
+          transition: 'transform 200ms ease',
           width: `min(100%, ${preferredTrayWidthRem}rem)`,
           zIndex: 150,
           borderTopLeftRadius: 12,
