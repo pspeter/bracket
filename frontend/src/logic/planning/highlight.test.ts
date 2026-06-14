@@ -117,4 +117,27 @@ describe('stageHighlightOptions', () => {
       },
     ]);
   });
+
+  it('lists teams before placeholder inputs, each sorted alphabetically', () => {
+    expect(
+      stageHighlightOptions([
+        {
+          stage_items: [
+            { id: 10, name: 'Group A', inputs: [] },
+            { id: 20, name: 'Group B', inputs: [] },
+            {
+              id: 30,
+              name: 'Final',
+              inputs: [
+                { ...input(301, null), winner_from_stage_item_id: 20, winner_position: 1 },
+                { ...input(302, null), winner_from_stage_item_id: 10, winner_position: 1 },
+                input(103, 12, 'Zeta'),
+                input(104, 11, 'Alpha'),
+              ],
+            },
+          ],
+        },
+      ]).map((option) => option.label)
+    ).toEqual(['Alpha', 'Zeta', '1st of Group A', '1st of Group B']);
+  });
 });
