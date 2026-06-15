@@ -573,6 +573,7 @@ export default function SchedulePage() {
               zoom={planner.zoom}
               focus={focus}
               nowOffsetMinutes={nowOffsetMinutes}
+              refereesEnabled={tournament.referees_enabled}
               onSelectionEvent={handlePlannerEvent}
             />
             <UnscheduledSheet

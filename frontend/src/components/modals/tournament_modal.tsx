@@ -56,6 +56,7 @@ function GeneralTournamentForm({
       auto_assign_courts: true,
       duration_minutes: 10,
       margin_minutes: 5,
+      referees_enabled: false,
       levels: '',
     },
 
@@ -91,6 +92,7 @@ function GeneralTournamentForm({
           4,
           true,
           false,
+          values.referees_enabled,
           levels.length > 0 ? levels : null
         );
         await swrTournamentsResponse.mutate();
@@ -184,6 +186,11 @@ function GeneralTournamentForm({
         mt="md"
         label={t('auto_assign_courts_label')}
         {...form.getInputProps('auto_assign_courts', { type: 'checkbox' })}
+      />
+      <Checkbox
+        mt="md"
+        label={t('referees_enabled_label')}
+        {...form.getInputProps('referees_enabled', { type: 'checkbox' })}
       />
 
       <Button fullWidth mt={8} color="green" type="submit">

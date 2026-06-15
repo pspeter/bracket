@@ -1,5 +1,6 @@
 import { Badge, Button, Divider, Group, Modal, NumberInput, Select, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
@@ -14,7 +15,7 @@ import {
   RoundWithMatches,
   StagesWithStageItemsResponse,
 } from '@openapi';
-import { getTournamentById } from '@services/adapter';
+import { getTeams, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 import { deleteMatch, updateMatch } from '@services/match';
 
@@ -23,6 +24,7 @@ type MatchModalFormValues = {
   stage_item_input2_score: number;
   custom_duration_minutes: number | string;
   state: MatchWithDetails['state'];
+  referee_team_id: string | null;
 };
 
 function MatchDeleteButton({
@@ -80,6 +82,7 @@ function MatchModalForm({
       stage_item_input2_score: match.stage_item_input2_score,
       custom_duration_minutes: match.custom_duration_minutes ?? match.duration_minutes,
       state: match.state,
+      referee_team_id: match.referee?.team_id != null ? `${match.referee.team_id}` : null,
     },
 
     validate: {
@@ -99,6 +102,12 @@ function MatchModalForm({
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const defaultDurationMinutes =
     swrTournamentResponse.data?.data.duration_minutes ?? match.duration_minutes;
+  const refereesEnabled = swrTournamentResponse.data?.data.referees_enabled ?? false;
+
+  const swrTeamsResponse = getTeams(refereesEnabled ? tournamentData.id : undefined);
+  const refereeTeamOptions = (swrTeamsResponse.data?.data.teams ?? [])
+    .filter((team) => team.active)
+    .map((team) => ({ value: `${team.id}`, label: team.name }));
 
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
   const matchesLookup = getMatchLookup(swrStagesResponse);
@@ -142,6 +151,14 @@ function MatchModalForm({
               : null,
             state: values.state,
             completed_at: match.completed_at,
+            // When the feature is on, write the combobox choice (null clears it).
+            // When it's off the combobox is hidden, so we re-send the current team
+            // referee to leave the stored assignment untouched.
+            referee_team_id: refereesEnabled
+              ? values.referee_team_id != null
+                ? Number(values.referee_team_id)
+                : null
+              : (match.referee?.team_id ?? null),
           };
           await updateMatch(tournamentData.id, match.id, updatedMatch);
           await swrStagesResponse.mutate();
@@ -188,6 +205,18 @@ function MatchModalForm({
           ]}
           {...form.getInputProps('state')}
         />
+        {refereesEnabled && (
+          <Select
+            mt="lg"
+            label={t('referee_label')}
+            placeholder={t('referee_placeholder')}
+            leftSection={<GiWhistle size="1.1rem" />}
+            data={refereeTeamOptions}
+            searchable
+            clearable
+            {...form.getInputProps('referee_team_id')}
+          />
+        )}
         <Divider mt="lg" />
 
         <Text size="sm" mt="lg">
