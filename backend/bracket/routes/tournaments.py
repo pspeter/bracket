@@ -68,8 +68,7 @@ async def _tournament_with_levels(tournament: Tournament) -> TournamentWithLevel
     return TournamentWithLevels(
         **tournament.model_dump(),
         levels=[
-            LevelResponse(id=level.id, name=level.name, position=level.position)
-            for level in levels
+            LevelResponse(id=level.id, name=level.name, position=level.position) for level in levels
         ],
     )
 

@@ -115,6 +115,9 @@ import type {
   GetRankingsTournamentsTournamentIdRankingsGetData,
   GetRankingsTournamentsTournamentIdRankingsGetErrors,
   GetRankingsTournamentsTournamentIdRankingsGetResponses,
+  GetRefereesTournamentsTournamentIdRefereesGetData,
+  GetRefereesTournamentsTournamentIdRefereesGetErrors,
+  GetRefereesTournamentsTournamentIdRefereesGetResponses,
   GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetData,
   GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetErrors,
   GetScoreTrackingInfoScoreTrackingScoreTrackingTokenGetResponses,
@@ -1094,6 +1097,23 @@ export const updateRankingByIdTournamentsTournamentIdRankingsRankingIdPut = <
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Get Referees
+ */
+export const getRefereesTournamentsTournamentIdRefereesGet = <ThrowOnError extends boolean = false>(
+  options: Options<GetRefereesTournamentsTournamentIdRefereesGetData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    GetRefereesTournamentsTournamentIdRefereesGetResponses,
+    GetRefereesTournamentsTournamentIdRefereesGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/referees',
+    ...options,
   });
 
 /**

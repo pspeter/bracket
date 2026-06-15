@@ -20,7 +20,12 @@ export async function deleteMatch(tournament_id: number, match_id: number) {
     .catch((response: any) => handleRequestError(response));
 }
 
-export async function updateMatch(tournament_id: number, match_id: number, match: MatchBody) {
+export async function updateMatch(
+  tournament_id: number,
+  match_id: number,
+  match: Omit<MatchBody, 'referee_team_id' | 'referee_name'> &
+    Partial<Pick<MatchBody, 'referee_team_id' | 'referee_name'>>
+) {
   return createAxios()
     .put(`tournaments/${tournament_id}/matches/${match_id}`, match)
     .catch((response: any) => handleRequestError(response));

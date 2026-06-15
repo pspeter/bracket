@@ -1,4 +1,16 @@
-import { Badge, Button, Divider, Group, Modal, NumberInput, Select, Text } from '@mantine/core';
+import {
+  Badge,
+  Button,
+  Combobox,
+  Divider,
+  Group,
+  InputBase,
+  Modal,
+  NumberInput,
+  Select,
+  Text,
+  useCombobox,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { useState } from 'react';
@@ -15,16 +27,18 @@ import {
   RoundWithMatches,
   StagesWithStageItemsResponse,
 } from '@openapi';
-import { getTeams, getTournamentById } from '@services/adapter';
+import { getReferees, getTeams, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 import { deleteMatch, updateMatch } from '@services/match';
+
+type RefereeValue = { kind: 'team'; teamId: string } | { kind: 'name'; name: string } | null;
 
 type MatchModalFormValues = {
   stage_item_input1_score: number;
   stage_item_input2_score: number;
   custom_duration_minutes: number | string;
   state: MatchWithDetails['state'];
-  referee_team_id: string | null;
+  referee: RefereeValue;
 };
 
 function MatchDeleteButton({
@@ -54,6 +68,131 @@ function MatchDeleteButton({
   );
 }
 
+function RefereeCombobox({
+  value,
+  onChange,
+  teamOptions,
+  recentlyUsedOptions,
+}: {
+  value: RefereeValue;
+  onChange: (v: RefereeValue) => void;
+  teamOptions: { value: string; label: string }[];
+  recentlyUsedOptions: string[];
+}) {
+  const { t } = useTranslation();
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+  });
+  const [search, setSearch] = useState('');
+
+  const currentLabel =
+    value == null
+      ? ''
+      : value.kind === 'team'
+        ? (teamOptions.find((o) => o.value === value.teamId)?.label ?? '')
+        : value.name;
+
+  const lowerSearch = search.toLowerCase();
+
+  const filteredTeams = teamOptions.filter((o) => o.label.toLowerCase().includes(lowerSearch));
+  const filteredRecent = recentlyUsedOptions.filter((n) => n.toLowerCase().includes(lowerSearch));
+
+  const exactMatchExists =
+    teamOptions.some((o) => o.label.toLowerCase() === lowerSearch) ||
+    recentlyUsedOptions.some((n) => n.toLowerCase() === lowerSearch);
+
+  const showNewOption = search.trim().length > 0 && !exactMatchExists;
+
+  const hasOptions = filteredTeams.length > 0 || filteredRecent.length > 0 || showNewOption;
+
+  return (
+    <Combobox
+      store={combobox}
+      onOptionSubmit={(val) => {
+        if (val === '__clear__') {
+          onChange(null);
+          setSearch('');
+        } else if (val.startsWith('team:')) {
+          const teamId = val.slice(5);
+          onChange({ kind: 'team', teamId });
+          setSearch(teamOptions.find((o) => o.value === teamId)?.label ?? '');
+        } else if (val.startsWith('name:')) {
+          const name = val.slice(5);
+          onChange({ kind: 'name', name });
+          setSearch(name);
+        }
+        combobox.closeDropdown();
+      }}
+    >
+      <Combobox.Target>
+        <InputBase
+          mt="lg"
+          label={t('referee_label')}
+          placeholder={t('referee_placeholder')}
+          leftSection={<GiWhistle size="1.1rem" />}
+          rightSection={
+            value != null ? (
+              <Combobox.ClearButton
+                onClear={() => {
+                  onChange(null);
+                  setSearch('');
+                }}
+              />
+            ) : (
+              <Combobox.Chevron />
+            )
+          }
+          rightSectionPointerEvents={value != null ? 'all' : 'none'}
+          value={search || currentLabel}
+          onChange={(e) => {
+            setSearch(e.currentTarget.value);
+            combobox.openDropdown();
+            combobox.updateSelectedOptionIndex();
+          }}
+          onClick={() => combobox.openDropdown()}
+          onFocus={() => combobox.openDropdown()}
+          onBlur={() => {
+            combobox.closeDropdown();
+            setSearch('');
+          }}
+        />
+      </Combobox.Target>
+
+      <Combobox.Dropdown>
+        <Combobox.Options>
+          {!hasOptions && <Combobox.Empty>{t('referee_no_options')}</Combobox.Empty>}
+
+          {filteredTeams.length > 0 && (
+            <Combobox.Group label={t('referee_teams_group')}>
+              {filteredTeams.map((opt) => (
+                <Combobox.Option key={opt.value} value={`team:${opt.value}`}>
+                  {opt.label}
+                </Combobox.Option>
+              ))}
+            </Combobox.Group>
+          )}
+
+          {filteredRecent.length > 0 && (
+            <Combobox.Group label={t('referee_recently_used_group')}>
+              {filteredRecent.map((name) => (
+                <Combobox.Option key={name} value={`name:${name}`}>
+                  {name}
+                </Combobox.Option>
+              ))}
+            </Combobox.Group>
+          )}
+
+          {showNewOption && (
+            <Combobox.Option value={`name:${search.trim()}`}>
+              {t('referee_use_as_new_name', { name: search.trim() })}
+            </Combobox.Option>
+          )}
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
+  );
+}
+
 function MatchModalForm({
   tournamentData,
   match,
@@ -76,13 +215,21 @@ function MatchModalForm({
   }
 
   const { t } = useTranslation();
+
+  const initialReferee: RefereeValue =
+    match.referee?.team_id != null
+      ? { kind: 'team', teamId: `${match.referee.team_id}` }
+      : match.referee?.name != null
+        ? { kind: 'name', name: match.referee.name }
+        : null;
+
   const form = useForm<MatchModalFormValues>({
     initialValues: {
       stage_item_input1_score: match.stage_item_input1_score,
       stage_item_input2_score: match.stage_item_input2_score,
       custom_duration_minutes: match.custom_duration_minutes ?? match.duration_minutes,
       state: match.state,
-      referee_team_id: match.referee?.team_id != null ? `${match.referee.team_id}` : null,
+      referee: initialReferee,
     },
 
     validate: {
@@ -108,6 +255,11 @@ function MatchModalForm({
   const refereeTeamOptions = (swrTeamsResponse.data?.data.teams ?? [])
     .filter((team) => team.active)
     .map((team) => ({ value: `${team.id}`, label: team.name }));
+
+  const swrRefereesResponse = getReferees(refereesEnabled ? tournamentData.id : undefined);
+  const recentlyUsedNames = (swrRefereesResponse.data?.data ?? [])
+    .filter((ref) => ref.name != null && ref.team_id == null)
+    .map((ref) => ref.name as string);
 
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
   const matchesLookup = getMatchLookup(swrStagesResponse);
@@ -140,6 +292,17 @@ function MatchModalForm({
     <>
       <form
         onSubmit={form.onSubmit(async (values) => {
+          const referee = values.referee;
+
+          // When referees are disabled the combobox is hidden; omit both referee
+          // fields entirely so the server leaves the existing assignment untouched.
+          const refereeFields = refereesEnabled
+            ? {
+                referee_team_id: referee?.kind === 'team' ? Number(referee.teamId) : null,
+                referee_name: referee?.kind === 'name' ? referee.name : null,
+              }
+            : {};
+
           const updatedMatch = {
             id: match.id,
             round_id: match.round_id,
@@ -151,14 +314,7 @@ function MatchModalForm({
               : null,
             state: values.state,
             completed_at: match.completed_at,
-            // When the feature is on, write the combobox choice (null clears it).
-            // When it's off the combobox is hidden, so we re-send the current team
-            // referee to leave the stored assignment untouched.
-            referee_team_id: refereesEnabled
-              ? values.referee_team_id != null
-                ? Number(values.referee_team_id)
-                : null
-              : (match.referee?.team_id ?? null),
+            ...refereeFields,
           };
           await updateMatch(tournamentData.id, match.id, updatedMatch);
           await swrStagesResponse.mutate();
@@ -206,15 +362,11 @@ function MatchModalForm({
           {...form.getInputProps('state')}
         />
         {refereesEnabled && (
-          <Select
-            mt="lg"
-            label={t('referee_label')}
-            placeholder={t('referee_placeholder')}
-            leftSection={<GiWhistle size="1.1rem" />}
-            data={refereeTeamOptions}
-            searchable
-            clearable
-            {...form.getInputProps('referee_team_id')}
+          <RefereeCombobox
+            value={form.values.referee}
+            onChange={(v) => form.setFieldValue('referee', v)}
+            teamOptions={refereeTeamOptions}
+            recentlyUsedOptions={recentlyUsedNames}
           />
         )}
         <Divider mt="lg" />
