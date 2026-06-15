@@ -585,6 +585,7 @@ def _add_referee_assignment(
     ends: dict[MatchId, Any],
     input_intervals: dict[StageItemInputId, list[Any]],
     pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]],
+    pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]],
     team_level_ids: dict[TeamId, LevelId | None],
     horizon: int,
 ) -> tuple[dict[MatchId, dict[TeamId, Any]], list[Any]]:
@@ -654,11 +655,12 @@ def _add_referee_assignment(
         team_id for choices in ref_choices.values() for team_id in choices
     )
 
-    # Per-team interval lists: playing (movable) + referee (optional, movable)
+    # Per-team interval lists: playing (movable) + referee (optional, movable) + pinned referee
     team_all_intervals: dict[TeamId, list[Any]] = defaultdict(list)
 
-    # Add movable playing intervals for each eligible team
-    for team_id in all_eligible_teams:
+    # Add movable playing intervals for eligible teams AND teams with pinned referee assignments
+    # (both groups need conflict-checking against each other's intervals)
+    for team_id in all_eligible_teams | set(pinned_by_referee_team.keys()):
         for input_id in team_to_input_ids.get(team_id, set()):
             team_all_intervals[team_id].extend(input_intervals.get(input_id, []))
 
@@ -681,7 +683,23 @@ def _add_referee_assignment(
                 )
             )
 
-    # No-overlap: a team cannot play and referee simultaneously (movable vs movable)
+    # Add fixed intervals for pinned referee assignments so AddNoOverlap covers:
+    #   - movable playing vs pinned referee (team plays a movable match while refereeing a pinned one)
+    #   - movable referee vs pinned referee (team referees both a movable and a pinned match)
+    for team_id, pinned_ref_matches in pinned_by_referee_team.items():
+        for pinned in pinned_ref_matches:
+            duration = pinned.end_minutes - pinned.start_minutes
+            if duration > 0:
+                team_all_intervals[team_id].append(
+                    model.NewFixedSizeIntervalVar(
+                        pinned.start_minutes,
+                        duration,
+                        f"pinned_ref_match_{pinned.context.match.id}_team_{team_id}",
+                    )
+                )
+
+    # No-overlap: a team cannot play or referee two overlapping intervals (movable vs movable,
+    # movable vs pinned-referee; pinned-playing vs movable-referee is handled separately below)
     for team_id, intervals in team_all_intervals.items():
         if len(intervals) >= 2:
             model.AddNoOverlap(intervals)
@@ -881,6 +899,19 @@ def build_schedule_plan(
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
     if tournament.referees_enabled:
         team_level_ids = _get_team_level_ids(stages)
+        pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]] = defaultdict(list)
+        for context in pinned_contexts:
+            ref = context.match.referee
+            if ref is None or ref.team_id is None:
+                continue
+            start_minutes = _minute_offset(tournament, assert_some(context.match.start_time))
+            pinned_by_referee_team[ref.team_id].append(
+                _PinnedMatch(
+                    context=context,
+                    start_minutes=start_minutes,
+                    end_minutes=start_minutes + context.match.duration_minutes,
+                )
+            )
         ref_choices, ref_spreads = _add_referee_assignment(
             model,
             movable_contexts,
@@ -889,6 +920,7 @@ def build_schedule_plan(
             ends,
             input_intervals,
             pinned_by_input,
+            pinned_by_referee_team,
             team_level_ids,
             horizon,
         )
@@ -993,6 +1025,16 @@ def build_referee_assignment_plan(
     if not needs_ref:
         return {}
 
+    # Build per-team refereeing intervals from already-assigned matches so we can
+    # exclude teams that are already committed as referee at an overlapping time.
+    team_refereeing_intervals: dict[TeamId, list[tuple[int, int]]] = defaultdict(list)
+    for context in has_ref:
+        ref = context.match.referee
+        if ref is not None and ref.team_id is not None:
+            start_min = _minute_offset(tournament, assert_some(context.match.start_time))
+            end_min = start_min + context.match.duration_minutes
+            team_refereeing_intervals[ref.team_id].append((start_min, end_min))
+
     model = cp_model.CpModel()
 
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
@@ -1009,7 +1051,7 @@ def build_referee_assignment_plan(
             if isinstance(input_, StageItemInputFinal):
                 playing_teams.add(input_.team_id)
 
-        # Eligible: same level, not playing in this match, not playing in an overlapping match.
+        # Eligible: same level, not playing in this match, not playing or refereeing at overlap.
         eligible: set[TeamId] = set()
         for team_id, level_id in team_level_ids.items():
             if level_id != context.level_id or team_id in playing_teams:
@@ -1017,6 +1059,11 @@ def build_referee_assignment_plan(
             if any(
                 start_min < p_end and p_start < end_min
                 for p_start, p_end in team_playing_intervals.get(team_id, [])
+            ):
+                continue
+            if any(
+                start_min < r_end and r_start < end_min
+                for r_start, r_end in team_refereeing_intervals.get(team_id, [])
             ):
                 continue
             eligible.add(team_id)
