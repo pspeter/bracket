@@ -1077,7 +1077,7 @@ def build_referee_assignment_plan(
     # assignable match to improve the spread. A safe bound: assigning one extra
     # match saves (max_load_spread * referee_fairness + 1) units vs. the worst
     # possible change in spread that the same assignment could cause.
-    coverage_weight = (max_possible_load + 1) * (weights.referee_fairness + 1)
+    coverage_weight = weights.referee_fairness + 1
     all_choice_vars = [var for choices in ref_choices.values() for var in choices.values()]
     # total_assigned is the sum of all AtMostOne choice vars (0/1 per match)
     total_assigned_expr = sum(all_choice_vars)
@@ -1119,14 +1119,13 @@ def build_referee_assignment_plan(
 
 
 async def assign_missing_referees_only(
-    tournament_id: TournamentId,
+    tournament: Tournament,
     stages: list[StageWithStageItems],
     weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
 ) -> None:
     """Persist referee assignments for scheduled matches that have none."""
-    tournament = await sql_get_tournament(tournament_id)
     for match_id, team_id in build_referee_assignment_plan(stages, tournament, weights).items():
-        referee = await sql_upsert_referee_by_team(tournament_id, team_id)
+        referee = await sql_upsert_referee_by_team(tournament.id, team_id)
         await sql_set_match_referee(match_id, referee.id)
 
 

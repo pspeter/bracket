@@ -272,7 +272,7 @@ async def auto_assign_referees(
             detail="Referees are not enabled for this tournament",
         )
     stages = await get_full_tournament_details(tournament_id)
-    await assign_missing_referees_only(tournament_id, stages, weights)
+    await assign_missing_referees_only(tournament, stages, weights)
     await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
