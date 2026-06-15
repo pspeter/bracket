@@ -21,6 +21,7 @@ export default function TournamentScoreTrackingMatchPage() {
           backHref={`/tournaments/${tournamentData.id}/score-tracking`}
           storageKey={`tournament-score-tracking:${tournamentData.id}:${matchId}:swapped`}
           levels={swrTournamentResponse.data?.data.levels ?? []}
+          refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}
           saveMatch={async (next) => {
             if (matchId == null) return;
             await updateTournamentScoreTrackingMatch(tournamentData.id, matchId, next);

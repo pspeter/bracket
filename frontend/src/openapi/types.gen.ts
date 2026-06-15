@@ -1118,6 +1118,10 @@ export type ScoreTrackingInfo = {
    */
   matches: Array<MatchWithDetails>;
   /**
+   * Referees Enabled
+   */
+  referees_enabled: boolean;
+  /**
    * Tournament Id
    */
   tournament_id: number;

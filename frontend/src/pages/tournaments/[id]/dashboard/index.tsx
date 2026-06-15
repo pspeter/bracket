@@ -14,6 +14,7 @@ import {
   formatMatchInput2,
   isMatchCompletedRecently,
 } from '@components/utils/match';
+import { RefereeDisplay } from '@components/utils/referee';
 import { Translator } from '@components/utils/types';
 import { responseIsValid, setTitle } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
@@ -27,11 +28,13 @@ export function ScheduleRow({
   stageItemsLookup,
   matchesLookup,
   levels,
+  refereesEnabled,
 }: {
   data: any;
   stageItemsLookup: any;
   matchesLookup: any;
   levels: LevelResponse[];
+  refereesEnabled: boolean;
 }) {
   const { t } = useTranslation();
   const colors = getScoreColors(data.match);
@@ -103,6 +106,7 @@ export function ScheduleRow({
             </div>
           </Grid.Col>
         </Grid>
+        <RefereeDisplay referee={data.match.referee} refereesEnabled={refereesEnabled} />
       </Stack>
     </Card>
   );
@@ -113,11 +117,13 @@ export function Schedule({
   stageItemsLookup,
   matchesLookup,
   levels,
+  refereesEnabled,
 }: {
   t: Translator;
   stageItemsLookup: any;
   matchesLookup: any;
   levels: LevelResponse[];
+  refereesEnabled: boolean;
 }) {
   const matches: any[] = Object.values(matchesLookup)
     .map((item: any) => item)
@@ -146,6 +152,7 @@ export function Schedule({
         stageItemsLookup={stageItemsLookup}
         matchesLookup={matchesLookup}
         levels={levels}
+        refereesEnabled={refereesEnabled}
       />
     );
   }
@@ -200,6 +207,7 @@ export default function DashboardSchedulePage() {
             matchesLookup={filteredMatchesLookup}
             stageItemsLookup={stageItemsLookup}
             levels={tournamentDataFull.levels}
+            refereesEnabled={tournamentDataFull.referees_enabled}
           />
         </Group>
       </Center>

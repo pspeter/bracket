@@ -14,12 +14,12 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
-import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { format } from 'date-fns';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import { RefereeDisplay } from '@components/utils/referee';
 import { NEUTRAL_STAGE_ITEM_COLOUR, scoreColour, type StageItemColour } from '@logic/colors';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
@@ -127,8 +127,6 @@ function MatchCard({
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
   const mergeConflictIcons = rows === 1;
-
-  const refereeName = match.referee?.name ?? match.referee?.team_name ?? null;
 
   let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
@@ -367,14 +365,7 @@ function MatchCard({
             {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
           </Flex>
         )}
-        {refereesEnabled && refereeName != null && rows >= 2 && (
-          <Flex gap={4} align="center" wrap="nowrap" c="dimmed">
-            <GiWhistle size={fontSize ?? 13} style={{ flexShrink: 0 }} />
-            <Text size="xs" fz={fontSize} lh={1.3} c="dimmed" truncate>
-              {refereeName}
-            </Text>
-          </Flex>
-        )}
+        {rows >= 2 && <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />}
       </Box>
     </Box>
   );

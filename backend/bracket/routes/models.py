@@ -146,6 +146,7 @@ class ScoreTrackingInfo(BaseModel):
     tournament_name: str
     matches: list[MatchWithDetails]
     has_active_stage: bool
+    referees_enabled: bool = False
     levels: list[LevelResponse] = []
     courts: list[Court] = []
 
