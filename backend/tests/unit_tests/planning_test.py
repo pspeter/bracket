@@ -1249,17 +1249,21 @@ def test_assign_referees_only_fills_missing_not_existing() -> None:
 
 
 def test_assign_referees_schedule_unchanged() -> None:
-    """Returns a plain dict of match_id→team_id; no court or time information."""
+    """Match court_id and start_time in the stage objects are untouched after the call."""
     level = LevelId(1)
-    m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
+    m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=7)
     inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
-    result = build_referee_assignment_plan(stages, _tournament_with_referees())
+    court_before = m.court_id
+    time_before = m.start_time
 
-    assert isinstance(result, dict)
-    for v in result.values():
-        assert isinstance(v, int)
+    build_referee_assignment_plan(stages, _tournament_with_referees())
+
+    # The match object in the stage is the same reference — verify it was not mutated
+    match_after = stages[0].stage_items[0].rounds[0].matches[0]
+    assert match_after.court_id == court_before
+    assert match_after.start_time == time_before
 
 
 def test_assign_referees_level_restriction() -> None:
@@ -1350,6 +1354,25 @@ def test_assign_referees_balanced_load() -> None:
         load[team_id] += 1
     if load:
         assert max(load.values()) - min(load.values()) <= 1
+
+
+def test_assign_referees_deterministic_tiebreak() -> None:
+    """Repeated calls with the same inputs and fixed seed yield identical assignments."""
+    level = LevelId(1)
+    # 2 non-overlapping matches, 4 eligible teams — multiple balanced solutions exist,
+    # so the tie-break (fixed solver seed) must select the same one every time.
+    matches = [
+        _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=1),
+        _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=SLOT, court_id=1),
+    ]
+    inputs = [_final_input(i * 10, i, level) for i in range(1, 7)]
+    stages = [_stage_with_inputs(1, matches, inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    result_a = build_referee_assignment_plan(stages, tournament)
+    result_b = build_referee_assignment_plan(stages, tournament)
+
+    assert result_a == result_b
 
 
 def test_assign_referees_no_free_text() -> None:
