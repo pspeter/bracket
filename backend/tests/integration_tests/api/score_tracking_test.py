@@ -47,7 +47,11 @@ async def test_score_tracking_response_includes_referees_enabled_true_when_set(
     await database.execute(
         query=tournaments.update()
         .where(tournaments.c.id == auth_context.tournament.id)
-        .values(referees_enabled=True, score_tracking_enabled=True, score_tracking_token="ref-enabled-token"),
+        .values(
+            referees_enabled=True,
+            score_tracking_enabled=True,
+            score_tracking_token="ref-enabled-token",
+        ),
     )
     try:
         authenticated_response = await send_tournament_request(
@@ -60,7 +64,9 @@ async def test_score_tracking_response_includes_referees_enabled_true_when_set(
         await database.execute(
             query=tournaments.update()
             .where(tournaments.c.id == auth_context.tournament.id)
-            .values(referees_enabled=False, score_tracking_enabled=False, score_tracking_token=None),
+            .values(
+                referees_enabled=False, score_tracking_enabled=False, score_tracking_token=None
+            ),
         )
 
 
