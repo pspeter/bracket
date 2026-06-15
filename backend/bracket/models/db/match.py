@@ -180,6 +180,7 @@ class SchedulerWeights(BaseModelORM):
     group_sync: int = Field(default=8, ge=0)
     court_locality: int = Field(default=4, ge=0)
     comfortable_rest_minutes: int = Field(default=30, ge=0)
+    referee_fairness: int = Field(default=200, ge=0)
 
 
 class MatchResizeBreakBody(BaseModelORM):

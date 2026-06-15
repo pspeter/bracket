@@ -2074,6 +2074,12 @@
             "title": "Makespan",
             "type": "integer"
           },
+          "referee_fairness": {
+            "default": 200,
+            "minimum": 0.0,
+            "title": "Referee Fairness",
+            "type": "integer"
+          },
           "team_rest": {
             "default": 13,
             "minimum": 0.0,
@@ -2086,7 +2092,8 @@
           "team_rest",
           "group_sync",
           "court_locality",
-          "comfortable_rest_minutes"
+          "comfortable_rest_minutes",
+          "referee_fairness"
         ],
         "title": "SchedulerWeights",
         "type": "object"
@@ -6457,6 +6464,7 @@
                   "court_locality": 4,
                   "group_sync": 8,
                   "makespan": 150,
+                  "referee_fairness": 200,
                   "team_rest": 13
                 }
               }
@@ -6697,6 +6705,7 @@
                   "court_locality": 4,
                   "group_sync": 8,
                   "makespan": 150,
+                  "referee_fairness": 200,
                   "team_rest": 13
                 }
               }

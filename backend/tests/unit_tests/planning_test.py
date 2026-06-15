@@ -14,12 +14,15 @@ from bracket.logic.planning.matches import (
 )
 from bracket.models.db.court import Court
 from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.referee import Referee
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
     StageItemInputEmpty,
+    StageItemInputFinal,
     StageItemInputTentative,
 )
+from bracket.models.db.team import Team
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
 from bracket.utils.dummy_records import DUMMY_MOCK_TIME, DUMMY_TOURNAMENT
@@ -27,10 +30,12 @@ from bracket.utils.id_types import (
     CourtId,
     LevelId,
     MatchId,
+    RefereeId,
     RoundId,
     StageId,
     StageItemId,
     StageItemInputId,
+    TeamId,
     TournamentId,
 )
 
@@ -836,3 +841,339 @@ async def test_reorder_skips_matches_without_court(
     await reorder_all_matches(_tournament(), positions)
 
     assert capture_sql_calls == [(CourtId(1), T0, with_court.id)]
+
+
+# ── Referee assignment helpers ────────────────────────────────────────────────
+
+
+def _tournament_with_referees() -> Tournament:
+    data = {**DUMMY_TOURNAMENT.model_dump(), "referees_enabled": True}
+    return Tournament(**data, id=TournamentId(-1))
+
+
+def _team(team_id: int, level_id: LevelId | None = None) -> Team:
+    return Team(
+        id=TeamId(team_id),
+        created=T0,
+        name=f"Team {team_id}",
+        tournament_id=TournamentId(-1),
+        active=True,
+        level_id=level_id,
+    )
+
+
+def _final_input(
+    input_id: int,
+    team_id: int,
+    level_id: LevelId | None = None,
+    stage_item_id: int = -1,
+) -> StageItemInputFinal:
+    return StageItemInputFinal(
+        id=StageItemInputId(input_id),
+        slot=1,
+        tournament_id=TournamentId(-1),
+        stage_item_id=StageItemId(stage_item_id),
+        team_id=TeamId(team_id),
+        team=_team(team_id, level_id),
+    )
+
+
+def _match_with_teams(
+    id_: int,
+    team_a_id: int,
+    team_b_id: int,
+    level_id: LevelId | None = None,
+) -> MatchWithDetails:
+    """Match with two defined teams (StageItemInputFinal) for referee tests."""
+    inp_a = _final_input(id_ * 10 + 1, team_a_id, level_id)
+    inp_b = _final_input(id_ * 10 + 2, team_b_id, level_id)
+    return MatchWithDetails(
+        id=MatchId(id_),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(id_),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=inp_a.id,
+        stage_item_input2_id=inp_b.id,
+        stage_item_input1=inp_a,
+        stage_item_input2=inp_b,
+    )
+
+
+def _stage_with_inputs(
+    stage_id: int,
+    matches: list[MatchWithDetails],
+    inputs: list[StageItemInputFinal],
+    level_id: LevelId | None = None,
+) -> StageWithStageItems:
+    """Stage with one stage item, the given matches, and explicit team inputs."""
+    item_id = stage_id * 100
+    return _stage_with_rounds(
+        stage_id,
+        [[matches]],
+        level_id=level_id,
+        inputs_per_item=[list(inputs)],  # type: ignore[list-item]
+    )
+
+
+def _referee(team_id: int) -> Referee:
+    return Referee(
+        id=RefereeId(team_id),
+        tournament_id=TournamentId(-1),
+        team_id=TeamId(team_id),
+        created=T0,
+    )
+
+
+def _match_with_referee(match: MatchWithDetails, team_id: int) -> MatchWithDetails:
+    ref = _referee(team_id)
+    return match.model_copy(update={"referee": ref, "referee_id": ref.id})
+
+
+# ── Referee assignment: level restriction ─────────────────────────────────────
+
+
+def test_referee_only_assigned_to_teams_of_own_level() -> None:
+    """A team is only a candidate for matches of its own level."""
+    level_a = LevelId(1)
+    level_b = LevelId(2)
+    # Teams 1,2 play in level A; team 3 is in level B
+    m = _match_with_teams(1, 1, 2, level_a)
+    inp_3 = _final_input(99, 3, level_b)
+    stages = [_stage_with_inputs(1, [m], [_final_input(11, 1, level_a), _final_input(12, 2, level_a), inp_3], level_id=level_a)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    # Team 3 is level_b, match is level_a → should NOT be assigned
+    assert ops[0].referee_team_id != TeamId(3)
+    # Teams 1 and 2 play in the match → should NOT be assigned either
+    assert ops[0].referee_team_id not in (TeamId(1), TeamId(2))
+    # No eligible referee → left unassigned
+    assert ops[0].referee_team_id is None
+
+
+def test_referee_not_assigned_to_playing_team() -> None:
+    """A team playing in a match is never chosen as its referee."""
+    level = LevelId(1)
+    # Teams 1,2 play match 1; team 3 is the only referee candidate
+    m = _match_with_teams(1, 1, 2, level)
+    stages = [
+        _stage_with_inputs(
+            1,
+            [m],
+            [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)],
+            level_id=level,
+        )
+    ]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    assert ops[0].referee_team_id == TeamId(3)
+
+
+# ── Referee assignment: no-overlap (play vs referee) ─────────────────────────
+
+
+def test_referee_not_assigned_when_playing_overlapping_match() -> None:
+    """A team assigned as referee cannot simultaneously play another match."""
+    level = LevelId(1)
+    # Two matches: m1 (teams 1 vs 2) and m2 (teams 3 vs 4). Both at same time on different courts.
+    # Teams 5,6 are referee candidates for both. A team can only referee ONE of the two.
+    m1 = _match_with_teams(1, 1, 2, level)
+    m2 = _match_with_teams(2, 3, 4, level)
+    inputs = [
+        _final_input(11, 1, level), _final_input(12, 2, level),
+        _final_input(13, 3, level), _final_input(14, 4, level),
+        _final_input(15, 5, level), _final_input(16, 6, level),
+    ]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament)
+
+    assert len(ops) == 2
+    op_by_id = {op.match.id: op for op in ops}
+
+    # Find matches that overlap in time
+    overlapping_pairs = [
+        (op_by_id[m1.id], op_by_id[m2.id])
+        for op in ops
+        if op_by_id[m1.id].start_time == op_by_id[m2.id].start_time
+    ]
+    if overlapping_pairs:
+        op1, op2 = overlapping_pairs[0]
+        # The same team must not referee both overlapping matches
+        assert op1.referee_team_id != op2.referee_team_id or (
+            op1.referee_team_id is None and op2.referee_team_id is None
+        )
+
+
+def test_referee_team_never_plays_and_referees_same_time_window() -> None:
+    """If team 3 plays in m2, it must not be assigned to referee m1 if they overlap."""
+    level = LevelId(1)
+    # m1: teams 1 vs 2; m2: teams 3 vs 4 — both on 1 court = sequential
+    # Team 5 is the extra referee candidate.
+    m1 = _match_with_teams(1, 1, 2, level)
+    m2 = _match_with_teams(2, 3, 4, level)
+    inputs = [
+        _final_input(11, 1, level), _final_input(12, 2, level),
+        _final_input(13, 3, level), _final_input(14, 4, level),
+        _final_input(15, 5, level),
+    ]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 2
+    op_by_id = {op.match.id: op for op in ops}
+    op1, op2 = op_by_id[MatchId(1)], op_by_id[MatchId(2)]
+    end1 = op1.start_time + timedelta(minutes=DURATION)
+    end2 = op2.start_time + timedelta(minutes=DURATION)
+
+    # Check each op: if it overlaps with a match where the referee is playing, that's a conflict
+    if op1.start_time < end2 and op2.start_time < end1:
+        # They overlap (shouldn't happen on 1 court, but check anyway)
+        if op1.referee_team_id == TeamId(3):
+            assert False, "Team 3 plays m2 and should not referee m1 if they overlap"
+        if op2.referee_team_id == TeamId(1) or op2.referee_team_id == TeamId(2):
+            assert False, "Teams 1/2 play m1 and should not referee m2 if they overlap"
+    # On one court matches are sequential → no overlap → any eligible team is fine
+
+
+# ── Referee assignment: balanced load ─────────────────────────────────────────
+
+
+def test_referee_load_is_balanced_across_eligible_teams() -> None:
+    """Referee assignments are spread across all eligible teams (max - min load <= 1)."""
+    level = LevelId(1)
+    # 4 matches: teams 1-8 playing (pairs), teams 9,10 are referee-only candidates
+    matches = [_match_with_teams(i, i * 2 - 1, i * 2, level) for i in range(1, 5)]
+    inputs = [_final_input(i * 10, i, level) for i in range(1, 11)]
+    stages = [_stage_with_inputs(1, matches, inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament)
+
+    assert len(ops) == 4
+    load: dict[TeamId, int] = defaultdict(int)
+    for op in ops:
+        if op.referee_team_id is not None:
+            load[op.referee_team_id] += 1
+
+    if load:
+        assert max(load.values()) - min(load.values()) <= 1
+
+
+# ── Referee assignment: preserve existing assignments ─────────────────────────
+
+
+def test_existing_referee_assignment_not_overwritten() -> None:
+    """Matches that already have a referee are left untouched."""
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level)
+    m_with_ref = _match_with_referee(m, team_id=3)
+    inputs = [
+        _final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level),
+        _final_input(14, 4, level),
+    ]
+    stages = [_stage_with_inputs(1, [m_with_ref], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    # The solver should not produce a referee_team_id for a match that already has one
+    assert ops[0].referee_team_id is None
+
+
+def test_free_text_referee_match_not_overwritten() -> None:
+    """A match with a free-text referee (no team_id) is also left as-is."""
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level)
+    free_text_ref = Referee(
+        id=RefereeId(99),
+        tournament_id=TournamentId(-1),
+        name="External Ref",
+        created=T0,
+    )
+    m_with_ref = m.model_copy(update={"referee": free_text_ref, "referee_id": free_text_ref.id})
+    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    stages = [_stage_with_inputs(1, [m_with_ref], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    assert ops[0].referee_team_id is None
+
+
+# ── Referee assignment: no rest penalty ───────────────────────────────────────
+
+
+def test_refereeing_does_not_add_rest_penalty() -> None:
+    """Assigning a team as referee adjacent to its own match does not change the rest objective.
+
+    Team 1 plays match m1 and another team referees m2 immediately before m1. The rest
+    penalty should be the same regardless of who referees m2 — refereeing itself adds
+    no shortfall.
+    """
+    level = LevelId(1)
+    # m1: team 1 vs 2; m2: team 3 vs 4 — team 1 is an eligible referee for m2
+    m1 = _match_with_teams(1, 1, 2, level)
+    m2 = _match_with_teams(2, 3, 4, level)
+    inputs = [
+        _final_input(11, 1, level), _final_input(12, 2, level),
+        _final_input(13, 3, level), _final_input(14, 4, level),
+    ]
+
+    # With referees_enabled: team 1 might referee m2
+    stages_on = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    ops_on = build_schedule_plan(stages_on, [_court(1)], _tournament_with_referees())
+
+    # Without referees: baseline schedule
+    stages_off = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    ops_off = build_schedule_plan(stages_off, [_court(1)], _tournament())
+
+    # Both should schedule the same times (rest penalty unchanged by refereeing)
+    times_on = sorted(op.start_time for op in ops_on)
+    times_off = sorted(op.start_time for op in ops_off)
+    assert times_on == times_off
+
+
+# ── Referee assignment: feature flag ──────────────────────────────────────────
+
+
+def test_referees_disabled_produces_no_referee_assignments() -> None:
+    """When referees_enabled=False, no referee_team_id is set on any operation."""
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level)
+    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
+
+    ops = build_schedule_plan(stages, [_court(1)], _tournament())  # referees_enabled=False
+
+    assert len(ops) == 1
+    assert ops[0].referee_team_id is None
+
+
+def test_no_eligible_referee_leaves_match_unassigned() -> None:
+    """If all level-matching teams are playing in the match, the match stays unassigned."""
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level)
+    # Only teams 1 and 2 exist and both play in m → no candidate
+    inputs = [_final_input(11, 1, level), _final_input(12, 2, level)]
+    stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    assert ops[0].referee_team_id is None

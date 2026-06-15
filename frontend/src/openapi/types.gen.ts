@@ -1104,6 +1104,10 @@ export type SchedulerWeights = {
    */
   makespan: number;
   /**
+   * Referee Fairness
+   */
+  referee_fairness: number;
+  /**
    * Team Rest
    */
   team_rest: number;

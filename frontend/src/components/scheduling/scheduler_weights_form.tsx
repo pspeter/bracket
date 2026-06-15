@@ -13,6 +13,7 @@ export const DEFAULT_SCHEDULER_WEIGHTS: SchedulerWeights = {
   group_sync: 8,
   court_locality: 4,
   comfortable_rest_minutes: 30,
+  referee_fairness: 200,
 };
 
 export default function SchedulerWeightsForm({
@@ -75,6 +76,12 @@ export default function SchedulerWeightsForm({
             min={0}
             value={weights.comfortable_rest_minutes}
             onChange={setField('comfortable_rest_minutes')}
+          />
+          <NumberInput
+            label={t('scheduler_weight_referee_fairness_label')}
+            min={0}
+            value={weights.referee_fairness}
+            onChange={setField('referee_fairness')}
           />
         </SimpleGrid>
       </Collapse>
