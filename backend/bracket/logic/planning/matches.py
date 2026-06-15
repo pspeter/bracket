@@ -1099,8 +1099,12 @@ def build_referee_assignment_plan(
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
     if currently_testing():
+        # Single worker + fixed seed makes the referee solver fully deterministic in tests
+        # (multi-worker portfolio search is non-deterministic even with a pinned seed).
         solver.parameters.random_seed = SOLVER_RANDOM_SEED
-    solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
+        solver.parameters.num_search_workers = 1
+    else:
+        solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
     status_code = solver.Solve(model)
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         logger.warning(

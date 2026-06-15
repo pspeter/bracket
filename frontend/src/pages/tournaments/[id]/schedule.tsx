@@ -297,6 +297,16 @@ export default function SchedulePage() {
     }
   }
 
+  async function handleAssignReferees() {
+    setIsOptimizing(true);
+    try {
+      await autoAssignReferees(tournamentData.id);
+      await swrStagesResponse.mutate();
+    } finally {
+      setIsOptimizing(false);
+    }
+  }
+
   async function performAction(action: PlanningAction) {
     switch (action.type) {
       case 'swap':
@@ -531,15 +541,7 @@ export default function SchedulePage() {
                     variant="light"
                     style={{ marginBottom: 10 }}
                     leftSection={<IconUserCheck size={24} />}
-                    onClick={async () => {
-                      setIsOptimizing(true);
-                      try {
-                        await autoAssignReferees(tournamentData.id);
-                        await swrStagesResponse.mutate();
-                      } finally {
-                        setIsOptimizing(false);
-                      }
-                    }}
+                    onClick={handleAssignReferees}
                   >
                     {t('assign_missing_referees_description')}
                   </Button>
@@ -638,16 +640,8 @@ export default function SchedulePage() {
                 onHighlightChange={setHighlightValue}
                 onSchedule={() => setScheduleModalOpened(true)}
                 onReoptimize={() => setReoptimizeModalOpened(true)}
-                refereesEnabled={tournament.referees_enabled}
-                onAssignReferees={async () => {
-                  setIsOptimizing(true);
-                  try {
-                    await autoAssignReferees(tournamentData.id);
-                    await swrStagesResponse.mutate();
-                  } finally {
-                    setIsOptimizing(false);
-                  }
-                }}
+                refereesEnabled={tournament.referees_enabled && courts.length > 0}
+                onAssignReferees={handleAssignReferees}
               />
             )}
             <Modal

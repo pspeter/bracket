@@ -1299,8 +1299,10 @@ def test_assign_referees_excludes_playing_team() -> None:
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
 
-    assert result.get(MatchId(1)) not in (TeamId(1), TeamId(2))
-    assert result.get(MatchId(2)) not in (TeamId(3), TeamId(4))
+    assert MatchId(1) in result
+    assert result[MatchId(1)] not in (TeamId(1), TeamId(2))
+    assert MatchId(2) in result
+    assert result[MatchId(2)] not in (TeamId(3), TeamId(4))
 
 
 def test_assign_referees_excludes_team_playing_overlapping_match() -> None:
@@ -1320,8 +1322,9 @@ def test_assign_referees_excludes_team_playing_overlapping_match() -> None:
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
 
-    if MatchId(1) in result and MatchId(2) in result:
-        assert result[MatchId(1)] != result[MatchId(2)]
+    assert MatchId(1) in result
+    assert MatchId(2) in result
+    assert result[MatchId(1)] != result[MatchId(2)]
 
 
 def test_assign_referees_no_candidate_leaves_match_unassigned() -> None:
