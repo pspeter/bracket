@@ -71,6 +71,7 @@ export default function DashboardMatchesPage() {
         stageItemsLookup={stageItemsLookup}
         matchesLookup={matchesLookup}
         levels={tournamentDataFull.levels}
+        refereesEnabled={tournamentDataFull.referees_enabled}
       />
     );
   }

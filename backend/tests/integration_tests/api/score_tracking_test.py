@@ -33,6 +33,38 @@ from tests.integration_tests.sql import (
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_score_tracking_response_includes_referees_enabled_false_by_default(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    response = await send_tournament_request(HTTPMethod.GET, "score-tracking", auth_context, {})
+    assert response["data"]["referees_enabled"] is False
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_score_tracking_response_includes_referees_enabled_true_when_set(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    await database.execute(
+        query=tournaments.update()
+        .where(tournaments.c.id == auth_context.tournament.id)
+        .values(referees_enabled=True, score_tracking_enabled=True, score_tracking_token="ref-enabled-token"),
+    )
+    try:
+        authenticated_response = await send_tournament_request(
+            HTTPMethod.GET, "score-tracking", auth_context, {}
+        )
+        public_response = await send_request(HTTPMethod.GET, "score-tracking/ref-enabled-token")
+        assert authenticated_response["data"]["referees_enabled"] is True
+        assert public_response["data"]["referees_enabled"] is True
+    finally:
+        await database.execute(
+            query=tournaments.update()
+            .where(tournaments.c.id == auth_context.tournament.id)
+            .values(referees_enabled=False, score_tracking_enabled=False, score_tracking_token=None),
+        )
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_authenticated_score_tracking_list_works_when_public_link_disabled(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

@@ -23,6 +23,7 @@ import { LevelBadge, LevelFilterSelect } from '@components/levels/levels';
 import { Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import { RefereeDisplay } from '@components/utils/referee';
 import { responseIsValid } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
 import {
@@ -89,6 +90,7 @@ export function ScoreTrackingListView({
   const info = responseData.data;
   const levels = info.levels ?? [];
   const courts = info.courts ?? [];
+  const refereesEnabled = info.referees_enabled ?? false;
   const matches = (info.matches || []).filter(
     (match) => filteredLevelId === 'all' || `${match.level_id}` === filteredLevelId
   );
@@ -214,6 +216,7 @@ export function ScoreTrackingListView({
                   </div>
                 </Grid.Col>
               </Grid>
+              <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />
               <Flex justify="center" pt="xs">
                 <Button component={PreloadLink} href={getMatchHref(match.id)}>
                   {t('open_score_tracker_button')}
@@ -233,11 +236,13 @@ export function ScoreTrackingMatchView({
   storageKey,
   saveMatch,
   levels = [],
+  refereesEnabled = false,
 }: {
   swrResponse: SWRResponse<ScoreTrackingMatchResponse>;
   backHref: string;
   storageKey: string;
   levels?: LevelResponse[];
+  refereesEnabled?: boolean;
   saveMatch: (next: {
     stage_item_input1_score: number;
     stage_item_input2_score: number;
@@ -325,6 +330,7 @@ export function ScoreTrackingMatchView({
             {t('back_to_matches_button')}
           </Button>
         </Group>
+        <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />
         {match.state === 'NOT_STARTED' ? (
           <Center>
             <Button

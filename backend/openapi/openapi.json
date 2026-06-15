@@ -2102,6 +2102,11 @@
             "title": "Matches",
             "type": "array"
           },
+          "referees_enabled": {
+            "default": false,
+            "title": "Referees Enabled",
+            "type": "boolean"
+          },
           "tournament_id": {
             "title": "Tournament Id",
             "type": "integer"
@@ -2116,6 +2121,7 @@
           "tournament_name",
           "matches",
           "has_active_stage",
+          "referees_enabled",
           "levels",
           "courts"
         ],

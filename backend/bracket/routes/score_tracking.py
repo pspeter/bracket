@@ -57,6 +57,7 @@ async def get_score_tracking_info(
             tournament_name=tournament.name,
             matches=matches,
             has_active_stage=has_active_stage,
+            referees_enabled=tournament.referees_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
             courts=courts,
         )
@@ -105,6 +106,7 @@ async def get_authenticated_score_tracking_info(
             tournament_name=tournament.name,
             matches=matches,
             has_active_stage=has_active_stage,
+            referees_enabled=tournament.referees_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
             courts=courts,
         )
