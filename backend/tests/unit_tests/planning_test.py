@@ -1441,3 +1441,99 @@ def test_assign_referees_existing_counts_toward_fairness() -> None:
         load[team_id] += 1
     if load:
         assert max(load.values()) - min(load.values()) <= 1
+
+
+def test_assign_referees_excludes_team_already_refereeing_overlapping_match() -> None:
+    """A team already assigned as referee for a match cannot referee another simultaneous match.
+
+    m1 and m2 run at the same time on different courts. m1 already has team 5 as referee.
+    Team 5 must not be assigned to also referee m2.
+    """
+    level = LevelId(1)
+    m1 = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=1)
+    m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=0, court_id=2)
+    m1_with_ref = _match_with_referee(m1, team_id=5)
+    inputs = [
+        _final_input(11, 1, level),
+        _final_input(12, 2, level),
+        _final_input(13, 3, level),
+        _final_input(14, 4, level),
+        _final_input(15, 5, level),
+        _final_input(16, 6, level),
+    ]
+    stages = [_stage_with_inputs(1, [m1_with_ref, m2], inputs, level_id=level)]
+
+    result = build_referee_assignment_plan(stages, _tournament_with_referees())
+
+    assert MatchId(1) not in result, "Should not overwrite existing referee"
+    if MatchId(2) in result:
+        assert result[MatchId(2)] != TeamId(5), "Team 5 already referees m1 at the same time"
+
+
+# ── build_schedule_plan: pinned-referee vs movable-playing conflict ────────────
+
+
+def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
+    """A movable match must not be placed at the same time as a pinned match refereed by
+    one of its playing teams.
+
+    Setup: m1 is pinned with team 3 as referee. m2 is movable, with team 3 playing.
+    The optimizer must not place m2 overlapping m1.
+    """
+    level = LevelId(1)
+    inp3_a = _final_input(31, 3, level)
+    inp3_b = _final_input(32, 4, level)
+    m1_base = MatchWithDetails(
+        id=MatchId(1),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(1),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=_final_input(11, 1, level).id,
+        stage_item_input2_id=_final_input(12, 2, level).id,
+        stage_item_input1=_final_input(11, 1, level),
+        stage_item_input2=_final_input(12, 2, level),
+        start_time=T0,
+        court_id=CourtId(1),
+    )
+    m1 = _match_with_referee(m1_base, team_id=3)
+    m2 = MatchWithDetails(
+        id=MatchId(2),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(2),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=inp3_a.id,
+        stage_item_input2_id=inp3_b.id,
+        stage_item_input1=inp3_a,
+        stage_item_input2=inp3_b,
+    )
+    inputs = [
+        _final_input(11, 1, level),
+        _final_input(12, 2, level),
+        inp3_a,
+        inp3_b,
+    ]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
+
+    # m2 is the only movable match; m1 is pinned at T0 on court 1
+    m2_ops = [op for op in ops if op.match.id == MatchId(2)]
+    assert len(m2_ops) == 1
+    m2_op = m2_ops[0]
+    m2_end = m2_op.start_time + timedelta(minutes=DURATION)
+    m1_end = T0 + timedelta(minutes=DURATION)
+    # m2 must not overlap with m1 (team 3 referees m1 and plays m2)
+    overlap = m2_op.start_time < m1_end and T0 < m2_end
+    assert not overlap, (
+        f"m2 (team 3 playing) overlaps m1 (team 3 refereeing): "
+        f"m2 starts {m2_op.start_time}, m1 ends {m1_end}"
+    )
