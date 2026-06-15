@@ -277,6 +277,7 @@
     "scheduler_weight_court_locality_label": "Court locality weight",
     "scheduler_weight_group_sync_label": "Group sync weight",
     "scheduler_weight_makespan_label": "Tournament duration weight",
+    "scheduler_weight_referee_fairness_label": "Referee fairness weight",
     "scheduler_weight_team_rest_label": "Team rest weight",
     "score_tracking_copy_button": "Copy score tracking URL",
     "score_tracking_enabled_label": "Allow helpers to track scores via a public link",

@@ -277,6 +277,7 @@
     "scheduler_weight_court_locality_label": "Gewichtung Platz-Lokalität",
     "scheduler_weight_group_sync_label": "Gewichtung Gruppen-Synchronität",
     "scheduler_weight_makespan_label": "Gewichtung Turnierdauer",
+    "scheduler_weight_referee_fairness_label": "Gewichtung Schiedsrichter-Fairness",
     "scheduler_weight_team_rest_label": "Gewichtung Team-Pause",
     "score_tracking_copy_button": "Score-Tracking-URL kopieren",
     "score_tracking_enabled_label": "Erlaube Helfern, Spielstände über einen öffentlichen Link zu erfassen",
