@@ -125,6 +125,7 @@ class MatchBody(BaseModelORM):
     stage_item_input2_score: int = 0
     court_id: CourtId | None = None
     referee_team_id: TeamId | None = None
+    referee_name: str | None = None
     custom_duration_minutes: int | None = None
     state: MatchState = MatchState.NOT_STARTED
     completed_at: datetime_utc | None = None

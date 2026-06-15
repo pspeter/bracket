@@ -365,6 +365,10 @@ export type MatchBody = {
    */
   custom_duration_minutes: number | null;
   /**
+   * Referee Name
+   */
+  referee_name: string | null;
+  /**
    * Referee Team Id
    */
   referee_team_id: number | null;
@@ -988,6 +992,16 @@ export type Referee = {
    * Tournament Id
    */
   tournament_id: number;
+};
+
+/**
+ * RefereesResponse
+ */
+export type RefereesResponse = {
+  /**
+   * Data
+   */
+  data: Array<Referee>;
 };
 
 /**
@@ -3655,6 +3669,38 @@ export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponse
 
 export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponse =
   UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses[keyof UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutResponses];
+
+export type GetRefereesTournamentsTournamentIdRefereesGetData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/referees';
+};
+
+export type GetRefereesTournamentsTournamentIdRefereesGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetRefereesTournamentsTournamentIdRefereesGetError =
+  GetRefereesTournamentsTournamentIdRefereesGetErrors[keyof GetRefereesTournamentsTournamentIdRefereesGetErrors];
+
+export type GetRefereesTournamentsTournamentIdRefereesGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: RefereesResponse;
+};
+
+export type GetRefereesTournamentsTournamentIdRefereesGetResponse =
+  GetRefereesTournamentsTournamentIdRefereesGetResponses[keyof GetRefereesTournamentsTournamentIdRefereesGetResponses];
 
 export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData = {
   body?: SchedulerWeights;

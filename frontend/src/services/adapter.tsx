@@ -11,6 +11,7 @@ import {
   CourtsResponse,
   PlayersResponse,
   RankingsResponse,
+  RefereesResponse,
   RoundWithMatches,
   StageItemInputOptionsResponse,
   StageRankingResponse,
@@ -176,6 +177,10 @@ export function getTeamsLive(tournament_id: number | null): SWRResponse<TeamsWit
   return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/teams`, fetcher, {
     refreshInterval: 5_000,
   });
+}
+
+export function getReferees(tournament_id: number | undefined): SWRResponse<RefereesResponse> {
+  return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/referees`, fetcher);
 }
 
 export function getAvailableStageItemInputs(

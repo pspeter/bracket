@@ -42,6 +42,42 @@ async def sql_get_referee_by_team(tournament_id: TournamentId, team_id: TeamId) 
     return Referee.model_validate(dict(result._mapping)) if result is not None else None
 
 
+async def sql_get_referee_by_name(tournament_id: TournamentId, name: str) -> Referee | None:
+    query = """
+        SELECT *
+        FROM referees
+        WHERE tournament_id = :tournament_id
+        AND name = :name
+        """
+    result = await database.fetch_one(
+        query=query, values={"tournament_id": tournament_id, "name": name}
+    )
+    return Referee.model_validate(dict(result._mapping)) if result is not None else None
+
+
+async def sql_upsert_referee_by_name(tournament_id: TournamentId, name: str) -> Referee:
+    """
+    Return the tournament's referee row for this free-text name, creating it if necessary.
+
+    A name is deduplicated per tournament, so the same name always returns the same row.
+    The same name in a different tournament produces a distinct row.
+    """
+    existing = await sql_get_referee_by_name(tournament_id, name)
+    if existing is not None:
+        return existing
+
+    query = """
+        INSERT INTO referees (tournament_id, team_id, name, created)
+        VALUES (:tournament_id, NULL, :name, NOW())
+        RETURNING *
+        """
+    result = await database.fetch_one(
+        query=query, values={"tournament_id": tournament_id, "name": name}
+    )
+    assert result is not None
+    return Referee.model_validate(dict(result._mapping))
+
+
 async def sql_upsert_referee_by_team(tournament_id: TournamentId, team_id: TeamId) -> Referee:
     """
     Return the tournament's referee row for this team, creating it if necessary.

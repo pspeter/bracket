@@ -109,9 +109,9 @@ async def sql_update_match(match_id: MatchId, match: MatchBody, tournament: Tour
         query=query,
         values={
             "match_id": match_id,
-            # referee_team_id is resolved into matches.referee_id by the route, not
-            # written here; it is not a column on this UPDATE.
-            **match.model_dump(exclude={"referee_team_id"}),
+            # referee_team_id and referee_name are resolved into matches.referee_id by the
+            # route, not written here; they are not columns on this UPDATE.
+            **match.model_dump(exclude={"referee_team_id", "referee_name"}),
             "duration_minutes": duration_minutes,
             "state": match.state.value,
             "completed_at": (
