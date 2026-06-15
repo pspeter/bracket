@@ -463,6 +463,11 @@
             "title": "Precedence Conflict",
             "type": "boolean"
           },
+          "referee_conflict": {
+            "default": false,
+            "title": "Referee Conflict",
+            "type": "boolean"
+          },
           "referee_id": {
             "anyOf": [
               {
@@ -608,6 +613,7 @@
           "stage_item_input2_conflict",
           "precedence_conflict",
           "short_break_conflict",
+          "referee_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -979,6 +985,11 @@
               }
             ]
           },
+          "referee_conflict": {
+            "default": false,
+            "title": "Referee Conflict",
+            "type": "boolean"
+          },
           "referee_id": {
             "anyOf": [
               {
@@ -1124,6 +1135,7 @@
           "stage_item_input2_conflict",
           "precedence_conflict",
           "short_break_conflict",
+          "referee_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1225,6 +1237,11 @@
               }
             ]
           },
+          "referee_conflict": {
+            "default": false,
+            "title": "Referee Conflict",
+            "type": "boolean"
+          },
           "referee_id": {
             "anyOf": [
               {
@@ -1364,6 +1381,7 @@
           "stage_item_input2_conflict",
           "precedence_conflict",
           "short_break_conflict",
+          "referee_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",

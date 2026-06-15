@@ -9,12 +9,22 @@ from bracket.logic.planning.conflicts import (
 )
 from bracket.logic.planning.team_windows import get_team_playing_windows
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
-from bracket.models.db.stage_item_inputs import StageItemInputTentative
-from bracket.models.db.util import RoundWithMatches, StageWithStageItems
-from bracket.utils.dummy_records import DUMMY_MOCK_TIME
+from bracket.models.db.referee import Referee
+from bracket.models.db.stage_item import StageType
+from bracket.models.db.stage_item_inputs import StageItemInputFinal, StageItemInputTentative
+from bracket.models.db.team import Team
+from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
+from bracket.utils.dummy_records import (
+    DUMMY_MOCK_TIME,
+    DUMMY_TEAM1,
+    DUMMY_TEAM2,
+    DUMMY_TEAM3,
+    DUMMY_TEAM4,
+)
 from bracket.utils.id_types import (
     CourtId,
     MatchId,
+    RefereeId,
     RoundId,
     StageId,
     StageItemId,
@@ -320,3 +330,249 @@ def test_get_match_conflict_flags_marks_sub_default_break_on_later_match() -> No
 
     assert flags[match1.id].short_break_conflict is False
     assert flags[match2.id].short_break_conflict is True
+
+
+# ---------------------------------------------------------------------------
+# Referee conflict tests
+# ---------------------------------------------------------------------------
+
+
+def _make_definitive_match(
+    match_id: MatchId,
+    input1: StageItemInputFinal,
+    input2: StageItemInputFinal,
+    round_id: RoundId,
+    court_id: CourtId,
+    start_time: object,
+    duration_minutes: int = 60,
+    referee: Referee | None = None,
+) -> MatchWithDetailsDefinitive:
+    return MatchWithDetailsDefinitive(
+        id=match_id,
+        stage_item_input1=input1,
+        stage_item_input2=input2,
+        stage_item_input1_id=input1.id,
+        stage_item_input2_id=input2.id,
+        created=DUMMY_MOCK_TIME,
+        start_time=start_time,  # type: ignore[arg-type]
+        duration_minutes=duration_minutes,
+        round_id=round_id,
+        court_id=court_id,
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        state=MatchState.NOT_STARTED,
+        completed_at=None,
+        referee=referee,
+    )
+
+
+def _make_stage_with_two_matches(
+    match1: MatchWithDetailsDefinitive,
+    match2: MatchWithDetailsDefinitive,
+) -> StageWithStageItems:
+    round1 = RoundWithMatches(
+        id=RoundId(-10),
+        matches=[match1],
+        stage_item_id=StageItemId(-10),
+        created=MOCK_NOW,
+        is_draft=False,
+        name="",
+    )
+    round2 = RoundWithMatches(
+        id=RoundId(-11),
+        matches=[match2],
+        stage_item_id=StageItemId(-10),
+        created=MOCK_NOW,
+        is_draft=False,
+        name="",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1, round2],
+        inputs=[match1.stage_item_input1, match1.stage_item_input2],
+        type_name="Single Elimination",
+        team_count=4,
+        ranking_id=None,
+        id=StageItemId(-10),
+        stage_id=StageId(-10),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.SINGLE_ELIMINATION,
+    )
+    return StageWithStageItems(
+        id=StageId(-10),
+        tournament_id=TournamentId(-1),
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+
+def _make_inputs(
+    tournament_id: TournamentId,
+) -> tuple[StageItemInputFinal, StageItemInputFinal, StageItemInputFinal, StageItemInputFinal]:
+    return (
+        StageItemInputFinal(
+            id=StageItemInputId(-20),
+            team_id=TeamId(-20),
+            slot=1,
+            tournament_id=tournament_id,
+            team=Team(**DUMMY_TEAM1.model_dump(), id=TeamId(-20)),
+        ),
+        StageItemInputFinal(
+            id=StageItemInputId(-21),
+            team_id=TeamId(-21),
+            slot=2,
+            tournament_id=tournament_id,
+            team=Team(**DUMMY_TEAM2.model_dump(), id=TeamId(-21)),
+        ),
+        StageItemInputFinal(
+            id=StageItemInputId(-22),
+            team_id=TeamId(-22),
+            slot=3,
+            tournament_id=tournament_id,
+            team=Team(**DUMMY_TEAM3.model_dump(), id=TeamId(-22)),
+        ),
+        StageItemInputFinal(
+            id=StageItemInputId(-23),
+            team_id=TeamId(-23),
+            slot=4,
+            tournament_id=tournament_id,
+            team=Team(**DUMMY_TEAM4.model_dump(), id=TeamId(-23)),
+        ),
+    )
+
+
+def test_referee_conflict_flags_both_sides() -> None:
+    """A team playing and refereeing in overlapping windows flags both matches."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # inp[0] (team -20) plays in playing_match; refereeing_match has team -20 as referee
+    playing_match = _make_definitive_match(
+        MatchId(-20), inp[0], inp[1], RoundId(-10), CourtId(-1), T
+    )
+    refereeing_match = _make_definitive_match(
+        MatchId(-21),
+        inp[2],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T,
+        referee=Referee(
+            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
+        ),
+    )
+    stage = _make_stage_with_two_matches(playing_match, refereeing_match)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match.id].referee_conflict is True
+    assert flags[playing_match.id].stage_item_input1_conflict is True
+    assert flags[playing_match.id].stage_item_input2_conflict is False
+    assert flags[playing_match.id].referee_conflict is False
+
+
+def test_referee_conflict_free_text_no_conflict() -> None:
+    """A free-text referee (no team_id) never produces a conflict."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    playing_match = _make_definitive_match(
+        MatchId(-20), inp[0], inp[1], RoundId(-10), CourtId(-1), T
+    )
+    refereeing_match = _make_definitive_match(
+        MatchId(-21),
+        inp[2],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T,
+        referee=Referee(
+            id=RefereeId(-1), tournament_id=tid, name="John Smith", created=DUMMY_MOCK_TIME
+        ),
+    )
+    stage = _make_stage_with_two_matches(playing_match, refereeing_match)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match.id].referee_conflict is False
+    assert flags[playing_match.id].stage_item_input1_conflict is False
+    assert flags[playing_match.id].stage_item_input2_conflict is False
+
+
+def test_referee_conflict_non_overlapping_no_conflict() -> None:
+    """Non-overlapping windows (refereeing ends before playing starts) produce no conflict."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # playing_match: T to T+60min; refereeing_match: T+120min onwards — no overlap
+    playing_match = _make_definitive_match(
+        MatchId(-20), inp[0], inp[1], RoundId(-10), CourtId(-1), T
+    )
+    refereeing_match = _make_definitive_match(
+        MatchId(-21),
+        inp[2],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T + timedelta(hours=2),
+        referee=Referee(
+            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
+        ),
+    )
+    stage = _make_stage_with_two_matches(playing_match, refereeing_match)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match.id].referee_conflict is False
+    assert flags[playing_match.id].stage_item_input1_conflict is False
+
+
+def test_referee_conflict_no_playing_match_no_conflict() -> None:
+    """A team referee whose team has no scheduled playing match produces no conflict."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # Only one match: team -22 and -23 play; referee is team -20 (not playing anywhere)
+    refereeing_match = _make_definitive_match(
+        MatchId(-21),
+        inp[2],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T,
+        referee=Referee(
+            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
+        ),
+    )
+    round1 = RoundWithMatches(
+        id=RoundId(-11),
+        matches=[refereeing_match],
+        stage_item_id=StageItemId(-10),
+        created=MOCK_NOW,
+        is_draft=False,
+        name="",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1],
+        inputs=[inp[2], inp[3]],
+        type_name="Single Elimination",
+        team_count=2,
+        ranking_id=None,
+        id=StageItemId(-10),
+        stage_id=StageId(-10),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.SINGLE_ELIMINATION,
+    )
+    stage = StageWithStageItems(
+        id=StageId(-10),
+        tournament_id=tid,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match.id].referee_conflict is False

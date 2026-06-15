@@ -44,6 +44,7 @@ class MatchConflictFlags:
     stage_item_input2_conflict: bool = False
     precedence_conflict: bool = False
     short_break_conflict: bool = False
+    referee_conflict: bool = False
 
 
 def _get_all_matches(
@@ -175,6 +176,34 @@ def _set_short_break_conflicts(
                 flags[match.id].short_break_conflict = True
 
 
+def _set_referee_overlap_conflicts(
+    stages: list[StageWithStageItems],
+    flags: dict[MatchId, MatchConflictFlags],
+) -> None:
+    team_playing_windows = get_team_playing_windows(stages)
+
+    for match in _get_all_matches(stages):
+        if match.start_time is None:
+            continue
+        referee = match.referee
+        if referee is None or referee.team_id is None:
+            continue
+
+        for playing_match, playing_window in team_playing_windows.get(referee.team_id, []):
+            if playing_match.id == match.id:
+                continue
+            if not _time_ranges_overlap(
+                match.start_time,
+                match.end_time,
+                playing_window.start_time,
+                playing_window.end_time,
+            ):
+                continue
+            flags[match.id].referee_conflict = True
+            if isinstance(playing_match, MatchWithDetailsDefinitive):
+                _set_stage_item_input_conflict(playing_match, playing_window, flags)
+
+
 def get_match_conflict_flags(
     stages: list[StageWithStageItems], default_break_minutes: int
 ) -> dict[MatchId, MatchConflictFlags]:
@@ -182,6 +211,7 @@ def get_match_conflict_flags(
     flags = {match.id: MatchConflictFlags() for match in matches}
 
     _set_team_overlap_conflicts(stages, flags)
+    _set_referee_overlap_conflicts(stages, flags)
     _set_winner_of_precedence_conflicts(matches, flags)
     _set_cross_stage_precedence_conflicts(stages, flags)
     _set_short_break_conflicts(matches, default_break_minutes, flags)
@@ -221,7 +251,8 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 stage_item_input1_conflict = :stage_item_input1_conflict,
                 stage_item_input2_conflict = :stage_item_input2_conflict,
                 precedence_conflict = :precedence_conflict,
-                short_break_conflict = :short_break_conflict
+                short_break_conflict = :short_break_conflict,
+                referee_conflict = :referee_conflict
             WHERE id = :match_id
             """,
             values={
@@ -230,6 +261,7 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 "stage_item_input2_conflict": conflict.stage_item_input2_conflict,
                 "precedence_conflict": conflict.precedence_conflict,
                 "short_break_conflict": conflict.short_break_conflict,
+                "referee_conflict": conflict.referee_conflict,
             },
         )
 

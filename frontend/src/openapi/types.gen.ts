@@ -290,6 +290,10 @@ export type Match = {
    */
   precedence_conflict: boolean;
   /**
+   * Referee Conflict
+   */
+  referee_conflict: boolean;
+  /**
    * Referee Id
    */
   referee_id: number | null;
@@ -524,6 +528,10 @@ export type MatchWithDetails = {
   precedence_conflict: boolean;
   referee: Referee | null;
   /**
+   * Referee Conflict
+   */
+  referee_conflict: boolean;
+  /**
    * Referee Id
    */
   referee_id: number | null;
@@ -620,6 +628,10 @@ export type MatchWithDetailsDefinitive = {
    */
   precedence_conflict: boolean;
   referee: Referee | null;
+  /**
+   * Referee Conflict
+   */
+  referee_conflict: boolean;
   /**
    * Referee Id
    */
