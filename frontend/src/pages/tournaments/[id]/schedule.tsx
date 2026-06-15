@@ -23,6 +23,7 @@ import {
   IconCalendarPlus,
   IconListDetails,
   IconTools,
+  IconUserCheck,
   IconWand,
 } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
@@ -80,6 +81,7 @@ import {
   getUnscheduledMatches,
 } from '@services/lookups';
 import {
+  autoAssignReferees,
   reoptimizeMatches,
   rescheduleMatch,
   resizeMatchBreak,
@@ -292,6 +294,16 @@ export default function SchedulePage() {
       rawStages
     )) {
       violations.add(matchId);
+    }
+  }
+
+  async function handleAssignReferees() {
+    setIsOptimizing(true);
+    try {
+      await autoAssignReferees(tournamentData.id);
+      await swrStagesResponse.mutate();
+    } finally {
+      setIsOptimizing(false);
     }
   }
 
@@ -522,6 +534,18 @@ export default function SchedulePage() {
                     {t('reoptimize_description')}
                   </Button>
                 )}
+                {courts.length < 1 || !tournament.referees_enabled ? null : (
+                  <Button
+                    color="teal"
+                    size="md"
+                    variant="light"
+                    style={{ marginBottom: 10 }}
+                    leftSection={<IconUserCheck size={24} />}
+                    onClick={handleAssignReferees}
+                  >
+                    {t('assign_missing_referees_description')}
+                  </Button>
+                )}
               </Group>
             </Grid.Col>
           )}
@@ -616,6 +640,8 @@ export default function SchedulePage() {
                 onHighlightChange={setHighlightValue}
                 onSchedule={() => setScheduleModalOpened(true)}
                 onReoptimize={() => setReoptimizeModalOpened(true)}
+                refereesEnabled={tournament.referees_enabled && courts.length > 0}
+                onAssignReferees={handleAssignReferees}
               />
             )}
             <Modal

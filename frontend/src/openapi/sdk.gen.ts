@@ -12,6 +12,9 @@ import type {
   ActivateNextStageTournamentsTournamentIdStagesActivatePostData,
   ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors,
   ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostData,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses,
   ChangeStatusTournamentsTournamentIdChangeStatusPostData,
   ChangeStatusTournamentsTournamentIdChangeStatusPostErrors,
   ChangeStatusTournamentsTournamentIdChangeStatusPostResponses,
@@ -743,6 +746,32 @@ export const createMatchTournamentsTournamentIdMatchesPost = <ThrowOnError exten
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/matches',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Auto Assign Referees
+ */
+export const autoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses,
+    AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/auto-assign-referees',
     ...options,
     headers: {
       'Content-Type': 'application/json',

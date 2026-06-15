@@ -6,6 +6,7 @@ from bracket.config import config
 from bracket.database import database
 from bracket.logic.planning.conflicts import reconcile_conflicts
 from bracket.logic.planning.matches import (
+    assign_missing_referees_only,
     get_scheduled_matches,
     handle_match_reschedule,
     handle_match_resize_break,
@@ -252,6 +253,26 @@ async def reoptimize_matches(
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await reoptimize_all_matches(tournament_id, stages, weights)
+    await reconcile_conflicts(tournament_id)
+    return SuccessResponse()
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/auto-assign-referees", response_model=SuccessResponse
+)
+async def auto_assign_referees(
+    tournament_id: TournamentId,
+    weights: SchedulerWeights = SchedulerWeights(),
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    tournament: Tournament = Depends(disallow_archived_tournament),
+) -> SuccessResponse:
+    if not tournament.referees_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Referees are not enabled for this tournament",
+        )
+    stages = await get_full_tournament_details(tournament_id)
+    await assign_missing_referees_only(tournament, stages, weights)
     await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 

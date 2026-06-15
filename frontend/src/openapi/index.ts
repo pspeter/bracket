@@ -2,6 +2,7 @@
 
 export {
   activateNextStageTournamentsTournamentIdStagesActivatePost,
+  autoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPost,
   changeStatusTournamentsTournamentIdChangeStatusPost,
   createCourtTournamentsTournamentIdCourtsPost,
   createMatchTournamentsTournamentIdMatchesPost,
@@ -84,6 +85,11 @@ export type {
   ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors,
   ActivateNextStageTournamentsTournamentIdStagesActivatePostResponse,
   ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostData,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostError,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponse,
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses,
   BodyLoginForAccessTokenTokenPost,
   BodyUpdateTeamLogoTournamentsTournamentIdTeamsTeamIdLogoPost,
   BodyUploadLogoTournamentsTournamentIdLogoPost,

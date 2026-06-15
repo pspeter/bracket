@@ -699,12 +699,8 @@ def _add_referee_assignment(
                         f"ref_match_{match_id}_team_{team_id}_"
                         f"after_pinned_{pinned.context.match.id}"
                     )
-                    model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(
-                        [var, before]
-                    )
-                    model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(
-                        [var, after]
-                    )
+                    model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf([var, before])
+                    model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf([var, after])
                     model.AddBoolOr([before, after, var.Not()])
 
     # Fixed referee load from pinned matches (already assigned, can't change)
@@ -720,9 +716,7 @@ def _add_referee_assignment(
     for team_id in sorted(all_eligible_teams):  # sorted for determinism
         fixed = fixed_ref_count.get(team_id, 0)
         var_choices = [
-            ref_choices[mid][team_id]
-            for mid in ref_choices
-            if team_id in ref_choices[mid]
+            ref_choices[mid][team_id] for mid in ref_choices if team_id in ref_choices[mid]
         ]
         if var_choices:
             load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_team_{team_id}")
@@ -767,10 +761,16 @@ def _build_operations_from_solution(
         referee_team_id: TeamId | None = None
         if match_id in ref_choices:
             referee_team_id = next(
-                (team_id for team_id, var in ref_choices[match_id].items() if solver.Value(var) == 1),
+                (
+                    team_id
+                    for team_id, var in ref_choices[match_id].items()
+                    if solver.Value(var) == 1
+                ),
                 None,
             )
-        operation_to_schedule = ScheduleOperation(court_id, start_time, 0, context.match, referee_team_id)
+        operation_to_schedule = ScheduleOperation(
+            court_id, start_time, 0, context.match, referee_team_id
+        )
         scheduled_slots[court_id].append((start_time, match_id, operation_to_schedule))
 
     for context in pinned_contexts:
@@ -954,6 +954,183 @@ async def _apply_schedule_plan(
         if op.referee_team_id is not None:
             referee = await sql_upsert_referee_by_team(tournament_id, op.referee_team_id)
             await sql_set_match_referee(op.match.id, referee.id)
+
+
+def build_referee_assignment_plan(
+    stages: list[StageWithStageItems],
+    tournament: Tournament,
+    weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
+) -> dict[MatchId, TeamId]:
+    """Assign referees to already-scheduled matches that have none, without moving any match.
+
+    Returns a mapping of match_id → team_id for each match that received a new referee.
+    Matches that already have a referee, unscheduled matches, and matches with no eligible
+    candidate are left untouched. Never fails — returns what it can.
+    """
+    if not tournament.referees_enabled:
+        return {}
+
+    contexts = _get_match_contexts(stages)
+    team_level_ids = _get_team_level_ids(stages)
+
+    # Only scheduled matches (fixed court + start_time) participate.
+    scheduled_contexts = [c for c in contexts if _is_scheduled(c)]
+    if not scheduled_contexts:
+        return {}
+
+    # Build per-team playing intervals (minute offsets) over all scheduled matches.
+    team_playing_intervals: dict[TeamId, list[tuple[int, int]]] = defaultdict(list)
+    for context in scheduled_contexts:
+        start_min = _minute_offset(tournament, assert_some(context.match.start_time))
+        end_min = start_min + context.match.duration_minutes
+        for input_ in (context.match.stage_item_input1, context.match.stage_item_input2):
+            if isinstance(input_, StageItemInputFinal):
+                team_playing_intervals[input_.team_id].append((start_min, end_min))
+
+    needs_ref = [c for c in scheduled_contexts if c.match.referee_id is None]
+    has_ref = [c for c in scheduled_contexts if c.match.referee_id is not None]
+
+    if not needs_ref:
+        return {}
+
+    model = cp_model.CpModel()
+
+    ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
+    match_windows: dict[MatchId, tuple[int, int]] = {}
+
+    for context in needs_ref:
+        match = context.match
+        start_min = _minute_offset(tournament, assert_some(match.start_time))
+        end_min = start_min + match.duration_minutes
+        match_windows[match.id] = (start_min, end_min)
+
+        playing_teams: set[TeamId] = set()
+        for input_ in (match.stage_item_input1, match.stage_item_input2):
+            if isinstance(input_, StageItemInputFinal):
+                playing_teams.add(input_.team_id)
+
+        # Eligible: same level, not playing in this match, not playing in an overlapping match.
+        eligible: set[TeamId] = set()
+        for team_id, level_id in team_level_ids.items():
+            if level_id != context.level_id or team_id in playing_teams:
+                continue
+            if any(
+                start_min < p_end and p_start < end_min
+                for p_start, p_end in team_playing_intervals.get(team_id, [])
+            ):
+                continue
+            eligible.add(team_id)
+
+        if not eligible:
+            continue
+
+        choices: dict[TeamId, Any] = {
+            team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
+            for team_id in sorted(eligible)
+        }
+        model.AddAtMostOne(choices.values())
+        ref_choices[match.id] = choices
+
+    if not ref_choices:
+        return {}
+
+    all_eligible_teams: set[TeamId] = set(
+        team_id for choices in ref_choices.values() for team_id in choices
+    )
+
+    # A team cannot referee two overlapping matches.
+    sorted_match_ids = sorted(ref_choices.keys())
+    for i, mid1 in enumerate(sorted_match_ids):
+        for mid2 in sorted_match_ids[i + 1 :]:
+            s1, e1 = match_windows[mid1]
+            s2, e2 = match_windows[mid2]
+            if s1 < e2 and s2 < e1:
+                for team_id in set(ref_choices[mid1]) & set(ref_choices[mid2]):
+                    model.AddBoolOr(
+                        [ref_choices[mid1][team_id].Not(), ref_choices[mid2][team_id].Not()]
+                    )
+
+    # Count existing assignments toward the fairness objective.
+    fixed_ref_count: dict[TeamId, int] = defaultdict(int)
+    for context in has_ref:
+        ref = context.match.referee
+        if ref is not None and ref.team_id is not None and ref.team_id in all_eligible_teams:
+            fixed_ref_count[ref.team_id] += 1
+
+    max_possible_load = len(needs_ref) + (max(fixed_ref_count.values(), default=0))
+    team_loads: list[Any] = []
+    for team_id in sorted(all_eligible_teams):
+        fixed = fixed_ref_count.get(team_id, 0)
+        var_choices = [
+            ref_choices[mid][team_id] for mid in ref_choices if team_id in ref_choices[mid]
+        ]
+        if var_choices:
+            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_team_{team_id}")
+            model.Add(load == fixed + sum(var_choices))
+        else:
+            load = model.NewIntVar(fixed, fixed, f"ref_load_team_{team_id}")
+        team_loads.append(load)
+
+    # Primary objective: maximize coverage (fill as many matches as possible).
+    # Secondary objective: minimize fairness spread.
+    # Coverage weight must dominate fairness so the solver never skips an
+    # assignable match to improve the spread. A safe bound: assigning one extra
+    # match saves (max_load_spread * referee_fairness + 1) units vs. the worst
+    # possible change in spread that the same assignment could cause.
+    coverage_weight = weights.referee_fairness + 1
+    all_choice_vars = [var for choices in ref_choices.values() for var in choices.values()]
+    # total_assigned is the sum of all AtMostOne choice vars (0/1 per match)
+    total_assigned_expr = sum(all_choice_vars)
+
+    if len(team_loads) >= 2:
+        max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
+        min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
+        model.AddMaxEquality(max_load, team_loads)
+        model.AddMinEquality(min_load, team_loads)
+        spread = model.NewIntVar(0, max_possible_load, "ref_spread")
+        model.Add(spread == max_load - min_load)
+        model.Minimize(
+            -coverage_weight * total_assigned_expr
+            + (weights.referee_fairness * spread if weights.referee_fairness > 0 else 0)
+        )
+    else:
+        model.Minimize(-coverage_weight * total_assigned_expr)
+
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
+    if currently_testing():
+        # Single worker + fixed seed makes the referee solver fully deterministic in tests
+        # (multi-worker portfolio search is non-deterministic even with a pinned seed).
+        solver.parameters.random_seed = SOLVER_RANDOM_SEED
+        solver.parameters.num_search_workers = 1
+    else:
+        solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
+    status_code = solver.Solve(model)
+    if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        logger.warning(
+            "Referee-only assignment found no solution (status %s); leaving matches unassigned",
+            solver.StatusName(status_code),
+        )
+        return {}
+
+    result: dict[MatchId, TeamId] = {}
+    for match_id, choices in ref_choices.items():
+        for team_id, var in choices.items():
+            if solver.Value(var) == 1:
+                result[match_id] = team_id
+                break
+    return result
+
+
+async def assign_missing_referees_only(
+    tournament: Tournament,
+    stages: list[StageWithStageItems],
+    weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
+) -> None:
+    """Persist referee assignments for scheduled matches that have none."""
+    for match_id, team_id in build_referee_assignment_plan(stages, tournament, weights).items():
+        referee = await sql_upsert_referee_by_team(tournament.id, team_id)
+        await sql_set_match_referee(match_id, referee.id)
 
 
 async def schedule_all_unscheduled_matches(
