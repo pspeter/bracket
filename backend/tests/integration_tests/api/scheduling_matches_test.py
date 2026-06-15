@@ -695,9 +695,7 @@ async def test_auto_scheduling_assigns_referees_when_enabled(
     """When referees_enabled, both scheduling endpoints assign team referees to matches."""
     tid = auth_context.tournament.id
     await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tid)
-        .values(referees_enabled=True),
+        query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True),
     )
     try:
         async with (
@@ -731,7 +729,6 @@ async def test_auto_scheduling_assigns_referees_when_enabled(
             await sql_delete_stage_item_with_foreign_keys(si.id)
 
         assert response == SUCCESS_RESPONSE
-        all_matches = _all_matches(stages)
         scheduled = _scheduled_matches(stages)
         assert len(scheduled) > 0
         # At least some matches should have a referee when referees_enabled is on
@@ -745,7 +742,9 @@ async def test_auto_scheduling_assigns_referees_when_enabled(
             playing_team_ids = {
                 inp.team_id
                 for inp in (match.stage_item_input1, match.stage_item_input2)
-                if hasattr(inp, "team_id") and inp is not None and getattr(inp, "team_id", None) is not None
+                if hasattr(inp, "team_id")
+                and inp is not None
+                and getattr(inp, "team_id", None) is not None
             }
             assert match.referee.team_id not in playing_team_ids, (
                 f"Match {match.id} has a referee who is also a playing team"
@@ -760,14 +759,13 @@ async def test_auto_scheduling_assigns_referees_when_enabled(
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_auto_scheduling_preserves_existing_referee_assignments(
-    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext,
+    startup_and_shutdown_uvicorn_server: None,
+    auth_context: AuthContext,
 ) -> None:
     """Existing (manual) referee assignments are never overwritten by the scheduler."""
     tid = auth_context.tournament.id
     await database.execute(
-        query=tournaments.update()
-        .where(tournaments.c.id == tid)
-        .values(referees_enabled=True),
+        query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True),
     )
     try:
         async with (

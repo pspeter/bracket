@@ -3104,6 +3104,38 @@ export type CreateMatchTournamentsTournamentIdMatchesPostResponses = {
 export type CreateMatchTournamentsTournamentIdMatchesPostResponse =
   CreateMatchTournamentsTournamentIdMatchesPostResponses[keyof CreateMatchTournamentsTournamentIdMatchesPostResponses];
 
+export type AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostData = {
+  body?: SchedulerWeights;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/auto-assign-referees';
+};
+
+export type AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostError =
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors[keyof AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors];
+
+export type AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponse =
+  AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses[keyof AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses];
+
 export type SwapMatchesTournamentsTournamentIdMatchesSwapPostData = {
   body: MatchSwapBody;
   path: {

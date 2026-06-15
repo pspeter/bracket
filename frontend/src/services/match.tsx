@@ -88,6 +88,12 @@ export async function resizeMatchBreak(
   return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/resize_break`, body);
 }
 
+export async function autoAssignReferees(tournament_id: number, weights?: SchedulerWeights) {
+  return createAxios()
+    .post(`tournaments/${tournament_id}/matches/auto-assign-referees`, weights)
+    .catch((response: any) => handleRequestError(response));
+}
+
 export async function scheduleMatches(tournament_id: number, weights?: SchedulerWeights) {
   return createAxios()
     .post(`tournaments/${tournament_id}/schedule_matches`, weights)

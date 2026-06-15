@@ -23,6 +23,7 @@ import {
   IconCalendarPlus,
   IconListDetails,
   IconTools,
+  IconUserCheck,
   IconWand,
 } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
@@ -80,6 +81,7 @@ import {
   getUnscheduledMatches,
 } from '@services/lookups';
 import {
+  autoAssignReferees,
   reoptimizeMatches,
   rescheduleMatch,
   resizeMatchBreak,
@@ -522,6 +524,26 @@ export default function SchedulePage() {
                     {t('reoptimize_description')}
                   </Button>
                 )}
+                {courts.length < 1 || !tournament.referees_enabled ? null : (
+                  <Button
+                    color="teal"
+                    size="md"
+                    variant="light"
+                    style={{ marginBottom: 10 }}
+                    leftSection={<IconUserCheck size={24} />}
+                    onClick={async () => {
+                      setIsOptimizing(true);
+                      try {
+                        await autoAssignReferees(tournamentData.id);
+                        await swrStagesResponse.mutate();
+                      } finally {
+                        setIsOptimizing(false);
+                      }
+                    }}
+                  >
+                    {t('assign_missing_referees_description')}
+                  </Button>
+                )}
               </Group>
             </Grid.Col>
           )}
@@ -616,6 +638,16 @@ export default function SchedulePage() {
                 onHighlightChange={setHighlightValue}
                 onSchedule={() => setScheduleModalOpened(true)}
                 onReoptimize={() => setReoptimizeModalOpened(true)}
+                refereesEnabled={tournament.referees_enabled}
+                onAssignReferees={async () => {
+                  setIsOptimizing(true);
+                  try {
+                    await autoAssignReferees(tournamentData.id);
+                    await swrStagesResponse.mutate();
+                  } finally {
+                    setIsOptimizing(false);
+                  }
+                }}
               />
             )}
             <Modal

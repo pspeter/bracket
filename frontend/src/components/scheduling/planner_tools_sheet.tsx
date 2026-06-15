@@ -1,5 +1,11 @@
 import { Button, Divider, Drawer, Select, Stack } from '@mantine/core';
-import { IconCalendarPlus, IconPlus, IconTrash, IconWand } from '@tabler/icons-react';
+import {
+  IconCalendarPlus,
+  IconPlus,
+  IconTrash,
+  IconUserCheck,
+  IconWand,
+} from '@tabler/icons-react';
 import { ComponentProps, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
@@ -28,6 +34,8 @@ export default function PlannerToolsSheet({
   onHighlightChange,
   onSchedule,
   onReoptimize,
+  refereesEnabled,
+  onAssignReferees,
 }: {
   opened: boolean;
   onClose: () => void;
@@ -40,6 +48,8 @@ export default function PlannerToolsSheet({
   onHighlightChange: (value: string | null) => void;
   onSchedule: () => void;
   onReoptimize: () => void;
+  refereesEnabled: boolean;
+  onAssignReferees: () => void;
 }) {
   const { t } = useTranslation();
   const [addOpened, setAddOpened] = useState(false);
@@ -134,6 +144,20 @@ export default function PlannerToolsSheet({
           >
             {t('reoptimize_description')}
           </Button>
+          {refereesEnabled && (
+            <Button
+              variant="light"
+              color="teal"
+              justify="flex-start"
+              leftSection={<IconUserCheck size={20} />}
+              onClick={() => {
+                onClose();
+                onAssignReferees();
+              }}
+            >
+              {t('assign_missing_referees_description')}
+            </Button>
+          )}
         </Stack>
       </Drawer>
     </>

@@ -5397,6 +5397,70 @@
         ]
       }
     },
+    "/tournaments/{tournament_id}/matches/auto-assign-referees": {
+      "post": {
+        "operationId": "auto_assign_referees_tournaments__tournament_id__matches_auto_assign_referees_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulerWeights",
+                "default": {
+                  "comfortable_rest_minutes": 30,
+                  "court_locality": 4,
+                  "group_sync": 8,
+                  "makespan": 150,
+                  "referee_fairness": 200,
+                  "team_rest": 13
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Auto Assign Referees",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
     "/tournaments/{tournament_id}/matches/swap": {
       "post": {
         "operationId": "swap_matches_tournaments__tournament_id__matches_swap_post",
