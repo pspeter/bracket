@@ -643,7 +643,7 @@ def _add_referee_assignment(
             team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
             for team_id in sorted(eligible)  # sorted for determinism
         }
-        model.AddAtMostOne(choices.values())
+        model.AddExactlyOne(choices.values())
         ref_choices[match.id] = choices
         match_durations[match.id] = match.duration_minutes
 
@@ -714,16 +714,6 @@ def _add_referee_assignment(
         if ref is not None and ref.team_id in all_eligible_teams:
             fixed_ref_count[ref.team_id] += 1
 
-    # Coverage: penalise each unassigned match.  The coefficient is large enough to make
-    # filling every assignable match always worth more than any improvement in spread.
-    # coefficient_coverage > max_possible_spread = len(ref_choices) → unassigned is always worse
-    coefficient_coverage = len(ref_choices) + 1
-    all_ref_vars = [var for choices in ref_choices.values() for var in choices.values()]
-    total_assigned = model.NewIntVar(0, len(all_ref_vars), "ref_total_assigned")
-    model.Add(total_assigned == sum(all_ref_vars))
-    unassigned = model.NewIntVar(0, len(ref_choices), "ref_unassigned")
-    model.Add(unassigned == len(ref_choices) - total_assigned)
-
     # Total load per team = fixed + variable referee assignments
     max_possible_load = len(movable_contexts) + (max(fixed_ref_count.values(), default=0))
     team_loads: list[Any] = []
@@ -742,8 +732,8 @@ def _add_referee_assignment(
         team_loads.append(load)
 
     if len(team_loads) < 2:
-        # Single eligible team: just penalise unassigned matches; no spread to balance.
-        return ref_choices, [coefficient_coverage * unassigned]
+        # Single eligible team forced to referee all matches; no spread to balance.
+        return ref_choices, []
 
     max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
     min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
@@ -751,10 +741,7 @@ def _add_referee_assignment(
     model.AddMinEquality(min_load, team_loads)
     spread = model.NewIntVar(0, max_possible_load, "ref_spread")
     model.Add(spread == max_load - min_load)
-    # Combined: prefer coverage (fill all matches) then balance load
-    combined = model.NewIntVar(0, coefficient_coverage * len(ref_choices) + max_possible_load, "ref_combined")
-    model.Add(combined == coefficient_coverage * unassigned + spread)
-    return ref_choices, [combined]
+    return ref_choices, [spread]
 
 
 def _build_operations_from_solution(
