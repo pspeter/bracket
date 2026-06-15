@@ -257,6 +257,17 @@ function MatchCard({
       </Box>
     </Tooltip>
   ) : null;
+  const refereeConflictIcon =
+    refereesEnabled && match.referee_conflict ? (
+      <Tooltip label={t('referee_conflict_label', 'Referee is also playing during this match')}>
+        <Box
+          component="span"
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+        >
+          <AiFillWarning color="orange" />
+        </Box>
+      </Tooltip>
+    ) : null;
   const placementWarningIcon = hasPlacementWarning ? (
     <Tooltip label={t('placement_conflict_preview_label', 'Would double-book a team')}>
       <Box
@@ -329,6 +340,7 @@ function MatchCard({
             {badgeLabel != null ? fullBadge(badgeLabel) : null}
             {placementWarningIcon}
             {shortBreakIcon}
+            {refereeConflictIcon}
             {violationIcon}
           </Flex>
         )}
@@ -339,6 +351,7 @@ function MatchCard({
           {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
           {rows < 3 && placementWarningIcon}
           {rows < 3 && shortBreakIcon}
+          {rows < 3 && refereeConflictIcon}
           {rows === 1 &&
             match.stage_item_input2_conflict &&
             !(mergeConflictIcons && match.stage_item_input1_conflict) && (

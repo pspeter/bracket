@@ -360,6 +360,7 @@ async def update_match_by_id(
             await sql_set_match_referee(match_id, referee.id)
         else:
             await sql_set_match_referee(match_id, None)
+        await reconcile_conflicts(tournament_id)
 
     round_ = await get_round_by_id(tournament_id, match.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
