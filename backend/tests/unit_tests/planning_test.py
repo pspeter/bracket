@@ -1112,37 +1112,6 @@ def test_existing_referee_assignment_not_overwritten() -> None:
     assert ops[0].referee_team_id is None
 
 
-def test_preserved_referee_not_overlapped_with_its_own_playing_match() -> None:
-    """A re-flowed match keeps its referee, and that team must not play an overlapping match.
-
-    Both matches are movable (reoptimize), so the solver chooses their start times. m1 keeps
-    its preserved referee team 3, but team 3 also plays m2. The solver must not place m1 and
-    m2 at overlapping times, or team 3 would referee m1 while playing m2.
-    """
-    level = LevelId(1)
-    # m1: teams 1 vs 2, refereed by team 3. m2: teams 3 vs 4 (team 3 plays here).
-    m1 = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
-    m2 = _match_with_teams(2, 3, 4, level)
-    inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-    ]
-    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
-    tournament = _tournament_with_referees()
-
-    # Two courts let the solver place both matches in parallel unless a constraint forbids it.
-    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
-
-    assert len(ops) == 2
-    op_by_id = {op.match.id: op for op in ops}
-    op1, op2 = op_by_id[MatchId(1)], op_by_id[MatchId(2)]
-    end1 = op1.start_time + timedelta(minutes=DURATION)
-    end2 = op2.start_time + timedelta(minutes=DURATION)
-    overlap = op1.start_time < end2 and op2.start_time < end1
-    assert not overlap, "Team 3 referees m1 and plays m2; the two must not overlap"
-
 
 def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
     """A re-flowed match's preserved referee must not overlap a pinned match the team plays.
@@ -1205,6 +1174,65 @@ def test_free_text_referee_match_not_overwritten() -> None:
 
     assert len(ops) == 1
     assert ops[0].referee_team_id is None
+
+
+# ── Referee assignment: full-optimize reshuffles referees ─────────────────────
+
+
+def test_full_optimize_reshuffles_referee_for_unpinned_match() -> None:
+    """reoptimize=True frees up referee assignments on movable matches for reshuffling.
+
+    A match that already has a referee (team 3) should have its assignment cleared in the
+    full-optimize path so the solver picks the best available team. The resulting operation
+    carries a freshly assigned referee_team_id.
+    """
+    level = LevelId(1)
+    m = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
+    inputs = [
+        _final_input(11, 1, level),
+        _final_input(12, 2, level),
+        _final_input(13, 3, level),
+        _final_input(14, 4, level),
+    ]
+    stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament, reoptimize=True)
+
+    assert len(ops) == 1
+    assert ops[0].referee_team_id is not None
+
+
+def test_reshuffled_referee_not_overlapped_with_its_own_playing_match() -> None:
+    """The no-overlap constraint applies to freshly assigned referees too.
+
+    Stage inputs only include teams 1–3, so team 4 is not eligible as referee. The solver is
+    forced to pick team 3 as referee for m1 (teams 1 vs 2). Since team 3 also plays m2
+    (teams 3 vs 4), m1 and m2 must not overlap in time.
+    """
+    level = LevelId(1)
+    m1 = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
+    m2 = _match_with_teams(2, 3, 4, level)
+    inputs = [
+        _final_input(11, 1, level),
+        _final_input(12, 2, level),
+        _final_input(13, 3, level),
+        # Team 4 intentionally omitted — not eligible as referee
+    ]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
+
+    assert len(ops) == 2
+    op_by_id = {op.match.id: op for op in ops}
+    op1 = op_by_id[MatchId(1)]
+    op2 = op_by_id[MatchId(2)]
+    assert op1.referee_team_id == TeamId(3), "Team 3 is the only eligible referee for m1"
+    end1 = op1.start_time + timedelta(minutes=DURATION)
+    end2 = op2.start_time + timedelta(minutes=DURATION)
+    overlap = op1.start_time < end2 and op2.start_time < end1
+    assert not overlap, "Team 3 both referees m1 and plays m2; they must not overlap"
 
 
 # ── Referee assignment: no rest penalty ───────────────────────────────────────

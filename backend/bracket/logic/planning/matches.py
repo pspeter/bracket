@@ -604,16 +604,17 @@ def _add_referee_assignment(
     pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]],
     team_level_ids: dict[TeamId, LevelId | None],
     horizon: int,
+    reoptimize: bool = False,
 ) -> tuple[dict[MatchId, dict[TeamId, Any]], list[Any]]:
     """Add referee decision variables, hard constraints, and fairness objective.
 
     For each movable match without a referee, optionally assigns one team (same level,
-    not currently playing). Hard constraints prevent a team from refereeing when it is
-    playing or already refereeing another overlapping match. This covers preserved
-    referees on movable matches too: a match that already has a referee keeps it, but its
-    start time is still re-flowed, so the fixed referee team is constrained from playing or
-    refereeing elsewhere at the chosen time. The fairness term minimises the spread of
-    per-team referee counts across all eligible teams.
+    not currently playing). When reoptimize=True, existing referee assignments on movable
+    matches are also freed up and reshuffled by the solver. When reoptimize=False, a match
+    that already has a referee keeps it, but the no-overlap constraint still applies because
+    its start time is re-flowed. Hard constraints prevent a team from refereeing when it is
+    playing or already refereeing another overlapping match. The fairness term minimises the
+    spread of per-team referee counts across all eligible teams.
 
     Returns (ref_choices, [spread_var]) where ref_choices[match_id][team_id] is the
     BoolVar indicating whether that team referees that match, and spread_var (if any
@@ -641,21 +642,21 @@ def _add_referee_assignment(
                 playing.add(input_.team_id)
         match_playing_teams[context.match.id] = playing
 
-    # Create referee decision variables for each movable match lacking a referee
+    # Create referee decision variables for each movable match.
+    # In default (non-reoptimize) mode, a match that already has a referee keeps it: the
+    # existing assignment is recorded in preserved_ref_team so the no-overlap constraint still
+    # applies while the match is re-flowed. In full-optimize (reoptimize=True) mode, existing
+    # assignments are cleared and the solver picks a fresh referee for every movable match.
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
     match_durations: dict[MatchId, int] = {}
-    # Movable matches whose referee is already assigned: we keep the referee, but the match
-    # start time is still re-flowed by the solver, so the fixed referee team must not be
-    # playing (or refereeing) at the chosen time. Record team_id per match so the no-overlap
-    # and pinned-playing constraints below cover these preserved assignments too.
     preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
         if not _opponents_are_known(match):
             # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
             continue
-        if match.referee_id is not None:
-            # Already assigned — preserve it, but still constrain it against playing overlaps.
+        if match.referee_id is not None and not reoptimize:
+            # Non-reoptimize: preserve the existing assignment; still constrain overlaps.
             referee = match.referee
             if referee is not None and referee.team_id is not None:
                 preserved_ref_team[match.id] = referee.team_id
@@ -996,6 +997,7 @@ def build_schedule_plan(
             pinned_by_referee_team,
             team_level_ids,
             horizon,
+            reoptimize,
         )
         if ref_spreads and weights.referee_fairness > 0:
             objective += weights.referee_fairness * sum(ref_spreads)
