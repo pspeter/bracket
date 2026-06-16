@@ -8,6 +8,7 @@ import { DashboardFooter } from '@components/dashboard/footer';
 import { DoubleHeader, getTournamentHeadTitle } from '@components/dashboard/layout';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { compareDateTime, formatTime } from '@components/utils/datetime';
+import { matchHasTeam } from '@components/utils/match';
 import { responseIsValid, setTitle } from '@components/utils/util';
 import { getStagesLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';
@@ -19,6 +20,7 @@ export default function DashboardMatchesPage() {
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
   const [levelId] = useQueryState('level', parseAsInteger);
+  const [teamId] = useQueryState('team', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
 
@@ -35,6 +37,10 @@ export default function DashboardMatchesPage() {
   const sortedMatches = Object.values(matchesLookup)
     .filter((item: any) => item.match.start_time != null)
     .filter((item: any) => levelId == null || item.stage.level_id === levelId)
+    .filter(
+      (item: any) =>
+        teamId == null || matchHasTeam(item.match, teamId, tournamentDataFull.referees_enabled)
+    )
     .sort(
       (m1: any, m2: any) =>
         compareDateTime(m1.match.start_time, m2.match.start_time) ||

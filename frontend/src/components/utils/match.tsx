@@ -33,6 +33,18 @@ export function isMatchHappening(match: MatchWithDetails) {
   return match.state === 'IN_PROGRESS';
 }
 
+/**
+ * Whether the given team is involved in the match: as one of the two (already determined)
+ * participants, or — when `includeReferee` is set — as the assigned referee.
+ */
+export function matchHasTeam(match: MatchWithDetails, teamId: number, includeReferee = false) {
+  return (
+    match.stage_item_input1?.team_id === teamId ||
+    match.stage_item_input2?.team_id === teamId ||
+    (includeReferee && match.referee?.team_id === teamId)
+  );
+}
+
 export function isMatchInTheFutureOrPresent(match: MatchWithDetails) {
   return getMatchEndTime(match) > dayjs();
 }

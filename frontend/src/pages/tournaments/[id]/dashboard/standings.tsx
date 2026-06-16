@@ -25,11 +25,13 @@ export function StandingsContent({
   fontSizeInPixels,
   maxTeamsToDisplay,
   levelId = null,
+  teamId = null,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   fontSizeInPixels: number;
   maxTeamsToDisplay: number;
   levelId?: number | null;
+  teamId?: number | null;
 }) {
   const { t } = useTranslation();
 
@@ -45,6 +47,11 @@ export function StandingsContent({
     .filter((stageItemId) => stageItemsLookup[stageItemId] != null)
     .filter(
       (stageItemId) => levelId == null || stageItemLevelLookup[parseInt(stageItemId)] === levelId
+    )
+    .filter(
+      (stageItemId) =>
+        teamId == null ||
+        stageItemTeamLookup[stageItemId].some((input: any) => input.team_id === teamId)
     )
     .sort((si1: any, si2: any) =>
       stageItemsLookup[si1].name > stageItemsLookup[si2].name ? 1 : -1
@@ -80,6 +87,7 @@ export default function DashboardStandingsPage() {
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
   const [levelId] = useQueryState('level', parseAsInteger);
+  const [teamId] = useQueryState('team', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
 
@@ -103,6 +111,7 @@ export default function DashboardStandingsPage() {
             fontSizeInPixels={16}
             maxTeamsToDisplay={100}
             levelId={levelId}
+            teamId={teamId}
           />
         </Container>
       </Container>

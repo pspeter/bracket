@@ -179,6 +179,19 @@ export function getTeamsLive(tournament_id: number | null): SWRResponse<TeamsWit
   });
 }
 
+// Teams for the public dashboard team filter. Fetches up to 100 teams, optionally
+// restricted to a single level so the dropdown only offers teams from that level.
+export function getTeamsForDashboard(
+  tournament_id: number | null,
+  level_id: number | null
+): SWRResponse<TeamsWithPlayersResponse> {
+  const levelParam = level_id == null ? '' : `&level_id=${level_id}`;
+  return useSWR(
+    tournament_id == null ? null : `tournaments/${tournament_id}/teams?limit=100${levelParam}`,
+    fetcher
+  );
+}
+
 export function getReferees(tournament_id: number | undefined): SWRResponse<RefereesResponse> {
   return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/referees`, fetcher);
 }
