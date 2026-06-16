@@ -13,6 +13,7 @@ import {
   formatMatchInput1,
   formatMatchInput2,
   isMatchCompletedRecently,
+  matchHasTeam,
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { Translator } from '@components/utils/types';
@@ -118,12 +119,14 @@ export function Schedule({
   matchesLookup,
   levels,
   refereesEnabled,
+  filterActive = false,
 }: {
   t: Translator;
   stageItemsLookup: any;
   matchesLookup: any;
   levels: LevelResponse[];
   refereesEnabled: boolean;
+  filterActive?: boolean;
 }) {
   const matches: any[] = Object.values(matchesLookup)
     .map((item: any) => item)
@@ -159,7 +162,11 @@ export function Schedule({
 
   if (rows.length < 1) {
     return (
-      <NoContent title={t('no_live_matches_title')} description="" icon={<AiOutlineHourglass />} />
+      <NoContent
+        title={filterActive ? t('no_live_matches_for_filter_title') : t('no_live_matches_title')}
+        description=""
+        icon={<AiOutlineHourglass />}
+      />
     );
   }
 
@@ -174,6 +181,7 @@ export default function DashboardSchedulePage() {
   const tournamentDataFull = getTournamentResponseByEndpointName();
   const tournamentValid = !React.isValidElement(tournamentDataFull);
   const [levelId] = useQueryState('level', parseAsInteger);
+  const [teamId] = useQueryState('team', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
   if (!tournamentValid) {
@@ -187,12 +195,17 @@ export default function DashboardSchedulePage() {
     : [];
   const matchesLookup = responseIsValid(swrStagesResponse) ? getMatchLookup(swrStagesResponse) : [];
 
-  const filteredMatchesLookup =
-    levelId != null
-      ? Object.fromEntries(
-          Object.entries(matchesLookup).filter(([, entry]: any) => entry.stage.level_id === levelId)
+  const filterActive = levelId != null || teamId != null;
+  const filteredMatchesLookup = filterActive
+    ? Object.fromEntries(
+        Object.entries(matchesLookup).filter(
+          ([, entry]: any) =>
+            (levelId == null || entry.stage.level_id === levelId) &&
+            (teamId == null ||
+              matchHasTeam(entry.match, teamId, tournamentDataFull.referees_enabled))
         )
-      : matchesLookup;
+      )
+    : matchesLookup;
 
   // TODO: show loading icon.
   if (!responseIsValid(swrStagesResponse)) return null;
@@ -208,6 +221,7 @@ export default function DashboardSchedulePage() {
             stageItemsLookup={stageItemsLookup}
             levels={tournamentDataFull.levels}
             refereesEnabled={tournamentDataFull.referees_enabled}
+            filterActive={filterActive}
           />
         </Group>
       </Center>

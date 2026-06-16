@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Center,
   Container,
   Group,
@@ -18,8 +19,9 @@ import { levelSelectData } from '@components/levels/levels';
 import PreloadLink from '@components/utils/link';
 import { getBaseURL } from '@components/utils/util';
 import { TournamentWithLevels } from '@openapi';
-import { getBaseApiUrl } from '@services/adapter';
+import { getBaseApiUrl, getTeamsForDashboard } from '@services/adapter';
 import classes from './layout.module.css';
+import { TeamFilterCombobox } from './team_filter';
 
 export function TournamentQRCode({
   tournamentDataFull,
@@ -96,16 +98,52 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
   const endpoint = tournamentData.dashboard_endpoint || '';
   const pathName = navigate.pathname.replace('[id]', endpoint).replace(/\/+$/, '');
   const [levelId, setLevelId] = useQueryState('level', parseAsInteger);
+  const [teamId, setTeamId] = useQueryState('team', parseAsInteger);
 
-  const levelParam = levelId != null ? `?level=${levelId}` : '';
+  // Only teams from the selected level are offered (when a level is selected).
+  const { teams } = getTeamsForDashboard(tournamentData.id, levelId);
+  const teamOptions = teams.map((team) => ({ value: `${team.id}`, label: team.name }));
+
+  // Keep both filters in the URL so they survive navigating between tabs.
+  const filterParams = new URLSearchParams();
+  if (levelId != null) filterParams.set('level', `${levelId}`);
+  if (teamId != null) filterParams.set('team', `${teamId}`);
+  const filterQuery = filterParams.toString();
+  const filterSuffix = filterQuery ? `?${filterQuery}` : '';
+
+  const onLevelChange = (val: string | null) => {
+    const nextLevelId = val === 'all' || val === null ? null : parseInt(val, 10);
+    setLevelId(nextLevelId);
+    // Selecting a specific level invalidates a team that may belong to another level.
+    if (nextLevelId != null && teamId != null) {
+      setTeamId(null);
+    }
+  };
+
+  const onTeamChange = (nextTeamId: number | null) => {
+    setTeamId(nextTeamId);
+    // When picking a team without a level filter, also scope to that team's level.
+    if (nextTeamId != null && levelId == null) {
+      const team = teams.find((candidate) => candidate.id === nextTeamId);
+      if (team?.level_id != null) {
+        setLevelId(team.level_id);
+      }
+    }
+  };
+
+  const clearFilters = () => {
+    setLevelId(null);
+    setTeamId(null);
+  };
+
   const mainLinks = [
-    { link: `/tournaments/${endpoint}/dashboard${levelParam}`, label: t('dashboard_tab_live') },
+    { link: `/tournaments/${endpoint}/dashboard${filterSuffix}`, label: t('dashboard_tab_live') },
     {
-      link: `/tournaments/${endpoint}/dashboard/matches${levelParam}`,
+      link: `/tournaments/${endpoint}/dashboard/matches${filterSuffix}`,
       label: t('dashboard_tab_matches'),
     },
     {
-      link: `/tournaments/${endpoint}/dashboard/standings${levelParam}`,
+      link: `/tournaments/${endpoint}/dashboard/standings${filterSuffix}`,
       label: t('dashboard_tab_standings'),
     },
     ...(tournamentData.rules?.trim()
@@ -149,21 +187,30 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
           </Group>
         </UnstyledButton>
         <Box className={classes.links}>
-          <Group gap="md" align="center" wrap="nowrap">
-            <Group gap={0} className={classes.mainLinks}>
-              {mainItems}
-            </Group>
+          <Group gap={0} className={classes.mainLinks}>
+            {mainItems}
+          </Group>
+          <Group gap="xs" align="center" wrap="wrap" mt="xs">
             {tournamentData.levels.length > 0 && (
               <Select
                 size="xs"
-                w={140}
+                w={130}
                 data={levelSelectData(tournamentData.levels, t('all_levels_label'))}
                 value={levelId != null ? `${levelId}` : 'all'}
-                onChange={(val) =>
-                  setLevelId(val === 'all' || val === null ? null : parseInt(val, 10))
-                }
+                onChange={onLevelChange}
                 placeholder={t('filter_level_placeholder')}
               />
+            )}
+            <TeamFilterCombobox
+              value={teamId}
+              onChange={onTeamChange}
+              teamOptions={teamOptions}
+              width={150}
+            />
+            {(levelId != null || teamId != null) && (
+              <Button size="xs" variant="subtle" onClick={clearFilters}>
+                {t('clear_filter_button')}
+              </Button>
             )}
           </Group>
         </Box>
