@@ -576,3 +576,55 @@ def test_referee_conflict_no_playing_match_no_conflict() -> None:
     flags = get_match_conflict_flags([stage], default_break_minutes=0)
 
     assert flags[refereeing_match.id].referee_conflict is False
+
+
+def test_referee_conflict_team_plays_and_referees_same_match() -> None:
+    """A team that is both a player and referee in the same match is flagged."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # inp[0] (team -20) plays as input1; same team is also the referee for this match
+    match = _make_definitive_match(
+        MatchId(-20),
+        inp[0],
+        inp[1],
+        RoundId(-10),
+        CourtId(-1),
+        T,
+        referee=Referee(
+            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
+        ),
+    )
+    round1 = RoundWithMatches(
+        id=RoundId(-10),
+        matches=[match],
+        stage_item_id=StageItemId(-10),
+        created=MOCK_NOW,
+        is_draft=False,
+        name="",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1],
+        inputs=[inp[0], inp[1]],
+        type_name="Single Elimination",
+        team_count=2,
+        ranking_id=None,
+        id=StageItemId(-10),
+        stage_id=StageId(-10),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.SINGLE_ELIMINATION,
+    )
+    stage = StageWithStageItems(
+        id=StageId(-10),
+        tournament_id=tid,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[match.id].referee_conflict is True
+    assert flags[match.id].stage_item_input1_conflict is True
+    assert flags[match.id].stage_item_input2_conflict is False

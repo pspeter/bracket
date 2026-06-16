@@ -190,8 +190,6 @@ def _set_referee_overlap_conflicts(
             continue
 
         for playing_match, playing_window in team_playing_windows.get(referee.team_id, []):
-            if playing_match.id == match.id:
-                continue
             if not _time_ranges_overlap(
                 match.start_time,
                 match.end_time,
