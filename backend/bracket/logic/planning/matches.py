@@ -593,8 +593,11 @@ def _add_referee_assignment(
 
     For each movable match without a referee, optionally assigns one team (same level,
     not currently playing). Hard constraints prevent a team from refereeing when it is
-    playing or already refereeing another overlapping match. The fairness term minimises
-    the spread of per-team referee counts across all eligible teams.
+    playing or already refereeing another overlapping match. This covers preserved
+    referees on movable matches too: a match that already has a referee keeps it, but its
+    start time is still re-flowed, so the fixed referee team is constrained from playing or
+    refereeing elsewhere at the chosen time. The fairness term minimises the spread of
+    per-team referee counts across all eligible teams.
 
     Returns (ref_choices, [spread_var]) where ref_choices[match_id][team_id] is the
     BoolVar indicating whether that team referees that match, and spread_var (if any
@@ -625,10 +628,20 @@ def _add_referee_assignment(
     # Create referee decision variables for each movable match lacking a referee
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
     match_durations: dict[MatchId, int] = {}
+    # Movable matches whose referee is already assigned: we keep the referee, but the match
+    # start time is still re-flowed by the solver, so the fixed referee team must not be
+    # playing (or refereeing) at the chosen time. Record team_id per match so the no-overlap
+    # and pinned-playing constraints below cover these preserved assignments too.
+    preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
         if match.referee_id is not None:
-            continue  # already assigned manually — preserve it
+            # Already assigned — preserve it, but still constrain it against playing overlaps.
+            referee = match.referee
+            if referee is not None and referee.team_id is not None:
+                preserved_ref_team[match.id] = referee.team_id
+                match_durations[match.id] = match.duration_minutes
+            continue
 
         match_level = context.level_id
         playing_teams = match_playing_teams[match.id]
@@ -648,19 +661,23 @@ def _add_referee_assignment(
         ref_choices[match.id] = choices
         match_durations[match.id] = match.duration_minutes
 
-    if not ref_choices:
+    if not ref_choices and not preserved_ref_team:
         return {}, []
 
     all_eligible_teams: set[TeamId] = set(
         team_id for choices in ref_choices.values() for team_id in choices
     )
 
-    # Per-team interval lists: playing (movable) + referee (optional, movable) + pinned referee
+    # Per-team interval lists: playing (movable) + referee (optional new, mandatory preserved,
+    # movable) + pinned referee
     team_all_intervals: dict[TeamId, list[Any]] = defaultdict(list)
 
-    # Add movable playing intervals for eligible teams AND teams with pinned referee assignments
-    # (both groups need conflict-checking against each other's intervals)
-    for team_id in all_eligible_teams | set(pinned_by_referee_team.keys()):
+    # Add movable playing intervals for every team that participates in a referee constraint:
+    # eligible candidates, teams refereeing a pinned match, and teams whose preserved referee
+    # assignment sits on a movable match. Each needs conflict-checking against the others.
+    for team_id in (
+        all_eligible_teams | set(pinned_by_referee_team.keys()) | set(preserved_ref_team.values())
+    ):
         for input_id in team_to_input_ids.get(team_id, set()):
             team_all_intervals[team_id].extend(input_intervals.get(input_id, []))
 
@@ -683,8 +700,27 @@ def _add_referee_assignment(
                 )
             )
 
+    # Add mandatory referee intervals for preserved assignments on movable matches. The team
+    # is fixed, but the start is a variable, so a plain (non-optional) interval at the match's
+    # start makes AddNoOverlap forbid the team from playing or refereeing anything else then.
+    for match_id, team_id in preserved_ref_team.items():
+        duration = match_durations[match_id]
+        ref_end = model.NewIntVar(
+            0,
+            horizon + duration,
+            f"preserved_ref_end_match_{match_id}_team_{team_id}",
+        )
+        team_all_intervals[team_id].append(
+            model.NewIntervalVar(
+                starts[match_id],
+                duration,
+                ref_end,
+                f"preserved_ref_interval_match_{match_id}_team_{team_id}",
+            )
+        )
+
     # Add fixed intervals for pinned referee assignments so AddNoOverlap covers:
-    #   - movable playing vs pinned referee (team plays a movable match while refereeing a pinned one)
+    #   - movable playing vs pinned referee (team plays a movable match, referees a pinned one)
     #   - movable referee vs pinned referee (team referees both a movable and a pinned match)
     for team_id, pinned_ref_matches in pinned_by_referee_team.items():
         for pinned in pinned_ref_matches:
@@ -720,6 +756,24 @@ def _add_referee_assignment(
                     model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf([var, before])
                     model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf([var, after])
                     model.AddBoolOr([before, after, var.Not()])
+
+    # Same constraint for preserved (fixed) referees on movable matches: the team is committed
+    # unconditionally, so the movable match must sit entirely before or after each pinned match
+    # the referee team plays in.
+    for match_id, team_id in preserved_ref_team.items():
+        for input_id in team_to_input_ids.get(team_id, set()):
+            for pinned in pinned_by_input.get(input_id, []):
+                before = model.NewBoolVar(
+                    f"preserved_ref_match_{match_id}_team_{team_id}_"
+                    f"before_pinned_{pinned.context.match.id}"
+                )
+                after = model.NewBoolVar(
+                    f"preserved_ref_match_{match_id}_team_{team_id}_"
+                    f"after_pinned_{pinned.context.match.id}"
+                )
+                model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(before)
+                model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(after)
+                model.AddBoolOr([before, after])
 
     # Fixed referee load from pinned matches (already assigned, can't change)
     fixed_ref_count: dict[TeamId, int] = defaultdict(int)
