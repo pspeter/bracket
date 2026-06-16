@@ -18,7 +18,7 @@ import { useLocation } from 'react-router';
 import { levelSelectData } from '@components/levels/levels';
 import PreloadLink from '@components/utils/link';
 import { getBaseURL } from '@components/utils/util';
-import { FullTeamWithPlayers, TournamentWithLevels } from '@openapi';
+import { TournamentWithLevels } from '@openapi';
 import { getBaseApiUrl, getTeamsForDashboard } from '@services/adapter';
 import classes from './layout.module.css';
 import { TeamFilterCombobox } from './team_filter';
@@ -101,8 +101,7 @@ export function DoubleHeader({ tournamentData }: { tournamentData: TournamentWit
   const [teamId, setTeamId] = useQueryState('team', parseAsInteger);
 
   // Only teams from the selected level are offered (when a level is selected).
-  const swrTeamsResponse = getTeamsForDashboard(tournamentData.id, levelId);
-  const teams: FullTeamWithPlayers[] = swrTeamsResponse.data?.data.teams ?? [];
+  const { teams } = getTeamsForDashboard(tournamentData.id, levelId);
   const teamOptions = teams.map((team) => ({ value: `${team.id}`, label: team.name }));
 
   // Keep both filters in the URL so they survive navigating between tabs.

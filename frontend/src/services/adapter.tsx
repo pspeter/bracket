@@ -9,6 +9,7 @@ import { Pagination } from '@components/utils/util';
 import {
   ClubsResponse,
   CourtsResponse,
+  FullTeamWithPlayers,
   PlayersResponse,
   RankingsResponse,
   RefereesResponse,
@@ -179,17 +180,29 @@ export function getTeamsLive(tournament_id: number | null): SWRResponse<TeamsWit
   });
 }
 
-// Teams for the public dashboard team filter. Fetches up to 100 teams, optionally
-// restricted to a single level so the dropdown only offers teams from that level.
+// Teams for the public dashboard team filter, optionally restricted to a single level so the
+// dropdown only offers teams from that level. The combobox filters this set client-side as the
+// user types. The endpoint caps a page at 100, so we fetch a second page when the tournament has
+// more than 100 teams (up to 200 total, which is plenty in practice).
 export function getTeamsForDashboard(
   tournament_id: number | null,
   level_id: number | null
-): SWRResponse<TeamsWithPlayersResponse> {
+): { teams: FullTeamWithPlayers[]; isLoading: boolean } {
   const levelParam = level_id == null ? '' : `&level_id=${level_id}`;
-  return useSWR(
-    tournament_id == null ? null : `tournaments/${tournament_id}/teams?limit=100${levelParam}`,
+  const baseUrl =
+    tournament_id == null ? null : `tournaments/${tournament_id}/teams?limit=100${levelParam}`;
+
+  const firstPage = useSWR<TeamsWithPlayersResponse>(baseUrl, fetcher);
+  const totalCount = firstPage.data?.data.count ?? 0;
+  const secondPage = useSWR<TeamsWithPlayersResponse>(
+    baseUrl != null && totalCount > 100 ? `${baseUrl}&offset=100` : null,
     fetcher
   );
+
+  return {
+    teams: [...(firstPage.data?.data.teams ?? []), ...(secondPage.data?.data.teams ?? [])],
+    isLoading: firstPage.isLoading,
+  };
 }
 
 export function getReferees(tournament_id: number | undefined): SWRResponse<RefereesResponse> {
