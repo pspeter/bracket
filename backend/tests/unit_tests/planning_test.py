@@ -1112,6 +1112,80 @@ def test_existing_referee_assignment_not_overwritten() -> None:
     assert ops[0].referee_team_id is None
 
 
+def test_preserved_referee_not_overlapped_with_its_own_playing_match() -> None:
+    """A re-flowed match keeps its referee, and that team must not play an overlapping match.
+
+    Both matches are movable (reoptimize), so the solver chooses their start times. m1 keeps
+    its preserved referee team 3, but team 3 also plays m2. The solver must not place m1 and
+    m2 at overlapping times, or team 3 would referee m1 while playing m2.
+    """
+    level = LevelId(1)
+    # m1: teams 1 vs 2, refereed by team 3. m2: teams 3 vs 4 (team 3 plays here).
+    m1 = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
+    m2 = _match_with_teams(2, 3, 4, level)
+    inputs = [
+        _final_input(11, 1, level),
+        _final_input(12, 2, level),
+        _final_input(13, 3, level),
+        _final_input(14, 4, level),
+    ]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    # Two courts let the solver place both matches in parallel unless a constraint forbids it.
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
+
+    assert len(ops) == 2
+    op_by_id = {op.match.id: op for op in ops}
+    op1, op2 = op_by_id[MatchId(1)], op_by_id[MatchId(2)]
+    end1 = op1.start_time + timedelta(minutes=DURATION)
+    end2 = op2.start_time + timedelta(minutes=DURATION)
+    overlap = op1.start_time < end2 and op2.start_time < end1
+    assert not overlap, "Team 3 referees m1 and plays m2; the two must not overlap"
+
+
+def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
+    """A re-flowed match's preserved referee must not overlap a pinned match the team plays.
+
+    m1 is pinned at T0 with team 3 playing. m2 is movable and keeps preserved referee team 3.
+    The solver must not place m2 overlapping m1.
+    """
+    level = LevelId(1)
+    # m1: pinned, teams 3 vs 4 at T0 on court 1. m2: movable, refereed by team 3.
+    inp31 = _final_input(31, 3, level)
+    inp32 = _final_input(32, 4, level)
+    m1 = MatchWithDetails(
+        id=MatchId(1),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(1),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=inp31.id,
+        stage_item_input2_id=inp32.id,
+        stage_item_input1=inp31,
+        stage_item_input2=inp32,
+        start_time=T0,
+        court_id=CourtId(1),
+    )
+    m2 = _match_with_referee(_match_with_teams(2, 1, 2, level), team_id=3)
+    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), inp31, inp32]
+    stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=False)
+
+    m2_ops = [op for op in ops if op.match.id == MatchId(2)]
+    assert len(m2_ops) == 1
+    m2_start = m2_ops[0].start_time
+    m2_end = m2_start + timedelta(minutes=DURATION)
+    m1_end = T0 + timedelta(minutes=DURATION)
+    overlap = m2_start < m1_end and T0 < m2_end
+    assert not overlap, "Team 3 plays pinned m1 and referees m2; the two must not overlap"
+
+
 def test_free_text_referee_match_not_overwritten() -> None:
     """A match with a free-text referee (no team_id) is also left as-is."""
     level = LevelId(1)
@@ -1523,7 +1597,10 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
-    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
+    # reoptimize=False keeps every already-scheduled match pinned, so m1 stays at T0 with its
+    # referee (team 3); only the unscheduled m2 is placed. (Under reoptimize=True a NOT_STARTED
+    # match is movable, so m1 would no longer be pinned and this would test a different case.)
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=False)
 
     # m2 is the only movable match; m1 is pinned at T0 on court 1
     m2_ops = [op for op in ops if op.match.id == MatchId(2)]
