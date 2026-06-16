@@ -136,6 +136,22 @@ def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
     return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
 
 
+def _opponents_are_known(match: ScheduleMatch) -> bool:
+    """True only when both opponents are concrete teams.
+
+    Matches in later stages get their opponents from placeholders (e.g. "winner of stage
+    item 2 of stage 1"), modelled as ``StageItemInputTentative``. Those resolve to a real
+    team only once the prior stage is activated. While a match still has a placeholder (or
+    empty) input we don't know who will play it, so the referee optimizer must not assign a
+    concrete team as its referee — that team might turn out to be one of the players
+    (issue #121). Such matches are left without a referee until their stage activates and
+    the optimizer (or the "assign missing referees" action) is run again.
+    """
+    return isinstance(match.stage_item_input1, StageItemInputFinal) and isinstance(
+        match.stage_item_input2, StageItemInputFinal
+    )
+
+
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
     return [
         _MatchContext(
@@ -635,6 +651,9 @@ def _add_referee_assignment(
     preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
+        if not _opponents_are_known(match):
+            # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
+            continue
         if match.referee_id is not None:
             # Already assigned — preserve it, but still constrain it against playing overlaps.
             referee = match.referee
@@ -1096,6 +1115,9 @@ def build_referee_assignment_plan(
 
     for context in needs_ref:
         match = context.match
+        if not _opponents_are_known(match):
+            # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
+            continue
         start_min = _minute_offset(tournament, assert_some(match.start_time))
         end_min = start_min + match.duration_minutes
         match_windows[match.id] = (start_min, end_min)
