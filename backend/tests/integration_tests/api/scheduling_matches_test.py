@@ -758,11 +758,16 @@ async def test_auto_scheduling_assigns_referees_when_enabled(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_auto_scheduling_preserves_existing_referee_assignments(
+async def test_reoptimize_keeps_matches_refereed(
     startup_and_shutdown_uvicorn_server: None,
     auth_context: AuthContext,
 ) -> None:
-    """Existing (manual) referee assignments are never overwritten by the scheduler."""
+    """Reoptimize may reshuffle referee slots (issue #123) but never drops an assignment.
+
+    A full re-optimize frees up referee slots on unpinned matches so the solver can rebalance
+    them, so the exact slot can change. What must hold is that a match which had a referee
+    still has one afterwards.
+    """
     tid = auth_context.tournament.id
     await database.execute(
         query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True),
@@ -797,23 +802,22 @@ async def test_auto_scheduling_preserves_existing_referee_assignments(
             await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
             stages_after_first = await get_full_tournament_details(tid)
             scheduled_first = _scheduled_matches(stages_after_first)
-            # Capture referee state from first pass
-            referees_after_first = {m.id: m.referee_stage_item_input_id for m in scheduled_first}
+            # Capture which matches had a referee after the first pass
+            refereed_match_ids = {
+                m.id for m in scheduled_first if m.referee_stage_item_input_id is not None
+            }
 
-            # Second pass (reoptimize): existing referee assignments must survive
+            # Second pass (reoptimize): slots may be reshuffled, but stay assigned
             await send_tournament_request(HTTPMethod.POST, "reoptimize_matches", auth_context)
             stages_after_second = await get_full_tournament_details(tid)
 
             await sql_delete_stage_item_with_foreign_keys(si.id)
 
         matches_after_second = {m.id: m for m in _all_matches(stages_after_second)}
-        for match_id, original_referee_slot_id in referees_after_first.items():
-            if original_referee_slot_id is None:
-                continue  # matches without a referee can be assigned or stay None
-            assert (
-                matches_after_second[match_id].referee_stage_item_input_id
-                == original_referee_slot_id
-            ), f"Match {match_id} had its referee overwritten by reoptimize"
+        for match_id in refereed_match_ids:
+            assert matches_after_second[match_id].referee_stage_item_input_id is not None, (
+                f"Match {match_id} lost its referee after reoptimize"
+            )
     finally:
         await database.execute(
             query=tournaments.update()
