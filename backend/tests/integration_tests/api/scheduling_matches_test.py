@@ -798,7 +798,7 @@ async def test_auto_scheduling_preserves_existing_referee_assignments(
             stages_after_first = await get_full_tournament_details(tid)
             scheduled_first = _scheduled_matches(stages_after_first)
             # Capture referee state from first pass
-            referees_after_first = {m.id: m.referee_id for m in scheduled_first}
+            referees_after_first = {m.id: m.referee_stage_item_input_id for m in scheduled_first}
 
             # Second pass (reoptimize): existing referee assignments must survive
             await send_tournament_request(HTTPMethod.POST, "reoptimize_matches", auth_context)
@@ -807,12 +807,13 @@ async def test_auto_scheduling_preserves_existing_referee_assignments(
             await sql_delete_stage_item_with_foreign_keys(si.id)
 
         matches_after_second = {m.id: m for m in _all_matches(stages_after_second)}
-        for match_id, original_referee_id in referees_after_first.items():
-            if original_referee_id is None:
+        for match_id, original_referee_slot_id in referees_after_first.items():
+            if original_referee_slot_id is None:
                 continue  # matches without a referee can be assigned or stay None
-            assert matches_after_second[match_id].referee_id == original_referee_id, (
-                f"Match {match_id} had its referee overwritten by reoptimize"
-            )
+            assert (
+                matches_after_second[match_id].referee_stage_item_input_id
+                == original_referee_slot_id
+            ), f"Match {match_id} had its referee overwritten by reoptimize"
     finally:
         await database.execute(
             query=tournaments.update()

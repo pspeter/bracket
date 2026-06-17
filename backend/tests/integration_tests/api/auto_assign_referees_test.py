@@ -7,8 +7,8 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
-from bracket.schema import tournaments
-from bracket.sql.referees import sql_set_match_referee, sql_upsert_referee_by_team
+from bracket.schema import stage_item_inputs, tournaments
+from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
@@ -108,7 +108,7 @@ async def test_auto_assign_referees_fills_missing_only(
 
     # Every scheduled match now has a referee
     assert len(scheduled_after) > 0
-    assert all(m.referee_id is not None for m in scheduled_after)
+    assert all(m.referee_stage_item_input_id is not None for m in scheduled_after)
 
     # Court and start_time are unchanged (schedule was not moved)
     scheduled_after_map = {m.id: (m.court_id, m.start_time) for m in scheduled_after}
@@ -148,10 +148,13 @@ async def test_auto_assign_referees_preserves_existing_assignment(
             ]
             assert len(scheduled_before) > 0
 
-            # Pre-assign t3 as referee on the first match
+            # Pre-assign t3's slot as referee on the first match
             first_match = scheduled_before[0]
-            pre_ref = await sql_upsert_referee_by_team(tid, t3.id)
-            await sql_set_match_referee(first_match.id, pre_ref.id)
+            t3_slot_id = await database.fetch_val(
+                query=stage_item_inputs.select().where(stage_item_inputs.c.team_id == t3.id),
+                column="id",
+            )
+            await sql_set_match_referee_slot(first_match.id, t3_slot_id)
 
             response = await send_tournament_request(HTTPMethod.POST, _ENDPOINT, auth_context)
 
@@ -165,26 +168,25 @@ async def test_auto_assign_referees_preserves_existing_assignment(
     assert response == SUCCESS_RESPONSE
 
     after_map = {
-        m.id: m.referee_id
+        m.id: m.referee_stage_item_input_id
         for s in stages_after
         for si_ in s.stage_items
         for r in si_.rounds
         for m in r.matches
     }
-    # The pre-assigned match still has the same referee
-    assert after_map[first_match.id] == pre_ref.id
+    # The pre-assigned match still has the same referee slot
+    assert after_map[first_match.id] == t3_slot_id
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_auto_assign_referees_skips_placeholder_matches(
+async def test_auto_assign_referees_assigns_placeholder_matches(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Matches whose opponents are still placeholders get no referee (issue #121).
+    """Matches whose opponents are still placeholders also get a referee slot (#125).
 
-    A later stage's matches reference the previous stage's results via tentative inputs.
-    Until that stage is activated we don't know who will play, so assigning a concrete team
-    as referee risks picking one of the eventual players. Those matches must stay
-    referee-less; the concrete first-stage matches still get referees.
+    A later stage's matches reference the previous stage's results via tentative inputs. The
+    referee is now a slot, so the optimizer assigns one regardless of whether the opponents
+    are known yet — both the concrete first-stage matches and the placeholder matches get one.
     """
     tid = auth_context.tournament.id
 
@@ -252,13 +254,13 @@ async def test_auto_assign_referees_skips_placeholder_matches(
         for m in r.matches
     ]
 
-    # First-stage (concrete) matches still get referees.
+    # First-stage (concrete) matches get referees.
     assert len(first_stage_matches) > 0
-    assert all(m.referee_id is not None for m in first_stage_matches)
+    assert all(m.referee_stage_item_input_id is not None for m in first_stage_matches)
 
-    # Placeholder matches are left without a referee.
+    # Placeholder matches now also get a referee slot (no more deferral).
     assert len(placeholder_matches) > 0
-    assert all(m.referee_id is None for m in placeholder_matches)
+    assert all(m.referee_stage_item_input_id is not None for m in placeholder_matches)
 
 
 @pytest.mark.asyncio(loop_scope="session")

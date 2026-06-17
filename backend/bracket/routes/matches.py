@@ -57,18 +57,44 @@ from bracket.sql.matches import (
     sql_update_match,
 )
 from bracket.sql.referees import (
-    sql_set_match_referee,
-    sql_upsert_referee_by_name,
-    sql_upsert_referee_by_team,
+    sql_clear_match_referee,
+    sql_set_match_referee_name,
+    sql_set_match_referee_slot,
 )
 from bracket.sql.rounds import get_round_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
-from bracket.utils.id_types import MatchId, StageItemId, TournamentId
+from bracket.utils.id_types import MatchId, StageItemId, StageItemInputId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
+
+
+async def validate_referee_slot_at_match_level(
+    tournament_id: TournamentId, match: Match, referee_stage_item_input_id: StageItemInputId
+) -> None:
+    """A referee slot must belong to a stage item at the refereed match's level."""
+    stages = await get_full_tournament_details(tournament_id)
+    match_level_id = None
+    input_level_id = None
+    input_found = False
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            for stage_item_input in stage_item.inputs:
+                if stage_item_input.id == referee_stage_item_input_id:
+                    input_found = True
+                    input_level_id = stage.level_id
+            for round_ in stage_item.rounds:
+                for round_match in round_.matches:
+                    if round_match.id == match.id:
+                        match_level_id = stage.level_id
+
+    if not input_found or input_level_id != match_level_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Referee slot must belong to a stage item at the match's level",
+        )
 
 
 async def validate_match_can_be_started(
@@ -355,17 +381,22 @@ async def update_match_by_id(
 
     # Only touch the referee when the client explicitly sent at least one referee field, so
     # other match edits (scores, duration, ...) never clear an existing assignment.
-    referee_team_id_provided = "referee_team_id" in match_body.model_fields_set
+    referee_slot_provided = "referee_stage_item_input_id" in match_body.model_fields_set
     referee_name_provided = "referee_name" in match_body.model_fields_set
-    referee_provided = referee_team_id_provided or referee_name_provided
+    referee_provided = referee_slot_provided or referee_name_provided
 
-    referee_team_id = match_body.referee_team_id
+    referee_stage_item_input_id = match_body.referee_stage_item_input_id
     referee_name = match_body.referee_name
 
-    if referee_team_id is not None and referee_name is not None:
+    if referee_stage_item_input_id is not None and referee_name is not None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="At most one of referee_team_id and referee_name may be set",
+            detail="At most one of referee_stage_item_input_id and referee_name may be set",
+        )
+
+    if referee_stage_item_input_id is not None:
+        await validate_referee_slot_at_match_level(
+            tournament_id, match, referee_stage_item_input_id
         )
 
     match_body = get_match_body_with_state_updates(match, match_body)
@@ -373,14 +404,12 @@ async def update_match_by_id(
     await sql_update_match(match_id, match_body, tournament)
 
     if referee_provided:
-        if referee_team_id is not None:
-            referee = await sql_upsert_referee_by_team(tournament_id, referee_team_id)
-            await sql_set_match_referee(match_id, referee.id)
+        if referee_stage_item_input_id is not None:
+            await sql_set_match_referee_slot(match_id, referee_stage_item_input_id)
         elif referee_name is not None:
-            referee = await sql_upsert_referee_by_name(tournament_id, referee_name)
-            await sql_set_match_referee(match_id, referee.id)
+            await sql_set_match_referee_name(match_id, referee_name)
         else:
-            await sql_set_match_referee(match_id, None)
+            await sql_clear_match_referee(match_id)
         await reconcile_conflicts(tournament_id)
 
     round_ = await get_round_by_id(tournament_id, match.round_id)

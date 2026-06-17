@@ -1,110 +1,57 @@
 from bracket.database import database
-from bracket.models.db.referee import Referee
-from bracket.utils.id_types import MatchId, RefereeId, TeamId, TournamentId
+from bracket.utils.id_types import MatchId, StageItemInputId, TournamentId
 
 
-async def sql_get_referees(tournament_id: TournamentId) -> list[Referee]:
+async def sql_get_referee_names(tournament_id: TournamentId) -> list[str]:
+    """Return the distinct free-text referee names used within a tournament.
+
+    Powers the "recently used names" section of the referee combobox; there is no separate
+    referees table any more, so the names are derived from the matches themselves.
+    """
     query = """
-        SELECT *
-        FROM referees
-        WHERE tournament_id = :tournament_id
-        ORDER BY referees.id
+        SELECT DISTINCT matches.referee_name AS name
+        FROM matches
+        JOIN rounds ON rounds.id = matches.round_id
+        JOIN stage_items ON stage_items.id = rounds.stage_item_id
+        JOIN stages ON stages.id = stage_items.stage_id
+        WHERE stages.tournament_id = :tournament_id
+        AND matches.referee_name IS NOT NULL
+        ORDER BY name
         """
     result = await database.fetch_all(query=query, values={"tournament_id": tournament_id})
-    return [Referee.model_validate(dict(row._mapping)) for row in result]
+    return [row._mapping["name"] for row in result]
 
 
-async def sql_get_referee_by_id(
-    tournament_id: TournamentId, referee_id: RefereeId
-) -> Referee | None:
-    query = """
-        SELECT *
-        FROM referees
-        WHERE tournament_id = :tournament_id
-        AND referees.id = :referee_id
-        """
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "referee_id": referee_id}
-    )
-    return Referee.model_validate(dict(result._mapping)) if result is not None else None
-
-
-async def sql_get_referee_by_team(tournament_id: TournamentId, team_id: TeamId) -> Referee | None:
-    query = """
-        SELECT *
-        FROM referees
-        WHERE tournament_id = :tournament_id
-        AND team_id = :team_id
-        """
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "team_id": team_id}
-    )
-    return Referee.model_validate(dict(result._mapping)) if result is not None else None
-
-
-async def sql_get_referee_by_name(tournament_id: TournamentId, name: str) -> Referee | None:
-    query = """
-        SELECT *
-        FROM referees
-        WHERE tournament_id = :tournament_id
-        AND name = :name
-        """
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "name": name}
-    )
-    return Referee.model_validate(dict(result._mapping)) if result is not None else None
-
-
-async def sql_upsert_referee_by_name(tournament_id: TournamentId, name: str) -> Referee:
-    """
-    Return the tournament's referee row for this free-text name, creating it if necessary.
-
-    A name is deduplicated per tournament, so the same name always returns the same row.
-    The same name in a different tournament produces a distinct row.
-    """
-    existing = await sql_get_referee_by_name(tournament_id, name)
-    if existing is not None:
-        return existing
-
-    query = """
-        INSERT INTO referees (tournament_id, team_id, name, created)
-        VALUES (:tournament_id, NULL, :name, NOW())
-        RETURNING *
-        """
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "name": name}
-    )
-    assert result is not None
-    return Referee.model_validate(dict(result._mapping))
-
-
-async def sql_upsert_referee_by_team(tournament_id: TournamentId, team_id: TeamId) -> Referee:
-    """
-    Return the tournament's referee row for this team, creating it if necessary.
-
-    A team has at most one referee row per tournament, so this is idempotent: calling
-    it again with the same team returns the same row instead of creating a duplicate.
-    """
-    existing = await sql_get_referee_by_team(tournament_id, team_id)
-    if existing is not None:
-        return existing
-
-    query = """
-        INSERT INTO referees (tournament_id, team_id, name, created)
-        VALUES (:tournament_id, :team_id, NULL, NOW())
-        RETURNING *
-        """
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "team_id": team_id}
-    )
-    assert result is not None
-    return Referee.model_validate(dict(result._mapping))
-
-
-async def sql_set_match_referee(match_id: MatchId, referee_id: RefereeId | None) -> None:
+async def sql_set_match_referee_slot(
+    match_id: MatchId, stage_item_input_id: StageItemInputId | None
+) -> None:
     query = """
         UPDATE matches
-        SET referee_id = :referee_id
+        SET referee_stage_item_input_id = :stage_item_input_id,
+            referee_name = NULL
         WHERE matches.id = :match_id
         """
-    await database.execute(query=query, values={"match_id": match_id, "referee_id": referee_id})
+    await database.execute(
+        query=query,
+        values={"match_id": match_id, "stage_item_input_id": stage_item_input_id},
+    )
+
+
+async def sql_set_match_referee_name(match_id: MatchId, name: str) -> None:
+    query = """
+        UPDATE matches
+        SET referee_name = :name,
+            referee_stage_item_input_id = NULL
+        WHERE matches.id = :match_id
+        """
+    await database.execute(query=query, values={"match_id": match_id, "name": name})
+
+
+async def sql_clear_match_referee(match_id: MatchId) -> None:
+    query = """
+        UPDATE matches
+        SET referee_stage_item_input_id = NULL,
+            referee_name = NULL
+        WHERE matches.id = :match_id
+        """
+    await database.execute(query=query, values={"match_id": match_id})
