@@ -643,43 +643,57 @@ def _add_referee_assignment(
         match_playing_teams[context.match.id] = playing
 
     # Create referee decision variables for each movable match.
-    # In default (non-reoptimize) mode, a match that already has a referee keeps it: the
-    # existing assignment is recorded in preserved_ref_team so the no-overlap constraint still
-    # applies while the match is re-flowed. In full-optimize (reoptimize=True) mode, existing
-    # assignments are cleared and the solver picks a fresh referee for every movable match.
+    #
+    # The solver only picks a *fresh* referee for a movable match when its opponents are known
+    # and either we're re-optimizing or it has no referee yet. In every other case the match
+    # keeps whatever referee it already has. Because a movable match's start time is always
+    # re-flowed, any retained referee must be recorded in preserved_ref_team so the no-overlap
+    # constraints still apply to it — otherwise the solver could slide the match on top of the
+    # referee team's own playing match (or another match it referees) and create a conflict.
+    # This matters most for placeholder/bye matches with an empty or unresolved opponent slot:
+    # we must not pick a *new* referee for them (that team might turn out to be a player —
+    # issue #121), but a referee they already carry still has to be constrained.
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
     match_durations: dict[MatchId, int] = {}
     preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
-        if not _opponents_are_known(match):
-            # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
-            continue
-        if match.referee_id is not None and not reoptimize:
-            # Non-reoptimize: preserve the existing assignment; still constrain overlaps.
-            referee = match.referee
-            if referee is not None and referee.team_id is not None:
-                preserved_ref_team[match.id] = referee.team_id
+        referee = match.referee
+        has_existing_ref = match.referee_id is not None and referee is not None
+        # team_id is None for free-text referees; those need no overlap constraint (no team
+        # plays), but must still never be overwritten outside full-optimize.
+        existing_ref_team = referee.team_id if referee is not None else None
+
+        # The solver assigns a fresh referee only for known-opponent matches, and only when
+        # re-optimizing or the match has no referee yet. Placeholder/bye matches never get a
+        # new referee (their players aren't known — issue #121), and an existing assignment is
+        # never overwritten outside full-optimize.
+        if _opponents_are_known(match) and (reoptimize or not has_existing_ref):
+            match_level = context.level_id
+            playing_teams = match_playing_teams[match.id]
+            eligible = {
+                team_id
+                for team_id, level_id in team_level_ids.items()
+                if level_id == match_level and team_id not in playing_teams
+            }
+            if eligible:
+                choices: dict[TeamId, Any] = {
+                    team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
+                    for team_id in sorted(eligible)  # sorted for determinism
+                }
+                model.AddExactlyOne(choices.values())
+                ref_choices[match.id] = choices
                 match_durations[match.id] = match.duration_minutes
-            continue
+                continue
+            # No eligible candidate: fall through and keep (and constrain) any existing referee.
 
-        match_level = context.level_id
-        playing_teams = match_playing_teams[match.id]
-        eligible = {
-            team_id
-            for team_id, level_id in team_level_ids.items()
-            if level_id == match_level and team_id not in playing_teams
-        }
-        if not eligible:
-            continue
-
-        choices: dict[TeamId, Any] = {
-            team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
-            for team_id in sorted(eligible)  # sorted for determinism
-        }
-        model.AddExactlyOne(choices.values())
-        ref_choices[match.id] = choices
-        match_durations[match.id] = match.duration_minutes
+        # No fresh referee is assigned, so the match keeps the referee it already has. A team
+        # referee is recorded in preserved_ref_team so the no-overlap constraints still apply
+        # while the match's start time is re-flowed — otherwise the solver could slide the
+        # match on top of the referee team's own playing match (or another match it referees).
+        if existing_ref_team is not None:
+            preserved_ref_team[match.id] = existing_ref_team
+            match_durations[match.id] = match.duration_minutes
 
     if not ref_choices and not preserved_ref_team:
         return {}, []

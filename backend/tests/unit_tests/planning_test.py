@@ -1112,7 +1112,6 @@ def test_existing_referee_assignment_not_overwritten() -> None:
     assert ops[0].referee_team_id is None
 
 
-
 def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
     """A re-flowed match's preserved referee must not overlap a pinned match the team plays.
 
@@ -1153,6 +1152,129 @@ def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
     m1_end = T0 + timedelta(minutes=DURATION)
     overlap = m2_start < m1_end and T0 < m2_end
     assert not overlap, "Team 3 plays pinned m1 and referees m2; the two must not overlap"
+
+
+def test_referee_on_placeholder_match_is_constrained_against_playing_overlap() -> None:
+    """A placeholder/bye match that already carries a referee keeps it constrained.
+
+    m1 is pinned at T0 with team 3 playing. m2 is a movable bye match (team 1 vs an empty
+    slot, so its opponents are not fully known) that already carries referee team 3. The
+    optimizer must not pick a *new* referee for a placeholder match (issue #121), but it must
+    still keep team 3 from refereeing m2 while it plays pinned m1 — so m2 cannot be re-flowed
+    on top of m1. Regression test for the auto-optimizer assigning a playing team as referee
+    when some team slots are still empty.
+    """
+    level = LevelId(1)
+    inp31 = _final_input(31, 3, level)
+    inp32 = _final_input(32, 4, level)
+    m1 = MatchWithDetails(
+        id=MatchId(1),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(1),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=inp31.id,
+        stage_item_input2_id=inp32.id,
+        stage_item_input1=inp31,
+        stage_item_input2=inp32,
+        start_time=T0,
+        court_id=CourtId(1),
+    )
+    inp1 = _final_input(11, 1, level)
+    empty = _empty_input(99, stage_item_id=100)
+    m2_base = MatchWithDetails(
+        id=MatchId(2),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(2),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=inp1.id,
+        stage_item_input2_id=empty.id,
+        stage_item_input1=inp1,
+        stage_item_input2=empty,
+    )
+    m2 = _match_with_referee(m2_base, team_id=3)
+    stages = [
+        _stage_with_rounds(
+            1,
+            [[[m1, m2]]],
+            level_id=level,
+            inputs_per_item=[[inp1, inp31, inp32, empty]],
+        )
+    ]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=False)
+
+    m2_ops = [op for op in ops if op.match.id == MatchId(2)]
+    assert len(m2_ops) == 1
+    m2_start = m2_ops[0].start_time
+    m2_end = m2_start + timedelta(minutes=DURATION)
+    m1_end = T0 + timedelta(minutes=DURATION)
+    overlap = m2_start < m1_end and T0 < m2_end
+    assert not overlap, "Team 3 plays pinned m1 and referees bye m2; the two must not overlap"
+
+
+def test_reoptimize_constrains_retained_referee_when_no_replacement_exists() -> None:
+    """When a re-flowed match has no eligible replacement referee, its existing one is kept.
+
+    In full-optimize mode a known match's referee is normally cleared and reshuffled, but when
+    no eligible same-level team exists the match keeps its current referee. That retained
+    referee must still be constrained: here m_play (level 2) is a completed, pinned match where
+    team 3 plays, and m1 (level 1, teams 1 vs 2) carries team 3 as a leftover referee with no
+    other level-1 team available to take over. The solver must not re-flow m1 over m_play.
+    """
+    level1 = LevelId(1)
+    level2 = LevelId(2)
+    m_play = MatchWithDetails(
+        id=MatchId(1),
+        created=T0,
+        duration_minutes=DURATION,
+        round_id=RoundId(1),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        stage_item_input1_id=StageItemInputId(31),
+        stage_item_input2_id=StageItemInputId(32),
+        stage_item_input1=_final_input(31, 3, level2),
+        stage_item_input2=_final_input(32, 4, level2),
+        start_time=T0,
+        court_id=CourtId(1),
+        state=MatchState.COMPLETED,
+    )
+    m1 = _match_with_referee(_match_with_teams(2, 1, 2, level1), team_id=3)
+    stages = [
+        _stage_with_rounds(
+            1,
+            [[[m1]]],
+            level_id=level1,
+            inputs_per_item=[[_final_input(11, 1, level1), _final_input(12, 2, level1)]],
+        ),
+        _stage_with_rounds(
+            2,
+            [[[m_play]]],
+            level_id=level2,
+            inputs_per_item=[[_final_input(31, 3, level2), _final_input(32, 4, level2)]],
+        ),
+    ]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2)], tournament, reoptimize=True)
+
+    m1_ops = [op for op in ops if op.match.id == MatchId(2)]
+    assert len(m1_ops) == 1
+    m1_start = m1_ops[0].start_time
+    m1_end = m1_start + timedelta(minutes=DURATION)
+    m_play_end = T0 + timedelta(minutes=DURATION)
+    overlap = m1_start < m_play_end and T0 < m1_end
+    assert not overlap, "Team 3 plays pinned m_play and still referees m1; they must not overlap"
 
 
 def test_free_text_referee_match_not_overwritten() -> None:
