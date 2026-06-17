@@ -1,21 +1,31 @@
 import { Flex, Text } from '@mantine/core';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 
-import { Referee } from '@openapi';
+import { MatchWithDetails } from '@openapi';
+import { formatStageItemInput } from './stage_item_input';
 
-export function getRefereeName(referee: Referee | null | undefined): string | null {
-  if (referee == null) return null;
-  return referee.name ?? referee.team_name ?? null;
+type RefereeFields = Pick<MatchWithDetails, 'referee' | 'referee_name'>;
+
+/**
+ * The display name of a match's referee: the free-text name when set, otherwise the referee
+ * slot's resolved team name, falling back to its placeholder label ("1st of Group A") when the
+ * slot is not resolved yet. `stageItemsLookup` is only needed to render placeholder labels.
+ */
+export function getRefereeName(match: RefereeFields, stageItemsLookup: any = {}): string | null {
+  if (match.referee_name != null) return match.referee_name;
+  return formatStageItemInput(match.referee ?? null, stageItemsLookup);
 }
 
 export function RefereeDisplay({
-  referee,
+  match,
   refereesEnabled,
+  stageItemsLookup = {},
 }: {
-  referee: Referee | null | undefined;
+  match: RefereeFields;
   refereesEnabled: boolean;
+  stageItemsLookup?: any;
 }) {
-  const name = getRefereeName(referee);
+  const name = getRefereeName(match, stageItemsLookup);
   if (!refereesEnabled || name == null) return null;
 
   return (

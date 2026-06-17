@@ -19,6 +19,7 @@ import { SWRResponse } from 'swr';
 
 import DeleteButton from '@components/buttons/delete';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { levelSwatchColour } from '@logic/colors';
 import {
@@ -27,11 +28,11 @@ import {
   RoundWithMatches,
   StagesWithStageItemsResponse,
 } from '@openapi';
-import { getReferees, getTeams, getTournamentById } from '@services/adapter';
+import { getReferees, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 import { deleteMatch, updateMatch } from '@services/match';
 
-type RefereeValue = { kind: 'team'; teamId: string } | { kind: 'name'; name: string } | null;
+type RefereeValue = { kind: 'slot'; inputId: string } | { kind: 'name'; name: string } | null;
 
 type MatchModalFormValues = {
   stage_item_input1_score: number;
@@ -71,12 +72,12 @@ function MatchDeleteButton({
 function RefereeCombobox({
   value,
   onChange,
-  teamOptions,
+  slotOptions,
   recentlyUsedOptions,
 }: {
   value: RefereeValue;
   onChange: (v: RefereeValue) => void;
-  teamOptions: { value: string; label: string }[];
+  slotOptions: { value: string; label: string }[];
   recentlyUsedOptions: string[];
 }) {
   const { t } = useTranslation();
@@ -88,22 +89,22 @@ function RefereeCombobox({
   const currentLabel =
     value == null
       ? ''
-      : value.kind === 'team'
-        ? (teamOptions.find((o) => o.value === value.teamId)?.label ?? '')
+      : value.kind === 'slot'
+        ? (slotOptions.find((o) => o.value === value.inputId)?.label ?? '')
         : value.name;
 
   const lowerSearch = search.toLowerCase();
 
-  const filteredTeams = teamOptions.filter((o) => o.label.toLowerCase().includes(lowerSearch));
+  const filteredSlots = slotOptions.filter((o) => o.label.toLowerCase().includes(lowerSearch));
   const filteredRecent = recentlyUsedOptions.filter((n) => n.toLowerCase().includes(lowerSearch));
 
   const exactMatchExists =
-    teamOptions.some((o) => o.label.toLowerCase() === lowerSearch) ||
+    slotOptions.some((o) => o.label.toLowerCase() === lowerSearch) ||
     recentlyUsedOptions.some((n) => n.toLowerCase() === lowerSearch);
 
   const showNewOption = search.trim().length > 0 && !exactMatchExists;
 
-  const hasOptions = filteredTeams.length > 0 || filteredRecent.length > 0 || showNewOption;
+  const hasOptions = filteredSlots.length > 0 || filteredRecent.length > 0 || showNewOption;
 
   return (
     <Combobox
@@ -112,10 +113,10 @@ function RefereeCombobox({
         if (val === '__clear__') {
           onChange(null);
           setSearch('');
-        } else if (val.startsWith('team:')) {
-          const teamId = val.slice(5);
-          onChange({ kind: 'team', teamId });
-          setSearch(teamOptions.find((o) => o.value === teamId)?.label ?? '');
+        } else if (val.startsWith('slot:')) {
+          const inputId = val.slice(5);
+          onChange({ kind: 'slot', inputId });
+          setSearch(slotOptions.find((o) => o.value === inputId)?.label ?? '');
         } else if (val.startsWith('name:')) {
           const name = val.slice(5);
           onChange({ kind: 'name', name });
@@ -162,10 +163,10 @@ function RefereeCombobox({
         <Combobox.Options>
           {!hasOptions && <Combobox.Empty>{t('referee_no_options')}</Combobox.Empty>}
 
-          {filteredTeams.length > 0 && (
-            <Combobox.Group label={t('referee_teams_group')}>
-              {filteredTeams.map((opt) => (
-                <Combobox.Option key={opt.value} value={`team:${opt.value}`}>
+          {filteredSlots.length > 0 && (
+            <Combobox.Group label={t('referee_slots_group')}>
+              {filteredSlots.map((opt) => (
+                <Combobox.Option key={opt.value} value={`slot:${opt.value}`}>
                   {opt.label}
                 </Combobox.Option>
               ))}
@@ -217,10 +218,10 @@ function MatchModalForm({
   const { t } = useTranslation();
 
   const initialReferee: RefereeValue =
-    match.referee?.team_id != null
-      ? { kind: 'team', teamId: `${match.referee.team_id}` }
-      : match.referee?.name != null
-        ? { kind: 'name', name: match.referee.name }
+    match.referee_stage_item_input_id != null
+      ? { kind: 'slot', inputId: `${match.referee_stage_item_input_id}` }
+      : match.referee_name != null
+        ? { kind: 'name', name: match.referee_name }
         : null;
 
   const form = useForm<MatchModalFormValues>({
@@ -251,22 +252,31 @@ function MatchModalForm({
     swrTournamentResponse.data?.data.duration_minutes ?? match.duration_minutes;
   const refereesEnabled = swrTournamentResponse.data?.data.referees_enabled ?? false;
 
-  const swrTeamsResponse = getTeams(refereesEnabled ? tournamentData.id : undefined);
-  const refereeTeamOptions = (swrTeamsResponse.data?.data.teams ?? [])
-    .filter((team) => team.active)
-    .map((team) => ({ value: `${team.id}`, label: team.name }));
-
   const swrRefereesResponse = getReferees(refereesEnabled ? tournamentData.id : undefined);
-  const recentlyUsedNames = (swrRefereesResponse.data?.data ?? [])
-    .filter((ref) => ref.name != null && ref.team_id == null)
-    .map((ref) => ref.name as string);
+  const recentlyUsedNames = swrRefereesResponse.data?.data ?? [];
 
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
   const matchesLookup = getMatchLookup(swrStagesResponse);
   const matchEntry = matchesLookup[match.id];
-  const level =
-    levels?.find((candidate) => candidate.id === (matchEntry?.stage.level_id ?? match.level_id)) ??
-    null;
+  const matchLevelId = matchEntry?.stage.level_id ?? match.level_id;
+  const level = levels?.find((candidate) => candidate.id === matchLevelId) ?? null;
+
+  // Referee slots are the stage-item inputs at the match's level (concrete teams, "Winner of
+  // Group A" placeholders, and still-empty positions), mirroring how playing slots are picked.
+  const ownInputIds = new Set(
+    [match.stage_item_input1_id, match.stage_item_input2_id].filter((id) => id != null)
+  );
+  const refereeSlotOptions = refereesEnabled
+    ? (swrStagesResponse.data?.data ?? [])
+        .filter((stage) => stage.level_id === matchLevelId)
+        .flatMap((stage) => stage.stage_items)
+        .flatMap((stageItem) => stageItem.inputs)
+        .filter((input) => !ownInputIds.has(input.id))
+        .map((input) => ({
+          value: `${input.id}`,
+          label: formatStageItemInput(input, stageItemsLookup) ?? t('empty_slot'),
+        }))
+    : [];
   const contextColour =
     level != null && levels != null ? levelSwatchColour(level.id, levels) : 'gray';
   const contextBadges = [
@@ -298,7 +308,8 @@ function MatchModalForm({
           // fields entirely so the server leaves the existing assignment untouched.
           const refereeFields = refereesEnabled
             ? {
-                referee_team_id: referee?.kind === 'team' ? Number(referee.teamId) : null,
+                referee_stage_item_input_id:
+                  referee?.kind === 'slot' ? Number(referee.inputId) : null,
                 referee_name: referee?.kind === 'name' ? referee.name : null,
               }
             : {};
@@ -365,7 +376,7 @@ function MatchModalForm({
           <RefereeCombobox
             value={form.values.referee}
             onChange={(v) => form.setFieldValue('referee', v)}
-            teamOptions={refereeTeamOptions}
+            slotOptions={refereeSlotOptions}
             recentlyUsedOptions={recentlyUsedNames}
           />
         )}

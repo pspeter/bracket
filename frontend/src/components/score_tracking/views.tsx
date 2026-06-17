@@ -216,7 +216,7 @@ export function ScoreTrackingListView({
                   </div>
                 </Grid.Col>
               </Grid>
-              <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />
+              <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
               <Flex justify="center" pt="xs">
                 <Button component={PreloadLink} href={getMatchHref(match.id)}>
                   {t('open_score_tracker_button')}
@@ -330,7 +330,7 @@ export function ScoreTrackingMatchView({
             {t('back_to_matches_button')}
           </Button>
         </Group>
-        <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />
+        <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
         {match.state === 'NOT_STARTED' ? (
           <Center>
             <Button
