@@ -362,6 +362,38 @@ def _add_movable_vs_pinned_court_constraints(
                 model.AddBoolOr([before, after, chosen.Not()])
 
 
+def _forbid_movable_slot_overlap_with_pinned(
+    model: Any,
+    match_id: MatchId,
+    starts: dict[MatchId, Any],
+    ends: dict[MatchId, Any],
+    pinned_matches: list[_PinnedMatch],
+    *,
+    gate: Any | None = None,
+    label: str,
+) -> None:
+    """Force a movable match to sit entirely before or after each pinned match on a shared slot.
+
+    The same disjunction governs every kind of slot a movable match occupies — its two playing
+    slots and, treated identically, its referee slot. ``gate`` distinguishes the two: a fixed
+    slot (a playing slot, or a preserved referee slot) passes ``gate=None`` and the match must
+    always clear the pinned interval; a *chosen* referee slot passes its choice BoolVar as
+    ``gate`` so the disjunction only binds when that slot is the one refereeing.
+
+    Pinned matches are not fed into the shared ``AddNoOverlap`` (that would make two
+    pre-existing pinned matches conflicting on a slot infeasible — see relax-around-pins), so
+    this explicit movable-vs-pinned form is needed instead.
+    """
+    for pinned in pinned_matches:
+        before = model.NewBoolVar(f"{label}_{match_id}_before_pinned_{pinned.context.match.id}")
+        after = model.NewBoolVar(f"{label}_{match_id}_after_pinned_{pinned.context.match.id}")
+        enforce_before = [before] if gate is None else [gate, before]
+        enforce_after = [after] if gate is None else [gate, after]
+        model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(enforce_before)
+        model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(enforce_after)
+        model.AddBoolOr([before, after] if gate is None else [before, after, gate.Not()])
+
+
 def _add_movable_vs_pinned_input_constraints(
     model: Any,
     movable_contexts: list[_MatchContext],
@@ -371,21 +403,17 @@ def _add_movable_vs_pinned_input_constraints(
 ) -> None:
     for context in movable_contexts:
         match_id = context.match.id
-        pinned_match_ids = set()
+        seen_pinned_ids: set[MatchId] = set()
+        deduped_pinned: list[_PinnedMatch] = []
         for input_id in context.input_ids:
             for pinned in pinned_by_input.get(input_id, []):
-                if pinned.context.match.id in pinned_match_ids:
+                if pinned.context.match.id in seen_pinned_ids:
                     continue
-                pinned_match_ids.add(pinned.context.match.id)
-                before = model.NewBoolVar(
-                    f"match_{match_id}_before_pinned_input_{pinned.context.match.id}"
-                )
-                after = model.NewBoolVar(
-                    f"match_{match_id}_after_pinned_input_{pinned.context.match.id}"
-                )
-                model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(before)
-                model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(after)
-                model.AddBoolOr([before, after])
+                seen_pinned_ids.add(pinned.context.match.id)
+                deduped_pinned.append(pinned)
+        _forbid_movable_slot_overlap_with_pinned(
+            model, match_id, starts, ends, deduped_pinned, label="match_input"
+        )
 
 
 def _open_slot_precedence_ids(contexts: list[_MatchContext]) -> set[tuple[MatchId, MatchId]]:
@@ -590,6 +618,46 @@ def _add_group_sync_penalty(
     return spreads
 
 
+def _referee_load_spread(
+    model: Any,
+    ref_choices: dict[MatchId, dict[StageItemInputId, Any]],
+    all_candidate_slots: set[StageItemInputId],
+    fixed_ref_count: dict[StageItemInputId, int],
+    max_possible_load: int,
+) -> Any | None:
+    """Build the referee fairness term: the spread of per-slot referee counts.
+
+    Each candidate slot's load is its fixed count (from already-assigned referees that can't
+    change) plus the variable choices that pick it. Shared by both referee solvers — the full
+    scheduler and the assign-missing-referees pass — so they balance load identically. Returns
+    the spread IntVar (``max_load - min_load``) to minimise, or ``None`` when fewer than two
+    candidate slots exist and there is nothing to balance.
+    """
+    slot_loads: list[Any] = []
+    for slot_id in sorted(all_candidate_slots):  # sorted for determinism
+        fixed = fixed_ref_count.get(slot_id, 0)
+        var_choices = [
+            ref_choices[mid][slot_id] for mid in ref_choices if slot_id in ref_choices[mid]
+        ]
+        if var_choices:
+            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_slot_{slot_id}")
+            model.Add(load == fixed + sum(var_choices))
+        else:
+            load = model.NewIntVar(fixed, fixed, f"ref_load_slot_{slot_id}")
+        slot_loads.append(load)
+
+    if len(slot_loads) < 2:
+        return None
+
+    max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
+    min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
+    model.AddMaxEquality(max_load, slot_loads)
+    model.AddMinEquality(min_load, slot_loads)
+    spread = model.NewIntVar(0, max_possible_load, "ref_spread")
+    model.Add(spread == max_load - min_load)
+    return spread
+
+
 def _add_referee_assignment(
     model: Any,
     movable_contexts: list[_MatchContext],
@@ -694,35 +762,30 @@ def _add_referee_assignment(
         )
 
     # Explicit constraints for movable referee slots vs pinned matches occupying the same slot
-    # (playing or refereeing — pinned_by_input already includes both).
+    # (playing or refereeing — pinned_by_input already includes both), gated on the choice var.
     for match_id, choices in ref_choices.items():
         for slot_id, var in choices.items():
-            for pinned in pinned_by_input.get(slot_id, []):
-                before = model.NewBoolVar(
-                    f"ref_match_{match_id}_slot_{slot_id}_before_pinned_{pinned.context.match.id}"
-                )
-                after = model.NewBoolVar(
-                    f"ref_match_{match_id}_slot_{slot_id}_after_pinned_{pinned.context.match.id}"
-                )
-                model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf([var, before])
-                model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf([var, after])
-                model.AddBoolOr([before, after, var.Not()])
+            _forbid_movable_slot_overlap_with_pinned(
+                model,
+                match_id,
+                starts,
+                ends,
+                pinned_by_input.get(slot_id, []),
+                gate=var,
+                label=f"ref_slot_{slot_id}",
+            )
 
     # Same constraint for preserved (fixed) referee slots: committed unconditionally, so the
     # movable match must sit entirely before or after each pinned match using that slot.
     for match_id, slot_id in preserved_ref_slot.items():
-        for pinned in pinned_by_input.get(slot_id, []):
-            before = model.NewBoolVar(
-                f"preserved_ref_match_{match_id}_slot_{slot_id}_before_pinned_"
-                f"{pinned.context.match.id}"
-            )
-            after = model.NewBoolVar(
-                f"preserved_ref_match_{match_id}_slot_{slot_id}_after_pinned_"
-                f"{pinned.context.match.id}"
-            )
-            model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(before)
-            model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(after)
-            model.AddBoolOr([before, after])
+        _forbid_movable_slot_overlap_with_pinned(
+            model,
+            match_id,
+            starts,
+            ends,
+            pinned_by_input.get(slot_id, []),
+            label=f"preserved_ref_slot_{slot_id}",
+        )
 
     all_candidate_slots: set[StageItemInputId] = set(
         slot_id for choices in ref_choices.values() for slot_id in choices
@@ -734,32 +797,11 @@ def _add_referee_assignment(
         if slot_id in all_candidate_slots:
             fixed_ref_count[slot_id] += 1
 
-    # Total load per slot = fixed + variable referee assignments.
     max_possible_load = len(movable_contexts) + (max(fixed_ref_count.values(), default=0))
-    slot_loads: list[Any] = []
-    for slot_id in sorted(all_candidate_slots):  # sorted for determinism
-        fixed = fixed_ref_count.get(slot_id, 0)
-        var_choices = [
-            ref_choices[mid][slot_id] for mid in ref_choices if slot_id in ref_choices[mid]
-        ]
-        if var_choices:
-            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_slot_{slot_id}")
-            model.Add(load == fixed + sum(var_choices))
-        else:
-            load = model.NewIntVar(fixed, fixed, f"ref_load_slot_{slot_id}")
-        slot_loads.append(load)
-
-    if len(slot_loads) < 2:
-        # Single candidate slot forced to referee all matches; no spread to balance.
-        return ref_choices, []
-
-    max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
-    min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
-    model.AddMaxEquality(max_load, slot_loads)
-    model.AddMinEquality(min_load, slot_loads)
-    spread = model.NewIntVar(0, max_possible_load, "ref_spread")
-    model.Add(spread == max_load - min_load)
-    return ref_choices, [spread]
+    spread = _referee_load_spread(
+        model, ref_choices, all_candidate_slots, fixed_ref_count, max_possible_load
+    )
+    return ref_choices, ([spread] if spread is not None else [])
 
 
 def _build_operations_from_solution(
@@ -1113,18 +1155,9 @@ def build_referee_assignment_plan(
             fixed_ref_count[slot_id] += 1
 
     max_possible_load = len(needs_ref) + (max(fixed_ref_count.values(), default=0))
-    slot_loads: list[Any] = []
-    for slot_id in sorted(all_candidate_slots):
-        fixed = fixed_ref_count.get(slot_id, 0)
-        var_choices = [
-            ref_choices[mid][slot_id] for mid in ref_choices if slot_id in ref_choices[mid]
-        ]
-        if var_choices:
-            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_slot_{slot_id}")
-            model.Add(load == fixed + sum(var_choices))
-        else:
-            load = model.NewIntVar(fixed, fixed, f"ref_load_slot_{slot_id}")
-        slot_loads.append(load)
+    spread = _referee_load_spread(
+        model, ref_choices, all_candidate_slots, fixed_ref_count, max_possible_load
+    )
 
     # Primary objective: maximize coverage (fill as many matches as possible).
     # Secondary objective: minimize fairness spread.
@@ -1137,19 +1170,10 @@ def build_referee_assignment_plan(
     # total_assigned is the sum of all AtMostOne choice vars (0/1 per match)
     total_assigned_expr = sum(all_choice_vars)
 
-    if len(slot_loads) >= 2:
-        max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
-        min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
-        model.AddMaxEquality(max_load, slot_loads)
-        model.AddMinEquality(min_load, slot_loads)
-        spread = model.NewIntVar(0, max_possible_load, "ref_spread")
-        model.Add(spread == max_load - min_load)
-        model.Minimize(
-            -coverage_weight * total_assigned_expr
-            + (weights.referee_fairness * spread if weights.referee_fairness > 0 else 0)
-        )
-    else:
-        model.Minimize(-coverage_weight * total_assigned_expr)
+    objective = -coverage_weight * total_assigned_expr
+    if spread is not None and weights.referee_fairness > 0:
+        objective += weights.referee_fairness * spread
+    model.Minimize(objective)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
