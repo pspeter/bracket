@@ -612,22 +612,23 @@ def _add_referee_assignment(
     cannot. Unresolved (tentative/empty) slots are allowed just as they are for playing slots.
 
     In default (non-reoptimize) mode a match that already has a referee keeps it; its slot is
-    still constrained via a mandatory interval while the start time is re-flowed. A free-text
-    referee name is left untouched in both modes. In full-optimize (reoptimize=True) mode
-    existing slot referees are cleared and re-picked. The fairness term minimises the spread of
-    per-slot referee counts across all candidate slots.
+    still constrained via a mandatory interval while the start time is re-flowed, and a
+    free-text referee name is left untouched. In full-optimize (reoptimize=True) mode existing
+    referees — both slot referees and free-text names — are cleared and re-picked as slots. The
+    fairness term minimises the spread of per-slot referee counts across all candidate slots.
 
     Returns (ref_choices, [spread_var]) where ref_choices[match_id][slot_id] is the BoolVar
     indicating whether that slot referees that match.
     """
-    # Create referee decision variables for each movable match. A match with a free-text
-    # referee name is treated as already having a referee and left alone in both modes.
+    # Create referee decision variables for each movable match. In default mode a match that
+    # already has a referee (a slot or a free-text name) keeps it; in full-optimize mode both
+    # kinds are cleared and re-picked.
     ref_choices: dict[MatchId, dict[StageItemInputId, Any]] = {}
     match_durations: dict[MatchId, int] = {}
     preserved_ref_slot: dict[MatchId, StageItemInputId] = {}
     for context in movable_contexts:
         match = context.match
-        if match.referee_name is not None:
+        if match.referee_name is not None and not reoptimize:
             continue
         if match.referee_stage_item_input_id is not None and not reoptimize:
             preserved_ref_slot[match.id] = match.referee_stage_item_input_id

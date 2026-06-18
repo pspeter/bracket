@@ -1213,7 +1213,27 @@ def test_full_optimize_reshuffles_referee_for_unpinned_match() -> None:
     assert ops[0].referee_stage_item_input_id is not None
 
 
-def test_reshuffled_referee_not_overlapped_with_its_own_playing_match() -> None:
+def test_full_optimize_clears_free_text_referee() -> None:
+    """reoptimize=True replaces a free-text referee with an optimized slot referee.
+
+    In default mode a free-text referee name is preserved (see
+    test_free_text_referee_match_not_overwritten); under full optimize it is cleared and the
+    solver assigns a slot referee like any other match. The chosen slot id on the operation,
+    when applied, overwrites the name (sql_set_match_referee_slot nulls referee_name).
+    """
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level).model_copy(
+        update={"referee": None, "referee_name": "External Ref"}
+    )
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
+    stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament, reoptimize=True)
+
+    assert len(ops) == 1
+    # Team 3 is the only candidate (teams 1, 2 play the match).
+    assert _slot_team(stages, ops[0].referee_stage_item_input_id) == TeamId(3)
     """The no-overlap constraint applies to freshly assigned referees too.
 
     Stage inputs only include teams 1–3, so team 4 is not eligible as referee. The solver is
