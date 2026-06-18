@@ -135,23 +135,27 @@ def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
     return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
 
 
-def _referee_slots_by_level(
+def _referee_slots_by_stage(
     stages: list[StageWithStageItems],
-) -> dict[LevelId | None, list[StageItemInputId]]:
-    """Map each level to the stage-item input slots that can referee a match at that level.
+) -> dict[StageId, list[StageItemInputId]]:
+    """Map each stage to the stage-item input slots that can referee a match in that stage.
 
     A referee is just a third match slot, treated like the two playing slots: any stage-item
-    input at the match's level is a candidate, regardless of whether it is Final (a team),
-    Tentative (winner-of a prior stage item) or Empty. Unresolved slots are allowed exactly as
-    they are for playing slots; they simply resolve to a team later. Slots are returned sorted
-    for deterministic candidate ordering.
+    input in the match's *own stage* is a candidate, regardless of whether it is Final (a team),
+    Tentative (winner-of a prior stage item) or Empty. Candidates are restricted to the same
+    stage because a slot only describes a participant who is actually present for that stage: a
+    later stage's slot (e.g. "1st of the group stage") names a team that is still unknown while
+    an earlier stage is being played, so it must never be picked to referee an earlier match.
+    Within a stage, unresolved slots are allowed exactly as they are for playing slots; they
+    simply resolve to a team later. Slots are returned sorted for deterministic candidate
+    ordering.
     """
-    by_level: dict[LevelId | None, list[StageItemInputId]] = defaultdict(list)
+    by_stage: dict[StageId, list[StageItemInputId]] = defaultdict(list)
     for stage in stages:
         for stage_item in stage.stage_items:
             for input_ in stage_item.inputs:
-                by_level[stage.level_id].append(input_.id)
-    return {level_id: sorted(slot_ids) for level_id, slot_ids in by_level.items()}
+                by_stage[stage.id].append(input_.id)
+    return {stage_id: sorted(slot_ids) for stage_id, slot_ids in by_stage.items()}
 
 
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
@@ -673,14 +677,14 @@ def _add_referee_assignment(
     input_intervals: dict[StageItemInputId, list[Any]],
     pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]],
     pinned_referee_slots: list[StageItemInputId],
-    referee_slots_by_level: dict[LevelId | None, list[StageItemInputId]],
+    referee_slots_by_stage: dict[StageId, list[StageItemInputId]],
     horizon: int,
     reoptimize: bool = False,
 ) -> tuple[dict[MatchId, dict[StageItemInputId, Any]], list[Any]]:
     """Assign the referee as a third match slot, treated like the two playing slots.
 
     For each movable match without a referee, the solver picks one referee *slot* from the
-    stage-item inputs at the match's level (any of Final/Tentative/Empty), excluding the
+    stage-item inputs in the match's own stage (any of Final/Tentative/Empty), excluding the
     match's own two playing slots. The chosen slot contributes an interval to the very same
     ``input_intervals`` no-overlap machinery used for playing slots, so a slot can never both
     play and referee — or referee two matches — at the same time, exactly as a playing slot
@@ -710,11 +714,11 @@ def _add_referee_assignment(
             match_durations[match.id] = match.duration_minutes
             continue
 
-        # Candidate referee slots: every input at the match's level except the two slots
+        # Candidate referee slots: every input in the match's own stage except the two slots
         # already playing this match.
         candidates = [
             slot_id
-            for slot_id in referee_slots_by_level.get(context.level_id, [])
+            for slot_id in referee_slots_by_stage.get(context.stage_id, [])
             if slot_id not in context.input_ids
         ]
         if not candidates:
@@ -924,7 +928,7 @@ def build_schedule_plan(
             input_intervals,
             pinned_by_input,
             pinned_referee_slots,
-            _referee_slots_by_level(stages),
+            _referee_slots_by_stage(stages),
             horizon,
             reoptimize,
         )
@@ -1056,7 +1060,7 @@ def build_referee_assignment_plan(
         return {}
 
     contexts = _get_match_contexts(stages)
-    referee_slots_by_level = _referee_slots_by_level(stages)
+    referee_slots_by_stage = _referee_slots_by_stage(stages)
 
     # Only scheduled matches (fixed court + start_time) participate.
     scheduled_contexts = [c for c in contexts if _is_scheduled(c)]
@@ -1106,11 +1110,13 @@ def build_referee_assignment_plan(
         end_min = start_min + match.duration_minutes
         match_windows[match.id] = (start_min, end_min)
 
-        # Eligible: a slot at the match's level, not one of this match's two playing slots, and
-        # not busy playing or refereeing at an overlapping time. Unresolved (tentative/empty)
-        # slots are allowed exactly as they are for playing slots.
+        # Eligible: a slot in the match's own stage, not one of this match's two playing slots,
+        # and not busy playing or refereeing at an overlapping time. A later stage's slot is
+        # excluded because it names a participant not yet known while this stage is played.
+        # Unresolved (tentative/empty) slots within the stage are allowed exactly as they are
+        # for playing slots.
         eligible: list[StageItemInputId] = []
-        for slot_id in referee_slots_by_level.get(context.level_id, []):
+        for slot_id in referee_slots_by_stage.get(context.stage_id, []):
             if slot_id in context.input_ids:
                 continue
             if any(
