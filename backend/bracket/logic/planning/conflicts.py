@@ -7,7 +7,7 @@ from bracket.database import database
 from bracket.logic.planning.team_windows import PlayingWindow, get_team_playing_windows
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.util import StageWithStageItems
-from bracket.utils.id_types import CourtId, MatchId, StageItemId, TournamentId
+from bracket.utils.id_types import CourtId, MatchId, StageItemId, TeamId, TournamentId
 
 
 def matches_overlap(match1: Match, match2: Match) -> bool:
@@ -181,6 +181,9 @@ def _set_referee_overlap_conflicts(
     flags: dict[MatchId, MatchConflictFlags],
 ) -> None:
     team_playing_windows = get_team_playing_windows(stages)
+    refereeing_matches_by_team: defaultdict[
+        TeamId, list[MatchWithDetailsDefinitive | MatchWithDetails]
+    ] = defaultdict(list)
 
     for match in _get_all_matches(stages):
         if match.start_time is None:
@@ -188,6 +191,8 @@ def _set_referee_overlap_conflicts(
         referee = match.referee
         if referee is None or referee.team_id is None:
             continue
+
+        refereeing_matches_by_team[referee.team_id].append(match)
 
         for playing_match, playing_window in team_playing_windows.get(referee.team_id, []):
             if not _time_ranges_overlap(
@@ -200,6 +205,14 @@ def _set_referee_overlap_conflicts(
             flags[match.id].referee_conflict = True
             if isinstance(playing_match, MatchWithDetailsDefinitive):
                 _set_stage_item_input_conflict(playing_match, playing_window, flags)
+
+    # A team cannot referee two matches that overlap in time; flag both of them.
+    for refereeing_matches in refereeing_matches_by_team.values():
+        for i, match1 in enumerate(refereeing_matches):
+            for match2 in refereeing_matches[i + 1 :]:
+                if matches_overlap(match1, match2):
+                    flags[match1.id].referee_conflict = True
+                    flags[match2.id].referee_conflict = True
 
 
 def get_match_conflict_flags(

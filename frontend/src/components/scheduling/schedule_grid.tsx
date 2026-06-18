@@ -259,7 +259,12 @@ function MatchCard({
   ) : null;
   const refereeConflictIcon =
     refereesEnabled && match.referee_conflict ? (
-      <Tooltip label={t('referee_conflict_label', 'Referee is also playing during this match')}>
+      <Tooltip
+        label={t(
+          'referee_conflict_label',
+          'Referee is playing or refereeing another match during this match'
+        )}
+      >
         <Box
           component="span"
           style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}

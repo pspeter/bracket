@@ -576,6 +576,68 @@ def test_referee_conflict_no_playing_match_no_conflict() -> None:
     assert flags[refereeing_match.id].referee_conflict is False
 
 
+def test_referee_conflict_team_referees_two_overlapping_matches() -> None:
+    """A team assigned as referee to two overlapping matches flags both matches."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # inp[0] (team -20) referees both matches, which overlap in time.
+    refereeing_match1 = _make_definitive_match(
+        MatchId(-20),
+        inp[1],
+        inp[2],
+        RoundId(-10),
+        CourtId(-1),
+        T,
+        referee=inp[0],
+    )
+    refereeing_match2 = _make_definitive_match(
+        MatchId(-21),
+        inp[1],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T + timedelta(minutes=30),
+        referee=inp[0],
+    )
+    stage = _make_stage_with_two_matches(refereeing_match1, refereeing_match2)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match1.id].referee_conflict is True
+    assert flags[refereeing_match2.id].referee_conflict is True
+
+
+def test_referee_conflict_team_referees_two_non_overlapping_matches() -> None:
+    """A team refereeing two matches that do not overlap is not flagged."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    # inp[0] (team -20) referees both matches, two hours apart — no overlap.
+    refereeing_match1 = _make_definitive_match(
+        MatchId(-20),
+        inp[1],
+        inp[2],
+        RoundId(-10),
+        CourtId(-1),
+        T,
+        referee=inp[0],
+    )
+    refereeing_match2 = _make_definitive_match(
+        MatchId(-21),
+        inp[1],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T + timedelta(hours=2),
+        referee=inp[0],
+    )
+    stage = _make_stage_with_two_matches(refereeing_match1, refereeing_match2)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[refereeing_match1.id].referee_conflict is False
+    assert flags[refereeing_match2.id].referee_conflict is False
+
+
 def test_referee_conflict_team_plays_and_referees_same_match() -> None:
     """A team that is both a player and referee in the same match is flagged."""
     tid = TournamentId(-1)

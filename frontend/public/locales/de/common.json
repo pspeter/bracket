@@ -168,7 +168,7 @@
     "max_results_input_label": "Maximale Ergebnisse",
     "match_scheduled_before_previous_stage_label": "Vor einem Spiel einer früheren Phase auf diesem Spielfeld geplant",
     "precedence_conflict_label": "Beginnt, bevor ein Zubringerspiel beendet ist",
-    "referee_conflict_label": "Der Schiedsrichter spielt ebenfalls während dieses Spiels",
+    "referee_conflict_label": "Der Schiedsrichter spielt oder pfeift während dieses Spiels ein anderes Spiel",
     "short_break_conflict_label": "Die Pause vor diesem Spiel ist kürzer als die Standardpause",
     "members_table_header": "Mitglieder",
     "minutes": "Minuten",
