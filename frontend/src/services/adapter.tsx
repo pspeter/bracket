@@ -12,7 +12,7 @@ import {
   FullTeamWithPlayers,
   PlayersResponse,
   RankingsResponse,
-  RefereesResponse,
+  RefereeNamesResponse,
   RoundWithMatches,
   StageItemInputOptionsResponse,
   StageRankingResponse,
@@ -205,7 +205,7 @@ export function getTeamsForDashboard(
   };
 }
 
-export function getReferees(tournament_id: number | undefined): SWRResponse<RefereesResponse> {
+export function getReferees(tournament_id: number | undefined): SWRResponse<RefereeNamesResponse> {
   return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/referees`, fetcher);
 }
 

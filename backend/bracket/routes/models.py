@@ -6,7 +6,6 @@ from bracket.models.db.court import Court
 from bracket.models.db.match import Match, MatchWithDetails, SuggestedMatch
 from bracket.models.db.player import Player, PlayerWithTeams
 from bracket.models.db.ranking import Ranking
-from bracket.models.db.referee import Referee
 from bracket.models.db.stage_item_inputs import (
     StageItemInputOptionFinal,
     StageItemInputOptionTentative,
@@ -93,7 +92,7 @@ class CourtsResponse(DataResponse[list[Court]]):
     pass
 
 
-class RefereesResponse(DataResponse[list[Referee]]):
+class RefereeNamesResponse(DataResponse[list[str]]):
     pass
 
 

@@ -9,9 +9,12 @@ from bracket.logic.planning.conflicts import (
 )
 from bracket.logic.planning.team_windows import get_team_playing_windows
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
-from bracket.models.db.referee import Referee
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.stage_item_inputs import StageItemInputFinal, StageItemInputTentative
+from bracket.models.db.stage_item_inputs import (
+    StageItemInput,
+    StageItemInputFinal,
+    StageItemInputTentative,
+)
 from bracket.models.db.team import Team
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
 from bracket.utils.dummy_records import (
@@ -24,7 +27,6 @@ from bracket.utils.dummy_records import (
 from bracket.utils.id_types import (
     CourtId,
     MatchId,
-    RefereeId,
     RoundId,
     StageId,
     StageItemId,
@@ -345,7 +347,8 @@ def _make_definitive_match(
     court_id: CourtId,
     start_time: object,
     duration_minutes: int = 60,
-    referee: Referee | None = None,
+    referee: StageItemInput | None = None,
+    referee_name: str | None = None,
 ) -> MatchWithDetailsDefinitive:
     return MatchWithDetailsDefinitive(
         id=match_id,
@@ -365,6 +368,8 @@ def _make_definitive_match(
         state=MatchState.NOT_STARTED,
         completed_at=None,
         referee=referee,
+        referee_stage_item_input_id=referee.id if referee is not None else None,
+        referee_name=referee_name,
     )
 
 
@@ -460,9 +465,7 @@ def test_referee_conflict_flags_both_sides() -> None:
         RoundId(-11),
         CourtId(-2),
         T,
-        referee=Referee(
-            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
-        ),
+        referee=inp[0],
     )
     stage = _make_stage_with_two_matches(playing_match, refereeing_match)
 
@@ -488,9 +491,8 @@ def test_referee_conflict_free_text_no_conflict() -> None:
         RoundId(-11),
         CourtId(-2),
         T,
-        referee=Referee(
-            id=RefereeId(-1), tournament_id=tid, name="John Smith", created=DUMMY_MOCK_TIME
-        ),
+        referee=None,
+        referee_name="John Smith",
     )
     stage = _make_stage_with_two_matches(playing_match, refereeing_match)
 
@@ -516,9 +518,7 @@ def test_referee_conflict_non_overlapping_no_conflict() -> None:
         RoundId(-11),
         CourtId(-2),
         T + timedelta(hours=2),
-        referee=Referee(
-            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
-        ),
+        referee=inp[0],
     )
     stage = _make_stage_with_two_matches(playing_match, refereeing_match)
 
@@ -540,9 +540,7 @@ def test_referee_conflict_no_playing_match_no_conflict() -> None:
         RoundId(-11),
         CourtId(-2),
         T,
-        referee=Referee(
-            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
-        ),
+        referee=inp[0],
     )
     round1 = RoundWithMatches(
         id=RoundId(-11),
@@ -590,9 +588,7 @@ def test_referee_conflict_team_plays_and_referees_same_match() -> None:
         RoundId(-10),
         CourtId(-1),
         T,
-        referee=Referee(
-            id=RefereeId(-1), tournament_id=tid, team_id=TeamId(-20), created=DUMMY_MOCK_TIME
-        ),
+        referee=inp[0],
     )
     round1 = RoundWithMatches(
         id=RoundId(-10),

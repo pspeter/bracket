@@ -468,7 +468,18 @@
             "title": "Referee Conflict",
             "type": "boolean"
           },
-          "referee_id": {
+          "referee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Name"
+          },
+          "referee_stage_item_input_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -477,7 +488,7 @@
                 "type": "null"
               }
             ],
-            "title": "Referee Id"
+            "title": "Referee Stage Item Input Id"
           },
           "round_id": {
             "title": "Round Id",
@@ -608,7 +619,8 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
-          "referee_id",
+          "referee_stage_item_input_id",
+          "referee_name",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -674,7 +686,7 @@
             ],
             "title": "Referee Name"
           },
-          "referee_team_id": {
+          "referee_stage_item_input_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -683,7 +695,7 @@
                 "type": "null"
               }
             ],
-            "title": "Referee Team Id"
+            "title": "Referee Stage Item Input Id"
           },
           "round_id": {
             "title": "Round Id",
@@ -709,7 +721,7 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
-          "referee_team_id",
+          "referee_stage_item_input_id",
           "referee_name",
           "custom_duration_minutes",
           "state",
@@ -978,19 +990,37 @@
           "referee": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Referee"
+                "$ref": "#/components/schemas/StageItemInputTentative"
+              },
+              {
+                "$ref": "#/components/schemas/StageItemInputFinal"
+              },
+              {
+                "$ref": "#/components/schemas/StageItemInputEmpty"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Referee"
           },
           "referee_conflict": {
             "default": false,
             "title": "Referee Conflict",
             "type": "boolean"
           },
-          "referee_id": {
+          "referee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Name"
+          },
+          "referee_stage_item_input_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -999,7 +1029,7 @@
                 "type": "null"
               }
             ],
-            "title": "Referee Id"
+            "title": "Referee Stage Item Input Id"
           },
           "round_id": {
             "title": "Round Id",
@@ -1130,7 +1160,8 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
-          "referee_id",
+          "referee_stage_item_input_id",
+          "referee_name",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -1230,19 +1261,37 @@
           "referee": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Referee"
+                "$ref": "#/components/schemas/StageItemInputTentative"
+              },
+              {
+                "$ref": "#/components/schemas/StageItemInputFinal"
+              },
+              {
+                "$ref": "#/components/schemas/StageItemInputEmpty"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Referee"
           },
           "referee_conflict": {
             "default": false,
             "title": "Referee Conflict",
             "type": "boolean"
           },
-          "referee_id": {
+          "referee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Name"
+          },
+          "referee_stage_item_input_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -1251,7 +1300,7 @@
                 "type": "null"
               }
             ],
-            "title": "Referee Id"
+            "title": "Referee Stage Item Input Id"
           },
           "round_id": {
             "title": "Round Id",
@@ -1376,7 +1425,8 @@
           "stage_item_input1_score",
           "stage_item_input2_score",
           "court_id",
-          "referee_id",
+          "referee_stage_item_input_id",
+          "referee_name",
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
@@ -1879,71 +1929,11 @@
         "title": "RankingsResponse",
         "type": "object"
       },
-      "Referee": {
-        "properties": {
-          "created": {
-            "format": "date-time",
-            "title": "Created",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "team_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Team Id"
-          },
-          "team_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Team Name"
-          },
-          "tournament_id": {
-            "title": "Tournament Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "tournament_id",
-          "team_id",
-          "name",
-          "created",
-          "id",
-          "team_name"
-        ],
-        "title": "Referee",
-        "type": "object"
-      },
-      "RefereesResponse": {
+      "RefereeNamesResponse": {
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/Referee"
+              "type": "string"
             },
             "title": "Data",
             "type": "array"
@@ -1952,7 +1942,7 @@
         "required": [
           "data"
         ],
-        "title": "RefereesResponse",
+        "title": "RefereeNamesResponse",
         "type": "object"
       },
       "RoundCreateBody": {
@@ -6476,7 +6466,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RefereesResponse"
+                  "$ref": "#/components/schemas/RefereeNamesResponse"
                 }
               }
             },

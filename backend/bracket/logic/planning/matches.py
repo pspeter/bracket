@@ -26,7 +26,7 @@ from bracket.sql.matches import (
     sql_reschedule_match_and_determine_duration,
     sql_unschedule_match,
 )
-from bracket.sql.referees import sql_set_match_referee, sql_upsert_referee_by_team
+from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import (
@@ -48,7 +48,7 @@ class ScheduleOperation(NamedTuple):
     start_time: datetime_utc
     position: int
     match: MatchWithDetails | MatchWithDetailsDefinitive
-    referee_team_id: TeamId | None = None
+    referee_stage_item_input_id: StageItemInputId | None = None
 
 
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
@@ -136,20 +136,23 @@ def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
     return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
 
 
-def _opponents_are_known(match: ScheduleMatch) -> bool:
-    """True only when both opponents are concrete teams.
+def _referee_slot_by_team_and_level(
+    stages: list[StageWithStageItems],
+) -> dict[LevelId | None, dict[TeamId, StageItemInputId]]:
+    """Map each level to the referee slot (stage_item_input) each participating team occupies.
 
-    Matches in later stages get their opponents from placeholders (e.g. "winner of stage
-    item 2 of stage 1"), modelled as ``StageItemInputTentative``. Those resolve to a real
-    team only once the prior stage is activated. While a match still has a placeholder (or
-    empty) input we don't know who will play it, so the referee optimizer must not assign a
-    concrete team as its referee — that team might turn out to be one of the players
-    (issue #121). Such matches are left without a referee until their stage activates and
-    the optimizer (or the "assign missing referees" action) is run again.
+    A referee is a third match slot restricted to teams that occupy a stage-item input at the
+    match's level. A team can appear in several inputs; we keep the lowest id for determinism.
     """
-    return isinstance(match.stage_item_input1, StageItemInputFinal) and isinstance(
-        match.stage_item_input2, StageItemInputFinal
-    )
+    by_level: dict[LevelId | None, dict[TeamId, StageItemInputId]] = defaultdict(dict)
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            for input_ in stage_item.inputs:
+                if isinstance(input_, StageItemInputFinal):
+                    existing = by_level[stage.level_id].get(input_.team_id)
+                    if existing is None or input_.id < existing:
+                        by_level[stage.level_id][input_.team_id] = input_.id
+    return by_level
 
 
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
@@ -198,17 +201,6 @@ def _planning_horizon_minutes(
         1,
         latest_pinned_end + movable_minutes + tournament.margin_minutes + max_duration,
     )
-
-
-def _get_team_level_ids(stages: list[StageWithStageItems]) -> dict[TeamId, LevelId | None]:
-    """Collect team_id → level_id for every team appearing in any stage item input."""
-    teams: dict[TeamId, LevelId | None] = {}
-    for stage in stages:
-        for stage_item in stage.stage_items:
-            for input_ in stage_item.inputs:
-                if isinstance(input_, StageItemInputFinal):
-                    teams[input_.team_id] = input_.team.level_id
-    return teams
 
 
 def _pinned_matches_by_court(
@@ -602,7 +594,7 @@ def _add_referee_assignment(
     input_intervals: dict[StageItemInputId, list[Any]],
     pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]],
     pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]],
-    team_level_ids: dict[TeamId, LevelId | None],
+    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]],
     horizon: int,
     reoptimize: bool = False,
 ) -> tuple[dict[MatchId, dict[TeamId, Any]], list[Any]]:
@@ -652,11 +644,13 @@ def _add_referee_assignment(
     preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
-        if not _opponents_are_known(match):
-            # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
-            continue
-        if match.referee_id is not None and not reoptimize:
-            # Non-reoptimize: preserve the existing assignment; still constrain overlaps.
+        referee_provided = (
+            match.referee_stage_item_input_id is not None or match.referee_name is not None
+        )
+        if referee_provided and not reoptimize:
+            # Non-reoptimize: preserve the existing assignment; still constrain overlaps when the
+            # referee slot resolves to a concrete team (an unresolved slot or a free-text referee
+            # name imposes no team constraint).
             referee = match.referee
             if referee is not None and referee.team_id is not None:
                 preserved_ref_team[match.id] = referee.team_id
@@ -665,11 +659,10 @@ def _add_referee_assignment(
 
         match_level = context.level_id
         playing_teams = match_playing_teams[match.id]
-        eligible = {
-            team_id
-            for team_id, level_id in team_level_ids.items()
-            if level_id == match_level and team_id not in playing_teams
-        }
+        # Eligible referee teams: those occupying a slot at the match's level, except teams
+        # playing this match. Placeholder matches have no known players yet, so none excluded.
+        slot_by_team = referee_slot_by_team_and_level.get(match_level, {})
+        eligible = {team_id for team_id in slot_by_team if team_id not in playing_teams}
         if not eligible:
             continue
 
@@ -837,6 +830,7 @@ def _build_operations_from_solution(
     starts: dict[MatchId, Any],
     court_choices: dict[MatchId, dict[CourtId, Any]],
     ref_choices: dict[MatchId, dict[TeamId, Any]],
+    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]],
     tournament: Tournament,
 ) -> list[ScheduleOperation]:
     scheduled_slots: dict[CourtId, list[tuple[datetime_utc, MatchId, ScheduleOperation | None]]] = (
@@ -850,7 +844,7 @@ def _build_operations_from_solution(
             if solver.Value(chosen) == 1
         )
         start_time = tournament.start_time + timedelta(minutes=solver.Value(starts[match_id]))
-        referee_team_id: TeamId | None = None
+        referee_slot_id: StageItemInputId | None = None
         if match_id in ref_choices:
             referee_team_id = next(
                 (
@@ -860,8 +854,12 @@ def _build_operations_from_solution(
                 ),
                 None,
             )
+            if referee_team_id is not None:
+                referee_slot_id = referee_slot_by_team_and_level.get(context.level_id, {}).get(
+                    referee_team_id
+                )
         operation_to_schedule = ScheduleOperation(
-            court_id, start_time, 0, context.match, referee_team_id
+            court_id, start_time, 0, context.match, referee_slot_id
         )
         scheduled_slots[court_id].append((start_time, match_id, operation_to_schedule))
 
@@ -880,7 +878,7 @@ def _build_operations_from_solution(
                         operation_for_position.start_time,
                         position,
                         operation_for_position.match,
-                        operation_for_position.referee_team_id,
+                        operation_for_position.referee_stage_item_input_id,
                     )
                 )
 
@@ -971,8 +969,9 @@ def build_schedule_plan(
         objective += weights.group_sync * sum(sync_spreads)
 
     ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
+    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]] = {}
     if tournament.referees_enabled:
-        team_level_ids = _get_team_level_ids(stages)
+        referee_slot_by_team_and_level = _referee_slot_by_team_and_level(stages)
         pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]] = defaultdict(list)
         for context in pinned_contexts:
             ref = context.match.referee
@@ -995,7 +994,7 @@ def build_schedule_plan(
             input_intervals,
             pinned_by_input,
             pinned_by_referee_team,
-            team_level_ids,
+            referee_slot_by_team_and_level,
             horizon,
             reoptimize,
         )
@@ -1035,6 +1034,7 @@ def build_schedule_plan(
         starts,
         court_choices,
         ref_choices,
+        referee_slot_by_team_and_level,
         tournament,
     )
 
@@ -1058,27 +1058,27 @@ async def _apply_schedule_plan(
             op.match,
             tournament,
         )
-        if op.referee_team_id is not None:
-            referee = await sql_upsert_referee_by_team(tournament_id, op.referee_team_id)
-            await sql_set_match_referee(op.match.id, referee.id)
+        if op.referee_stage_item_input_id is not None:
+            await sql_set_match_referee_slot(op.match.id, op.referee_stage_item_input_id)
 
 
 def build_referee_assignment_plan(
     stages: list[StageWithStageItems],
     tournament: Tournament,
     weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
-) -> dict[MatchId, TeamId]:
+) -> dict[MatchId, StageItemInputId]:
     """Assign referees to already-scheduled matches that have none, without moving any match.
 
-    Returns a mapping of match_id → team_id for each match that received a new referee.
-    Matches that already have a referee, unscheduled matches, and matches with no eligible
-    candidate are left untouched. Never fails — returns what it can.
+    Returns a mapping of match_id → referee stage_item_input_id for each match that received a
+    new referee. Matches that already have a referee (slot or free-text name), unscheduled
+    matches, and matches with no eligible candidate are left untouched. Never fails — returns
+    what it can.
     """
     if not tournament.referees_enabled:
         return {}
 
     contexts = _get_match_contexts(stages)
-    team_level_ids = _get_team_level_ids(stages)
+    referee_slot_by_team_and_level = _referee_slot_by_team_and_level(stages)
 
     # Only scheduled matches (fixed court + start_time) participate.
     scheduled_contexts = [c for c in contexts if _is_scheduled(c)]
@@ -1094,8 +1094,14 @@ def build_referee_assignment_plan(
             if isinstance(input_, StageItemInputFinal):
                 team_playing_intervals[input_.team_id].append((start_min, end_min))
 
-    needs_ref = [c for c in scheduled_contexts if c.match.referee_id is None]
-    has_ref = [c for c in scheduled_contexts if c.match.referee_id is not None]
+    def _has_referee(context: _MatchContext) -> bool:
+        return (
+            context.match.referee_stage_item_input_id is not None
+            or context.match.referee_name is not None
+        )
+
+    needs_ref = [c for c in scheduled_contexts if not _has_referee(c)]
+    has_ref = [c for c in scheduled_contexts if _has_referee(c)]
 
     if not needs_ref:
         return {}
@@ -1117,9 +1123,6 @@ def build_referee_assignment_plan(
 
     for context in needs_ref:
         match = context.match
-        if not _opponents_are_known(match):
-            # Defer: a placeholder match's players aren't known yet, so don't pick a referee.
-            continue
         start_min = _minute_offset(tournament, assert_some(match.start_time))
         end_min = start_min + match.duration_minutes
         match_windows[match.id] = (start_min, end_min)
@@ -1129,10 +1132,11 @@ def build_referee_assignment_plan(
             if isinstance(input_, StageItemInputFinal):
                 playing_teams.add(input_.team_id)
 
-        # Eligible: same level, not playing in this match, not playing or refereeing at overlap.
+        # Eligible: occupies a slot at the match's level, not playing in this match, not playing
+        # or refereeing at an overlapping time. Placeholder matches exclude no players (unknown).
         eligible: set[TeamId] = set()
-        for team_id, level_id in team_level_ids.items():
-            if level_id != context.level_id or team_id in playing_teams:
+        for team_id in referee_slot_by_team_and_level.get(context.level_id, {}):
+            if team_id in playing_teams:
                 continue
             if any(
                 start_min < p_end and p_start < end_min
@@ -1238,11 +1242,16 @@ def build_referee_assignment_plan(
         )
         return {}
 
-    result: dict[MatchId, TeamId] = {}
+    level_by_match = {context.match.id: context.level_id for context in needs_ref}
+    result: dict[MatchId, StageItemInputId] = {}
     for match_id, choices in ref_choices.items():
         for team_id, var in choices.items():
             if solver.Value(var) == 1:
-                result[match_id] = team_id
+                slot_id = referee_slot_by_team_and_level.get(level_by_match[match_id], {}).get(
+                    team_id
+                )
+                if slot_id is not None:
+                    result[match_id] = slot_id
                 break
     return result
 
@@ -1253,9 +1262,8 @@ async def assign_missing_referees_only(
     weights: SchedulerWeights = DEFAULT_SCHEDULER_WEIGHTS,
 ) -> None:
     """Persist referee assignments for scheduled matches that have none."""
-    for match_id, team_id in build_referee_assignment_plan(stages, tournament, weights).items():
-        referee = await sql_upsert_referee_by_team(tournament.id, team_id)
-        await sql_set_match_referee(match_id, referee.id)
+    for match_id, slot_id in build_referee_assignment_plan(stages, tournament, weights).items():
+        await sql_set_match_referee_slot(match_id, slot_id)
 
 
 async def schedule_all_unscheduled_matches(

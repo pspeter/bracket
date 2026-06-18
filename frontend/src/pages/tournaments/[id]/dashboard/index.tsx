@@ -107,7 +107,7 @@ export function ScheduleRow({
             </div>
           </Grid.Col>
         </Grid>
-        <RefereeDisplay referee={data.match.referee} refereesEnabled={refereesEnabled} />
+        <RefereeDisplay match={data.match} refereesEnabled={refereesEnabled} />
       </Stack>
     </Card>
   );

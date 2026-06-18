@@ -378,7 +378,13 @@ function MatchCard({
             {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
           </Flex>
         )}
-        {rows >= 2 && <RefereeDisplay referee={match.referee} refereesEnabled={refereesEnabled} />}
+        {rows >= 2 && (
+          <RefereeDisplay
+            match={match}
+            refereesEnabled={refereesEnabled}
+            stageItemsLookup={stageItemsLookup}
+          />
+        )}
       </Box>
     </Box>
   );

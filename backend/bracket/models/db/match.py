@@ -7,17 +7,14 @@ from heliclockter import datetime_utc, timedelta
 from pydantic import BaseModel, Field, field_validator
 
 from bracket.models.db.court import Court
-from bracket.models.db.referee import Referee
 from bracket.models.db.shared import BaseModelORM
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.utils.id_types import (
     CourtId,
     LevelId,
     MatchId,
-    RefereeId,
     RoundId,
     StageItemInputId,
-    TeamId,
 )
 from bracket.utils.types import EnumAutoStr, assert_some
 
@@ -37,7 +34,10 @@ class MatchBaseInsertable(BaseModelORM):
     stage_item_input1_score: int
     stage_item_input2_score: int
     court_id: CourtId | None = None
-    referee_id: RefereeId | None = None
+    # Referee as a third match slot: a reference to a stage_item_input that resolves to a team
+    # like the playing slots, or a free-text external referee name. At most one is set.
+    referee_stage_item_input_id: StageItemInputId | None = None
+    referee_name: str | None = None
     stage_item_input1_conflict: bool
     stage_item_input2_conflict: bool
     precedence_conflict: bool = False
@@ -81,7 +81,8 @@ class MatchWithDetails(Match):
     """
 
     court: Court | None = None
-    referee: Referee | None = None
+    # The hydrated referee slot (resolves to a team like a playing slot), if slot-based.
+    referee: StageItemInput | None = None
     level_id: LevelId | None = None
 
     @field_validator("stage_item_input1", "stage_item_input2", "court", "referee", mode="before")
@@ -103,7 +104,7 @@ class MatchWithDetailsDefinitive(Match):
     stage_item_input1: StageItemInput  # pyrefly: ignore [bad-override]
     stage_item_input2: StageItemInput  # pyrefly: ignore [bad-override]
     court: Court | None = None
-    referee: Referee | None = None
+    referee: StageItemInput | None = None
 
     @property
     def stage_item_inputs(self) -> list[StageItemInput]:
@@ -125,7 +126,7 @@ class MatchBody(BaseModelORM):
     stage_item_input1_score: int = 0
     stage_item_input2_score: int = 0
     court_id: CourtId | None = None
-    referee_team_id: TeamId | None = None
+    referee_stage_item_input_id: StageItemInputId | None = None
     referee_name: str | None = None
     custom_duration_minutes: int | None = None
     state: MatchState = MatchState.NOT_STARTED

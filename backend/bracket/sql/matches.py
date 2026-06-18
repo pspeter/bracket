@@ -109,9 +109,9 @@ async def sql_update_match(match_id: MatchId, match: MatchBody, tournament: Tour
         query=query,
         values={
             "match_id": match_id,
-            # referee_team_id and referee_name are resolved into matches.referee_id by the
-            # route, not written here; they are not columns on this UPDATE.
-            **match.model_dump(exclude={"referee_team_id", "referee_name"}),
+            # The referee columns are set by dedicated setters in the route (preserving the
+            # "only touch when provided" semantics), not by this generic UPDATE.
+            **match.model_dump(exclude={"referee_stage_item_input_id", "referee_name"}),
             "duration_minutes": duration_minutes,
             "state": match.state.value,
             "completed_at": (
@@ -243,17 +243,7 @@ async def sql_get_match_with_details(
             to_json(sii1) AS stage_item_input1,
             to_json(sii2) AS stage_item_input2,
             to_json(c) AS court,
-            CASE
-                WHEN ref.id IS NULL THEN NULL
-                ELSE json_build_object(
-                    'id', ref.id,
-                    'tournament_id', ref.tournament_id,
-                    'team_id', ref.team_id,
-                    'name', ref.name,
-                    'created', ref.created,
-                    'team_name', ref_team.name
-                )
-            END AS referee,
+            to_json(ref_sii) AS referee,
             stages.level_id AS level_id
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
@@ -262,8 +252,7 @@ async def sql_get_match_with_details(
         LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
         LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
         LEFT JOIN courts c ON c.id = matches.court_id
-        LEFT JOIN referees ref ON ref.id = matches.referee_id
-        LEFT JOIN teams ref_team ON ref_team.id = ref.team_id
+        LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
         WHERE stages.tournament_id = :tournament_id
         AND matches.id = :match_id
         """
@@ -295,17 +284,7 @@ async def sql_get_scheduled_matches_with_details(
             to_json(sii1) AS stage_item_input1,
             to_json(sii2) AS stage_item_input2,
             to_json(c) AS court,
-            CASE
-                WHEN ref.id IS NULL THEN NULL
-                ELSE json_build_object(
-                    'id', ref.id,
-                    'tournament_id', ref.tournament_id,
-                    'team_id', ref.team_id,
-                    'name', ref.name,
-                    'created', ref.created,
-                    'team_name', ref_team.name
-                )
-            END AS referee,
+            to_json(ref_sii) AS referee,
             stages.level_id AS level_id
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
@@ -314,8 +293,7 @@ async def sql_get_scheduled_matches_with_details(
         LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
         LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
         LEFT JOIN courts c ON c.id = matches.court_id
-        LEFT JOIN referees ref ON ref.id = matches.referee_id
-        LEFT JOIN teams ref_team ON ref_team.id = ref.team_id
+        LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
         WHERE stages.tournament_id = :tournament_id
         AND stages.is_active IS TRUE
         AND rounds.is_draft IS FALSE

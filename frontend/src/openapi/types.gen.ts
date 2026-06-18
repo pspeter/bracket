@@ -294,9 +294,13 @@ export type Match = {
    */
   referee_conflict: boolean;
   /**
-   * Referee Id
+   * Referee Name
    */
-  referee_id: number | null;
+  referee_name: string | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
   /**
    * Round Id
    */
@@ -373,9 +377,9 @@ export type MatchBody = {
    */
   referee_name: string | null;
   /**
-   * Referee Team Id
+   * Referee Stage Item Input Id
    */
-  referee_team_id: number | null;
+  referee_stage_item_input_id: number | null;
   /**
    * Round Id
    */
@@ -526,15 +530,22 @@ export type MatchWithDetails = {
    * Precedence Conflict
    */
   precedence_conflict: boolean;
-  referee: Referee | null;
+  /**
+   * Referee
+   */
+  referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
   /**
    * Referee Conflict
    */
   referee_conflict: boolean;
   /**
-   * Referee Id
+   * Referee Name
    */
-  referee_id: number | null;
+  referee_name: string | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
   /**
    * Round Id
    */
@@ -627,15 +638,22 @@ export type MatchWithDetailsDefinitive = {
    * Precedence Conflict
    */
   precedence_conflict: boolean;
-  referee: Referee | null;
+  /**
+   * Referee
+   */
+  referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
   /**
    * Referee Conflict
    */
   referee_conflict: boolean;
   /**
-   * Referee Id
+   * Referee Name
    */
-  referee_id: number | null;
+  referee_name: string | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
   /**
    * Round Id
    */
@@ -977,43 +995,13 @@ export type RankingsResponse = {
 };
 
 /**
- * Referee
+ * RefereeNamesResponse
  */
-export type Referee = {
-  /**
-   * Created
-   */
-  created: string;
-  /**
-   * Id
-   */
-  id: number;
-  /**
-   * Name
-   */
-  name: string | null;
-  /**
-   * Team Id
-   */
-  team_id: number | null;
-  /**
-   * Team Name
-   */
-  team_name: string | null;
-  /**
-   * Tournament Id
-   */
-  tournament_id: number;
-};
-
-/**
- * RefereesResponse
- */
-export type RefereesResponse = {
+export type RefereeNamesResponse = {
   /**
    * Data
    */
-  data: Array<Referee>;
+  data: Array<string>;
 };
 
 /**
@@ -3748,7 +3736,7 @@ export type GetRefereesTournamentsTournamentIdRefereesGetResponses = {
   /**
    * Successful Response
    */
-  200: RefereesResponse;
+  200: RefereeNamesResponse;
 };
 
 export type GetRefereesTournamentsTournamentIdRefereesGetResponse =
