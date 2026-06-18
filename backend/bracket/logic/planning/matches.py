@@ -136,22 +136,30 @@ def _has_open_slot(stage_item: StageItemWithRounds) -> bool:
     return any(isinstance(input_, StageItemInputEmpty) for input_ in stage_item.inputs)
 
 
-def _referee_slot_by_team_and_level(
+def _referee_candidate_slots_by_level(
     stages: list[StageWithStageItems],
-) -> dict[LevelId | None, dict[TeamId, StageItemInputId]]:
-    """Map each level to the referee slot (stage_item_input) each participating team occupies.
+) -> dict[LevelId | None, list[tuple[StageItemInputId, TeamId | None]]]:
+    """Candidate referee slots per level: ``(stage_item_input_id, resolved_team_id_or_None)``.
 
-    A referee is a third match slot restricted to teams that occupy a stage-item input at the
-    match's level. A team can appear in several inputs; we keep the lowest id for determinism.
+    A referee is just a third match slot, so any stage-item input at the match's level can
+    referee. Resolved (Final) slots are deduplicated to one per team (lowest id) so referee load
+    balances per team; unresolved (tentative/empty) slots are each offered as a fallback so the
+    optimizer can pick "whoever ends up in this position" when no concrete team is free.
     """
-    by_level: dict[LevelId | None, dict[TeamId, StageItemInputId]] = defaultdict(dict)
+    by_level: dict[LevelId | None, list[tuple[StageItemInputId, TeamId | None]]] = defaultdict(list)
+    resolved: dict[LevelId | None, dict[TeamId, StageItemInputId]] = defaultdict(dict)
     for stage in stages:
         for stage_item in stage.stage_items:
             for input_ in stage_item.inputs:
                 if isinstance(input_, StageItemInputFinal):
-                    existing = by_level[stage.level_id].get(input_.team_id)
+                    existing = resolved[stage.level_id].get(input_.team_id)
                     if existing is None or input_.id < existing:
-                        by_level[stage.level_id][input_.team_id] = input_.id
+                        resolved[stage.level_id][input_.team_id] = input_.id
+                else:
+                    by_level[stage.level_id].append((input_.id, None))
+    for level_id, team_slots in resolved.items():
+        for team_id, slot_id in team_slots.items():
+            by_level[level_id].append((slot_id, team_id))
     return by_level
 
 
@@ -234,7 +242,16 @@ def _pinned_matches_by_input(
             start_minutes=start_minutes,
             end_minutes=start_minutes + context.match.duration_minutes,
         )
-        for input_id in context.input_ids:
+        # A pinned match occupies all three of its slots for its whole window: the two playing
+        # inputs and (if set) its referee slot. Treating the referee slot the same way lets a
+        # movable match's referee/playing choice avoid colliding with a pinned occupant.
+        referee_slot_id = context.match.referee_stage_item_input_id
+        slot_ids = (
+            (*context.input_ids, referee_slot_id)
+            if referee_slot_id is not None
+            else context.input_ids
+        )
+        for input_id in slot_ids:
             pinned_by_input[input_id].append(pinned)
     return pinned_by_input
 
@@ -585,242 +602,157 @@ def _add_group_sync_penalty(
     return spreads
 
 
+def _add_referee_slot_occupancy(
+    model: Any,
+    slot_id: StageItemInputId,
+    match_id: MatchId,
+    duration: int,
+    enforce: Any | None,
+    starts: dict[MatchId, Any],
+    ends: dict[MatchId, Any],
+    horizon: int,
+    input_intervals: dict[StageItemInputId, list[Any]],
+    pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]],
+) -> None:
+    """Mark a slot occupied for a match's window as its referee.
+
+    The interval joins the slot's own no-overlap list (shared with its playing intervals); since
+    pinned matches contribute fixed intervals that are not in that list, the slot is also
+    constrained against pinned occupants explicitly. ``enforce=None`` is an unconditional
+    occupancy (a preserved assignment); otherwise the occupancy holds only when ``enforce`` is set.
+    """
+    ref_end = model.NewIntVar(0, horizon + duration, f"ref_end_m{match_id}_s{slot_id}")
+    name = f"ref_iv_m{match_id}_s{slot_id}"
+    if enforce is None:
+        input_intervals[slot_id].append(
+            model.NewIntervalVar(starts[match_id], duration, ref_end, name)
+        )
+    else:
+        input_intervals[slot_id].append(
+            model.NewOptionalIntervalVar(starts[match_id], duration, ref_end, enforce, name)
+        )
+
+    for pinned in pinned_by_input.get(slot_id, []):
+        before = model.NewBoolVar(f"ref_m{match_id}_s{slot_id}_before_{pinned.context.match.id}")
+        after = model.NewBoolVar(f"ref_m{match_id}_s{slot_id}_after_{pinned.context.match.id}")
+        before_guard = [before] if enforce is None else [enforce, before]
+        after_guard = [after] if enforce is None else [enforce, after]
+        model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(before_guard)
+        model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(after_guard)
+        model.AddBoolOr([before, after] if enforce is None else [before, after, enforce.Not()])
+
+
+def _referee_fairness_spread(
+    model: Any, resolved_choice_vars: dict[StageItemInputId, list[Any]], max_possible: int
+) -> list[Any]:
+    """Min-max spread of per-resolved-slot referee load (one slot per team, so per team)."""
+    if len(resolved_choice_vars) < 2:
+        return []
+    loads: list[Any] = []
+    for slot_id in sorted(resolved_choice_vars):  # sorted for determinism
+        choice_vars = resolved_choice_vars[slot_id]
+        load = model.NewIntVar(0, len(choice_vars), f"ref_load_s{slot_id}")
+        model.Add(load == sum(choice_vars))
+        loads.append(load)
+    max_load = model.NewIntVar(0, max_possible, "ref_max_load")
+    min_load = model.NewIntVar(0, max_possible, "ref_min_load")
+    model.AddMaxEquality(max_load, loads)
+    model.AddMinEquality(min_load, loads)
+    spread = model.NewIntVar(0, max_possible, "ref_spread")
+    model.Add(spread == max_load - min_load)
+    return [spread]
+
+
 def _add_referee_assignment(
     model: Any,
     movable_contexts: list[_MatchContext],
-    pinned_contexts: list[_MatchContext],
     starts: dict[MatchId, Any],
     ends: dict[MatchId, Any],
     input_intervals: dict[StageItemInputId, list[Any]],
     pinned_by_input: dict[StageItemInputId, list[_PinnedMatch]],
-    pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]],
-    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]],
+    candidate_slots_by_level: dict[LevelId | None, list[tuple[StageItemInputId, TeamId | None]]],
     horizon: int,
     reoptimize: bool = False,
-) -> tuple[dict[MatchId, dict[TeamId, Any]], list[Any]]:
-    """Add referee decision variables, hard constraints, and fairness objective.
+) -> tuple[dict[MatchId, dict[StageItemInputId, Any]], list[Any], list[Any]]:
+    """Assign each movable match a referee slot, treating it as a third match slot.
 
-    For each movable match without a referee, optionally assigns one team (same level,
-    not currently playing). When reoptimize=True, existing referee assignments on movable
-    matches are also freed up and reshuffled by the solver. When reoptimize=False, a match
-    that already has a referee keeps it, but the no-overlap constraint still applies because
-    its start time is re-flowed. Hard constraints prevent a team from refereeing when it is
-    playing or already refereeing another overlapping match. The fairness term minimises the
-    spread of per-team referee counts across all eligible teams.
+    The chosen referee occupies a ``stage_item_input`` for the match's duration via the very same
+    per-input ``AddNoOverlap`` used for the two playing slots, so a slot cannot play and referee
+    (nor referee twice) at overlapping times — no referee-specific overlap bookkeeping.
 
-    Returns (ref_choices, [spread_var]) where ref_choices[match_id][team_id] is the
-    BoolVar indicating whether that team referees that match, and spread_var (if any
-    eligible team exists for at least two teams) is the min-max spread to add to the
-    objective.
+    Resolved (team) slots are preferred via ``unresolved_vars`` (penalised in the objective);
+    unresolved (tentative/empty) slots are a fallback. Under ``reoptimize`` existing assignments
+    are reshuffled; otherwise a match keeps its referee (its slot interval is still added so the
+    no-overlap holds as the match re-flows).
+
+    Returns ``(ref_choices, fairness_spreads, unresolved_vars)`` where
+    ``ref_choices[match_id][slot_id]`` is the BoolVar for "that slot referees that match".
     """
-    # Build team_id -> set of stage_item_input_ids (from all contexts, for overlap tracking)
-    all_contexts = movable_contexts + pinned_contexts
-    team_to_input_ids: dict[TeamId, set[StageItemInputId]] = defaultdict(set)
-    for context in all_contexts:
-        match = context.match
-        for input_, input_id in (
-            (match.stage_item_input1, match.stage_item_input1_id),
-            (match.stage_item_input2, match.stage_item_input2_id),
-        ):
-            if isinstance(input_, StageItemInputFinal) and input_id is not None:
-                team_to_input_ids[input_.team_id].add(input_id)
+    ref_choices: dict[MatchId, dict[StageItemInputId, Any]] = {}
+    resolved_choice_vars: dict[StageItemInputId, list[Any]] = defaultdict(list)
+    unresolved_vars: list[Any] = []
 
-    # Build match_id -> set of team_ids that are PLAYING in each movable match
-    match_playing_teams: dict[MatchId, set[TeamId]] = {}
-    for context in movable_contexts:
-        playing: set[TeamId] = set()
-        for input_ in (context.match.stage_item_input1, context.match.stage_item_input2):
-            if isinstance(input_, StageItemInputFinal):
-                playing.add(input_.team_id)
-        match_playing_teams[context.match.id] = playing
-
-    # Create referee decision variables for each movable match.
-    # In default (non-reoptimize) mode, a match that already has a referee keeps it: the
-    # existing assignment is recorded in preserved_ref_team so the no-overlap constraint still
-    # applies while the match is re-flowed. In full-optimize (reoptimize=True) mode, existing
-    # assignments are cleared and the solver picks a fresh referee for every movable match.
-    ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
-    match_durations: dict[MatchId, int] = {}
-    preserved_ref_team: dict[MatchId, TeamId] = {}
     for context in movable_contexts:
         match = context.match
-        referee_provided = (
+        match_id = match.id
+        duration = match.duration_minutes
+        own = set(context.input_ids)
+
+        keep_existing = (
             match.referee_stage_item_input_id is not None or match.referee_name is not None
-        )
-        if referee_provided and not reoptimize:
-            # Non-reoptimize: preserve the existing assignment; still constrain overlaps when the
-            # referee slot resolves to a concrete team (an unresolved slot or a free-text referee
-            # name imposes no team constraint).
-            referee = match.referee
-            if referee is not None and referee.team_id is not None:
-                preserved_ref_team[match.id] = referee.team_id
-                match_durations[match.id] = match.duration_minutes
-            continue
-
-        match_level = context.level_id
-        playing_teams = match_playing_teams[match.id]
-        # Eligible referee teams: those occupying a slot at the match's level, except teams
-        # playing this match. Placeholder matches have no known players yet, so none excluded.
-        slot_by_team = referee_slot_by_team_and_level.get(match_level, {})
-        eligible = {team_id for team_id in slot_by_team if team_id not in playing_teams}
-        if not eligible:
-            continue
-
-        choices: dict[TeamId, Any] = {
-            team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
-            for team_id in sorted(eligible)  # sorted for determinism
-        }
-        model.AddExactlyOne(choices.values())
-        ref_choices[match.id] = choices
-        match_durations[match.id] = match.duration_minutes
-
-    if not ref_choices and not preserved_ref_team:
-        return {}, []
-
-    all_eligible_teams: set[TeamId] = set(
-        team_id for choices in ref_choices.values() for team_id in choices
-    )
-
-    # Per-team interval lists: playing (movable) + referee (optional new, mandatory preserved,
-    # movable) + pinned referee
-    team_all_intervals: dict[TeamId, list[Any]] = defaultdict(list)
-
-    # Add movable playing intervals for every team that participates in a referee constraint:
-    # eligible candidates, teams refereeing a pinned match, and teams whose preserved referee
-    # assignment sits on a movable match. Each needs conflict-checking against the others.
-    for team_id in (
-        all_eligible_teams | set(pinned_by_referee_team.keys()) | set(preserved_ref_team.values())
-    ):
-        for input_id in team_to_input_ids.get(team_id, set()):
-            team_all_intervals[team_id].extend(input_intervals.get(input_id, []))
-
-    # Add optional referee intervals for movable matches
-    for match_id, choices in ref_choices.items():
-        duration = match_durations[match_id]
-        for team_id, var in choices.items():
-            ref_end = model.NewIntVar(
-                0,
-                horizon + duration,
-                f"ref_end_match_{match_id}_team_{team_id}",
-            )
-            team_all_intervals[team_id].append(
-                model.NewOptionalIntervalVar(
-                    starts[match_id],
+        ) and not reoptimize
+        if keep_existing:
+            # Preserve the assignment; a slot-based referee still occupies its slot (a free-text
+            # referee occupies none) so the no-overlap stays valid as the match re-flows.
+            slot_id = match.referee_stage_item_input_id
+            if slot_id is not None:
+                _add_referee_slot_occupancy(
+                    model,
+                    slot_id,
+                    match_id,
                     duration,
-                    ref_end,
-                    var,
-                    f"ref_interval_match_{match_id}_team_{team_id}",
+                    None,
+                    starts,
+                    ends,
+                    horizon,
+                    input_intervals,
+                    pinned_by_input,
                 )
-            )
+            continue
 
-    # Add mandatory referee intervals for preserved assignments on movable matches. The team
-    # is fixed, but the start is a variable, so a plain (non-optional) interval at the match's
-    # start makes AddNoOverlap forbid the team from playing or refereeing anything else then.
-    for match_id, team_id in preserved_ref_team.items():
-        duration = match_durations[match_id]
-        ref_end = model.NewIntVar(
-            0,
-            horizon + duration,
-            f"preserved_ref_end_match_{match_id}_team_{team_id}",
-        )
-        team_all_intervals[team_id].append(
-            model.NewIntervalVar(
-                starts[match_id],
-                duration,
-                ref_end,
-                f"preserved_ref_interval_match_{match_id}_team_{team_id}",
-            )
-        )
-
-    # Add fixed intervals for pinned referee assignments so AddNoOverlap covers:
-    #   - movable playing vs pinned referee (team plays a movable match, referees a pinned one)
-    #   - movable referee vs pinned referee (team referees both a movable and a pinned match)
-    for team_id, pinned_ref_matches in pinned_by_referee_team.items():
-        for pinned in pinned_ref_matches:
-            duration = pinned.end_minutes - pinned.start_minutes
-            if duration > 0:
-                team_all_intervals[team_id].append(
-                    model.NewFixedSizeIntervalVar(
-                        pinned.start_minutes,
-                        duration,
-                        f"pinned_ref_match_{pinned.context.match.id}_team_{team_id}",
-                    )
-                )
-
-    # No-overlap: a team cannot play or referee two overlapping intervals (movable vs movable,
-    # movable vs pinned-referee; pinned-playing vs movable-referee is handled separately below)
-    for team_id, intervals in team_all_intervals.items():
-        if len(intervals) >= 2:
-            model.AddNoOverlap(intervals)
-
-    # Explicit constraints for movable referee vs pinned playing intervals
-    for match_id, choices in ref_choices.items():
-        for team_id, var in choices.items():
-            for input_id in team_to_input_ids.get(team_id, set()):
-                for pinned in pinned_by_input.get(input_id, []):
-                    before = model.NewBoolVar(
-                        f"ref_match_{match_id}_team_{team_id}_"
-                        f"before_pinned_{pinned.context.match.id}"
-                    )
-                    after = model.NewBoolVar(
-                        f"ref_match_{match_id}_team_{team_id}_"
-                        f"after_pinned_{pinned.context.match.id}"
-                    )
-                    model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf([var, before])
-                    model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf([var, after])
-                    model.AddBoolOr([before, after, var.Not()])
-
-    # Same constraint for preserved (fixed) referees on movable matches: the team is committed
-    # unconditionally, so the movable match must sit entirely before or after each pinned match
-    # the referee team plays in.
-    for match_id, team_id in preserved_ref_team.items():
-        for input_id in team_to_input_ids.get(team_id, set()):
-            for pinned in pinned_by_input.get(input_id, []):
-                before = model.NewBoolVar(
-                    f"preserved_ref_match_{match_id}_team_{team_id}_"
-                    f"before_pinned_{pinned.context.match.id}"
-                )
-                after = model.NewBoolVar(
-                    f"preserved_ref_match_{match_id}_team_{team_id}_"
-                    f"after_pinned_{pinned.context.match.id}"
-                )
-                model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(before)
-                model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(after)
-                model.AddBoolOr([before, after])
-
-    # Fixed referee load from pinned matches (already assigned, can't change)
-    fixed_ref_count: dict[TeamId, int] = defaultdict(int)
-    for context in pinned_contexts:
-        ref = context.match.referee
-        if ref is not None and ref.team_id in all_eligible_teams:
-            fixed_ref_count[ref.team_id] += 1
-
-    # Total load per team = fixed + variable referee assignments
-    max_possible_load = len(movable_contexts) + (max(fixed_ref_count.values(), default=0))
-    team_loads: list[Any] = []
-    for team_id in sorted(all_eligible_teams):  # sorted for determinism
-        fixed = fixed_ref_count.get(team_id, 0)
-        var_choices = [
-            ref_choices[mid][team_id] for mid in ref_choices if team_id in ref_choices[mid]
+        candidates = [
+            (slot_id, team_id)
+            for slot_id, team_id in candidate_slots_by_level.get(context.level_id, [])
+            if slot_id not in own
         ]
-        if var_choices:
-            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_team_{team_id}")
-            model.Add(load == fixed + sum(var_choices))
-        else:
-            load = model.NewIntVar(fixed, fixed, f"ref_load_team_{team_id}")
-        team_loads.append(load)
+        if not candidates:
+            continue
 
-    if len(team_loads) < 2:
-        # Single eligible team forced to referee all matches; no spread to balance.
-        return ref_choices, []
+        choices: dict[StageItemInputId, Any] = {}
+        for slot_id, team_id in sorted(candidates, key=lambda candidate: candidate[0]):
+            var = model.NewBoolVar(f"ref_m{match_id}_s{slot_id}")
+            choices[slot_id] = var
+            _add_referee_slot_occupancy(
+                model,
+                slot_id,
+                match_id,
+                duration,
+                var,
+                starts,
+                ends,
+                horizon,
+                input_intervals,
+                pinned_by_input,
+            )
+            if team_id is not None:
+                resolved_choice_vars[slot_id].append(var)
+            else:
+                unresolved_vars.append(var)
+        model.AddExactlyOne(choices.values())
+        ref_choices[match_id] = choices
 
-    max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
-    min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
-    model.AddMaxEquality(max_load, team_loads)
-    model.AddMinEquality(min_load, team_loads)
-    spread = model.NewIntVar(0, max_possible_load, "ref_spread")
-    model.Add(spread == max_load - min_load)
-    return ref_choices, [spread]
+    spreads = _referee_fairness_spread(model, resolved_choice_vars, len(movable_contexts))
+    return ref_choices, spreads, unresolved_vars
 
 
 def _build_operations_from_solution(
@@ -829,8 +761,7 @@ def _build_operations_from_solution(
     pinned_contexts: list[_MatchContext],
     starts: dict[MatchId, Any],
     court_choices: dict[MatchId, dict[CourtId, Any]],
-    ref_choices: dict[MatchId, dict[TeamId, Any]],
-    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]],
+    ref_choices: dict[MatchId, dict[StageItemInputId, Any]],
     tournament: Tournament,
 ) -> list[ScheduleOperation]:
     scheduled_slots: dict[CourtId, list[tuple[datetime_utc, MatchId, ScheduleOperation | None]]] = (
@@ -846,18 +777,14 @@ def _build_operations_from_solution(
         start_time = tournament.start_time + timedelta(minutes=solver.Value(starts[match_id]))
         referee_slot_id: StageItemInputId | None = None
         if match_id in ref_choices:
-            referee_team_id = next(
+            referee_slot_id = next(
                 (
-                    team_id
-                    for team_id, var in ref_choices[match_id].items()
+                    slot_id
+                    for slot_id, var in ref_choices[match_id].items()
                     if solver.Value(var) == 1
                 ),
                 None,
             )
-            if referee_team_id is not None:
-                referee_slot_id = referee_slot_by_team_and_level.get(context.level_id, {}).get(
-                    referee_team_id
-                )
         operation_to_schedule = ScheduleOperation(
             court_id, start_time, 0, context.match, referee_slot_id
         )
@@ -919,6 +846,27 @@ def build_schedule_plan(
         tournament,
         horizon,
     )
+    pinned_by_input = _pinned_matches_by_input(contexts, tournament, pinned_ids)
+
+    # Referee assignment treats the referee as a third match slot: it appends the chosen
+    # referee's interval to that stage_item_input's interval list, so it must run before the
+    # per-input no-overlap below — which then covers playing and refereeing uniformly.
+    ref_choices: dict[MatchId, dict[StageItemInputId, Any]] = {}
+    ref_spreads: list[Any] = []
+    unresolved_referee_vars: list[Any] = []
+    if tournament.referees_enabled:
+        ref_choices, ref_spreads, unresolved_referee_vars = _add_referee_assignment(
+            model,
+            movable_contexts,
+            starts,
+            ends,
+            input_intervals,
+            pinned_by_input,
+            _referee_candidate_slots_by_level(stages),
+            horizon,
+            reoptimize,
+        )
+
     _add_no_overlap_constraints(model, court_intervals, input_intervals)
     _add_movable_vs_pinned_court_constraints(
         model,
@@ -929,7 +877,6 @@ def build_schedule_plan(
         _pinned_matches_by_court(contexts, tournament, pinned_ids),
         tournament.margin_minutes,
     )
-    pinned_by_input = _pinned_matches_by_input(contexts, tournament, pinned_ids)
     _add_movable_vs_pinned_input_constraints(
         model,
         movable_contexts,
@@ -968,38 +915,13 @@ def build_schedule_plan(
     if sync_spreads:
         objective += weights.group_sync * sum(sync_spreads)
 
-    ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
-    referee_slot_by_team_and_level: dict[LevelId | None, dict[TeamId, StageItemInputId]] = {}
-    if tournament.referees_enabled:
-        referee_slot_by_team_and_level = _referee_slot_by_team_and_level(stages)
-        pinned_by_referee_team: dict[TeamId, list[_PinnedMatch]] = defaultdict(list)
-        for context in pinned_contexts:
-            ref = context.match.referee
-            if ref is None or ref.team_id is None:
-                continue
-            start_minutes = _minute_offset(tournament, assert_some(context.match.start_time))
-            pinned_by_referee_team[ref.team_id].append(
-                _PinnedMatch(
-                    context=context,
-                    start_minutes=start_minutes,
-                    end_minutes=start_minutes + context.match.duration_minutes,
-                )
-            )
-        ref_choices, ref_spreads = _add_referee_assignment(
-            model,
-            movable_contexts,
-            pinned_contexts,
-            starts,
-            ends,
-            input_intervals,
-            pinned_by_input,
-            pinned_by_referee_team,
-            referee_slot_by_team_and_level,
-            horizon,
-            reoptimize,
-        )
-        if ref_spreads and weights.referee_fairness > 0:
-            objective += weights.referee_fairness * sum(ref_spreads)
+    if ref_spreads and weights.referee_fairness > 0:
+        objective += weights.referee_fairness * sum(ref_spreads)
+    if unresolved_referee_vars:
+        # Prefer a concrete (resolved) referee over an unresolved slot ("winner of ...") whenever
+        # one is free: this penalty per unresolved pick dominates the per-pick fairness swing, so
+        # balancing never trades a real referee for a placeholder.
+        objective += (weights.referee_fairness + 1) * sum(unresolved_referee_vars)
 
     model.Minimize(objective)
 
@@ -1034,7 +956,6 @@ def build_schedule_plan(
         starts,
         court_choices,
         ref_choices,
-        referee_slot_by_team_and_level,
         tournament,
     )
 
@@ -1078,21 +999,25 @@ def build_referee_assignment_plan(
         return {}
 
     contexts = _get_match_contexts(stages)
-    referee_slot_by_team_and_level = _referee_slot_by_team_and_level(stages)
+    candidate_slots_by_level = _referee_candidate_slots_by_level(stages)
 
     # Only scheduled matches (fixed court + start_time) participate.
     scheduled_contexts = [c for c in contexts if _is_scheduled(c)]
     if not scheduled_contexts:
         return {}
 
-    # Build per-team playing intervals (minute offsets) over all scheduled matches.
-    team_playing_intervals: dict[TeamId, list[tuple[int, int]]] = defaultdict(list)
+    # Treat all three slots the same: a stage_item_input is "busy" in a window when it plays (one
+    # of the two playing slots) or referees an existing assignment. A candidate referee slot must
+    # be free for the match's window, whether it resolves to a team or is still a placeholder.
+    slot_busy: dict[StageItemInputId, list[tuple[int, int]]] = defaultdict(list)
     for context in scheduled_contexts:
         start_min = _minute_offset(tournament, assert_some(context.match.start_time))
         end_min = start_min + context.match.duration_minutes
-        for input_ in (context.match.stage_item_input1, context.match.stage_item_input2):
-            if isinstance(input_, StageItemInputFinal):
-                team_playing_intervals[input_.team_id].append((start_min, end_min))
+        for input_id in context.input_ids:
+            slot_busy[input_id].append((start_min, end_min))
+        referee_slot_id = context.match.referee_stage_item_input_id
+        if referee_slot_id is not None:
+            slot_busy[referee_slot_id].append((start_min, end_min))
 
     def _has_referee(context: _MatchContext) -> bool:
         return (
@@ -1100,130 +1025,94 @@ def build_referee_assignment_plan(
             or context.match.referee_name is not None
         )
 
-    needs_ref = [c for c in scheduled_contexts if not _has_referee(c)]
-    has_ref = [c for c in scheduled_contexts if _has_referee(c)]
+    def _overlaps(start: int, end: int, busy: list[tuple[int, int]]) -> bool:
+        return any(start < b_end and b_start < end for b_start, b_end in busy)
 
+    needs_ref = [c for c in scheduled_contexts if not _has_referee(c)]
     if not needs_ref:
         return {}
 
-    # Build per-team refereeing intervals from already-assigned matches so we can
-    # exclude teams that are already committed as referee at an overlapping time.
-    team_refereeing_intervals: dict[TeamId, list[tuple[int, int]]] = defaultdict(list)
-    for context in has_ref:
-        ref = context.match.referee
-        if ref is not None and ref.team_id is not None:
-            start_min = _minute_offset(tournament, assert_some(context.match.start_time))
-            end_min = start_min + context.match.duration_minutes
-            team_refereeing_intervals[ref.team_id].append((start_min, end_min))
-
     model = cp_model.CpModel()
-
-    ref_choices: dict[MatchId, dict[TeamId, Any]] = {}
+    ref_choices: dict[MatchId, dict[StageItemInputId, Any]] = {}
     match_windows: dict[MatchId, tuple[int, int]] = {}
+    resolved_choice_vars: dict[StageItemInputId, list[Any]] = defaultdict(list)
+    unresolved_vars: list[Any] = []
 
     for context in needs_ref:
         match = context.match
         start_min = _minute_offset(tournament, assert_some(match.start_time))
         end_min = start_min + match.duration_minutes
         match_windows[match.id] = (start_min, end_min)
+        own = set(context.input_ids)
 
-        playing_teams: set[TeamId] = set()
-        for input_ in (match.stage_item_input1, match.stage_item_input2):
-            if isinstance(input_, StageItemInputFinal):
-                playing_teams.add(input_.team_id)
-
-        # Eligible: occupies a slot at the match's level, not playing in this match, not playing
-        # or refereeing at an overlapping time. Placeholder matches exclude no players (unknown).
-        eligible: set[TeamId] = set()
-        for team_id in referee_slot_by_team_and_level.get(context.level_id, {}):
-            if team_id in playing_teams:
+        choices: dict[StageItemInputId, Any] = {}
+        for slot_id, team_id in sorted(
+            candidate_slots_by_level.get(context.level_id, []), key=lambda candidate: candidate[0]
+        ):
+            if slot_id in own or _overlaps(start_min, end_min, slot_busy.get(slot_id, [])):
                 continue
-            if any(
-                start_min < p_end and p_start < end_min
-                for p_start, p_end in team_playing_intervals.get(team_id, [])
-            ):
-                continue
-            if any(
-                start_min < r_end and r_start < end_min
-                for r_start, r_end in team_refereeing_intervals.get(team_id, [])
-            ):
-                continue
-            eligible.add(team_id)
+            var = model.NewBoolVar(f"ref_m{match.id}_s{slot_id}")
+            choices[slot_id] = var
+            if team_id is not None:
+                resolved_choice_vars[slot_id].append(var)
+            else:
+                unresolved_vars.append(var)
 
-        if not eligible:
-            continue
-
-        choices: dict[TeamId, Any] = {
-            team_id: model.NewBoolVar(f"ref_match_{match.id}_team_{team_id}")
-            for team_id in sorted(eligible)
-        }
-        model.AddAtMostOne(choices.values())
-        ref_choices[match.id] = choices
+        if choices:
+            model.AddAtMostOne(choices.values())
+            ref_choices[match.id] = choices
 
     if not ref_choices:
         return {}
 
-    all_eligible_teams: set[TeamId] = set(
-        team_id for choices in ref_choices.values() for team_id in choices
-    )
-
-    # A team cannot referee two overlapping matches.
+    # A slot cannot referee two overlapping newly-assigned matches.
     sorted_match_ids = sorted(ref_choices.keys())
     for i, mid1 in enumerate(sorted_match_ids):
         for mid2 in sorted_match_ids[i + 1 :]:
             s1, e1 = match_windows[mid1]
             s2, e2 = match_windows[mid2]
             if s1 < e2 and s2 < e1:
-                for team_id in set(ref_choices[mid1]) & set(ref_choices[mid2]):
+                for slot_id in set(ref_choices[mid1]) & set(ref_choices[mid2]):
                     model.AddBoolOr(
-                        [ref_choices[mid1][team_id].Not(), ref_choices[mid2][team_id].Not()]
+                        [ref_choices[mid1][slot_id].Not(), ref_choices[mid2][slot_id].Not()]
                     )
 
-    # Count existing assignments toward the fairness objective.
-    fixed_ref_count: dict[TeamId, int] = defaultdict(int)
-    for context in has_ref:
-        ref = context.match.referee
-        if ref is not None and ref.team_id is not None and ref.team_id in all_eligible_teams:
-            fixed_ref_count[ref.team_id] += 1
+    # Count existing resolved-referee assignments toward the fairness balance.
+    fixed_load: dict[StageItemInputId, int] = defaultdict(int)
+    for context in scheduled_contexts:
+        existing_slot_id = context.match.referee_stage_item_input_id
+        if existing_slot_id is not None and existing_slot_id in resolved_choice_vars:
+            fixed_load[existing_slot_id] += 1
 
-    max_possible_load = len(needs_ref) + (max(fixed_ref_count.values(), default=0))
-    team_loads: list[Any] = []
-    for team_id in sorted(all_eligible_teams):
-        fixed = fixed_ref_count.get(team_id, 0)
-        var_choices = [
-            ref_choices[mid][team_id] for mid in ref_choices if team_id in ref_choices[mid]
-        ]
-        if var_choices:
-            load = model.NewIntVar(fixed, fixed + len(var_choices), f"ref_load_team_{team_id}")
-            model.Add(load == fixed + sum(var_choices))
-        else:
-            load = model.NewIntVar(fixed, fixed, f"ref_load_team_{team_id}")
-        team_loads.append(load)
-
-    # Primary objective: maximize coverage (fill as many matches as possible).
-    # Secondary objective: minimize fairness spread.
-    # Coverage weight must dominate fairness so the solver never skips an
-    # assignable match to improve the spread. A safe bound: assigning one extra
-    # match saves (max_load_spread * referee_fairness + 1) units vs. the worst
-    # possible change in spread that the same assignment could cause.
-    coverage_weight = weights.referee_fairness + 1
+    # Objective, in order of dominance:
+    #   1. coverage         — assign as many matches as possible
+    #   2. prefer resolved  — only fall back to an unresolved slot when no team is free
+    #   3. fairness         — balance referee load across resolved slots (i.e. per team)
     all_choice_vars = [var for choices in ref_choices.values() for var in choices.values()]
-    # total_assigned is the sum of all AtMostOne choice vars (0/1 per match)
-    total_assigned_expr = sum(all_choice_vars)
+    fairness_max = weights.referee_fairness * len(needs_ref)
+    unresolved_weight = fairness_max + 1
+    coverage_weight = unresolved_weight + fairness_max + 1
 
-    if len(team_loads) >= 2:
-        max_load = model.NewIntVar(0, max_possible_load, "ref_max_load")
-        min_load = model.NewIntVar(0, max_possible_load, "ref_min_load")
-        model.AddMaxEquality(max_load, team_loads)
-        model.AddMinEquality(min_load, team_loads)
-        spread = model.NewIntVar(0, max_possible_load, "ref_spread")
+    objective = -coverage_weight * sum(all_choice_vars) + unresolved_weight * sum(unresolved_vars)
+
+    if len(resolved_choice_vars) >= 2 and weights.referee_fairness > 0:
+        max_possible = len(needs_ref) + max(fixed_load.values(), default=0)
+        loads: list[Any] = []
+        for slot_id in sorted(resolved_choice_vars):
+            choice_vars = resolved_choice_vars[slot_id]
+            fixed = fixed_load.get(slot_id, 0)
+            load = model.NewIntVar(fixed, fixed + len(choice_vars), f"ref_load_s{slot_id}")
+            model.Add(load == fixed + sum(choice_vars))
+            loads.append(load)
+        max_load = model.NewIntVar(0, max_possible, "ref_max_load")
+        min_load = model.NewIntVar(0, max_possible, "ref_min_load")
+        model.AddMaxEquality(max_load, loads)
+        model.AddMinEquality(min_load, loads)
+        spread = model.NewIntVar(0, max_possible, "ref_spread")
         model.Add(spread == max_load - min_load)
-        model.Minimize(
-            -coverage_weight * total_assigned_expr
-            + (weights.referee_fairness * spread if weights.referee_fairness > 0 else 0)
-        )
-    else:
-        model.Minimize(-coverage_weight * total_assigned_expr)
+        objective += weights.referee_fairness * spread
+
+    model.Minimize(objective)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = SOLVER_TIME_LIMIT_SECONDS
@@ -1242,16 +1131,11 @@ def build_referee_assignment_plan(
         )
         return {}
 
-    level_by_match = {context.match.id: context.level_id for context in needs_ref}
     result: dict[MatchId, StageItemInputId] = {}
     for match_id, choices in ref_choices.items():
-        for team_id, var in choices.items():
+        for slot_id, var in choices.items():
             if solver.Value(var) == 1:
-                slot_id = referee_slot_by_team_and_level.get(level_by_match[match_id], {}).get(
-                    team_id
-                )
-                if slot_id is not None:
-                    result[match_id] = slot_id
+                result[match_id] = slot_id
                 break
     return result
 
