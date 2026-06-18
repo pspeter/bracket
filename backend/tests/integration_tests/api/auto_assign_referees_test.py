@@ -187,6 +187,10 @@ async def test_auto_assign_referees_assigns_placeholder_matches(
     A later stage's matches reference the previous stage's results via tentative inputs. The
     referee is now a slot, so the optimizer assigns one regardless of whether the opponents
     are known yet — both the concrete first-stage matches and the placeholder matches get one.
+
+    Crucially, each referee slot comes from the match's *own stage*: a later stage's slot (e.g.
+    "1st of the group stage") must never referee an earlier match, since that participant is
+    unknown until the earlier stage is played.
     """
     tid = auth_context.tournament.id
 
@@ -203,13 +207,15 @@ async def test_auto_assign_referees_assigns_placeholder_matches(
             inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t3,
         ):
             si_first = await _setup_round_robin_3teams(tid, stage_one.id, t1.id, t2.id, t3.id)
-            # Second-stage item whose two opponents are placeholders from the first stage.
+            # Second-stage item whose opponents are all placeholders from the first stage. It has
+            # three slots so that, in each of its matches, a slot from its own stage is free to
+            # referee (the only eligible candidates after the same-stage restriction).
             si_placeholder = await sql_create_stage_item_with_inputs(
                 tid,
                 StageItemWithInputsCreate(
                     stage_id=stage_two.id,
                     name="Finals",
-                    team_count=2,
+                    team_count=3,
                     type=DUMMY_STAGE_ITEM1.type,
                     inputs=[
                         StageItemInputCreateBodyTentative(
@@ -217,6 +223,9 @@ async def test_auto_assign_referees_assigns_placeholder_matches(
                         ),
                         StageItemInputCreateBodyTentative(
                             slot=2, winner_from_stage_item_id=si_first.id, winner_position=2
+                        ),
+                        StageItemInputCreateBodyTentative(
+                            slot=3, winner_from_stage_item_id=si_first.id, winner_position=3
                         ),
                     ],
                 ),
@@ -254,13 +263,25 @@ async def test_auto_assign_referees_assigns_placeholder_matches(
         for m in r.matches
     ]
 
-    # First-stage (concrete) matches get referees.
+    # The stage-item input slots that belong to each stage.
+    slots_by_stage = {
+        s.id: {inp.id for si_ in s.stage_items for inp in si_.inputs} for s in stages_after
+    }
+
+    # First-stage (concrete) matches get referees, all from the first stage's own slots.
     assert len(first_stage_matches) > 0
     assert all(m.referee_stage_item_input_id is not None for m in first_stage_matches)
+    assert all(
+        m.referee_stage_item_input_id in slots_by_stage[stage_one.id] for m in first_stage_matches
+    )
 
-    # Placeholder matches now also get a referee slot (no more deferral).
+    # Placeholder matches now also get a referee slot (no more deferral), and that slot comes
+    # from the placeholder stage itself — never a slot from a different stage.
     assert len(placeholder_matches) > 0
     assert all(m.referee_stage_item_input_id is not None for m in placeholder_matches)
+    assert all(
+        m.referee_stage_item_input_id in slots_by_stage[stage_two.id] for m in placeholder_matches
+    )
 
 
 @pytest.mark.asyncio(loop_scope="session")

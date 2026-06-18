@@ -983,6 +983,34 @@ def test_referee_only_assigned_to_teams_of_own_level() -> None:
     assert ops[0].referee_stage_item_input_id is None
 
 
+def test_referee_not_assigned_from_a_later_stage() -> None:
+    """A slot that only exists in a later stage is never picked to referee an earlier match.
+
+    Both stages share a level, so before the fix the later stage's slot (e.g. "1st of the
+    group stage") was a candidate referee for an earlier-stage match — but that participant is
+    still unknown while the earlier stage is being played. The earlier match has no spare slot
+    in its own stage, so the only correct outcome is no referee.
+    """
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level)
+    stages = [
+        _stage_with_inputs(
+            1,
+            [m],
+            [_final_input(1, level), _final_input(2, level)],
+            level_id=level,
+        ),
+        # Same level but a *later* stage: its slot must not referee the earlier match.
+        _stage_with_inputs(2, [], [_final_input(3, level)], level_id=level),
+    ]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament)
+
+    assert len(ops) == 1
+    assert ops[0].referee_stage_item_input_id is None
+
+
 def test_referee_not_assigned_to_playing_team() -> None:
     """A team playing in a match is never chosen as its referee."""
     level = LevelId(1)
@@ -1324,7 +1352,9 @@ def test_referee_assigned_to_placeholder_match() -> None:
     Such matches used to be deferred because assigning a concrete team risked picking an
     eventual player (#121). Now the referee is a slot: the optimizer assigns one regardless of
     whether the opponents are known, and the unresolved playing slots impose no constraint
-    until they resolve.
+    until they resolve. The referee must come from the placeholder match's *own stage*, so the
+    stage needs a spare slot beyond the two that play — a slot from the earlier stage (e.g. a
+    concrete group team) is no longer eligible, since the rule is strictly same-stage.
     """
     level = LevelId(1)
     # Stage item 1 (level L): a concrete match between teams 1 and 2; slots for teams 1..3 exist.
@@ -1335,6 +1365,7 @@ def test_referee_assigned_to_placeholder_match() -> None:
         _final_input(3, level),
     ]
     # Stage item 2 (level L): a match whose two opponents are tentative winners of stage item 1.
+    # A third tentative slot exists so the placeholder match has an eligible same-stage referee.
     source_stage_item_id = StageItemId(100)  # stage 1's single stage item (stage_id * 100)
     tentative_a = StageItemInputTentative(
         id=StageItemInputId(201),
@@ -1352,6 +1383,14 @@ def test_referee_assigned_to_placeholder_match() -> None:
         winner_from_stage_item_id=source_stage_item_id,
         winner_position=2,
     )
+    tentative_c = StageItemInputTentative(
+        id=StageItemInputId(203),
+        slot=3,
+        tournament_id=TournamentId(-1),
+        stage_item_id=StageItemId(200),
+        winner_from_stage_item_id=source_stage_item_id,
+        winner_position=3,
+    )
     placeholder = MatchWithDetails(
         id=MatchId(2),
         created=T0,
@@ -1368,19 +1407,18 @@ def test_referee_assigned_to_placeholder_match() -> None:
     )
     stages = [
         _stage_with_inputs(1, [concrete], concrete_inputs, level_id=level),
-        _stage_with_inputs(2, [placeholder], [tentative_a, tentative_b], level_id=level),
+        _stage_with_inputs(
+            2, [placeholder], [tentative_a, tentative_b, tentative_c], level_id=level
+        ),
     ]
     tournament = _tournament_with_referees()
 
     ops = build_schedule_plan(stages, [_court(1)], tournament)
 
     op_by_id = {op.match.id: op for op in ops}
-    # The placeholder match is assigned a referee resolving to one of the level's teams.
-    assert _slot_team(stages, op_by_id[MatchId(2)].referee_stage_item_input_id) in (
-        TeamId(1),
-        TeamId(2),
-        TeamId(3),
-    )
+    # The placeholder match gets the only spare slot of its own stage as referee, never an
+    # earlier stage's slot (teams 1..3 belong to stage 1).
+    assert op_by_id[MatchId(2)].referee_stage_item_input_id == tentative_c.id
 
 
 def test_no_eligible_referee_leaves_match_unassigned() -> None:
@@ -1478,6 +1516,30 @@ def test_assign_referees_level_restriction() -> None:
             level_id=level_a,
         ),
         _stage_with_inputs(2, [], [_final_input(3, level_b)], level_id=level_b),
+    ]
+
+    result = build_referee_assignment_plan(stages, _tournament_with_referees())
+
+    assert result == {}
+
+
+def test_assign_referees_excludes_later_stage_slots() -> None:
+    """A slot from a later stage (same level) is not assigned to referee an earlier match.
+
+    The earlier-stage match has no spare slot in its own stage, so no referee can be picked:
+    reaching into the next stage would name a participant who is unknown until that stage.
+    """
+    level = LevelId(1)
+    m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
+    stages = [
+        _stage_with_inputs(
+            1,
+            [m],
+            [_final_input(1, level), _final_input(2, level)],
+            level_id=level,
+        ),
+        # Same level but a later stage; its slot is ineligible for the earlier match.
+        _stage_with_inputs(2, [], [_final_input(3, level)], level_id=level),
     ]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
