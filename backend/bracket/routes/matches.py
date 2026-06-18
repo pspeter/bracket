@@ -7,6 +7,7 @@ from bracket.database import database
 from bracket.logic.planning.conflicts import reconcile_conflicts
 from bracket.logic.planning.matches import (
     assign_missing_referees_only,
+    eligible_referee_slot_ids,
     get_scheduled_matches,
     handle_match_reschedule,
     handle_match_resize_break,
@@ -71,29 +72,20 @@ from bracket.utils.id_types import MatchId, StageItemId, StageItemInputId, Tourn
 router = APIRouter(prefix=config.api_prefix)
 
 
-async def validate_referee_slot_at_match_level(
+async def validate_referee_slot_for_match(
     tournament_id: TournamentId, match: Match, referee_stage_item_input_id: StageItemInputId
 ) -> None:
-    """A referee slot must belong to a stage item at the refereed match's level."""
+    """A referee slot must be eligible for the refereed match: a stage-item input in the match's
+    own stage that is not one of the two slots playing the match. This reuses the same
+    eligibility the CP-SAT auto-scheduler applies (see eligible_referee_slot_ids), so a
+    hand-picked referee can never name a participant from a later stage who is still unknown
+    while this match is played.
+    """
     stages = await get_full_tournament_details(tournament_id)
-    match_level_id = None
-    input_level_id = None
-    input_found = False
-    for stage in stages:
-        for stage_item in stage.stage_items:
-            for stage_item_input in stage_item.inputs:
-                if stage_item_input.id == referee_stage_item_input_id:
-                    input_found = True
-                    input_level_id = stage.level_id
-            for round_ in stage_item.rounds:
-                for round_match in round_.matches:
-                    if round_match.id == match.id:
-                        match_level_id = stage.level_id
-
-    if not input_found or input_level_id != match_level_id:
+    if referee_stage_item_input_id not in eligible_referee_slot_ids(stages, match.id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Referee slot must belong to a stage item at the match's level",
+            detail="Referee slot must be a stage-item input in the match's own stage",
         )
 
 
@@ -395,9 +387,7 @@ async def update_match_by_id(
         )
 
     if referee_stage_item_input_id is not None:
-        await validate_referee_slot_at_match_level(
-            tournament_id, match, referee_stage_item_input_id
-        )
+        await validate_referee_slot_for_match(tournament_id, match, referee_stage_item_input_id)
 
     match_body = get_match_body_with_state_updates(match, match_body)
 

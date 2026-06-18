@@ -261,14 +261,18 @@ function MatchModalForm({
   const matchLevelId = matchEntry?.stage.level_id ?? match.level_id;
   const level = levels?.find((candidate) => candidate.id === matchLevelId) ?? null;
 
-  // Referee slots are the stage-item inputs at the match's level (concrete teams, "Winner of
+  // Referee slots are the stage-item inputs in the match's own stage (concrete teams, "Winner of
   // Group A" placeholders, and still-empty positions), mirroring how playing slots are picked.
+  // Slots are restricted to the match's stage — not just its level — because a later stage's slot
+  // names a participant who is still unknown while this match is played; the backend enforces the
+  // same rule (see eligible_referee_slot_ids).
+  const matchStageId = matchEntry?.stage.id;
   const ownInputIds = new Set(
     [match.stage_item_input1_id, match.stage_item_input2_id].filter((id) => id != null)
   );
   const refereeSlotOptions = refereesEnabled
     ? (swrStagesResponse.data?.data ?? [])
-        .filter((stage) => stage.level_id === matchLevelId)
+        .filter((stage) => stage.id === matchStageId)
         .flatMap((stage) => stage.stage_items)
         .flatMap((stageItem) => stageItem.inputs)
         .filter((input) => !ownInputIds.has(input.id))
