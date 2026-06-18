@@ -866,14 +866,20 @@ def _team(team_id: int, level_id: LevelId | None = None) -> Team:
     )
 
 
+# A team's identity slot id. The slot id is derived from the team id so the team occupies one
+# stable stage_item_input across the whole fixture — in a stage item's `inputs` list and in every
+# match it plays or referees. This mirrors real data (one stage_item_input per team within a stage
+# item) and lets the slot-based optimizer treat the referee as just another slot.
+_TEAM_SLOT_BASE = 700
+
+
 def _final_input(
-    input_id: int,
     team_id: int,
     level_id: LevelId | None = None,
     stage_item_id: int = -1,
 ) -> StageItemInputFinal:
     return StageItemInputFinal(
-        id=StageItemInputId(input_id),
+        id=StageItemInputId(_TEAM_SLOT_BASE + team_id),
         slot=1,
         tournament_id=TournamentId(-1),
         stage_item_id=StageItemId(stage_item_id),
@@ -889,8 +895,8 @@ def _match_with_teams(
     level_id: LevelId | None = None,
 ) -> MatchWithDetails:
     """Match with two defined teams (StageItemInputFinal) for referee tests."""
-    inp_a = _final_input(id_ * 10 + 1, team_a_id, level_id)
-    inp_b = _final_input(id_ * 10 + 2, team_b_id, level_id)
+    inp_a = _final_input(team_a_id, level_id)
+    inp_b = _final_input(team_b_id, level_id)
     return MatchWithDetails(
         id=MatchId(id_),
         created=T0,
@@ -923,8 +929,8 @@ def _stage_with_inputs(
 
 
 def _referee_slot(team_id: int) -> StageItemInputFinal:
-    """A resolved referee slot (third match slot) pointing at the given team."""
-    return _final_input(900 + team_id, team_id)
+    """A resolved referee slot (third match slot) pointing at the given team's identity slot."""
+    return _final_input(team_id)
 
 
 def _match_with_referee(match: MatchWithDetails, team_id: int) -> MatchWithDetails:
@@ -943,10 +949,10 @@ def _slot_team(
             for input_ in stage_item.inputs:
                 if input_.id == slot_id and isinstance(input_, StageItemInputFinal):
                     return input_.team_id
-    # The optimizer points referees at a team's identity slot; fall back to the encoding used by
-    # _referee_slot (900 + team_id) for preserved/existing referees not present in stage inputs.
-    if slot_id >= 900:
-        return TeamId(slot_id - 900)
+    # Referee slots are a team's identity slot (see _TEAM_SLOT_BASE); fall back to that encoding
+    # for preserved/existing referees whose slot is not present in the stage inputs list.
+    if slot_id >= _TEAM_SLOT_BASE:
+        return TeamId(slot_id - _TEAM_SLOT_BASE)
     return None
 
 
@@ -963,10 +969,10 @@ def test_referee_only_assigned_to_teams_of_own_level() -> None:
         _stage_with_inputs(
             1,
             [m],
-            [_final_input(11, 1, level_a), _final_input(12, 2, level_a)],
+            [_final_input(1, level_a), _final_input(2, level_a)],
             level_id=level_a,
         ),
-        _stage_with_inputs(2, [], [_final_input(99, 3, level_b)], level_id=level_b),
+        _stage_with_inputs(2, [], [_final_input(3, level_b)], level_id=level_b),
     ]
     tournament = _tournament_with_referees()
 
@@ -986,7 +992,7 @@ def test_referee_not_assigned_to_playing_team() -> None:
         _stage_with_inputs(
             1,
             [m],
-            [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)],
+            [_final_input(1, level), _final_input(2, level), _final_input(3, level)],
             level_id=level,
         )
     ]
@@ -1009,12 +1015,12 @@ def test_referee_not_assigned_when_playing_overlapping_match() -> None:
     m1 = _match_with_teams(1, 1, 2, level)
     m2 = _match_with_teams(2, 3, 4, level)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
-        _final_input(16, 6, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
+        _final_input(6, level),
     ]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
     tournament = _tournament_with_referees()
@@ -1046,11 +1052,11 @@ def test_referee_team_never_plays_and_referees_same_time_window() -> None:
     m1 = _match_with_teams(1, 1, 2, level)
     m2 = _match_with_teams(2, 3, 4, level)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
     ]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
     tournament = _tournament_with_referees()
@@ -1081,7 +1087,7 @@ def test_referee_load_is_balanced_across_eligible_teams() -> None:
     level = LevelId(1)
     # 4 matches: teams 1-8 playing (pairs), teams 9,10 are referee-only candidates
     matches = [_match_with_teams(i, i * 2 - 1, i * 2, level) for i in range(1, 5)]
-    inputs = [_final_input(i * 10, i, level) for i in range(1, 11)]
+    inputs = [_final_input(i, level) for i in range(1, 11)]
     stages = [_stage_with_inputs(1, matches, inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
@@ -1107,10 +1113,10 @@ def test_existing_referee_assignment_not_overwritten() -> None:
     m = _match_with_teams(1, 1, 2, level)
     m_with_ref = _match_with_referee(m, team_id=3)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
     ]
     stages = [_stage_with_inputs(1, [m_with_ref], inputs, level_id=level)]
     tournament = _tournament_with_referees()
@@ -1130,8 +1136,8 @@ def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
     """
     level = LevelId(1)
     # m1: pinned, teams 3 vs 4 at T0 on court 1. m2: movable, refereed by team 3.
-    inp31 = _final_input(31, 3, level)
-    inp32 = _final_input(32, 4, level)
+    inp31 = _final_input(3, level)
+    inp32 = _final_input(4, level)
     m1 = MatchWithDetails(
         id=MatchId(1),
         created=T0,
@@ -1149,7 +1155,7 @@ def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
         court_id=CourtId(1),
     )
     m2 = _match_with_referee(_match_with_teams(2, 1, 2, level), team_id=3)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), inp31, inp32]
+    inputs = [_final_input(1, level), _final_input(2, level), inp31, inp32]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
@@ -1170,7 +1176,7 @@ def test_free_text_referee_match_not_overwritten() -> None:
     m = _match_with_teams(1, 1, 2, level)
     # A free-text external referee: referee_name set, no slot.
     m_with_ref = m.model_copy(update={"referee": None, "referee_name": "External Ref"})
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
     stages = [_stage_with_inputs(1, [m_with_ref], inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
@@ -1193,10 +1199,10 @@ def test_full_optimize_reshuffles_referee_for_unpinned_match() -> None:
     level = LevelId(1)
     m = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
     ]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
     tournament = _tournament_with_referees()
@@ -1207,7 +1213,27 @@ def test_full_optimize_reshuffles_referee_for_unpinned_match() -> None:
     assert ops[0].referee_stage_item_input_id is not None
 
 
-def test_reshuffled_referee_not_overlapped_with_its_own_playing_match() -> None:
+def test_full_optimize_clears_free_text_referee() -> None:
+    """reoptimize=True replaces a free-text referee with an optimized slot referee.
+
+    In default mode a free-text referee name is preserved (see
+    test_free_text_referee_match_not_overwritten); under full optimize it is cleared and the
+    solver assigns a slot referee like any other match. The chosen slot id on the operation,
+    when applied, overwrites the name (sql_set_match_referee_slot nulls referee_name).
+    """
+    level = LevelId(1)
+    m = _match_with_teams(1, 1, 2, level).model_copy(
+        update={"referee": None, "referee_name": "External Ref"}
+    )
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
+    stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
+    tournament = _tournament_with_referees()
+
+    ops = build_schedule_plan(stages, [_court(1)], tournament, reoptimize=True)
+
+    assert len(ops) == 1
+    # Team 3 is the only candidate (teams 1, 2 play the match).
+    assert _slot_team(stages, ops[0].referee_stage_item_input_id) == TeamId(3)
     """The no-overlap constraint applies to freshly assigned referees too.
 
     Stage inputs only include teams 1–3, so team 4 is not eligible as referee. The solver is
@@ -1218,9 +1244,9 @@ def test_reshuffled_referee_not_overlapped_with_its_own_playing_match() -> None:
     m1 = _match_with_referee(_match_with_teams(1, 1, 2, level), team_id=3)
     m2 = _match_with_teams(2, 3, 4, level)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
         # Team 4 intentionally omitted — not eligible as referee
     ]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
@@ -1256,10 +1282,10 @@ def test_refereeing_does_not_add_rest_penalty() -> None:
     m1 = _match_with_teams(1, 1, 2, level)
     m2 = _match_with_teams(2, 3, 4, level)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
     ]
 
     # With referees_enabled: team 1 might referee m2
@@ -1283,7 +1309,7 @@ def test_referees_disabled_produces_no_referee_assignments() -> None:
     """When referees_enabled=False, no referee_team_id is set on any operation."""
     level = LevelId(1)
     m = _match_with_teams(1, 1, 2, level)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
     ops = build_schedule_plan(stages, [_court(1)], _tournament())  # referees_enabled=False
@@ -1304,9 +1330,9 @@ def test_referee_assigned_to_placeholder_match() -> None:
     # Stage item 1 (level L): a concrete match between teams 1 and 2; slots for teams 1..3 exist.
     concrete = _match_with_teams(1, 1, 2, level)
     concrete_inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
     ]
     # Stage item 2 (level L): a match whose two opponents are tentative winners of stage item 1.
     source_stage_item_id = StageItemId(100)  # stage 1's single stage item (stage_id * 100)
@@ -1362,7 +1388,7 @@ def test_no_eligible_referee_leaves_match_unassigned() -> None:
     level = LevelId(1)
     m = _match_with_teams(1, 1, 2, level)
     # Only teams 1 and 2 exist and both play in m → no candidate
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level)]
+    inputs = [_final_input(1, level), _final_input(2, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
@@ -1384,8 +1410,8 @@ def _scheduled_match_with_teams(
     court_id: int = 1,
 ) -> MatchWithDetails:
     """Match with two defined teams, already scheduled at a fixed time on a court."""
-    inp_a = _final_input(id_ * 10 + 1, team_a_id, level_id)
-    inp_b = _final_input(id_ * 10 + 2, team_b_id, level_id)
+    inp_a = _final_input(team_a_id, level_id)
+    inp_b = _final_input(team_b_id, level_id)
     return MatchWithDetails(
         id=MatchId(id_),
         created=T0,
@@ -1411,7 +1437,7 @@ def test_assign_referees_only_fills_missing_not_existing() -> None:
     m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=SLOT)
     m3 = _scheduled_match_with_teams(3, 5, 6, level, start_offset_minutes=2 * SLOT)
     m2_with_ref = _match_with_referee(m2, team_id=9)
-    inputs = [_final_input(i * 10, i, level) for i in range(1, 11)]
+    inputs = [_final_input(i, level) for i in range(1, 11)]
     stages = [_stage_with_inputs(1, [m1, m2_with_ref, m3], inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1425,7 +1451,7 @@ def test_assign_referees_schedule_unchanged() -> None:
     """Match court_id and start_time in the stage objects are untouched after the call."""
     level = LevelId(1)
     m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=7)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
     court_before = m.court_id
@@ -1448,10 +1474,10 @@ def test_assign_referees_level_restriction() -> None:
         _stage_with_inputs(
             1,
             [m],
-            [_final_input(11, 1, level_a), _final_input(12, 2, level_a)],
+            [_final_input(1, level_a), _final_input(2, level_a)],
             level_id=level_a,
         ),
-        _stage_with_inputs(2, [], [_final_input(13, 3, level_b)], level_id=level_b),
+        _stage_with_inputs(2, [], [_final_input(3, level_b)], level_id=level_b),
     ]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1465,11 +1491,11 @@ def test_assign_referees_excludes_playing_team() -> None:
     m1 = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
     m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=SLOT)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
     ]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
 
@@ -1487,12 +1513,12 @@ def test_assign_referees_excludes_team_playing_overlapping_match() -> None:
     m1 = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=1)
     m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=0, court_id=2)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
-        _final_input(16, 6, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
+        _final_input(6, level),
     ]
     stages = [_stage_with_inputs(1, [m1, m2], inputs, level_id=level)]
 
@@ -1507,7 +1533,7 @@ def test_assign_referees_no_candidate_leaves_match_unassigned() -> None:
     """A match is left unassigned when no eligible team is available; no error raised."""
     level = LevelId(1)
     m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level)]
+    inputs = [_final_input(1, level), _final_input(2, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1522,7 +1548,7 @@ def test_assign_referees_balanced_load() -> None:
         _scheduled_match_with_teams(i, i * 2 - 1, i * 2, level, start_offset_minutes=(i - 1) * SLOT)
         for i in range(1, 5)
     ]
-    inputs = [_final_input(i * 10, i, level) for i in range(1, 11)]
+    inputs = [_final_input(i, level) for i in range(1, 11)]
     stages = [_stage_with_inputs(1, matches, inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1546,7 +1572,7 @@ def test_assign_referees_deterministic_tiebreak() -> None:
         _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0, court_id=1),
         _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=SLOT, court_id=1),
     ]
-    inputs = [_final_input(i * 10, i, level) for i in range(1, 7)]
+    inputs = [_final_input(i, level) for i in range(1, 7)]
     stages = [_stage_with_inputs(1, matches, inputs, level_id=level)]
     tournament = _tournament_with_referees()
 
@@ -1560,7 +1586,7 @@ def test_assign_referees_returns_slot_ids() -> None:
     """All result values are integer stage_item_input ids that resolve to a team."""
     level = LevelId(1)
     m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1574,7 +1600,7 @@ def test_assign_referees_disabled_returns_empty() -> None:
     """When referees_enabled is False the function returns an empty dict immediately."""
     level = LevelId(1)
     m = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
-    inputs = [_final_input(11, 1, level), _final_input(12, 2, level), _final_input(13, 3, level)]
+    inputs = [_final_input(1, level), _final_input(2, level), _final_input(3, level)]
     stages = [_stage_with_inputs(1, [m], inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament())
@@ -1588,11 +1614,11 @@ def test_assign_referees_skips_unscheduled_matches() -> None:
     m_scheduled = _scheduled_match_with_teams(1, 1, 2, level, start_offset_minutes=0)
     m_unscheduled = _match_with_teams(2, 3, 4, level)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
     ]
     stages = [_stage_with_inputs(1, [m_scheduled, m_unscheduled], inputs, level_id=level)]
 
@@ -1608,7 +1634,7 @@ def test_assign_referees_existing_counts_toward_fairness() -> None:
     m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=SLOT)
     m3 = _scheduled_match_with_teams(3, 5, 6, level, start_offset_minutes=2 * SLOT)
     m1_with_ref = _match_with_referee(m1, team_id=9)
-    inputs = [_final_input(i * 10, i, level) for i in range(1, 11)]
+    inputs = [_final_input(i, level) for i in range(1, 11)]
     stages = [_stage_with_inputs(1, [m1_with_ref, m2, m3], inputs, level_id=level)]
 
     result = build_referee_assignment_plan(stages, _tournament_with_referees())
@@ -1635,12 +1661,12 @@ def test_assign_referees_excludes_team_already_refereeing_overlapping_match() ->
     m2 = _scheduled_match_with_teams(2, 3, 4, level, start_offset_minutes=0, court_id=2)
     m1_with_ref = _match_with_referee(m1, team_id=5)
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
-        _final_input(13, 3, level),
-        _final_input(14, 4, level),
-        _final_input(15, 5, level),
-        _final_input(16, 6, level),
+        _final_input(1, level),
+        _final_input(2, level),
+        _final_input(3, level),
+        _final_input(4, level),
+        _final_input(5, level),
+        _final_input(6, level),
     ]
     stages = [_stage_with_inputs(1, [m1_with_ref, m2], inputs, level_id=level)]
 
@@ -1664,8 +1690,8 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
     The optimizer must not place m2 overlapping m1.
     """
     level = LevelId(1)
-    inp3_a = _final_input(31, 3, level)
-    inp3_b = _final_input(32, 4, level)
+    inp3_a = _final_input(3, level)
+    inp3_b = _final_input(4, level)
     m1_base = MatchWithDetails(
         id=MatchId(1),
         created=T0,
@@ -1675,10 +1701,10 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         stage_item_input2_score=0,
         stage_item_input1_conflict=False,
         stage_item_input2_conflict=False,
-        stage_item_input1_id=_final_input(11, 1, level).id,
-        stage_item_input2_id=_final_input(12, 2, level).id,
-        stage_item_input1=_final_input(11, 1, level),
-        stage_item_input2=_final_input(12, 2, level),
+        stage_item_input1_id=_final_input(1, level).id,
+        stage_item_input2_id=_final_input(2, level).id,
+        stage_item_input1=_final_input(1, level),
+        stage_item_input2=_final_input(2, level),
         start_time=T0,
         court_id=CourtId(1),
     )
@@ -1698,8 +1724,8 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         stage_item_input2=inp3_b,
     )
     inputs = [
-        _final_input(11, 1, level),
-        _final_input(12, 2, level),
+        _final_input(1, level),
+        _final_input(2, level),
         inp3_a,
         inp3_b,
     ]
