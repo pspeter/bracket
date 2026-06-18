@@ -331,6 +331,49 @@ def _add_no_overlap_constraints(
         model.AddNoOverlap(intervals)
 
 
+def _forbid_movable_overlap_with_pinned(
+    model: Any,
+    match_id: MatchId,
+    starts: dict[MatchId, Any],
+    ends: dict[MatchId, Any],
+    pinned_matches: list[_PinnedMatch],
+    *,
+    gate: Any | None = None,
+    break_minutes: int = 0,
+    label: str,
+) -> None:
+    """Force a movable match to sit entirely before or after each pinned match on a shared
+    resource — the court it would share, or any of its slots (the two playing slots and,
+    treated identically, the referee slot).
+
+    This single disjunction backs every movable-vs-pinned case:
+
+    * ``gate`` is the choice BoolVar guarding a resource the match only *might* use, so the
+      disjunction binds only when that resource is selected: the court-choice var for courts,
+      the slot-choice var for a chosen referee slot. Resources the match definitely occupies (a
+      playing slot, a preserved referee slot) pass ``gate=None`` and must always clear the
+      pinned interval.
+    * ``break_minutes`` is the gap required on either side. Courts need the default break
+      between matches; slots need none (a team's rest is a soft penalty, not a hard gap).
+
+    Pinned matches are not fed into the shared ``AddNoOverlap`` (that would make two
+    pre-existing pinned matches conflicting on a resource infeasible — see relax-around-pins),
+    so this explicit movable-vs-pinned form is needed instead.
+    """
+    for pinned in pinned_matches:
+        before = model.NewBoolVar(f"{label}_{match_id}_before_pinned_{pinned.context.match.id}")
+        after = model.NewBoolVar(f"{label}_{match_id}_after_pinned_{pinned.context.match.id}")
+        enforce_before = [before] if gate is None else [gate, before]
+        enforce_after = [after] if gate is None else [gate, after]
+        model.Add(ends[match_id] + break_minutes <= pinned.start_minutes).OnlyEnforceIf(
+            enforce_before
+        )
+        model.Add(starts[match_id] >= pinned.end_minutes + break_minutes).OnlyEnforceIf(
+            enforce_after
+        )
+        model.AddBoolOr([before, after] if gate is None else [before, after, gate.Not()])
+
+
 def _add_movable_vs_pinned_court_constraints(
     model: Any,
     movable_contexts: list[_MatchContext],
@@ -346,52 +389,16 @@ def _add_movable_vs_pinned_court_constraints(
             chosen = court_choices[match_id].get(court_id)
             if chosen is None:
                 continue
-            for pinned in pinned_matches:
-                before = model.NewBoolVar(
-                    f"match_{match_id}_before_pinned_{pinned.context.match.id}_on_court_{court_id}"
-                )
-                after = model.NewBoolVar(
-                    f"match_{match_id}_after_pinned_{pinned.context.match.id}_on_court_{court_id}"
-                )
-                model.Add(
-                    ends[match_id] + default_break_minutes <= pinned.start_minutes
-                ).OnlyEnforceIf([chosen, before])
-                model.Add(
-                    starts[match_id] >= pinned.end_minutes + default_break_minutes
-                ).OnlyEnforceIf([chosen, after])
-                model.AddBoolOr([before, after, chosen.Not()])
-
-
-def _forbid_movable_slot_overlap_with_pinned(
-    model: Any,
-    match_id: MatchId,
-    starts: dict[MatchId, Any],
-    ends: dict[MatchId, Any],
-    pinned_matches: list[_PinnedMatch],
-    *,
-    gate: Any | None = None,
-    label: str,
-) -> None:
-    """Force a movable match to sit entirely before or after each pinned match on a shared slot.
-
-    The same disjunction governs every kind of slot a movable match occupies — its two playing
-    slots and, treated identically, its referee slot. ``gate`` distinguishes the two: a fixed
-    slot (a playing slot, or a preserved referee slot) passes ``gate=None`` and the match must
-    always clear the pinned interval; a *chosen* referee slot passes its choice BoolVar as
-    ``gate`` so the disjunction only binds when that slot is the one refereeing.
-
-    Pinned matches are not fed into the shared ``AddNoOverlap`` (that would make two
-    pre-existing pinned matches conflicting on a slot infeasible — see relax-around-pins), so
-    this explicit movable-vs-pinned form is needed instead.
-    """
-    for pinned in pinned_matches:
-        before = model.NewBoolVar(f"{label}_{match_id}_before_pinned_{pinned.context.match.id}")
-        after = model.NewBoolVar(f"{label}_{match_id}_after_pinned_{pinned.context.match.id}")
-        enforce_before = [before] if gate is None else [gate, before]
-        enforce_after = [after] if gate is None else [gate, after]
-        model.Add(ends[match_id] <= pinned.start_minutes).OnlyEnforceIf(enforce_before)
-        model.Add(starts[match_id] >= pinned.end_minutes).OnlyEnforceIf(enforce_after)
-        model.AddBoolOr([before, after] if gate is None else [before, after, gate.Not()])
+            _forbid_movable_overlap_with_pinned(
+                model,
+                match_id,
+                starts,
+                ends,
+                pinned_matches,
+                gate=chosen,
+                break_minutes=default_break_minutes,
+                label=f"court_{court_id}",
+            )
 
 
 def _add_movable_vs_pinned_input_constraints(
@@ -411,7 +418,7 @@ def _add_movable_vs_pinned_input_constraints(
                     continue
                 seen_pinned_ids.add(pinned.context.match.id)
                 deduped_pinned.append(pinned)
-        _forbid_movable_slot_overlap_with_pinned(
+        _forbid_movable_overlap_with_pinned(
             model, match_id, starts, ends, deduped_pinned, label="match_input"
         )
 
@@ -765,7 +772,7 @@ def _add_referee_assignment(
     # (playing or refereeing — pinned_by_input already includes both), gated on the choice var.
     for match_id, choices in ref_choices.items():
         for slot_id, var in choices.items():
-            _forbid_movable_slot_overlap_with_pinned(
+            _forbid_movable_overlap_with_pinned(
                 model,
                 match_id,
                 starts,
@@ -778,7 +785,7 @@ def _add_referee_assignment(
     # Same constraint for preserved (fixed) referee slots: committed unconditionally, so the
     # movable match must sit entirely before or after each pinned match using that slot.
     for match_id, slot_id in preserved_ref_slot.items():
-        _forbid_movable_slot_overlap_with_pinned(
+        _forbid_movable_overlap_with_pinned(
             model,
             match_id,
             starts,
