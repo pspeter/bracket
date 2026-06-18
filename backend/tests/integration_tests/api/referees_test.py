@@ -195,6 +195,71 @@ async def test_deleting_referee_input_nulls_match(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_patch_match_referee_slot_later_stage_rejected(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A referee slot from a later stage is rejected even when both stages share a level.
+
+    The slot names a participant who is still unknown while the earlier match is played, so the
+    manual path honours the same same-stage rule as the auto-scheduler.
+    """
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_level(DUMMY_LEVEL1.model_copy(update={"tournament_id": tournament_id})) as level1,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "level_id": level1.id})
+        ) as stage_a,
+        inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id, "level_id": level1.id})
+        ) as stage_b,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_a.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_a,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM2.model_copy(
+                update={"stage_id": stage_b.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_b,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_a.id})
+        ) as round_a,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as team3,
+        _final_input(tournament_id, stage_item_b.id, 0, team3.id) as later_stage_input,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_a.id,
+                    "stage_item_input1_id": None,
+                    "stage_item_input2_id": None,
+                    "court_id": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"matches/{match_inserted.id}",
+            auth_context,
+            None,
+            {
+                "round_id": round_a.id,
+                "referee_stage_item_input_id": later_stage_input.id,
+            },
+        )
+        assert "detail" in response
+        assert "success" not in response
+
+        match_after = await fetch_one_parsed_certain(
+            database, Match, query=matches.select().where(matches.c.id == match_inserted.id)
+        )
+        assert match_after.referee_stage_item_input_id is None
+
+        await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_patch_match_referee_name_round_trips(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

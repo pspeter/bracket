@@ -158,6 +158,44 @@ def _referee_slots_by_stage(
     return {stage_id: sorted(slot_ids) for stage_id, slot_ids in by_stage.items()}
 
 
+def _stage_referee_candidates(
+    referee_slots_by_stage: dict[StageId, list[StageItemInputId]],
+    stage_id: StageId,
+    playing_slot_ids: tuple[StageItemInputId, ...],
+) -> list[StageItemInputId]:
+    """Base referee candidates for a match: every slot in the match's own stage except the two
+    slots already playing it. The single source of truth for "which slot may referee this match"
+    — shared by the CP-SAT auto-scheduler, the assign-missing-referees pass and the manual
+    single-match validation, so all three honour the same-stage rule identically. Returned in the
+    (already sorted) order of ``referee_slots_by_stage`` for deterministic candidate ordering.
+    """
+    return [
+        slot_id
+        for slot_id in referee_slots_by_stage.get(stage_id, [])
+        if slot_id not in playing_slot_ids
+    ]
+
+
+def eligible_referee_slot_ids(
+    stages: list[StageWithStageItems], match_id: MatchId
+) -> frozenset[StageItemInputId]:
+    """Stage-item input slots that may referee the given match (empty if the match is unknown).
+
+    Public wrapper over ``_stage_referee_candidates`` for callers outside the solver — notably
+    the manual referee-assignment route — so a hand-picked referee is validated against exactly
+    the same eligibility the auto-scheduler uses.
+    """
+    referee_slots_by_stage = _referee_slots_by_stage(stages)
+    for context in _get_match_contexts(stages):
+        if context.match.id == match_id:
+            return frozenset(
+                _stage_referee_candidates(
+                    referee_slots_by_stage, context.stage_id, context.input_ids
+                )
+            )
+    return frozenset()
+
+
 def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
     return [
         _MatchContext(
@@ -714,13 +752,9 @@ def _add_referee_assignment(
             match_durations[match.id] = match.duration_minutes
             continue
 
-        # Candidate referee slots: every input in the match's own stage except the two slots
-        # already playing this match.
-        candidates = [
-            slot_id
-            for slot_id in referee_slots_by_stage.get(context.stage_id, [])
-            if slot_id not in context.input_ids
-        ]
+        candidates = _stage_referee_candidates(
+            referee_slots_by_stage, context.stage_id, context.input_ids
+        )
         if not candidates:
             continue
 
@@ -1110,15 +1144,12 @@ def build_referee_assignment_plan(
         end_min = start_min + match.duration_minutes
         match_windows[match.id] = (start_min, end_min)
 
-        # Eligible: a slot in the match's own stage, not one of this match's two playing slots,
-        # and not busy playing or refereeing at an overlapping time. A later stage's slot is
-        # excluded because it names a participant not yet known while this stage is played.
-        # Unresolved (tentative/empty) slots within the stage are allowed exactly as they are
-        # for playing slots.
+        # Start from the same-stage candidates (slots in the match's own stage minus its two
+        # playing slots), then drop any busy playing or refereeing at an overlapping time.
         eligible: list[StageItemInputId] = []
-        for slot_id in referee_slots_by_stage.get(context.stage_id, []):
-            if slot_id in context.input_ids:
-                continue
+        for slot_id in _stage_referee_candidates(
+            referee_slots_by_stage, context.stage_id, context.input_ids
+        ):
             if any(
                 start_min < p_end and p_start < end_min
                 for p_start, p_end in slot_playing_intervals.get(slot_id, [])
