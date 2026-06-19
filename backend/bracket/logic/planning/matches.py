@@ -909,7 +909,6 @@ def _build_operations_from_solution(
 def _no_solution_detail(
     movable_contexts: list[_MatchContext],
     courts: list[Court],
-    tournament: Tournament,
     reoptimize: bool,
 ) -> str:
     """Build a human-readable explanation for why the scheduler couldn't place the matches,
@@ -918,8 +917,6 @@ def _no_solution_detail(
         f"add more courts (currently {len(courts)})",
         "shorten match durations or reduce the break time between matches",
     ]
-    if tournament.referees_enabled:
-        suggestions.append("turn off referees so they don't have to be slotted in too")
     if reoptimize:
         suggestions.append(
             "free up in-progress or finished matches that the new schedule has to work around"
@@ -1081,7 +1078,7 @@ def build_schedule_plan(
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_no_solution_detail(movable_contexts, courts, tournament, reoptimize),
+            detail=_no_solution_detail(movable_contexts, courts, reoptimize),
         )
 
     return _build_operations_from_solution(
