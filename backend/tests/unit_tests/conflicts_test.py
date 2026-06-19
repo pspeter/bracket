@@ -341,8 +341,8 @@ def test_get_match_conflict_flags_marks_sub_default_break_on_later_match() -> No
 
 def _make_definitive_match(
     match_id: MatchId,
-    input1: StageItemInputFinal,
-    input2: StageItemInputFinal,
+    input1: StageItemInput,
+    input2: StageItemInput,
     round_id: RoundId,
     court_id: CourtId,
     start_time: object,
@@ -686,3 +686,110 @@ def test_referee_conflict_team_plays_and_referees_same_match() -> None:
     assert flags[match.id].referee_conflict is True
     assert flags[match.id].stage_item_input1_conflict is True
     assert flags[match.id].stage_item_input2_conflict is False
+
+
+# ---------------------------------------------------------------------------
+# Placeholder (tentative/empty) slot conflict tests (issue #132)
+# ---------------------------------------------------------------------------
+
+
+def _make_tentative(
+    input_id: int, slot: int, tournament_id: TournamentId
+) -> StageItemInputTentative:
+    """A placeholder ("winner of …") slot: a real stage_item_input with team_id = None."""
+    return StageItemInputTentative(
+        id=StageItemInputId(input_id),
+        slot=slot,
+        tournament_id=tournament_id,
+        stage_item_id=StageItemId(-10),
+        winner_from_stage_item_id=StageItemId(-99),
+        winner_position=slot,
+    )
+
+
+def test_referee_conflict_placeholder_slot_plays_and_referees() -> None:
+    """The issue's example: a tentative slot referees one match and plays in an overlapping one.
+
+    Inputs [A, B, C(tentative), D]: match1 is ``A vs B`` refereed by ``C``; match2 is ``C vs D``
+    overlapping. ``C`` both plays and referees, so the backend must flag it even though ``C`` has
+    no resolved team_id yet — matching the auto-scheduler and the frontend placement preview.
+    """
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    tentative_c = _make_tentative(-30, 3, tid)
+    referee_match = _make_definitive_match(
+        MatchId(-20), inp[0], inp[1], RoundId(-10), CourtId(-1), T, referee=tentative_c
+    )
+    playing_match = _make_definitive_match(
+        MatchId(-21), tentative_c, inp[3], RoundId(-11), CourtId(-2), T
+    )
+    stage = _make_stage_with_two_matches(referee_match, playing_match)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[referee_match.id].referee_conflict is True
+    assert flags[playing_match.id].stage_item_input1_conflict is True
+    assert flags[playing_match.id].stage_item_input2_conflict is False
+    assert flags[playing_match.id].referee_conflict is False
+
+
+def test_referee_conflict_placeholder_slot_referees_two_overlapping_matches() -> None:
+    """A tentative slot assigned as referee to two overlapping matches flags both."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    tentative_c = _make_tentative(-30, 3, tid)
+    referee_match1 = _make_definitive_match(
+        MatchId(-20), inp[0], inp[1], RoundId(-10), CourtId(-1), T, referee=tentative_c
+    )
+    referee_match2 = _make_definitive_match(
+        MatchId(-21),
+        inp[2],
+        inp[3],
+        RoundId(-11),
+        CourtId(-2),
+        T + timedelta(minutes=30),
+        referee=tentative_c,
+    )
+    stage = _make_stage_with_two_matches(referee_match1, referee_match2)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[referee_match1.id].referee_conflict is True
+    assert flags[referee_match2.id].referee_conflict is True
+
+
+def test_conflict_two_matches_share_placeholder_playing_slot() -> None:
+    """Two overlapping matches that both use the same placeholder playing slot are flagged."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    tentative_c = _make_tentative(-30, 3, tid)
+    # tentative_c plays input1 in both matches, which overlap in time.
+    match1 = _make_definitive_match(MatchId(-20), tentative_c, inp[1], RoundId(-10), CourtId(-1), T)
+    match2 = _make_definitive_match(
+        MatchId(-21), tentative_c, inp[3], RoundId(-11), CourtId(-2), T + timedelta(minutes=30)
+    )
+    stage = _make_stage_with_two_matches(match1, match2)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[match1.id].stage_item_input1_conflict is True
+    assert flags[match2.id].stage_item_input1_conflict is True
+    assert flags[match1.id].stage_item_input2_conflict is False
+    assert flags[match2.id].stage_item_input2_conflict is False
+
+
+def test_conflict_placeholder_playing_slots_non_overlapping_no_conflict() -> None:
+    """The same placeholder playing slot in two non-overlapping matches is not flagged."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    tentative_c = _make_tentative(-30, 3, tid)
+    match1 = _make_definitive_match(MatchId(-20), tentative_c, inp[1], RoundId(-10), CourtId(-1), T)
+    match2 = _make_definitive_match(
+        MatchId(-21), tentative_c, inp[3], RoundId(-11), CourtId(-2), T + timedelta(hours=2)
+    )
+    stage = _make_stage_with_two_matches(match1, match2)
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[match1.id].stage_item_input1_conflict is False
+    assert flags[match2.id].stage_item_input1_conflict is False
