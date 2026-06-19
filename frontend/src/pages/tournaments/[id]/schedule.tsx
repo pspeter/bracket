@@ -424,6 +424,7 @@ export default function SchedulePage() {
         stages: rawStages,
         layout,
         selection: planner.selection,
+        refereesEnabled: tournament.referees_enabled,
       });
 
   // Pieces of the selection pill, extracted so the mobile (stacked) and desktop
