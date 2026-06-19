@@ -7,7 +7,14 @@ from bracket.database import database
 from bracket.logic.planning.team_windows import PlayingWindow, get_team_playing_windows
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.util import StageWithStageItems
-from bracket.utils.id_types import CourtId, MatchId, StageItemId, TeamId, TournamentId
+from bracket.utils.id_types import (
+    CourtId,
+    MatchId,
+    StageItemId,
+    StageItemInputId,
+    TeamId,
+    TournamentId,
+)
 
 
 def matches_overlap(match1: Match, match2: Match) -> bool:
@@ -215,6 +222,76 @@ def _set_referee_overlap_conflicts(
                     flags[match2.id].referee_conflict = True
 
 
+@dataclass(frozen=True)
+class _SlotOccupancy:
+    """A match's use of a single stage_item_input slot, as either a player or the referee.
+
+    ``playing_side`` is 1 or 2 for the two playing slots, or None when the match occupies the
+    slot as its referee. This mirrors the auto-scheduler and the frontend placement preview,
+    which treat the referee as a third match slot alongside the two playing slots.
+    """
+
+    match: MatchWithDetailsDefinitive | MatchWithDetails
+    start_time: datetime_utc
+    end_time: datetime_utc
+    playing_side: int | None
+
+
+def _flag_slot_occupancy(
+    occupancy: _SlotOccupancy, flags: dict[MatchId, MatchConflictFlags]
+) -> None:
+    if occupancy.playing_side == 1:
+        flags[occupancy.match.id].stage_item_input1_conflict = True
+    elif occupancy.playing_side == 2:
+        flags[occupancy.match.id].stage_item_input2_conflict = True
+    else:
+        flags[occupancy.match.id].referee_conflict = True
+
+
+def _set_slot_overlap_conflicts(
+    stages: list[StageWithStageItems],
+    flags: dict[MatchId, MatchConflictFlags],
+) -> None:
+    """Flag any two overlapping matches that share a stage_item_input slot id.
+
+    This is slot-id based rather than team-id based, so it flags placeholder (tentative/empty)
+    slots too — a slot that isn't yet resolved to a concrete team is still a real resource that
+    cannot play and/or referee two overlapping matches, exactly as the auto-scheduler and the
+    frontend placement preview already assume. The team-id based checks above remain for cross-
+    stage-item identity (the same team appearing under different slot ids), which a slot-id check
+    cannot see; for resolved slots this check only re-flags conflicts those already cover, so
+    behavior for Final slots is unchanged.
+    """
+    occupancies_by_slot: defaultdict[StageItemInputId, list[_SlotOccupancy]] = defaultdict(list)
+    for match in _get_all_matches(stages):
+        if match.start_time is None:
+            continue
+        slots = (
+            (match.stage_item_input1_id, 1),
+            (match.stage_item_input2_id, 2),
+            (match.referee_stage_item_input_id, None),
+        )
+        for slot_id, playing_side in slots:
+            if slot_id is None:
+                continue
+            occupancies_by_slot[slot_id].append(
+                _SlotOccupancy(match, match.start_time, match.end_time, playing_side)
+            )
+
+    for occupancies in occupancies_by_slot.values():
+        for i, occupancy1 in enumerate(occupancies):
+            for occupancy2 in occupancies[i + 1 :]:
+                if not _time_ranges_overlap(
+                    occupancy1.start_time,
+                    occupancy1.end_time,
+                    occupancy2.start_time,
+                    occupancy2.end_time,
+                ):
+                    continue
+                _flag_slot_occupancy(occupancy1, flags)
+                _flag_slot_occupancy(occupancy2, flags)
+
+
 def get_match_conflict_flags(
     stages: list[StageWithStageItems], default_break_minutes: int
 ) -> dict[MatchId, MatchConflictFlags]:
@@ -223,6 +300,7 @@ def get_match_conflict_flags(
 
     _set_team_overlap_conflicts(stages, flags)
     _set_referee_overlap_conflicts(stages, flags)
+    _set_slot_overlap_conflicts(stages, flags)
     _set_winner_of_precedence_conflicts(matches, flags)
     _set_cross_stage_precedence_conflicts(stages, flags)
     _set_short_break_conflicts(matches, default_break_minutes, flags)
