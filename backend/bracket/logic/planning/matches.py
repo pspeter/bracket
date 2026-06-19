@@ -906,6 +906,30 @@ def _build_operations_from_solution(
     return sorted(operations, key=lambda operation: (operation.start_time, operation.court_id))
 
 
+def _no_solution_detail(
+    movable_contexts: list[_MatchContext],
+    courts: list[Court],
+    reoptimize: bool,
+) -> str:
+    """Build a human-readable explanation for why the scheduler couldn't place the matches,
+    with concrete things the organizer can change in their current situation."""
+    suggestions = [
+        f"add more courts (currently {len(courts)})",
+        "shorten match durations or reduce the break time between matches",
+    ]
+    if reoptimize:
+        suggestions.append(
+            "free up in-progress or finished matches that the new schedule has to work around"
+        )
+    suggestions.append("schedule fewer matches at once")
+    suggestion_text = "; ".join(suggestions)
+    return (
+        f"The scheduler couldn't fit the {len(movable_contexts)} match(es) it had to place onto "
+        f"{len(courts)} court(s): the matches are too tightly constrained to lay out without "
+        f"conflicts. Try one of the following and run it again: {suggestion_text}."
+    )
+
+
 def build_schedule_plan(
     stages: list[StageWithStageItems],
     courts: list[Court],
@@ -920,7 +944,7 @@ def build_schedule_plan(
     matches are pinned, so every not-started match is re-flowed around them. ``weights``
     tunes the objective blend (makespan, team rest, court locality, group sync).
     """
-    if not stages or not courts:
+    if not stages:
         return []
 
     contexts = _get_match_contexts(stages)
@@ -928,6 +952,15 @@ def build_schedule_plan(
     movable_contexts = [context for context in contexts if context.match.id not in pinned_ids]
     if not movable_contexts:
         return []
+
+    if not courts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Can't schedule {len(movable_contexts)} match(es) because this tournament has "
+                "no courts. Add at least one court in the tournament settings and try again."
+            ),
+        )
 
     pinned_contexts = [context for context in contexts if context.match.id in pinned_ids]
     horizon = _planning_horizon_minutes(contexts, tournament, movable_contexts, pinned_ids)
@@ -1034,15 +1067,19 @@ def build_schedule_plan(
     solver.parameters.num_search_workers = SOLVER_SEARCH_WORKERS
     status_code = solver.Solve(model)
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        # Never fail the request: the action must always succeed. Leave the unscheduled
-        # matches as-is (placing nothing adds no new conflicts) so the organizer can retry.
+        # The solver couldn't fit every match given the current courts and constraints. Nothing
+        # is scheduled (placing a partial layout would add conflicts), so tell the organizer what
+        # went wrong and what they can change instead of failing silently.
         logger.warning(
-            "Scheduler found no solution (status %s) for %d unscheduled matches; leaving them "
-            "unscheduled",
+            "Scheduler found no solution (status %s) for %d unscheduled matches; surfacing error "
+            "to the user",
             solver.StatusName(status_code),
             len(movable_contexts),
         )
-        return []
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_no_solution_detail(movable_contexts, courts, reoptimize),
+        )
 
     return _build_operations_from_solution(
         solver,
