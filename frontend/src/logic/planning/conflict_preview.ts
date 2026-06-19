@@ -5,6 +5,7 @@ import { PlanningAction, SelectionState, selectionReducer } from './selection';
 export interface ConflictPreviewMatch extends OptimisticMatch {
   stage_item_input1_id: number | null;
   stage_item_input2_id: number | null;
+  referee_stage_item_input_id: number | null;
 }
 
 export interface ConflictPreviewStage extends OptimisticStage {
@@ -27,6 +28,7 @@ interface PreparedPreview {
   blocksByCourtId: Map<number, PreviewBlock[]>;
   blockByMatchId: Map<number, PreviewBlock>;
   defaultBreakMinutes: number;
+  refereesEnabled: boolean;
 }
 
 export function insertionLineKey(courtId: number, index: number): string {
@@ -54,20 +56,26 @@ function getMatches(stages: ConflictPreviewStage[]): ConflictPreviewMatch[] {
   );
 }
 
-function matchInputIds(match: ConflictPreviewMatch): Set<number> {
-  return new Set(
-    [match.stage_item_input1_id, match.stage_item_input2_id].filter(
-      (id): id is number => id != null
-    )
-  );
+/**
+ * The stage-item-input slots a match occupies for conflict purposes: its two
+ * playing slots and — when referees are enabled — the referee slot, mirroring the
+ * backend's "referee is a third match slot" model. This is the single place that
+ * decides which slots a match ties up; both the simulated-action check and the
+ * block-based preview share it, so referee double-booking is handled identically.
+ */
+function occupiedSlotIds(match: ConflictPreviewMatch, refereesEnabled: boolean): Set<number> {
+  const slotIds = [match.stage_item_input1_id, match.stage_item_input2_id];
+  if (refereesEnabled) slotIds.push(match.referee_stage_item_input_id);
+  return new Set(slotIds.filter((id): id is number => id != null));
 }
 
-function sharesInput(match1: ConflictPreviewMatch, match2: ConflictPreviewMatch): boolean {
-  const inputIds = matchInputIds(match1);
-  return (
-    (match2.stage_item_input1_id != null && inputIds.has(match2.stage_item_input1_id)) ||
-    (match2.stage_item_input2_id != null && inputIds.has(match2.stage_item_input2_id))
-  );
+function sharesSlot(
+  match1: ConflictPreviewMatch,
+  match2: ConflictPreviewMatch,
+  refereesEnabled: boolean
+): boolean {
+  const slots1 = occupiedSlotIds(match1, refereesEnabled);
+  return [...occupiedSlotIds(match2, refereesEnabled)].some((id) => slots1.has(id));
 }
 
 function playingIntervalMillis(match: ConflictPreviewMatch): [number, number] | null {
@@ -107,12 +115,14 @@ export function actionCreatesSelectedConflict({
   selectedMatchId,
   tournamentStartTime,
   defaultBreakMinutes = 0,
+  refereesEnabled = true,
   action,
 }: {
   stages: ConflictPreviewStage[];
   selectedMatchId: number;
   tournamentStartTime: string | Date;
   defaultBreakMinutes?: number;
+  refereesEnabled?: boolean;
   action: PlanningAction;
 }): boolean {
   const simulated = applyPlanningActions(
@@ -123,12 +133,12 @@ export function actionCreatesSelectedConflict({
   );
   const matches = getMatches(simulated);
   const selected = matches.find((match) => match.id === selectedMatchId);
-  if (selected == null || matchInputIds(selected).size === 0) return false;
+  if (selected == null || occupiedSlotIds(selected, refereesEnabled).size === 0) return false;
 
   return matches.some(
     (match) =>
       match.id !== selected.id &&
-      sharesInput(selected, match) &&
+      sharesSlot(selected, match, refereesEnabled) &&
       playingTimesOverlap(selected, match)
   );
 }
@@ -136,7 +146,8 @@ export function actionCreatesSelectedConflict({
 function preparePreview(
   stages: ConflictPreviewStage[],
   layout: ScheduleGridLayout<LayoutCourt, ConflictPreviewMatch>,
-  selection: SelectionState
+  selection: SelectionState,
+  refereesEnabled: boolean
 ): PreparedPreview | null {
   const selectedMatchId = getSelectedMatchId(selection);
   if (selectedMatchId == null) return null;
@@ -164,6 +175,7 @@ function preparePreview(
     blocksByCourtId,
     blockByMatchId,
     defaultBreakMinutes: layout.defaultBreakMinutes,
+    refereesEnabled,
   };
 }
 
@@ -206,9 +218,13 @@ function courtEntries(
     .map((block) => ({ match: block.match, baseStartMinutes: block.startMinutes }));
 }
 
-function blocksConflict(block1: PreviewBlock, block2: PreviewBlock): boolean {
+function blocksConflict(
+  block1: PreviewBlock,
+  block2: PreviewBlock,
+  refereesEnabled: boolean
+): boolean {
   return (
-    sharesInput(block1.match, block2.match) &&
+    sharesSlot(block1.match, block2.match, refereesEnabled) &&
     playingMinutesOverlap(
       block1.startMinutes,
       slotLengthMinutes(block1.match),
@@ -248,7 +264,10 @@ function affectedScheduleCreatesConflict(
 
   for (const changedBlock of changedBlocks) {
     for (const block of postBlocks) {
-      if (changedBlock.match.id !== block.match.id && blocksConflict(changedBlock, block)) {
+      if (
+        changedBlock.match.id !== block.match.id &&
+        blocksConflict(changedBlock, block, prepared.refereesEnabled)
+      ) {
         return true;
       }
     }
@@ -372,13 +391,15 @@ export function computeConflictPreview({
   stages,
   layout,
   selection,
+  refereesEnabled = true,
 }: {
   stages: ConflictPreviewStage[];
   layout: ScheduleGridLayout<LayoutCourt, ConflictPreviewMatch>;
   selection: SelectionState;
+  refereesEnabled?: boolean;
 }): ConflictPreview {
   if (selection.kind === 'idle') return emptyPreview();
-  const prepared = preparePreview(stages, layout, selection);
+  const prepared = preparePreview(stages, layout, selection, refereesEnabled);
   if (prepared == null) return emptyPreview();
   const preparedPreview = prepared;
 

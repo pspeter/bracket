@@ -21,6 +21,7 @@ function match({
   startMinutes,
   input1,
   input2,
+  referee = null,
   durationMinutes = 90,
 }: {
   id: number;
@@ -28,6 +29,7 @@ function match({
   startMinutes: number | null;
   input1: number;
   input2: number;
+  referee?: number | null;
   durationMinutes?: number;
 }): ConflictPreviewMatch {
   return {
@@ -37,6 +39,7 @@ function match({
     duration_minutes: durationMinutes,
     stage_item_input1_id: input1,
     stage_item_input2_id: input2,
+    referee_stage_item_input_id: referee,
   };
 }
 
@@ -98,6 +101,88 @@ describe('actionCreatesSelectedConflict', () => {
         },
       })
     ).toBe(true);
+  });
+
+  it('detects a conflict when the selected match referees a team that is playing an overlapping match', () => {
+    // Match 1 referees team 60; match 3 plays team 60 at the same time. They share
+    // no playing input, so only the referee slot makes them conflict.
+    const stages = stagesWith([
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 3, startMinutes: 0, input1: 60, input2: 30 }),
+    ]);
+
+    expect(
+      actionCreatesSelectedConflict({
+        stages,
+        selectedMatchId: 1,
+        tournamentStartTime: START,
+        action: {
+          type: 'reschedule',
+          matchId: 1,
+          body: {
+            old_court_id: 1,
+            old_position: 0,
+            new_court_id: 2,
+            new_position: 0,
+          },
+        },
+      })
+    ).toBe(true);
+  });
+
+  it('detects a conflict when the selected match referees a team that referees an overlapping match', () => {
+    // Both match 1 and match 3 have team 60 as referee, at the same time.
+    const stages = stagesWith([
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 3, startMinutes: 0, input1: 70, input2: 30, referee: 60 }),
+    ]);
+
+    expect(
+      actionCreatesSelectedConflict({
+        stages,
+        selectedMatchId: 1,
+        tournamentStartTime: START,
+        action: {
+          type: 'reschedule',
+          matchId: 1,
+          body: {
+            old_court_id: 1,
+            old_position: 0,
+            new_court_id: 2,
+            new_position: 0,
+          },
+        },
+      })
+    ).toBe(true);
+  });
+
+  it('ignores the referee slot when referees are disabled', () => {
+    const stages = stagesWith([
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 3, startMinutes: 0, input1: 60, input2: 30 }),
+    ]);
+
+    expect(
+      actionCreatesSelectedConflict({
+        stages,
+        selectedMatchId: 1,
+        tournamentStartTime: START,
+        refereesEnabled: false,
+        action: {
+          type: 'reschedule',
+          matchId: 1,
+          body: {
+            old_court_id: 1,
+            old_position: 0,
+            new_court_id: 2,
+            new_position: 0,
+          },
+        },
+      })
+    ).toBe(false);
   });
 });
 
@@ -282,5 +367,34 @@ describe('computeConflictPreview', () => {
 
     expect([...preview.swapTargets]).toContain(4);
     expect([...preview.swapTargets]).not.toContain(2);
+  });
+
+  it('flags a swap target whose slot would double-book the selected match referee', () => {
+    // Tray match 1 referees team 60. Swapping it into match 2's slot (court 1, start
+    // 0) puts it in the same window as match 3, which plays team 60 on court 2 — a
+    // referee conflict the preview must surface even though no playing input is shared.
+    const matches = [
+      match({ id: 1, courtId: null, startMinutes: null, input1: 10, input2: 20, referee: 60 }),
+      match({ id: 2, courtId: 1, startMinutes: 0, input1: 40, input2: 50 }),
+      match({ id: 3, courtId: 2, startMinutes: 0, input1: 60, input2: 30 }),
+    ];
+    const layout = computeScheduleLayout({
+      courts: [
+        { id: 1, name: 'Court 1' },
+        { id: 2, name: 'Court 2' },
+      ],
+      matchesByCourtId: { 1: [matches[1]], 2: [matches[2]] },
+      tournamentStartTime: START,
+    });
+
+    const preview = computeConflictPreview({
+      stages: stagesWith(matches),
+      layout,
+      selection: { kind: 'tray-match-selected', matchId: 1 },
+      refereesEnabled: true,
+    });
+
+    expect([...preview.swapTargets]).toContain(2);
+    expect([...preview.swapTargets]).not.toContain(3);
   });
 });
