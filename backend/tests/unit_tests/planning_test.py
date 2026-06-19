@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 
 import pytest
+from fastapi import HTTPException
 from heliclockter import datetime_utc
 
 from bracket.logic.planning import matches as planning_matches
@@ -633,9 +634,17 @@ def test_groups_in_a_stage_progress_round_for_round_when_free() -> None:
 # ── Edge cases ────────────────────────────────────────────────────────────────
 
 
-def test_no_courts_returns_empty() -> None:
+def test_no_courts_raises_with_actionable_detail() -> None:
     stages = [_stage(1, [[_match(1)]])]
-    assert build_schedule_plan(stages, [], _tournament()) == []
+    with pytest.raises(HTTPException) as exc_info:
+        build_schedule_plan(stages, [], _tournament())
+    assert exc_info.value.status_code == 400
+    assert "no courts" in exc_info.value.detail
+
+
+def test_no_courts_with_nothing_to_schedule_returns_empty() -> None:
+    """No matches to place and no courts is a no-op, not an error."""
+    assert build_schedule_plan([], [], _tournament()) == []
 
 
 def test_no_stages_returns_empty() -> None:
