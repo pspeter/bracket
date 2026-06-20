@@ -330,6 +330,13 @@ function MatchModalForm({
           label: t('precedence_conflict_label'),
         }
       : null,
+    match.feeder_precedence_conflict
+      ? {
+          key: 'feeder_precedence',
+          colour: CONFLICT_COLOURS.precedence,
+          label: t('feeder_precedence_conflict_label'),
+        }
+      : null,
     match.short_break_conflict
       ? {
           key: 'short_break',

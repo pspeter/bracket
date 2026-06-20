@@ -165,6 +165,7 @@ matches = Table(
     Column("stage_item_input1_conflict", Boolean, nullable=False),
     Column("stage_item_input2_conflict", Boolean, nullable=False),
     Column("precedence_conflict", Boolean, nullable=False, server_default="f"),
+    Column("feeder_precedence_conflict", Boolean, nullable=False, server_default="f"),
     Column("short_break_conflict", Boolean, nullable=False, server_default="f"),
     Column("referee_conflict", Boolean, nullable=False, server_default="f"),
     Column(

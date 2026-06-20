@@ -49,7 +49,12 @@ def _windows_overlap(window1: PlayingWindow, window2: PlayingWindow) -> bool:
 class MatchConflictFlags:
     stage_item_input1_conflict: bool = False
     stage_item_input2_conflict: bool = False
+    # Set on the *dependent* match: it starts before a match whose results it depends on has
+    # finished.
     precedence_conflict: bool = False
+    # Set on the *source* match: it ends after a match depending on its results has started. The
+    # mirror image of ``precedence_conflict``, flagged on the other side of the same dependency.
+    feeder_precedence_conflict: bool = False
     short_break_conflict: bool = False
     referee_conflict: bool = False
 
@@ -123,9 +128,10 @@ def _set_winner_of_precedence_conflicts(
                 and match.start_time < feeder.end_time
             ):
                 # The dependent match starts before its feeder finishes; flag both sides so
-                # the precedence conflict is marked on the feeder too.
+                # the precedence conflict is marked on the feeder too, from its own perspective
+                # (it ends after a match depending on its results has started).
                 flags[match.id].precedence_conflict = True
-                flags[feeder.id].precedence_conflict = True
+                flags[feeder.id].feeder_precedence_conflict = True
 
 
 def _get_stage_item_end_times(
@@ -237,7 +243,7 @@ def _set_cross_stage_feeder_precedence_conflicts(
                     if match.start_time is None:
                         continue
                     if match.end_time > dependent_start:
-                        flags[match.id].precedence_conflict = True
+                        flags[match.id].feeder_precedence_conflict = True
 
 
 def _set_short_break_conflicts(
@@ -420,6 +426,7 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 stage_item_input1_conflict = :stage_item_input1_conflict,
                 stage_item_input2_conflict = :stage_item_input2_conflict,
                 precedence_conflict = :precedence_conflict,
+                feeder_precedence_conflict = :feeder_precedence_conflict,
                 short_break_conflict = :short_break_conflict,
                 referee_conflict = :referee_conflict
             WHERE id = :match_id
@@ -429,6 +436,7 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 "stage_item_input1_conflict": conflict.stage_item_input1_conflict,
                 "stage_item_input2_conflict": conflict.stage_item_input2_conflict,
                 "precedence_conflict": conflict.precedence_conflict,
+                "feeder_precedence_conflict": conflict.feeder_precedence_conflict,
                 "short_break_conflict": conflict.short_break_conflict,
                 "referee_conflict": conflict.referee_conflict,
             },

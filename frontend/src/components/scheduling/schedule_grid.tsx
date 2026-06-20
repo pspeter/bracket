@@ -236,12 +236,33 @@ function MatchCard({
       {chips}
     </Box>
   );
-  const precedenceWarningLabel = match.precedence_conflict
-    ? t('precedence_conflict_label', 'Starts before a feeder match has finished')
-    : t('match_scheduled_before_previous_stage_label');
+  // A match can sit on either (or both) sides of a precedence dependency, plus the earlier-stage
+  // ordering violation — collect every applicable description so the tooltip explains them all.
+  const precedenceWarningLabels = [
+    match.precedence_conflict
+      ? t(
+          'precedence_conflict_label',
+          'Starts before a match it depends on the results of has finished'
+        )
+      : null,
+    match.feeder_precedence_conflict
+      ? t(
+          'feeder_precedence_conflict_label',
+          'Ends after a match depending on the results of this one starts'
+        )
+      : null,
+    isViolation ? t('match_scheduled_before_previous_stage_label') : null,
+  ].filter((label): label is string => label != null);
   const violationIcon =
-    isViolation || match.precedence_conflict ? (
-      <Tooltip label={precedenceWarningLabel}>
+    precedenceWarningLabels.length > 0 ? (
+      <Tooltip
+        multiline={precedenceWarningLabels.length > 1}
+        label={
+          precedenceWarningLabels.length > 1
+            ? precedenceWarningLabels.map((label) => <div key={label}>{label}</div>)
+            : precedenceWarningLabels[0]
+        }
+      >
         <Box
           component="span"
           style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
@@ -446,7 +467,10 @@ function OverviewBlock({
   const conflictColour =
     match.stage_item_input1_conflict || match.stage_item_input2_conflict
       ? 'red'
-      : isViolation || match.precedence_conflict || (refereesEnabled && match.referee_conflict)
+      : isViolation ||
+          match.precedence_conflict ||
+          match.feeder_precedence_conflict ||
+          (refereesEnabled && match.referee_conflict)
         ? 'orange'
         : match.short_break_conflict
           ? 'var(--mantine-color-yellow-filled)'
