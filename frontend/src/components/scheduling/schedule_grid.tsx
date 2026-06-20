@@ -382,11 +382,12 @@ function MatchCard({
       >
         {metaLine && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
-            {/* The two-line card's first row is badge + conflicts only; the time (and
-                status) join it once there are three lines to spare. */}
-            {lines >= 3 && (
+            {/* Compact cards never spend a line on the time — the ruler and break
+                chips already carry it; only agenda shows it. The status glyph still
+                rides up here on the three- and four-line cards. */}
+            {lines >= 3 && (zoom === 'agenda' || statusIndicator != null) && (
               <Flex gap={4} align="center" wrap="nowrap">
-                {timeLabel}
+                {zoom === 'agenda' && timeLabel}
                 {statusIndicator}
               </Flex>
             )}
