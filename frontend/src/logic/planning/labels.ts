@@ -5,7 +5,7 @@ const isNumeric = (word: string) => /^\d+$/.test(word);
  * rest to initials, preserving squad numbers ("TSV Musterstadt 2" → "TSV M. 2").
  * Falls back to bare initials, then to truncation.
  */
-export function abbreviateTeamName(name: string, maxLength: number = 12): string {
+export function abbreviateTeamName(name: string, maxLength: number = 8): string {
   const collapsed = name.trim().replace(/\s+/g, ' ');
   if (collapsed.length <= maxLength) return collapsed;
 

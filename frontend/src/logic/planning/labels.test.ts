@@ -4,15 +4,15 @@ import { abbreviateStageItem, abbreviateTeamName, shortCourtLabel } from './labe
 
 describe('abbreviateTeamName', () => {
   it('keeps short names untouched', () => {
-    expect(abbreviateTeamName('Smash Bros')).toBe('Smash Bros');
+    expect(abbreviateTeamName('Red Sox')).toBe('Red Sox');
   });
 
   it('collapses repeated whitespace', () => {
-    expect(abbreviateTeamName('Smash   Bros ')).toBe('Smash Bros');
+    expect(abbreviateTeamName('Red   Sox ')).toBe('Red Sox');
   });
 
   it('shrinks trailing words to initials, keeping the first word', () => {
-    expect(abbreviateTeamName('Smash Brothers United')).toBe('Smash B. U.');
+    expect(abbreviateTeamName('Ajax United')).toBe('Ajax U.');
   });
 
   it('keeps squad numbers intact while abbreviating', () => {
@@ -24,7 +24,7 @@ describe('abbreviateTeamName', () => {
   });
 
   it('truncates a single long word with an ellipsis', () => {
-    expect(abbreviateTeamName('Spielvereinigungsgemeinschaft')).toBe('Spielverein…');
+    expect(abbreviateTeamName('Spielvereinigungsgemeinschaft')).toBe('Spielve…');
   });
 });
 
