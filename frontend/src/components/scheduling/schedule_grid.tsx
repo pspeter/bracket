@@ -37,13 +37,8 @@ import {
   computeInsertionLines,
 } from '@logic/planning/layout';
 import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
-import {
-  ZOOM_PX_PER_MINUTE,
-  ZoomLevel,
-  abbreviateStageItem,
-  abbreviateTeamName,
-  shortCourtLabel,
-} from '@logic/planning/zoom';
+import { abbreviateStageItem, abbreviateTeamName, shortCourtLabel } from '@logic/planning/labels';
+import { ZOOM_PX_PER_MINUTE, ZoomLevel } from '@logic/planning/zoom';
 import { Court, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
 
