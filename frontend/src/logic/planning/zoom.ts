@@ -30,9 +30,9 @@ export function defaultZoomLevel(viewportWidthPx: number): ZoomLevel {
 
 /** Vertical scale per zoom level: one minute of schedule time in pixels. */
 export const ZOOM_PX_PER_MINUTE: Record<ZoomLevel, number> = {
-  agenda: 5,
-  compact: 3,
-  overview: 1.25,
+  agenda: 8,
+  compact: 4,
+  overview: 2,
 };
 
 /** Ruler tick spacing per zoom level, in minutes. */

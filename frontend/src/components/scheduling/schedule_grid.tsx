@@ -133,7 +133,7 @@ function MatchCard({
   //   2 → meta / both teams (compact) or badge + team 1 / team 2 (agenda)
   //   3 → meta / both teams / referee (compact) or meta / team 1 / team 2 (agenda)
   //   4 → meta / team 1 / team 2 / referee
-  const lines = cardHeightPx >= 60 ? 4 : cardHeightPx >= 39 ? 3 : cardHeightPx >= 30 ? 2 : 1;
+  const lines = cardHeightPx >= 65 ? 4 : cardHeightPx >= 45 ? 3 : cardHeightPx >= 30 ? 2 : 1;
   const fontSize = zoom === 'compact' ? 11 : undefined;
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
