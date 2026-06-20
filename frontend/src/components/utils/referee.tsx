@@ -1,5 +1,6 @@
 import { Flex, Text } from '@mantine/core';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
+import { ReactNode } from 'react';
 
 import { MatchWithDetails } from '@openapi';
 import { formatStageItemInput } from './stage_item_input';
@@ -20,16 +21,19 @@ export function RefereeDisplay({
   match,
   refereesEnabled,
   stageItemsLookup = {},
+  conflictIcon = null,
 }: {
   match: RefereeFields;
   refereesEnabled: boolean;
   stageItemsLookup?: any;
+  conflictIcon?: ReactNode;
 }) {
   const name = getRefereeName(match, stageItemsLookup);
   if (!refereesEnabled || name == null) return null;
 
   return (
     <Flex gap={4} align="center" wrap="nowrap">
+      {conflictIcon}
       <GiWhistle size={13} style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)' }} />
       <Text size="xs" c="dimmed" truncate>
         {name}
