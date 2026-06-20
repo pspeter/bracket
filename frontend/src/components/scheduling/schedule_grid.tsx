@@ -173,10 +173,16 @@ function MatchCard({
       : itemName != null
         ? abbreviateStageItem(itemName)
         : null;
+  // Compact's narrow columns can't fit the full stage-item name, so the badge there
+  // uses the abbreviated form ("D · 3") rather than ellipsis-truncating the full one
+  // ("Group D · 3" → "Group D…"). Agenda has the room for the full label, and prepends
+  // the stage name once the card is tall enough.
   const badgeLabel =
-    cardHeightPx >= 72 && stageName != null && coreFull != null
-      ? `${stageName} · ${coreFull}`
-      : coreFull;
+    zoom === 'compact'
+      ? coreShort
+      : cardHeightPx >= 72 && stageName != null && coreFull != null
+        ? `${stageName} · ${coreFull}`
+        : coreFull;
   // Full pill at 2+ rows; a bare coloured token on the shortest one-row cards,
   // where a pill's padding would crowd out the team names.
   // The accent (the level's hue) shares the fill's hue, so using it as text on the
