@@ -15,7 +15,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
@@ -834,9 +834,13 @@ export default function ScheduleGrid({
   }, [zoom]);
 
   // After a zoom change with a focus target (overview tap, anchored pinch or
-  // ctrl+wheel), center the focused court/time region. Runs after the
-  // re-render at the new zoom level, so measurements are up to date.
-  useEffect(() => {
+  // ctrl+wheel), center the focused court/time region. A layout effect with an
+  // instant scroll snaps the grid to the target before the browser paints the
+  // new zoom level: otherwise the re-render at the new scale paints once at the
+  // now-stale scroll offset (a jump to a canvas edge) before a smooth scroll
+  // pans across to the target. Runs after the re-render, so measurements match
+  // the post-zoom layout.
+  useLayoutEffect(() => {
     if (focus == null) return;
     const container = containerRef.current;
     const column = container?.querySelector<HTMLElement>(`[data-court-id="${focus.courtId}"]`);
@@ -850,7 +854,7 @@ export default function ScheduleGrid({
     container.scrollTo({
       left: columnLeft - (container.clientWidth - column.clientWidth) / 2,
       top: targetY - container.clientHeight / 2,
-      behavior: 'smooth',
+      behavior: 'auto',
     });
     // Only re-run per navigation event; gridHeight is already the post-zoom scale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
