@@ -409,14 +409,28 @@ function MatchCard({
           {lines === 1 && coreShort != null && inlineBadge(coreShort)}
           {lines < 3 && statusIndicator}
           {match.stage_item_input1_conflict && (
-            <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+            <Tooltip label={t('team_double_booked_conflict_label', { team: input1 })}>
+              <Box
+                component="span"
+                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+              >
+                <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+              </Box>
+            </Tooltip>
           )}
           {!metaLine && placementWarningIcon}
           {!metaLine && shortBreakIcon}
           {(combineTeams ||
             (lines === 1 && !(mergeConflictIcons && match.stage_item_input1_conflict))) &&
             match.stage_item_input2_conflict && (
-              <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+              <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
+                <Box
+                  component="span"
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+                >
+                  <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+                </Box>
+              </Tooltip>
             )}
           <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
             {lines === 1 || combineTeams ? `${input1} – ${input2}` : input1}
@@ -434,7 +448,14 @@ function MatchCard({
         {lines >= 2 && !combineTeams && (
           <Flex gap={4} align="center" wrap="nowrap">
             {match.stage_item_input2_conflict && (
-              <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+              <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
+                <Box
+                  component="span"
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+                >
+                  <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+                </Box>
+              </Tooltip>
             )}
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
