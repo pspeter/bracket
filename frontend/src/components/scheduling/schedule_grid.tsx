@@ -400,7 +400,6 @@ function MatchCard({
             {badgeLabel != null ? fullBadge(badgeLabel) : null}
             {placementWarningIcon}
             {shortBreakIcon}
-            {refereeConflictIcon}
             {violationIcon}
           </Flex>
         )}
@@ -413,7 +412,6 @@ function MatchCard({
           )}
           {!metaLine && placementWarningIcon}
           {!metaLine && shortBreakIcon}
-          {!metaLine && refereeConflictIcon}
           {(combineTeams ||
             (lines === 1 && !(mergeConflictIcons && match.stage_item_input1_conflict))) &&
             match.stage_item_input2_conflict && (
@@ -447,6 +445,7 @@ function MatchCard({
             match={match}
             refereesEnabled={refereesEnabled}
             stageItemsLookup={stageItemsLookup}
+            conflictIcon={refereeConflictIcon}
           />
         )}
       </Box>
