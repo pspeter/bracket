@@ -518,6 +518,7 @@ function MatchCard({
             refereesEnabled={refereesEnabled}
             stageItemsLookup={stageItemsLookup}
             conflictIcon={mergeConflictIcons ? null : refereeConflictIcon}
+            abbreviated={zoom === 'compact'}
           />
         )}
       </Box>
