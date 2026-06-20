@@ -401,6 +401,7 @@ function MatchCard({
             {placementWarningIcon}
             {shortBreakIcon}
             {violationIcon}
+            {!showReferee && refereeConflictIcon}
           </Flex>
         )}
         <Flex gap={6} align="center" wrap="nowrap">
@@ -428,6 +429,7 @@ function MatchCard({
                 )
               : pinnedScores(scoreChip(match.stage_item_input1_score, score1Colour)))}
           {!metaLine && violationIcon}
+          {!metaLine && refereeConflictIcon}
         </Flex>
         {lines >= 2 && !combineTeams && (
           <Flex gap={4} align="center" wrap="nowrap">
