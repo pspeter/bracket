@@ -303,6 +303,76 @@ def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes
     flags = get_match_conflict_flags([stage], default_break_minutes=5)
 
     assert flags[target_match.id].precedence_conflict is True
+    # source_match1 (T → T+10) finishes before the target stage item starts (T+15).
+    assert flags[source_match1.id].precedence_conflict is False
+    # source_match2 (T+10 → T+20) is still running once the target stage item starts (T+15),
+    # so the precedence conflict is flagged on the feeder side too.
+    assert flags[source_match2.id].precedence_conflict is True
+
+
+def test_get_match_conflict_flags_does_not_mark_feeder_finishing_before_dependent() -> None:
+    """A feeder stage item that fully finishes before its dependent starts is not flagged."""
+    tournament_id = TournamentId(-1)
+    source_inputs = get_stage_item_inputs_mock(tournament_id)
+    source_match1, source_match2 = get_2_definitive_matches_mock(
+        source_inputs,
+        match1_start_time=T,
+        match2_start_time=T + timedelta(minutes=10),
+        duration_minutes=10,
+    )
+    source_round = get_one_round_with_two_definitive_matches(source_match1, source_match2)
+    source_stage_item = get_stage_item_mock(source_inputs, [source_round])
+
+    target_input = StageItemInputTentative(
+        id=StageItemInputId(-10),
+        slot=1,
+        tournament_id=tournament_id,
+        stage_item_id=StageItemId(-2),
+        winner_from_stage_item_id=source_stage_item.id,
+        winner_position=1,
+    )
+    # The dependent match starts at T+20, exactly when source_match2 ends (back-to-back).
+    target_match = MatchWithDetailsDefinitive(
+        id=MatchId(-3),
+        stage_item_input1=target_input,
+        stage_item_input2=source_inputs[1],
+        stage_item_input1_id=target_input.id,
+        stage_item_input2_id=source_inputs[1].id,
+        created=T,
+        start_time=T + timedelta(minutes=20),
+        duration_minutes=10,
+        round_id=RoundId(-4),
+        court_id=CourtId(-3),
+        stage_item_input1_score=0,
+        stage_item_input2_score=0,
+        stage_item_input1_conflict=False,
+        stage_item_input2_conflict=False,
+        state=MatchState.NOT_STARTED,
+        completed_at=None,
+    )
+    target_round = RoundWithMatches(
+        id=RoundId(-4),
+        matches=[target_match],
+        stage_item_id=StageItemId(-2),
+        created=T,
+        is_draft=False,
+        name="",
+    )
+    target_stage_item = get_stage_item_mock(source_inputs, [target_round]).model_copy(
+        update={"id": StageItemId(-2), "inputs": [target_input, source_inputs[1]]}
+    )
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[source_stage_item, target_stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=5)
+
+    assert flags[target_match.id].precedence_conflict is False
     assert flags[source_match1.id].precedence_conflict is False
     assert flags[source_match2.id].precedence_conflict is False
 

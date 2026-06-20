@@ -143,6 +143,56 @@ def _get_stage_item_end_times(
     return stage_item_end_times
 
 
+def _get_stage_item_start_times(
+    stages: list[StageWithStageItems],
+) -> dict[StageItemId, datetime_utc]:
+    stage_item_start_times: dict[StageItemId, datetime_utc] = {}
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            earliest_start_time: datetime_utc | None = None
+            for round_ in stage_item.rounds:
+                for match in round_.matches:
+                    if match.start_time is None:
+                        continue
+                    if earliest_start_time is None or match.start_time < earliest_start_time:
+                        earliest_start_time = match.start_time
+            if earliest_start_time is not None:
+                stage_item_start_times[stage_item.id] = earliest_start_time
+    return stage_item_start_times
+
+
+def _get_earliest_dependent_start_times(
+    stages: list[StageWithStageItems],
+) -> dict[StageItemId, datetime_utc]:
+    """Map each source stage item to the earliest start of any stage item feeding off it.
+
+    A stage item "feeds off" a source when one of its matches has an input whose
+    ``winner_from_stage_item_id`` points at that source.
+    """
+    stage_item_start_times = _get_stage_item_start_times(stages)
+    earliest_dependent_start: dict[StageItemId, datetime_utc] = {}
+
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            dependent_start = stage_item_start_times.get(stage_item.id)
+            if dependent_start is None:
+                continue
+            for round_ in stage_item.rounds:
+                for match in round_.matches:
+                    for stage_item_input in (match.stage_item_input1, match.stage_item_input2):
+                        if (
+                            stage_item_input is None
+                            or stage_item_input.winner_from_stage_item_id is None
+                        ):
+                            continue
+                        source_id = stage_item_input.winner_from_stage_item_id
+                        existing = earliest_dependent_start.get(source_id)
+                        if existing is None or dependent_start < existing:
+                            earliest_dependent_start[source_id] = dependent_start
+
+    return earliest_dependent_start
+
+
 def _set_cross_stage_precedence_conflicts(
     stages: list[StageWithStageItems],
     flags: dict[MatchId, MatchConflictFlags],
@@ -159,6 +209,32 @@ def _set_cross_stage_precedence_conflicts(
             source_end_time = stage_item_end_times.get(stage_item_input.winner_from_stage_item_id)
             if source_end_time is not None and match.start_time < source_end_time:
                 flags[match.id].precedence_conflict = True
+
+
+def _set_cross_stage_feeder_precedence_conflicts(
+    stages: list[StageWithStageItems],
+    flags: dict[MatchId, MatchConflictFlags],
+) -> None:
+    """Flag feeder matches scheduled after the stage item they feed into has started.
+
+    The mirror image of ``_set_cross_stage_precedence_conflicts``: a source stage item must
+    finish before any stage item consuming its ranking begins. Here we flag the *source* matches
+    that are still running once a dependent stage item's earliest match has started, so the
+    precedence conflict is marked on both sides of the dependency.
+    """
+    earliest_dependent_start = _get_earliest_dependent_start_times(stages)
+
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            dependent_start = earliest_dependent_start.get(stage_item.id)
+            if dependent_start is None:
+                continue
+            for round_ in stage_item.rounds:
+                for match in round_.matches:
+                    if match.start_time is None:
+                        continue
+                    if match.end_time > dependent_start:
+                        flags[match.id].precedence_conflict = True
 
 
 def _set_short_break_conflicts(
@@ -303,6 +379,7 @@ def get_match_conflict_flags(
     _set_slot_overlap_conflicts(stages, flags)
     _set_winner_of_precedence_conflicts(matches, flags)
     _set_cross_stage_precedence_conflicts(stages, flags)
+    _set_cross_stage_feeder_precedence_conflicts(stages, flags)
     _set_short_break_conflicts(matches, default_break_minutes, flags)
 
     return flags

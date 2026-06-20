@@ -167,7 +167,7 @@
     "match_context_stage_label": "Stage",
     "max_results_input_label": "Max results",
     "match_scheduled_before_previous_stage_label": "Scheduled before a match of an earlier stage on this court",
-    "precedence_conflict_label": "Starts before a feeder match has finished",
+    "precedence_conflict_label": "Overlaps with a feeder or dependent match",
     "referee_conflict_label": "Referee is playing or refereeing another match during this match",
     "short_break_conflict_label": "Break before this match is shorter than the default",
     "members_table_header": "Members",
