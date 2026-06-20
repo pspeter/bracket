@@ -130,24 +130,23 @@ function MatchCard({
   // round durations the planner thinks in: 1 line below 10 min, 2 lines at 10–12 min,
   // 3 lines at 13–19 min, 4 lines from 20 min. The line layouts are:
   //   1 → "team 1 – team 2"
-  //   2 → badge + team 1 / team 2
-  //   3 → meta / both teams (compact) or team 1 / team 2 (agenda)
+  //   2 → meta / both teams (compact) or badge + team 1 / team 2 (agenda)
+  //   3 → meta / both teams / referee (compact) or meta / team 1 / team 2 (agenda)
   //   4 → meta / team 1 / team 2 / referee
   const lines = cardHeightPx >= 60 ? 4 : cardHeightPx >= 39 ? 3 : cardHeightPx >= 30 ? 2 : 1;
   const fontSize = zoom === 'compact' ? 11 : undefined;
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
   const mergeConflictIcons = lines === 1;
-  // The meta line (time + identity badge + every scheduling-conflict flag) gets its
-  // own row once the card is tall enough; below that the badge rides inline with the
-  // teams.
-  const metaLine = lines >= 3;
-  // In compact, a three-line card's meta row already carries the badge and all the
-  // conflict flags; stacking the two teams below it on their own lines then pushes the
-  // second team (and referee) past the card and clips it. Put both abbreviated teams on
-  // the second line instead — like the one-row layout — so they always show, leaving
-  // the third line for the referee. A four-line card has the room to split them again.
-  const combineTeams = lines === 3 && zoom === 'compact';
+  // In compact, both abbreviated teams share the second line whenever there is a meta
+  // line above them (two- and three-line cards), like the one-row layout — so the badge
+  // and conflict flags up top never crowd a team out of view. A four-line card has the
+  // room to split the teams onto their own lines again.
+  const combineTeams = (lines === 2 || lines === 3) && zoom === 'compact';
+  // The meta line (time + identity badge + every scheduling-conflict flag) gets its own
+  // row once the card is tall enough, or in compact as soon as the teams are combined
+  // below it; otherwise the badge rides inline with the first team.
+  const metaLine = lines >= 3 || combineTeams;
   // The referee gets its own line only when there is room left after the teams: on the
   // four-line card, and on the compact three-line card where both teams share a line.
   const showReferee = lines === 4 || (lines === 3 && combineTeams);
@@ -383,10 +382,14 @@ function MatchCard({
       >
         {metaLine && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
-            <Flex gap={4} align="center" wrap="nowrap">
-              {timeLabel}
-              {statusIndicator}
-            </Flex>
+            {/* The two-line card's first row is badge + conflicts only; the time (and
+                status) join it once there are three lines to spare. */}
+            {lines >= 3 && (
+              <Flex gap={4} align="center" wrap="nowrap">
+                {timeLabel}
+                {statusIndicator}
+              </Flex>
+            )}
             {badgeLabel != null ? fullBadge(badgeLabel) : null}
             {placementWarningIcon}
             {shortBreakIcon}
@@ -395,9 +398,9 @@ function MatchCard({
           </Flex>
         )}
         <Flex gap={6} align="center" wrap="nowrap">
-          {lines === 2 && coreShort != null && fullBadge(coreShort)}
+          {lines === 2 && !metaLine && coreShort != null && fullBadge(coreShort)}
           {lines === 1 && coreShort != null && inlineBadge(coreShort)}
-          {!metaLine && statusIndicator}
+          {lines < 3 && statusIndicator}
           {match.stage_item_input1_conflict && (
             <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
           )}
