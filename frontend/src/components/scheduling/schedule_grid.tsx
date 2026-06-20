@@ -20,7 +20,12 @@ import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
-import { NEUTRAL_STAGE_ITEM_COLOUR, scoreColour, type StageItemColour } from '@logic/colors';
+import {
+  CONFLICT_COLOURS,
+  NEUTRAL_STAGE_ITEM_COLOUR,
+  scoreColour,
+  type StageItemColour,
+} from '@logic/colors';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import {
@@ -241,7 +246,7 @@ function MatchCard({
           component="span"
           style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
         >
-          <AiFillWarning color="orange" />
+          <AiFillWarning color={CONFLICT_COLOURS.precedence} />
         </Box>
       </Tooltip>
     ) : null;
@@ -253,7 +258,7 @@ function MatchCard({
         component="span"
         style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
       >
-        <AiFillWarning color="var(--mantine-color-yellow-filled)" />
+        <AiFillWarning color={CONFLICT_COLOURS.shortBreak} />
       </Box>
     </Tooltip>
   ) : null;
@@ -269,7 +274,7 @@ function MatchCard({
           component="span"
           style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
         >
-          <AiFillWarning color="orange" />
+          <AiFillWarning color={CONFLICT_COLOURS.referee} />
         </Box>
       </Tooltip>
     ) : null;
@@ -353,14 +358,16 @@ function MatchCard({
           {rows === 2 && coreShort != null && fullBadge(coreShort)}
           {rows === 1 && coreShort != null && inlineBadge(coreShort)}
           {rows < 3 && statusIndicator}
-          {match.stage_item_input1_conflict && <AiFillWarning color="red" />}
+          {match.stage_item_input1_conflict && (
+            <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+          )}
           {rows < 3 && placementWarningIcon}
           {rows < 3 && shortBreakIcon}
           {rows < 3 && refereeConflictIcon}
           {rows === 1 &&
             match.stage_item_input2_conflict &&
             !(mergeConflictIcons && match.stage_item_input1_conflict) && (
-              <AiFillWarning color="red" />
+              <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
             )}
           <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
             {rows === 1 ? `${input1} – ${input2}` : input1}
@@ -376,7 +383,9 @@ function MatchCard({
         </Flex>
         {rows > 1 && (
           <Flex gap={4} align="center" wrap="nowrap">
-            {match.stage_item_input2_conflict && <AiFillWarning color="red" />}
+            {match.stage_item_input2_conflict && (
+              <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+            )}
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>

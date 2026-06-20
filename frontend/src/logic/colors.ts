@@ -277,6 +277,25 @@ export function computeStageItemColours(
 
 export { NEUTRAL as NEUTRAL_STAGE_ITEM_COLOUR };
 
+// ── Conflict colours ─────────────────────────────────────────────────────────
+
+/**
+ * Warning-icon colours for the scheduling conflicts the planner flags on a match,
+ * shared by the planner grid and the match details modal so a given conflict reads
+ * as the same colour everywhere. Defined here, with every other app colour, so each
+ * is set in exactly one place.
+ */
+export const CONFLICT_COLOURS = {
+  /** A team is double-booked across two overlapping matches (per playing slot). */
+  teamDoubleBooked: 'red',
+  /** The match's referee is playing or refereeing another match at the same time. */
+  referee: 'red',
+  /** The match starts before a feeder / previous-stage match has finished. */
+  precedence: 'orange',
+  /** The break before the match is shorter than the tournament default. */
+  shortBreak: 'var(--mantine-color-yellow-filled)',
+} as const;
+
 // ── Score colours ───────────────────────────────────────────────────────────
 
 /**
