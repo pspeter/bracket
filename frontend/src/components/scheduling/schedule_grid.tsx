@@ -125,13 +125,31 @@ function MatchCard({
   // The card covers only the playing time; the margin after the match shows as a
   // calendar-style gap before the next card.
   const cardHeightPx = block.durationMinutes * pxPerMinute;
-  // Pick the densest layout that still fits: three rows (time / team 1 / team 2),
-  // two rows (badge + team 1 / team 2), or a single "team 1 – team 2" row.
-  const rows = cardHeightPx >= 52 ? 3 : cardHeightPx >= 34 ? 2 : 1;
+  // How many text lines the card can fit, budgeting ~13–15px per line so they never
+  // clip. Thresholds are in pixels but, at the compact scale (3px/min), land on the
+  // round durations the planner thinks in: 1 line below 10 min, 2 lines at 10–12 min,
+  // 3 lines at 13–19 min, 4 lines from 20 min. The line layouts are:
+  //   1 → "team 1 – team 2"
+  //   2 → meta / both teams (compact) or badge + team 1 / team 2 (agenda)
+  //   3 → meta / both teams / referee (compact) or meta / team 1 / team 2 (agenda)
+  //   4 → meta / team 1 / team 2 / referee
+  const lines = cardHeightPx >= 60 ? 4 : cardHeightPx >= 39 ? 3 : cardHeightPx >= 30 ? 2 : 1;
   const fontSize = zoom === 'compact' ? 11 : undefined;
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
-  const mergeConflictIcons = rows === 1;
+  const mergeConflictIcons = lines === 1;
+  // In compact, both abbreviated teams share the second line whenever there is a meta
+  // line above them (two- and three-line cards), like the one-row layout — so the badge
+  // and conflict flags up top never crowd a team out of view. A four-line card has the
+  // room to split the teams onto their own lines again.
+  const combineTeams = (lines === 2 || lines === 3) && zoom === 'compact';
+  // The meta line (time + identity badge + every scheduling-conflict flag) gets its own
+  // row once the card is tall enough, or in compact as soon as the teams are combined
+  // below it; otherwise the badge rides inline with the first team.
+  const metaLine = lines >= 3 || combineTeams;
+  // The referee gets its own line only when there is room left after the teams: on the
+  // four-line card, and on the compact three-line card where both teams share a line.
+  const showReferee = lines === 4 || (lines === 3 && combineTeams);
 
   let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
@@ -155,10 +173,16 @@ function MatchCard({
       : itemName != null
         ? abbreviateStageItem(itemName)
         : null;
+  // Compact's narrow columns can't fit the full stage-item name, so the badge there
+  // uses the abbreviated form ("D · 3") rather than ellipsis-truncating the full one
+  // ("Group D · 3" → "Group D…"). Agenda has the room for the full label, and prepends
+  // the stage name once the card is tall enough.
   const badgeLabel =
-    cardHeightPx >= 72 && stageName != null && coreFull != null
-      ? `${stageName} · ${coreFull}`
-      : coreFull;
+    zoom === 'compact'
+      ? coreShort
+      : cardHeightPx >= 72 && stageName != null && coreFull != null
+        ? `${stageName} · ${coreFull}`
+        : coreFull;
   // Full pill at 2+ rows; a bare coloured token on the shortest one-row cards,
   // where a pill's padding would crowd out the team names.
   // The accent (the level's hue) shares the fill's hue, so using it as text on the
@@ -353,21 +377,26 @@ function MatchCard({
     >
       <Box
         px={6}
-        pt={rows === 3 ? 2 : 0}
+        pt={metaLine ? 2 : 0}
         style={{
           height: '100%',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: rows === 3 ? 'flex-start' : 'center',
+          justifyContent: metaLine ? 'flex-start' : 'center',
         }}
       >
-        {rows === 3 && (
+        {metaLine && (
           <Flex gap={4} justify="space-between" align="center" wrap="nowrap">
-            <Flex gap={4} align="center" wrap="nowrap">
-              {timeLabel}
-              {statusIndicator}
-            </Flex>
+            {/* Compact cards never spend a line on the time — the ruler and break
+                chips already carry it; only agenda shows it. The status glyph still
+                rides up here on the three- and four-line cards. */}
+            {lines >= 3 && (zoom === 'agenda' || statusIndicator != null) && (
+              <Flex gap={4} align="center" wrap="nowrap">
+                {zoom === 'agenda' && timeLabel}
+                {statusIndicator}
+              </Flex>
+            )}
             {badgeLabel != null ? fullBadge(badgeLabel) : null}
             {placementWarningIcon}
             {shortBreakIcon}
@@ -376,33 +405,33 @@ function MatchCard({
           </Flex>
         )}
         <Flex gap={6} align="center" wrap="nowrap">
-          {rows === 2 && coreShort != null && fullBadge(coreShort)}
-          {rows === 1 && coreShort != null && inlineBadge(coreShort)}
-          {rows < 3 && statusIndicator}
+          {lines === 2 && !metaLine && coreShort != null && fullBadge(coreShort)}
+          {lines === 1 && coreShort != null && inlineBadge(coreShort)}
+          {lines < 3 && statusIndicator}
           {match.stage_item_input1_conflict && (
             <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
           )}
-          {rows < 3 && placementWarningIcon}
-          {rows < 3 && shortBreakIcon}
-          {rows < 3 && refereeConflictIcon}
-          {rows === 1 &&
-            match.stage_item_input2_conflict &&
-            !(mergeConflictIcons && match.stage_item_input1_conflict) && (
+          {!metaLine && placementWarningIcon}
+          {!metaLine && shortBreakIcon}
+          {!metaLine && refereeConflictIcon}
+          {(combineTeams ||
+            (lines === 1 && !(mergeConflictIcons && match.stage_item_input1_conflict))) &&
+            match.stage_item_input2_conflict && (
               <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
             )}
           <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
-            {rows === 1 ? `${input1} – ${input2}` : input1}
+            {lines === 1 || combineTeams ? `${input1} – ${input2}` : input1}
           </Text>
           {showScore &&
-            (rows === 1
+            (lines === 1 || combineTeams
               ? pinnedScores(
                   scoreChip(match.stage_item_input1_score, score1Colour),
                   scoreChip(match.stage_item_input2_score, score2Colour)
                 )
               : pinnedScores(scoreChip(match.stage_item_input1_score, score1Colour)))}
-          {rows < 3 && violationIcon}
+          {!metaLine && violationIcon}
         </Flex>
-        {rows > 1 && (
+        {lines >= 2 && !combineTeams && (
           <Flex gap={4} align="center" wrap="nowrap">
             {match.stage_item_input2_conflict && (
               <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
@@ -413,7 +442,7 @@ function MatchCard({
             {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
           </Flex>
         )}
-        {rows >= 2 && (
+        {showReferee && (
           <RefereeDisplay
             match={match}
             refereesEnabled={refereesEnabled}
