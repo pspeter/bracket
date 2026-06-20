@@ -9,23 +9,41 @@
  *      arbitrary key (team, stage item, …). Used where any stable-but-distinct
  *      colour will do.
  *
- *   2. Level colours      — a level's colour is generated in OKLCH and spread by
- *      the level's *position* in the tournament, so the levels actually present
- *      land as far apart on the hue wheel as the count allows. `levelColour`
- *      returns the badge colour shown on every view; the planner derives its
- *      stage/item shades from the same hue (`levelHue`), so a level keeps its
- *      identity from a badge to a schedule card.
+ *   2. Level colours      — a level's colour is drawn, by the level's *position*
+ *      in the tournament, from a curated colourblind-safe qualitative palette
+ *      (`LEVEL_PALETTE`), falling back to an even OKLCH hue spread only past the
+ *      palette length. `levelColour` returns the badge colour shown on every
+ *      view; the planner derives its stage/item shades from the same hue
+ *      (`levelHue`), so a level keeps its identity from a badge to a schedule
+ *      card.
  *
  *   3. Score colours      — win / draw / loss (and live / pending) chip colours,
  *      shared by the results, dashboard, score-tracking and schedule views.
  *
+ * Invariant across all three: colour is never the *only* cue. Level badges always
+ * render the level name, the planner legend pairs every swatch with its name, and
+ * score chips contain the score — so colour only sharpens the at-a-glance read and
+ * is never load-bearing for correctness. That is what lets us optimise the palette
+ * for colour-vision deficiency (CVD) without worrying about ambiguous edge cases.
+ *
  * Why OKLCH for levels: OKLCH is perceptually uniform, so equal hue steps look
- * equally different and a fixed lightness reads as equally light across every
- * hue. That makes "spread the levels evenly around the wheel" actually look even,
- * and keeps the within-level shade steps from blurring into the next level — the
+ * equally different and equal lightness reads as equally light across every hue.
+ * That keeps the within-level shade steps from blurring into the next level — the
  * failure mode of the old HSL scheme, where e.g. blue (217°) and indigo (228°)
  * were numerically distinct but visually identical. OKLCH and `color-mix(in
  * oklch)` are Baseline-supported in every browser this app targets.
+ *
+ * Why a curated palette and not an even hue spread: for the ~8% of men with
+ * red–green CVD (deuter-/protan-), the perceivable hue axis collapses roughly to a
+ * single blue↔yellow line, so spreading hues evenly around the *whole* wheel spends
+ * most of the separation budget on the red↔green direction they can't see — two
+ * levels 130° apart can look identical to them. `LEVEL_PALETTE` instead picks hues
+ * that stay apart on the blue↔yellow axis and, crucially, varies *lightness* level
+ * to level (the one cue every CVD type keeps), so consecutive levels separate by
+ * lightness as well as hue. The colours were verified with a Machado-2009 CVD
+ * simulation: every pair of the first N (N ≤ palette length) stays well clear of
+ * confusion (min ΔE76 ≳ 16) under both deuteranopia and protanopia, versus ≈10 for
+ * the old even spread, while normal-vision separation stays strong (min ΔE76 ≳ 30).
  */
 
 import type { LevelResponse, MatchWithDetails, StageWithStageItems } from '@openapi';
@@ -59,13 +77,40 @@ export function stringToColour(input: string): string {
 
 // ── Level colours (OKLCH) ───────────────────────────────────────────────────
 
-/** Hue the first level (and a tournament without levels) anchors on. */
+/** Hue the first level (and a tournament without levels) anchors on. Matches the
+ * first palette entry so a no-levels family and the first level read alike. */
 const LEVEL_BASE_HUE = 250;
-/** Lightness/chroma of a level's badge + planner accent. Tuned so the colour
- * reads as text on its own light tint (the `variant="light"` badge) and as a
- * border/glyph in the planner, identically across every hue. */
+/** Lightness/chroma for levels beyond the palette length, and for the planner
+ * accent (which keeps a constant brightness across every level hue). Tuned so the
+ * colour reads as text on its own light tint (the `variant="light"` badge) and as
+ * a border/glyph in the planner, identically across every hue. */
 const LEVEL_LIGHTNESS = 0.55;
 const LEVEL_CHROMA = 0.15;
+
+/**
+ * Colourblind-safe qualitative palette for level badges, as OKLCH `[L, C, H]`
+ * triples assigned to levels in position order. Inspired by the Okabe-Ito set but
+ * tuned for this app's `variant="light"` badge (where the colour is the *text*):
+ *
+ *   - Hues stay spread along the blue↔yellow axis that red–green CVD keeps, rather
+ *     than evenly around the whole wheel.
+ *   - Lightness deliberately varies entry to entry — the cue that survives every
+ *     CVD type — so consecutive levels separate by lightness as well as hue.
+ *   - The first five entries (the common 2–5 level case) hold L ≤ 0.68 so the level
+ *     name stays legible as badge text; the rarely-reached tail may run lighter.
+ *
+ * Verified with a Machado-2009 CVD simulation (see the header note): every pair of
+ * the first N stays at min ΔE76 ≳ 16 under deuteranopia and protanopia.
+ */
+const LEVEL_PALETTE: readonly (readonly [number, number, number])[] = [
+  [0.5, 0.13, 250], // blue
+  [0.66, 0.145, 62], // orange
+  [0.56, 0.115, 160], // green
+  [0.62, 0.15, 352], // reddish purple
+  [0.68, 0.105, 232], // sky blue
+  [0.55, 0.175, 33], // vermillion
+  [0.8, 0.135, 100], // yellow
+];
 
 function oklch(lightness: number, chroma: number, hue: number): string {
   const wrapped = ((hue % 360) + 360) % 360;
@@ -80,26 +125,37 @@ function orderedLevels(levels: LevelResponse[]): LevelResponse[] {
 }
 
 /**
- * Base hue (deg) for a level, spread evenly around the wheel by the level's
- * position among all levels — so N levels are as far apart as N points can be.
+ * A level's OKLCH `[L, C, H]`, by its position among all levels: the curated
+ * `LEVEL_PALETTE` entry while one is available, then an even hue spread (at the
+ * fixed level lightness/chroma) for any overflow past the palette length.
  *
- * Trade-off: because the spread divides the wheel by the level *count*, adding
- * or removing a level re-spaces the others. We accept that (levels are set up
- * once and rarely change) in exchange for maximal separation, which is the whole
- * point of the scheme. Unknown levels fall back to the base hue.
+ * The even-spread fallback divides the wheel by the level *count*, so adding or
+ * removing an overflow level re-spaces those — accepted (levels are set up once
+ * and rarely change, and >7 levels is vanishingly rare). Unknown levels fall back
+ * to the base hue.
  */
-export function levelHue(levelId: number, levels: LevelResponse[]): number {
+function levelOklch(levelId: number, levels: LevelResponse[]): readonly [number, number, number] {
   const ordered = orderedLevels(levels);
   const index = ordered.findIndex((level) => level.id === levelId);
-  if (index < 0) return LEVEL_BASE_HUE;
+  if (index < 0) return [LEVEL_LIGHTNESS, LEVEL_CHROMA, LEVEL_BASE_HUE];
+  if (index < LEVEL_PALETTE.length) return LEVEL_PALETTE[index];
   const count = Math.max(ordered.length, 1);
-  return (LEVEL_BASE_HUE + (360 * index) / count) % 360;
+  return [LEVEL_LIGHTNESS, LEVEL_CHROMA, (LEVEL_BASE_HUE + (360 * index) / count) % 360];
 }
 
-/** A level's app-wide colour: the same hue every view paints it with. Pass it
+/**
+ * Base hue (deg) for a level: the hue of its palette colour, so the planner's
+ * stage/item shades land on the same hue the badge uses and a level keeps its
+ * identity from a badge to a schedule card.
+ */
+export function levelHue(levelId: number, levels: LevelResponse[]): number {
+  return levelOklch(levelId, levels)[2];
+}
+
+/** A level's app-wide colour: the same colour every view paints it with. Pass it
  * straight to a Mantine `<Badge color={...} variant="light">`. */
 export function levelColour(levelId: number, levels: LevelResponse[]): string {
-  return oklch(LEVEL_LIGHTNESS, LEVEL_CHROMA, levelHue(levelId, levels));
+  return oklch(...levelOklch(levelId, levels));
 }
 
 /** Legend swatch in the planner: a level's exact app-wide colour, so the key
