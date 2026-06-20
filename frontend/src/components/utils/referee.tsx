@@ -3,6 +3,7 @@ import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { ReactNode } from 'react';
 
 import { MatchWithDetails } from '@openapi';
+import { abbreviateTeamName } from '@logic/planning/labels';
 import { formatStageItemInput } from './stage_item_input';
 
 type RefereeFields = Pick<MatchWithDetails, 'referee' | 'referee_name'>;
@@ -22,14 +23,17 @@ export function RefereeDisplay({
   refereesEnabled,
   stageItemsLookup = {},
   conflictIcon = null,
+  abbreviated = false,
 }: {
   match: RefereeFields;
   refereesEnabled: boolean;
   stageItemsLookup?: any;
   conflictIcon?: ReactNode;
+  abbreviated?: boolean;
 }) {
-  const name = getRefereeName(match, stageItemsLookup);
+  let name = getRefereeName(match, stageItemsLookup);
   if (!refereesEnabled || name == null) return null;
+  if (abbreviated) name = abbreviateTeamName(name);
 
   return (
     <Flex gap={4} align="center" wrap="nowrap">
