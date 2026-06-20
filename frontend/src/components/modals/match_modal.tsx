@@ -8,10 +8,12 @@ import {
   Modal,
   NumberInput,
   Select,
+  Stack,
   Text,
   useCombobox,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +23,7 @@ import DeleteButton from '@components/buttons/delete';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { levelSwatchColour } from '@logic/colors';
+import { CONFLICT_COLOURS, levelSwatchColour } from '@logic/colors';
 import {
   LevelResponse,
   MatchWithDetails,
@@ -302,6 +304,51 @@ function MatchModalForm({
   const team1Name = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   const team2Name = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
 
+  // Surface the same scheduling conflicts the planner grid flags on this match, each as an
+  // icon plus a brief description. Colours come from the shared CONFLICT_COLOURS so the
+  // grid and this list always agree.
+  type ActiveConflict = { key: string; colour: string; label: string };
+  const activeConflicts: (ActiveConflict | null)[] = [
+    match.stage_item_input1_conflict
+      ? {
+          key: 'input1',
+          colour: CONFLICT_COLOURS.teamDoubleBooked,
+          label: t('team_double_booked_conflict_label', { team: team1Name }),
+        }
+      : null,
+    match.stage_item_input2_conflict
+      ? {
+          key: 'input2',
+          colour: CONFLICT_COLOURS.teamDoubleBooked,
+          label: t('team_double_booked_conflict_label', { team: team2Name }),
+        }
+      : null,
+    match.precedence_conflict
+      ? {
+          key: 'precedence',
+          colour: CONFLICT_COLOURS.precedence,
+          label: t('precedence_conflict_label'),
+        }
+      : null,
+    match.short_break_conflict
+      ? {
+          key: 'short_break',
+          colour: CONFLICT_COLOURS.shortBreak,
+          label: t('short_break_conflict_label'),
+        }
+      : null,
+    refereesEnabled && match.referee_conflict
+      ? {
+          key: 'referee',
+          colour: CONFLICT_COLOURS.referee,
+          label: t('referee_conflict_label'),
+        }
+      : null,
+  ];
+  const shownConflicts = activeConflicts.filter(
+    (conflict): conflict is ActiveConflict => conflict != null
+  );
+
   return (
     <>
       <form
@@ -350,6 +397,21 @@ function MatchModalForm({
               </Badge>
             ))}
           </Group>
+        )}
+        {shownConflicts.length > 0 && (
+          <Stack gap={6} mb="md">
+            <Text size="sm" fw={600}>
+              {t('active_conflicts_label')}
+            </Text>
+            {shownConflicts.map((conflict) => (
+              <Group key={conflict.key} gap="xs" wrap="nowrap" align="center">
+                <AiFillWarning color={conflict.colour} style={{ flexShrink: 0 }} />
+                <Text size="sm" c="dimmed">
+                  {conflict.label}
+                </Text>
+              </Group>
+            ))}
+          </Stack>
         )}
         <NumberInput
           withAsterisk
