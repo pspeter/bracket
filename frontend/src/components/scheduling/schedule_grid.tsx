@@ -133,23 +133,23 @@ function MatchCard({
   //   2 → meta / both teams (compact) or badge + team 1 / team 2 (agenda)
   //   3 → meta / both teams / referee (compact) or meta / team 1 / team 2 (agenda)
   //   4 → meta / team 1 / team 2 / referee
-  const lines = cardHeightPx >= 65 ? 4 : cardHeightPx >= 45 ? 3 : cardHeightPx >= 30 ? 2 : 1;
-  const fontSize = zoom === 'compact' ? 11 : undefined;
+  const lines = cardHeightPx >= 65 ? 4 : cardHeightPx >= 49 ? 3 : cardHeightPx >= 30 ? 2 : 1;
+  const fontSize = 11;
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
-  const mergeConflictIcons = lines === 1;
+  const mergeConflictIcons = lines === 1 | (zoom === 'compact' && lines === 2);
   // In compact, both abbreviated teams share the second line whenever there is a meta
   // line above them (two- and three-line cards), like the one-row layout — so the badge
   // and conflict flags up top never crowd a team out of view. A four-line card has the
   // room to split the teams onto their own lines again.
-  const combineTeams = (lines === 2 || lines === 3) && zoom === 'compact';
+  const combineTeams = lines <= 3;
   // The meta line (time + identity badge + every scheduling-conflict flag) gets its own
   // row once the card is tall enough, or in compact as soon as the teams are combined
   // below it; otherwise the badge rides inline with the first team.
-  const metaLine = lines >= 3 || combineTeams;
+  const metaLine = lines >= 3;
   // The referee gets its own line only when there is room left after the teams: on the
   // four-line card, and on the compact three-line card where both teams share a line.
-  const showReferee = lines === 4 || (lines === 3 && combineTeams);
+  const showReferee = lines >= 3 || (lines === 2 && combineTeams);
 
   let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
