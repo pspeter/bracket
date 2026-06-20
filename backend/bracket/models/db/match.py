@@ -41,6 +41,7 @@ class MatchBaseInsertable(BaseModelORM):
     stage_item_input1_conflict: bool
     stage_item_input2_conflict: bool
     precedence_conflict: bool = False
+    feeder_precedence_conflict: bool = False
     short_break_conflict: bool = False
     referee_conflict: bool = False
     state: MatchState = MatchState.NOT_STARTED

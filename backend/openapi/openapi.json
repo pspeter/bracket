@@ -454,6 +454,11 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
+          "feeder_precedence_conflict": {
+            "default": false,
+            "title": "Feeder Precedence Conflict",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -624,6 +629,7 @@
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
+          "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
           "state",
@@ -967,6 +973,11 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
+          "feeder_precedence_conflict": {
+            "default": false,
+            "title": "Feeder Precedence Conflict",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -1165,6 +1176,7 @@
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
+          "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
           "state",
@@ -1238,6 +1250,11 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
+          "feeder_precedence_conflict": {
+            "default": false,
+            "title": "Feeder Precedence Conflict",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -1430,6 +1447,7 @@
           "stage_item_input1_conflict",
           "stage_item_input2_conflict",
           "precedence_conflict",
+          "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
           "state",

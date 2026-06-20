@@ -282,6 +282,10 @@ export type Match = {
    */
   duration_minutes: number;
   /**
+   * Feeder Precedence Conflict
+   */
+  feeder_precedence_conflict: boolean;
+  /**
    * Id
    */
   id: number;
@@ -519,6 +523,10 @@ export type MatchWithDetails = {
    */
   duration_minutes: number;
   /**
+   * Feeder Precedence Conflict
+   */
+  feeder_precedence_conflict: boolean;
+  /**
    * Id
    */
   id: number;
@@ -626,6 +634,10 @@ export type MatchWithDetailsDefinitive = {
    * Duration Minutes
    */
   duration_minutes: number;
+  /**
+   * Feeder Precedence Conflict
+   */
+  feeder_precedence_conflict: boolean;
   /**
    * Id
    */

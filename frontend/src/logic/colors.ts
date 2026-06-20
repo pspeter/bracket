@@ -290,7 +290,7 @@ export const CONFLICT_COLOURS = {
   teamDoubleBooked: 'red',
   /** The match's referee is playing or refereeing another match at the same time. */
   referee: 'red',
-  /** The match starts before a feeder / previous-stage match has finished. */
+  /** The match is on either side of a precedence dependency, or before an earlier stage's match. */
   precedence: 'orange',
   /** The break before the match is shorter than the tournament default. */
   shortBreak: 'var(--mantine-color-yellow-filled)',

@@ -238,9 +238,10 @@ def test_get_match_conflict_flags_marks_match_before_winner_feeder() -> None:
 
     assert flags[final.id].precedence_conflict is True
     # The final (T+30 → T+120) starts while both feeders (T → T+90) are still running, so the
-    # precedence conflict is marked on the feeder side too.
-    assert flags[feeder1.id].precedence_conflict is True
-    assert flags[feeder2.id].precedence_conflict is True
+    # conflict is marked on the feeder side too — from their perspective they end after a match
+    # depending on their results has started.
+    assert flags[feeder1.id].feeder_precedence_conflict is True
+    assert flags[feeder2.id].feeder_precedence_conflict is True
 
 
 def test_get_match_conflict_flags_does_not_mark_winner_feeder_finishing_before_dependent() -> None:
@@ -271,8 +272,8 @@ def test_get_match_conflict_flags_does_not_mark_winner_feeder_finishing_before_d
     flags = get_match_conflict_flags([stage], default_break_minutes=5)
 
     assert flags[final.id].precedence_conflict is False
-    assert flags[feeder1.id].precedence_conflict is False
-    assert flags[feeder2.id].precedence_conflict is False
+    assert flags[feeder1.id].feeder_precedence_conflict is False
+    assert flags[feeder2.id].feeder_precedence_conflict is False
 
 
 def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes() -> None:
@@ -338,10 +339,10 @@ def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes
 
     assert flags[target_match.id].precedence_conflict is True
     # source_match1 (T → T+10) finishes before the target stage item starts (T+15).
-    assert flags[source_match1.id].precedence_conflict is False
+    assert flags[source_match1.id].feeder_precedence_conflict is False
     # source_match2 (T+10 → T+20) is still running once the target stage item starts (T+15),
-    # so the precedence conflict is flagged on the feeder side too.
-    assert flags[source_match2.id].precedence_conflict is True
+    # so the conflict is flagged on the feeder side too.
+    assert flags[source_match2.id].feeder_precedence_conflict is True
 
 
 def test_get_match_conflict_flags_does_not_mark_feeding_stage_item_finishing_before_dependent() -> (
@@ -409,8 +410,8 @@ def test_get_match_conflict_flags_does_not_mark_feeding_stage_item_finishing_bef
     flags = get_match_conflict_flags([stage], default_break_minutes=5)
 
     assert flags[target_match.id].precedence_conflict is False
-    assert flags[source_match1.id].precedence_conflict is False
-    assert flags[source_match2.id].precedence_conflict is False
+    assert flags[source_match1.id].feeder_precedence_conflict is False
+    assert flags[source_match2.id].feeder_precedence_conflict is False
 
 
 def test_get_match_conflict_flags_marks_sub_default_break_on_later_match() -> None:
