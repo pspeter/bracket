@@ -122,7 +122,10 @@ def _set_winner_of_precedence_conflicts(
                 and feeder.start_time is not None
                 and match.start_time < feeder.end_time
             ):
+                # The dependent match starts before its feeder finishes; flag both sides so
+                # the precedence conflict is marked on the feeder too.
                 flags[match.id].precedence_conflict = True
+                flags[feeder.id].precedence_conflict = True
 
 
 def _get_stage_item_end_times(

@@ -237,6 +237,40 @@ def test_get_match_conflict_flags_marks_match_before_winner_feeder() -> None:
     flags = get_match_conflict_flags([stage], default_break_minutes=5)
 
     assert flags[final.id].precedence_conflict is True
+    # The final (T+30 → T+120) starts while both feeders (T → T+90) are still running, so the
+    # precedence conflict is marked on the feeder side too.
+    assert flags[feeder1.id].precedence_conflict is True
+    assert flags[feeder2.id].precedence_conflict is True
+
+
+def test_get_match_conflict_flags_does_not_mark_winner_feeder_finishing_before_dependent() -> None:
+    """A winner-of feeder that finishes before its dependent match starts is not flagged."""
+    tournament_id = TournamentId(-1)
+    stage_item_inputs = get_stage_item_inputs_mock(tournament_id)
+    feeder1, feeder2, final, consolation = get_2_definitive_and_2_tentative_matches_mock(
+        stage_item_inputs
+    )
+    # Feeders run T → T+90; the final starts at T+90 (back-to-back), so no precedence conflict.
+    final = final.model_copy(
+        update={
+            "court_id": CourtId(-3),
+            "start_time": T + timedelta(minutes=90),
+        }
+    )
+    first_round = get_one_round_with_two_definitive_matches(feeder1, feeder2)
+    final_round, _ = get_two_round_with_one_tentative_match_each(final, consolation)
+    stage = StageWithStageItems(
+        id=StageId(-1),
+        tournament_id=tournament_id,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[get_stage_item_mock(stage_item_inputs, [first_round, final_round])],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=5)
+
+    assert flags[final.id].precedence_conflict is False
     assert flags[feeder1.id].precedence_conflict is False
     assert flags[feeder2.id].precedence_conflict is False
 
@@ -310,7 +344,9 @@ def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes
     assert flags[source_match2.id].precedence_conflict is True
 
 
-def test_get_match_conflict_flags_does_not_mark_feeder_finishing_before_dependent() -> None:
+def test_get_match_conflict_flags_does_not_mark_feeding_stage_item_finishing_before_dependent() -> (
+    None
+):
     """A feeder stage item that fully finishes before its dependent starts is not flagged."""
     tournament_id = TournamentId(-1)
     source_inputs = get_stage_item_inputs_mock(tournament_id)
