@@ -405,6 +405,8 @@ function OverviewBlock({
   block,
   pxPerMinute,
   colour,
+  isViolation,
+  refereesEnabled,
   isSelected,
   highlightActive,
   isHighlighted,
@@ -412,23 +414,45 @@ function OverviewBlock({
   block: MatchBlock<MatchWithDetails>;
   pxPerMinute: number;
   colour: StageItemColour;
+  isViolation: boolean;
+  refereesEnabled: boolean;
   isSelected: boolean;
   highlightActive: boolean;
   isHighlighted: boolean;
 }) {
+  const { match } = block;
   const blockHeightPx = block.durationMinutes * pxPerMinute;
-  const isCompleted = block.match.state === 'COMPLETED';
-  const isInProgress = block.match.state === 'IN_PROGRESS';
+  const isCompleted = match.state === 'COMPLETED';
+  const isInProgress = match.state === 'IN_PROGRESS';
   // The fill is the same capped-light tint the cards use, so a level/stage keeps
   // its colour when zooming out. Blocks render at full opacity (status is carried
   // by the check/live-dot glyphs); only the highlight-dim fades the rest.
   const opacity = highlightActive && !isHighlighted ? 0.25 : undefined;
 
+  // The cards split conflicts across several icons; an overview block is too small
+  // for more than one, so they collapse into a single warning marker coloured by
+  // the most severe conflict present: a double-booked team (red) outranks a
+  // precedence/referee violation (orange), which outranks a short break (yellow).
+  // This is the same palette the cards use for each conflict.
+  const conflictColour =
+    match.stage_item_input1_conflict || match.stage_item_input2_conflict
+      ? 'red'
+      : isViolation || match.precedence_conflict || (refereesEnabled && match.referee_conflict)
+        ? 'orange'
+        : match.short_break_conflict
+          ? 'var(--mantine-color-yellow-filled)'
+          : null;
+  // The marker must stay legible on the smallest blocks (a 10-minute match is only
+  // ~12px tall at this zoom), so it is sized to the block but never shrinks below a
+  // readable floor — overflowing a hair past a tiny block rather than vanishing.
+  const conflictIconSize = Math.min(Math.max(blockHeightPx - 1, 9), 13);
+
   return (
     <Box
-      data-match-id={block.match.id}
+      data-match-id={match.id}
       data-highlighted={isHighlighted ? 'true' : undefined}
       data-dimmed={highlightActive && !isHighlighted ? 'true' : undefined}
+      data-conflict={conflictColour != null ? 'true' : undefined}
       style={{
         position: 'absolute',
         top: block.startMinutes * pxPerMinute,
@@ -450,18 +474,25 @@ function OverviewBlock({
         justifyContent: 'center',
       }}
     >
-      {isCompleted && blockHeightPx >= 12 && (
+      {conflictColour != null ? (
+        // The conflict marker takes priority over the status glyph: on a small
+        // block there is only room for one, and a conflict is the more actionable
+        // cue. It is always rendered (no height gate) so even a 10-minute match
+        // surfaces its warning.
+        <Box component="span" style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}>
+          <AiFillWarning color={conflictColour} size={conflictIconSize} />
+        </Box>
+      ) : isCompleted && blockHeightPx >= 12 ? (
         <Text c="var(--mantine-color-text)" fz={Math.min(blockHeightPx - 2, 12)} fw={700} lh={1}>
           ✓
         </Text>
-      )}
-      {isInProgress && blockHeightPx >= 12 && (
+      ) : isInProgress && blockHeightPx >= 12 ? (
         <Box
           component="span"
           className={classes.liveDot}
           style={{ backgroundColor: colour.accent }}
         />
-      )}
+      ) : null}
     </Box>
   );
 }
@@ -1046,6 +1077,8 @@ export default function ScheduleGrid({
                       block={block}
                       pxPerMinute={pxPerMinute}
                       colour={colour}
+                      isViolation={violations.has(block.match.id)}
+                      refereesEnabled={refereesEnabled}
                       isSelected={selectedMatch?.matchId === block.match.id}
                       highlightActive={highlightActive}
                       isHighlighted={isHighlighted}
