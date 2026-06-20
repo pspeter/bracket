@@ -137,7 +137,7 @@ function MatchCard({
   const fontSize = 11;
   // A one-row card is too narrow for everything; both conflict flags collapse
   // into a single icon.
-  const mergeConflictIcons = lines === 1 | (zoom === 'compact' && lines === 2);
+  const mergeConflictIcons = lines === 1 || (zoom === 'compact' && lines === 2);
   // In compact, both abbreviated teams share the second line whenever there is a meta
   // line above them (two- and three-line cards), like the one-row layout — so the badge
   // and conflict flags up top never crowd a team out of view. A four-line card has the
@@ -333,6 +333,51 @@ function MatchCard({
       </Box>
     </Tooltip>
   ) : null;
+  // On one-line and compact two-line cards every conflict collapses into one icon.
+  // The colour follows the same severity order as the overview blocks; the tooltip
+  // lists every active conflict so nothing is silently hidden.
+  const allConflictLabels: string[] = [
+    ...(match.stage_item_input1_conflict
+      ? [t('team_double_booked_conflict_label', { team: input1 })]
+      : []),
+    ...(match.stage_item_input2_conflict
+      ? [t('team_double_booked_conflict_label', { team: input2 })]
+      : []),
+    ...precedenceWarningLabels,
+    ...(match.short_break_conflict ? [t('short_break_conflict_label')] : []),
+    ...(refereesEnabled && match.referee_conflict ? [t('referee_conflict_label')] : []),
+    ...(hasPlacementWarning ? [t('placement_conflict_preview_label')] : []),
+  ];
+  const mergedConflictColour =
+    match.stage_item_input1_conflict || match.stage_item_input2_conflict
+      ? CONFLICT_COLOURS.teamDoubleBooked
+      : refereesEnabled && match.referee_conflict
+        ? CONFLICT_COLOURS.referee
+        : precedenceWarningLabels.length > 0
+          ? CONFLICT_COLOURS.precedence
+          : hasPlacementWarning
+            ? 'var(--mantine-color-orange-filled)'
+            : match.short_break_conflict
+              ? CONFLICT_COLOURS.shortBreak
+              : null;
+  const mergedConflictIcon =
+    mergeConflictIcons && mergedConflictColour != null ? (
+      <Tooltip
+        multiline={allConflictLabels.length > 1}
+        label={
+          allConflictLabels.length > 1
+            ? allConflictLabels.map((label) => <div key={label}>{label}</div>)
+            : allConflictLabels[0]
+        }
+      >
+        <Box
+          component="span"
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+        >
+          <AiFillWarning color={mergedConflictColour} />
+        </Box>
+      </Tooltip>
+    ) : null;
 
   return (
     <Box
@@ -408,30 +453,34 @@ function MatchCard({
           {lines === 2 && !metaLine && coreShort != null && fullBadge(coreShort)}
           {lines === 1 && coreShort != null && inlineBadge(coreShort)}
           {lines < 3 && statusIndicator}
-          {match.stage_item_input1_conflict && (
-            <Tooltip label={t('team_double_booked_conflict_label', { team: input1 })}>
-              <Box
-                component="span"
-                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
-              >
-                <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
-              </Box>
-            </Tooltip>
+          {mergeConflictIcons ? (
+            mergedConflictIcon
+          ) : (
+            <>
+              {match.stage_item_input1_conflict && (
+                <Tooltip label={t('team_double_booked_conflict_label', { team: input1 })}>
+                  <Box
+                    component="span"
+                    style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+                  >
+                    <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+                  </Box>
+                </Tooltip>
+              )}
+              {!metaLine && placementWarningIcon}
+              {!metaLine && shortBreakIcon}
+              {combineTeams && match.stage_item_input2_conflict && (
+                <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
+                  <Box
+                    component="span"
+                    style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
+                  >
+                    <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
+                  </Box>
+                </Tooltip>
+              )}
+            </>
           )}
-          {!metaLine && placementWarningIcon}
-          {!metaLine && shortBreakIcon}
-          {(combineTeams ||
-            (lines === 1 && !(mergeConflictIcons && match.stage_item_input1_conflict))) &&
-            match.stage_item_input2_conflict && (
-              <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
-                <Box
-                  component="span"
-                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: '1rem' }}
-                >
-                  <AiFillWarning color={CONFLICT_COLOURS.teamDoubleBooked} />
-                </Box>
-              </Tooltip>
-            )}
           <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate style={{ flex: 1 }}>
             {lines === 1 || combineTeams ? `${input1} – ${input2}` : input1}
           </Text>
@@ -442,8 +491,8 @@ function MatchCard({
                   scoreChip(match.stage_item_input2_score, score2Colour)
                 )
               : pinnedScores(scoreChip(match.stage_item_input1_score, score1Colour)))}
-          {!metaLine && violationIcon}
-          {!metaLine && refereeConflictIcon}
+          {!metaLine && !mergeConflictIcons && violationIcon}
+          {!metaLine && !mergeConflictIcons && refereeConflictIcon}
         </Flex>
         {lines >= 2 && !combineTeams && (
           <Flex gap={4} align="center" wrap="nowrap">
@@ -468,7 +517,7 @@ function MatchCard({
             match={match}
             refereesEnabled={refereesEnabled}
             stageItemsLookup={stageItemsLookup}
-            conflictIcon={refereeConflictIcon}
+            conflictIcon={mergeConflictIcons ? null : refereeConflictIcon}
           />
         )}
       </Box>
