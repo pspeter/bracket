@@ -24,6 +24,7 @@ import { SWRResponse } from 'swr';
 
 import CreateStageButton from '@components/buttons/create_stage';
 import { LevelBadge } from '@components/levels/levels';
+import { ConfirmModal } from '@components/modals/confirm_modal';
 import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import { CreateStageItemModal } from '@components/modals/create_stage_item';
 import { UpdateStageModal } from '@components/modals/update_stage';
@@ -278,6 +279,7 @@ function StageItemRow({
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
+  const [confirmDeleteOpened, setConfirmDeleteOpened] = useState(false);
 
   const inputs = stageItem.inputs
     .sort((i1, i2) => (i1.slot > i2.slot ? 1 : -1))
@@ -320,6 +322,18 @@ function StageItemRow({
             setOpened={setOpened}
             rankings={rankings}
           />
+          <ConfirmModal
+            opened={confirmDeleteOpened}
+            setOpened={setConfirmDeleteOpened}
+            title={t('delete_stage_item_confirm_title')}
+            message={t('delete_stage_item_confirm_message')}
+            confirmLabel={t('delete_button')}
+            onConfirm={async () => {
+              await deleteStageItem(tournament.id, stageItem.id);
+              await swrStagesResponse.mutate();
+              await swrAvailableInputsResponse.mutate();
+            }}
+          />
           <Group gap="0rem">
             {stageItem.type === 'SWISS' ? (
               <Tooltip label={t('handle_swiss_system')}>
@@ -360,11 +374,7 @@ function StageItemRow({
                 ) : null}
                 <Menu.Item
                   leftSection={<IconTrash size="1.5rem" />}
-                  onClick={async () => {
-                    await deleteStageItem(tournament.id, stageItem.id);
-                    await swrStagesResponse.mutate();
-                    await swrAvailableInputsResponse.mutate();
-                  }}
+                  onClick={() => setConfirmDeleteOpened(true)}
                   color="red"
                 >
                   {t('delete_button')}
@@ -396,6 +406,7 @@ function StageColumn({
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
+  const [confirmDeleteOpened, setConfirmDeleteOpened] = useState(false);
   const teamsMap = getTeamsLookup(tournament != null ? tournament.id : -1);
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
 
@@ -471,6 +482,22 @@ function StageColumn({
         opened={opened}
         setOpened={setOpened}
       />
+      <ConfirmModal
+        opened={confirmDeleteOpened}
+        setOpened={setConfirmDeleteOpened}
+        title={t('delete_stage_confirm_title')}
+        message={
+          stage.stage_items.length > 0
+            ? t('delete_stage_confirm_message_with_items')
+            : t('delete_stage_confirm_message')
+        }
+        confirmLabel={t('delete_button')}
+        onConfirm={async () => {
+          await deleteStage(tournament.id, stage.id);
+          await swrStagesResponse.mutate();
+          await swrAvailableInputsResponse.mutate();
+        }}
+      />
       <Group justify="space-between">
         <Group>
           {stage.name}
@@ -498,11 +525,7 @@ function StageColumn({
             </Menu.Item>
             <Menu.Item
               leftSection={<IconTrash size="1.5rem" />}
-              onClick={async () => {
-                await deleteStage(tournament.id, stage.id);
-                await swrStagesResponse.mutate();
-                await swrAvailableInputsResponse.mutate();
-              }}
+              onClick={() => setConfirmDeleteOpened(true)}
               color="red"
             >
               {t('delete_button')}

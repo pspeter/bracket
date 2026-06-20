@@ -108,20 +108,8 @@ async def delete_stage(
     stage_id: StageId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
-    stage: StageWithStageItems = Depends(stage_dependency),
+    _stage: StageWithStageItems = Depends(stage_dependency),
 ) -> SuccessResponse:
-    if len(stage.stage_items) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Stage contains stage items, please delete those first",
-        )
-
-    if stage.is_active and len(stage.stage_items) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Stage is active, please activate another stage first",
-        )
-
     await sql_delete_stage(tournament_id, stage_id)
 
     return SuccessResponse()

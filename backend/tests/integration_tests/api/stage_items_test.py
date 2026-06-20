@@ -1,11 +1,15 @@
 import pytest
 
 from bracket.database import database
+from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.models.db.match import MatchState
-from bracket.models.db.stage_item import StageType
-from bracket.models.db.stage_item_inputs import StageItemInputCreateBodyFinal
+from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
+from bracket.models.db.stage_item_inputs import (
+    StageItemInputCreateBodyFinal,
+    StageItemInputCreateBodyTentative,
+)
 from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stages
-from bracket.sql.stage_items import get_stage_item
+from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
     DUMMY_STAGE1,
@@ -112,6 +116,112 @@ async def test_delete_stage_item(
             )
             == SUCCESS_RESPONSE
         )
+        await assert_row_count_and_clear(stages, 0)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_delete_stage_item_empties_downstream_references(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted_1,
+        inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted_2,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_1,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team_inserted_2,
+    ):
+        tournament_id = auth_context.tournament.id
+        source_stage_item = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_1.id,
+                name="Group A",
+                team_count=2,
+                type=StageType.ROUND_ROBIN,
+                ranking_id=auth_context.ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=team_inserted_1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=team_inserted_2.id),
+                ],
+            ),
+        )
+        downstream_stage_item = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_2.id,
+                name="Bracket A",
+                team_count=2,
+                type=StageType.SINGLE_ELIMINATION,
+                ranking_id=auth_context.ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyTentative(
+                        slot=1, winner_from_stage_item_id=source_stage_item.id, winner_position=1
+                    ),
+                    StageItemInputCreateBodyTentative(
+                        slot=2, winner_from_stage_item_id=source_stage_item.id, winner_position=2
+                    ),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(source_stage_item, tournament_id)
+        await build_matches_for_stage_item(downstream_stage_item, tournament_id)
+
+        assert (
+            await send_tournament_request(
+                HTTPMethod.DELETE, f"stage_items/{source_stage_item.id}", auth_context, {}
+            )
+            == SUCCESS_RESPONSE
+        )
+
+        # The downstream inputs are kept (so their matches stay valid) but emptied.
+        downstream_inputs = await database.fetch_all(
+            query=stage_item_inputs.select().where(
+                stage_item_inputs.c.stage_item_id == downstream_stage_item.id
+            )
+        )
+        assert len(downstream_inputs) == 2
+        for row in downstream_inputs:
+            assert row["team_id"] is None
+            assert row["winner_from_stage_item_id"] is None
+            assert row["winner_position"] is None
+
+        await assert_row_count_and_clear(matches, 1)
+        await assert_row_count_and_clear(rounds, 1)
+        await assert_row_count_and_clear(stage_item_inputs, 2)
+        await assert_row_count_and_clear(stage_items, 1)
+        await assert_row_count_and_clear(stages, 2)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_delete_stage_cascades_to_stage_items(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with inserted_stage(
+        DUMMY_STAGE2.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as stage_inserted:
+        stage_item_id = await create_stage_item_via_api(
+            auth_context, stage_inserted.id, StageType.SINGLE_ELIMINATION, 4
+        )
+        assert stage_item_id
+
+        assert (
+            await send_tournament_request(
+                HTTPMethod.DELETE, f"stages/{stage_inserted.id}", auth_context, {}
+            )
+            == SUCCESS_RESPONSE
+        )
+
+        await assert_row_count_and_clear(matches, 0)
+        await assert_row_count_and_clear(rounds, 0)
+        await assert_row_count_and_clear(stage_item_inputs, 0)
+        await assert_row_count_and_clear(stage_items, 0)
         await assert_row_count_and_clear(stages, 0)
 
 

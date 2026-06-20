@@ -71,11 +71,26 @@ async def sql_set_team_id_for_stage_item_input(
 
 
 async def sql_delete_stage_item_inputs(stage_item_id: StageItemId) -> None:
-    query = """
-        DELETE FROM stage_item_inputs
-        WHERE stage_item_id = :stage_item_id OR winner_from_stage_item_id = :stage_item_id
-        """
-    await database.execute(query=query, values={"stage_item_id": stage_item_id})
+    # Inputs in other stage items that draw their team from this stage item's result are
+    # turned into empty slots rather than deleted, so their matches keep referencing a valid
+    # (now unassigned) input row instead of failing on a foreign key.
+    await database.execute(
+        query="""
+            UPDATE stage_item_inputs
+            SET team_id = NULL,
+                winner_from_stage_item_id = NULL,
+                winner_position = NULL
+            WHERE winner_from_stage_item_id = :stage_item_id
+            """,
+        values={"stage_item_id": stage_item_id},
+    )
+    await database.execute(
+        query="""
+            DELETE FROM stage_item_inputs
+            WHERE stage_item_id = :stage_item_id
+            """,
+        values={"stage_item_id": stage_item_id},
+    )
 
 
 async def sql_create_stage_item_input(

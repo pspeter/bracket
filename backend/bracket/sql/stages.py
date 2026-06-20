@@ -117,12 +117,15 @@ async def get_full_tournament_details(
 
 
 async def sql_delete_stage(tournament_id: TournamentId, stage_id: StageId) -> None:
+    from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
+
     async with database.transaction():
-        query = """
-            DELETE FROM stage_items
-            WHERE stage_items.stage_id = :stage_id
-            """
-        await database.execute(query=query, values={"stage_id": stage_id})
+        stage_item_rows = await database.fetch_all(
+            query="SELECT id FROM stage_items WHERE stage_id = :stage_id",
+            values={"stage_id": stage_id},
+        )
+        for row in stage_item_rows:
+            await sql_delete_stage_item_with_foreign_keys(StageItemId(row["id"]))
 
         query = """
             DELETE FROM stages
