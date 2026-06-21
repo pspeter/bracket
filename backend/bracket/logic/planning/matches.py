@@ -33,7 +33,6 @@ from bracket.utils.id_types import (
     CourtId,
     LevelId,
     MatchId,
-    RoundId,
     StageId,
     StageItemId,
     StageItemInputId,
@@ -116,33 +115,38 @@ def _pinned_match_ids(contexts: list[_MatchContext], reoptimize: bool) -> frozen
     return frozenset(pinned)
 
 
-# Maps (round_id, abstract_slot_number) → synthetic negative StageItemInputId.
+# Maps (stage_item_id, abstract_slot_number) → synthetic negative StageItemInputId.
 # Placeholder matches have no real stage_item_input_id values; we assign them synthetic
 # negative IDs so the CP-SAT no-overlap machinery treats abstract slots like real ones.
-_SlotIdMap = dict[tuple[RoundId, int], StageItemInputId]
+# The key uses stage_item_id (not round_id) so the same abstract slot in different rounds
+# of the same stage item maps to the same ID — preventing a team from playing two rounds
+# at the same time.
+_SlotIdMap = dict[tuple[StageItemId, int], StageItemInputId]
 
 
 def _make_slot_id_map(stages: list[StageWithStageItems]) -> _SlotIdMap:
-    pairs: set[tuple[RoundId, int]] = set()
+    pairs: set[tuple[StageItemId, int]] = set()
     for stage in stages:
         for stage_item in stage.stage_items:
             for round_ in stage_item.rounds:
                 for match in round_.matches:
                     if match.stage_item_input1_id is None and match.input1_slot is not None:
-                        pairs.add((match.round_id, match.input1_slot))
+                        pairs.add((stage_item.id, match.input1_slot))
                     if match.stage_item_input2_id is None and match.input2_slot is not None:
-                        pairs.add((match.round_id, match.input2_slot))
+                        pairs.add((stage_item.id, match.input2_slot))
                     if match.stage_item_input1_id is None and match.referee_slot is not None:
-                        pairs.add((match.round_id, match.referee_slot))
+                        pairs.add((stage_item.id, match.referee_slot))
     return {pair: StageItemInputId(-i - 1) for i, pair in enumerate(sorted(pairs))}
 
 
-def _input_ids(match: ScheduleMatch, slot_id_map: _SlotIdMap) -> tuple[StageItemInputId, ...]:
+def _input_ids(
+    match: ScheduleMatch, slot_id_map: _SlotIdMap, stage_item_id: StageItemId
+) -> tuple[StageItemInputId, ...]:
     if match.stage_item_input1_id is None and match.stage_item_input2_id is None:
         return tuple(
-            slot_id_map[(match.round_id, slot)]
+            slot_id_map[(stage_item_id, slot)]
             for slot in (match.input1_slot, match.input2_slot)
-            if slot is not None and (match.round_id, slot) in slot_id_map
+            if slot is not None and (stage_item_id, slot) in slot_id_map
         )
     return tuple(
         input_id
@@ -237,7 +241,7 @@ def _get_match_contexts(
             stage_id=stage.id,
             stage_item_id=stage_item.id,
             round_index=round_index,
-            input_ids=_input_ids(match, slot_id_map),
+            input_ids=_input_ids(match, slot_id_map, stage_item.id),
             cross_stage_source_ids=_cross_stage_source_ids(match),
             stage_item_has_open_slot=_has_open_slot(stage_item),
         )
@@ -761,7 +765,7 @@ def _add_placeholder_referee_slot_constraints(
         match = context.match
         if match.stage_item_input1_id is not None or match.referee_slot is None:
             continue
-        synthetic_id = slot_id_map.get((match.round_id, match.referee_slot))
+        synthetic_id = slot_id_map.get((context.stage_item_id, match.referee_slot))
         if synthetic_id is None:
             continue
         ref_end = model.NewIntVar(
