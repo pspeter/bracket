@@ -3079,6 +3079,17 @@
       },
       "StageItemUpdateBody": {
         "properties": {
+          "games_per_player": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Games Per Player"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -3097,7 +3108,8 @@
         "required": [
           "name",
           "ranking_id",
-          "team_count"
+          "team_count",
+          "games_per_player"
         ],
         "title": "StageItemUpdateBody",
         "type": "object"

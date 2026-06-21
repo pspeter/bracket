@@ -44,9 +44,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Re-add is_draft column (nullable first, then populate, then constrain)
     op.add_column("rounds", sa.Column("is_draft", sa.Boolean(), nullable=True))
-    op.execute(
-        "UPDATE rounds SET is_draft = (lifecycle_state = 'DRAFT')"
-    )
+    op.execute("UPDATE rounds SET is_draft = (lifecycle_state = 'DRAFT')")
     op.alter_column("rounds", "is_draft", nullable=False)
 
     # Make lifecycle_state nullable again

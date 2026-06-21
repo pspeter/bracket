@@ -38,6 +38,7 @@ class StageItemUpdateBody(BaseModelORM):
     name: str
     ranking_id: RankingId
     team_count: int = Field(ge=2, le=64)
+    games_per_player: int | None = None
 
 
 class StageItemActivateNextBody(BaseModelORM):

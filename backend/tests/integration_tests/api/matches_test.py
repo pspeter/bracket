@@ -64,7 +64,10 @@ async def test_create_match(
         ) as stage_item_inserted,
         inserted_round(
             DUMMY_ROUND1.model_copy(
-                update={"stage_item_id": stage_item_inserted.id, "lifecycle_state": RoundLifecycleState.DRAFT}
+                update={
+                    "stage_item_id": stage_item_inserted.id,
+                    "lifecycle_state": RoundLifecycleState.DRAFT,
+                }
             )
         ) as round_inserted,
         inserted_team(
@@ -110,7 +113,10 @@ async def test_delete_match(
         ) as stage_item_inserted,
         inserted_round(
             DUMMY_ROUND1.model_copy(
-                update={"stage_item_id": stage_item_inserted.id, "lifecycle_state": RoundLifecycleState.DRAFT}
+                update={
+                    "stage_item_id": stage_item_inserted.id,
+                    "lifecycle_state": RoundLifecycleState.DRAFT,
+                }
             )
         ) as round_inserted,
         inserted_team(

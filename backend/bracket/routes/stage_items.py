@@ -25,6 +25,7 @@ from bracket.logic.scheduling.round_robin import (
     get_number_of_rounds_to_create_round_robin,
     get_round_robin_combinations,
 )
+from bracket.logic.scheduling.swiss_skeleton import build_swiss_skeleton
 from bracket.logic.scheduling.upcoming_matches import get_upcoming_matches_for_swiss
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.match import MatchCreateBody, MatchFilter, MatchState, SuggestedMatch
@@ -55,6 +56,7 @@ from bracket.sql.rounds import (
     get_round_by_id,
     set_round_lifecycle_state,
     sql_create_round,
+    sql_delete_round,
     sql_delete_rounds_for_stage_item_id,
 )
 from bracket.sql.shared import (
@@ -129,7 +131,8 @@ async def update_stage_item_row(
             UPDATE stage_items
             SET name = :name,
                 ranking_id = :ranking_id,
-                team_count = :team_count
+                team_count = :team_count,
+                games_per_player = COALESCE(:games_per_player, games_per_player)
             WHERE stage_items.id = :stage_item_id
         """,
         values={
@@ -137,6 +140,7 @@ async def update_stage_item_row(
             "name": stage_item_body.name,
             "ranking_id": stage_item_body.ranking_id,
             "team_count": stage_item_body.team_count,
+            "games_per_player": stage_item_body.games_per_player,
         },
     )
 
@@ -380,6 +384,67 @@ async def resize_non_elimination_stage_item(
     await clear_removed_winner_positions(stage_item_id, new_team_count)
 
 
+async def adjust_swiss_games_per_player(
+    tournament_id: TournamentId,
+    stage_item_id: StageItemId,
+    stage_item: StageItemWithRounds,
+    new_games_per_player: int,
+) -> None:
+    """Append or remove trailing PLACEHOLDER rounds when games-per-player changes."""
+    old_games_per_player = stage_item.games_per_player
+    if old_games_per_player is None or new_games_per_player == old_games_per_player:
+        return
+
+    old_skeleton = build_swiss_skeleton(stage_item.team_count, old_games_per_player)
+    new_skeleton = build_swiss_skeleton(stage_item.team_count, new_games_per_player)
+    current_rounds = sorted(stage_item.rounds, key=lambda r: r.id)
+
+    if new_skeleton.round_count > old_skeleton.round_count:
+        tournament = await sql_get_tournament(tournament_id)
+        for round_skeleton in new_skeleton.rounds[old_skeleton.round_count :]:
+            round_id = await sql_create_round(
+                RoundInsertable(
+                    created=datetime_utc.now(),
+                    stage_item_id=stage_item_id,
+                    name=await get_next_round_name(tournament_id, stage_item_id),
+                    lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                )
+            )
+            for slot1, slot2 in round_skeleton.matches:
+                await sql_create_match(
+                    MatchCreateBody(
+                        round_id=round_id,
+                        court_id=None,
+                        stage_item_input1_id=None,
+                        stage_item_input2_id=None,
+                        stage_item_input1_winner_from_match_id=None,
+                        stage_item_input2_winner_from_match_id=None,
+                        duration_minutes=tournament.duration_minutes,
+                        custom_duration_minutes=None,
+                        input1_slot=slot1,
+                        input2_slot=slot2,
+                        referee_slot=round_skeleton.bye_slot,
+                    )
+                )
+    elif new_skeleton.round_count < old_skeleton.round_count:
+        rounds_to_remove = current_rounds[new_skeleton.round_count :]
+        for round_ in rounds_to_remove:
+            for match in round_.matches:
+                if match.state is not MatchState.NOT_STARTED:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            "Cannot reduce games-per-player: a trailing round contains "
+                            "matches that have already started or completed"
+                        ),
+                    )
+        for round_ in rounds_to_remove:
+            match_ids = [match.id for match in round_.matches]
+            if match_ids:
+                await sql_delete_matches(match_ids)
+            await sql_delete_round(round_.id)
+
+
 async def resize_stage_item_if_needed(
     tournament_id: TournamentId,
     stage_item_id: StageItemId,
@@ -456,6 +521,10 @@ async def update_stage_item(
     team_count_changed = stage_item_body.team_count != stage_item.team_count
 
     async with database.transaction():
+        if stage_item_body.games_per_player is not None and stage_item.type is StageType.SWISS:
+            await adjust_swiss_games_per_player(
+                tournament_id, stage_item_id, stage_item, stage_item_body.games_per_player
+            )
         await resize_stage_item_if_needed(tournament_id, stage_item_id, stage_item, stage_item_body)
         await update_stage_item_row(stage_item_id, stage_item_body)
 

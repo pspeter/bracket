@@ -1,5 +1,4 @@
 from enum import auto
-from typing import Any
 
 from heliclockter import datetime_utc
 from pydantic import computed_field
