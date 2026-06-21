@@ -26,7 +26,7 @@ from bracket.sql.matches import (
     sql_reschedule_match_and_determine_duration,
     sql_unschedule_match,
 )
-from bracket.sql.referees import sql_set_match_referee_slot
+from bracket.sql.referees import sql_set_match_abstract_referee_slot, sql_set_match_referee_slot
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import (
@@ -48,6 +48,7 @@ class ScheduleOperation(NamedTuple):
     position: int
     match: MatchWithDetails | MatchWithDetailsDefinitive
     referee_stage_item_input_id: StageItemInputId | None = None
+    abstract_referee_slot: int | None = None
 
 
 ScheduleMatch = MatchWithDetails | MatchWithDetailsDefinitive
@@ -783,6 +784,70 @@ def _add_placeholder_referee_slot_constraints(
         )
 
 
+def _add_placeholder_referee_auto_assignment(
+    model: Any,
+    movable_contexts: list[_MatchContext],
+    starts: dict[MatchId, Any],
+    input_intervals: dict[StageItemInputId, list[Any]],
+    slot_id_map: _SlotIdMap,
+    horizon: int,
+) -> dict[MatchId, dict[int, Any]]:
+    """Auto-assign an abstract referee_slot to placeholder matches that lack one.
+
+    For each placeholder match without a pre-set referee_slot, pick one abstract slot
+    from the stage item's known slots (those appearing in any match in the stage item)
+    excluding the two playing slots. The chosen slot's synthetic ID gets an optional
+    interval in input_intervals so AddNoOverlap prevents two matches from sharing the
+    same referee slot at the same time.
+
+    Returns {match_id: {abstract_slot: choice_bool_var}} for use in extracting the
+    solver's choice after solving.
+    """
+    all_slots_by_item: dict[StageItemId, dict[int, StageItemInputId]] = defaultdict(dict)
+    for (item_id, slot), syn_id in slot_id_map.items():
+        all_slots_by_item[item_id][slot] = syn_id
+
+    ref_choices: dict[MatchId, dict[int, Any]] = {}
+    for context in movable_contexts:
+        match = context.match
+        if match.stage_item_input1_id is not None or match.stage_item_input2_id is not None:
+            continue
+        if match.referee_slot is not None:
+            continue
+        playing = {match.input1_slot, match.input2_slot} - {None}
+        candidates = {
+            slot: syn_id
+            for slot, syn_id in sorted(all_slots_by_item[context.stage_item_id].items())
+            if slot not in playing
+        }
+        if not candidates:
+            continue
+        choices: dict[int, Any] = {
+            slot: model.NewBoolVar(f"placeholder_ref_match_{match.id}_slot_{slot}")
+            for slot in candidates
+        }
+        model.AddExactlyOne(choices.values())
+        ref_choices[match.id] = choices
+
+        for slot, var in choices.items():
+            syn_id = candidates[slot]
+            ref_end = model.NewIntVar(
+                0,
+                horizon + match.duration_minutes,
+                f"placeholder_ref_auto_end_{match.id}_slot_{slot}",
+            )
+            input_intervals[syn_id].append(
+                model.NewOptionalIntervalVar(
+                    starts[match.id],
+                    match.duration_minutes,
+                    ref_end,
+                    var,
+                    f"placeholder_ref_auto_interval_{match.id}_slot_{slot}",
+                )
+            )
+    return ref_choices
+
+
 def _add_referee_assignment(
     model: Any,
     movable_contexts: list[_MatchContext],
@@ -937,6 +1002,7 @@ def _build_operations_from_solution(
     starts: dict[MatchId, Any],
     court_choices: dict[MatchId, dict[CourtId, Any]],
     ref_choices: dict[MatchId, dict[StageItemInputId, Any]],
+    placeholder_ref_choices: dict[MatchId, dict[int, Any]],
     tournament: Tournament,
 ) -> list[ScheduleOperation]:
     scheduled_slots: dict[CourtId, list[tuple[datetime_utc, MatchId, ScheduleOperation | None]]] = (
@@ -960,8 +1026,18 @@ def _build_operations_from_solution(
                 ),
                 None,
             )
+        abstract_ref_slot: int | None = None
+        if match_id in placeholder_ref_choices:
+            abstract_ref_slot = next(
+                (
+                    slot
+                    for slot, var in placeholder_ref_choices[match_id].items()
+                    if solver.Value(var) == 1
+                ),
+                None,
+            )
         operation_to_schedule = ScheduleOperation(
-            court_id, start_time, 0, context.match, referee_slot_id
+            court_id, start_time, 0, context.match, referee_slot_id, abstract_ref_slot
         )
         scheduled_slots[court_id].append((start_time, match_id, operation_to_schedule))
 
@@ -981,6 +1057,7 @@ def _build_operations_from_solution(
                         position,
                         operation_for_position.match,
                         operation_for_position.referee_stage_item_input_id,
+                        operation_for_position.abstract_referee_slot,
                     )
                 )
 
@@ -1070,6 +1147,7 @@ def build_schedule_plan(
     # slot. ref_spreads feeds the fairness term in the objective.
     ref_choices: dict[MatchId, dict[StageItemInputId, Any]] = {}
     ref_spreads: list[Any] = []
+    placeholder_ref_choices: dict[MatchId, dict[int, Any]] = {}
     if tournament.referees_enabled:
         pinned_referee_slots = [
             context.match.referee_stage_item_input_id
@@ -1087,6 +1165,9 @@ def build_schedule_plan(
             _referee_slots_by_stage(stages),
             horizon,
             reoptimize,
+        )
+        placeholder_ref_choices = _add_placeholder_referee_auto_assignment(
+            model, movable_contexts, starts, input_intervals, slot_id_map, horizon
         )
 
     _add_no_overlap_constraints(model, court_intervals, input_intervals)
@@ -1177,6 +1258,7 @@ def build_schedule_plan(
         starts,
         court_choices,
         ref_choices,
+        placeholder_ref_choices,
         tournament,
     )
 
@@ -1202,6 +1284,8 @@ async def _apply_schedule_plan(
         )
         if op.referee_stage_item_input_id is not None:
             await sql_set_match_referee_slot(op.match.id, op.referee_stage_item_input_id)
+        if op.abstract_referee_slot is not None:
+            await sql_set_match_abstract_referee_slot(op.match.id, op.abstract_referee_slot)
 
 
 def build_referee_assignment_plan(

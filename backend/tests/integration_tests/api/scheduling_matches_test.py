@@ -1008,3 +1008,80 @@ async def test_placeholder_cross_round_slot_conflict_forces_stagger(
     assert len(start_times) == 2, (
         "slot 1 plays in both rounds and must not be double-booked at the same time"
     )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_referee_slot_auto_assigned_when_enabled(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """When referees_enabled, the scheduler picks an abstract referee_slot for each
+    placeholder match and the chosen slot is never one of the two playing slots.
+
+    Without auto-assignment, every placeholder match keeps referee_slot=NULL after
+    scheduling. The test fails because the assertion requires referee_slot to be set.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_id = await sql_create_round(
+                RoundInsertable(
+                    stage_item_id=si.id,
+                    name="Round 1",
+                    lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                    created=MOCK_NOW,
+                )
+            )
+            # Two matches covering all 4 slots — no referee_slot pre-set.
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=1, input2_slot=2
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=3, input2_slot=4
+                )
+            )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be scheduled onto a court"
+    )
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "scheduler must auto-assign a referee_slot to each placeholder match when referees_enabled"
+    )
+    for m in all_matches:
+        assert m.referee_slot != m.input1_slot, "referee slot must not be a playing slot"
+        assert m.referee_slot != m.input2_slot, "referee slot must not be a playing slot"
