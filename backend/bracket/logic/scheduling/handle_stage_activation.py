@@ -8,16 +8,25 @@ from bracket.logic.ranking.calculation import (
     determine_team_ranking_for_stage_item,
 )
 from bracket.logic.ranking.statistics import TeamStatistics
+from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
+from bracket.logic.scheduling.swiss_slot_assigner import (
+    assign_pairs_to_slots,
+    skeleton_from_slot_pairs,
+)
 from bracket.models.db.match import MatchState
+from bracket.models.db.round import RoundLifecycleState
+from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputEmpty,
     StageItemInputFinal,
     StageItemInputTentative,
 )
 from bracket.models.db.team import Team
-from bracket.models.db.util import StageWithStageItems
-from bracket.sql.matches import clear_scores_for_matches_in_stage_item
+from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
+from bracket.sql.matches import clear_scores_for_matches_in_stage_item, sql_set_input_ids_for_match
 from bracket.sql.rankings import get_ranking_for_stage_item
+from bracket.sql.referees import sql_set_match_referee_slot
+from bracket.sql.rounds import set_round_lifecycle_state
 from bracket.sql.stage_item_inputs import (
     get_stage_item_input_by_id,
     sql_set_team_id_for_stage_item_input,
@@ -147,9 +156,59 @@ async def get_updates_to_inputs_in_activated_stage(
     return dict(result)
 
 
+async def _resolve_round_1_for_swiss_stage_item(
+    tournament_id: TournamentId,
+    stage_item: StageItemWithRounds,
+) -> None:
+    """Fill in concrete team assignments for round 1 of a Swiss stage item."""
+    placeholder_round = next(
+        (r for r in stage_item.rounds if r.lifecycle_state == RoundLifecycleState.PLACEHOLDER),
+        None,
+    )
+    if placeholder_round is None:
+        return
+
+    inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
+    if not inputs:
+        return
+
+    slot_pairs = [
+        (m.input1_slot, m.input2_slot)
+        for m in placeholder_round.matches
+        if m.input1_slot is not None and m.input2_slot is not None
+    ]
+    bye_slot = next(
+        (m.referee_slot for m in placeholder_round.matches if m.referee_slot is not None),
+        None,
+    )
+
+    pairs, bye = select_round_pairing(inputs, [])
+    skeleton = skeleton_from_slot_pairs(slot_pairs, bye_slot)
+    slot_mapping = assign_pairs_to_slots(pairs, bye, skeleton)
+
+    for match in placeholder_round.matches:
+        if match.input1_slot is None or match.input2_slot is None:
+            continue
+        input1_id = slot_mapping.get(match.input1_slot)
+        input2_id = slot_mapping.get(match.input2_slot)
+        if input1_id is None or input2_id is None:
+            continue
+        await sql_set_input_ids_for_match(placeholder_round.id, match.id, [input1_id, input2_id])
+
+        if match.referee_slot is not None:
+            ref_id = slot_mapping.get(match.referee_slot)
+            if ref_id is not None:
+                await sql_set_match_referee_slot(match.id, ref_id)
+
+    await set_round_lifecycle_state(
+        placeholder_round.id, tournament_id, RoundLifecycleState.RESOLVED
+    )
+
+
 async def update_matches_in_activated_stage(tournament_id: TournamentId, stage_id: StageId) -> None:
     """
     Sets the team_id for stage item inputs of the newly activated stage.
+    For Swiss stage items also resolves round 1 placeholder matches.
     """
     updates_per_stage_item = await get_updates_to_inputs_in_activated_stage(tournament_id, stage_id)
     for stage_item_updates in updates_per_stage_item.values():
@@ -157,6 +216,16 @@ async def update_matches_in_activated_stage(tournament_id: TournamentId, stage_i
             await sql_set_team_id_for_stage_item_input(
                 tournament_id, update.stage_item_input.id, update.team.id
             )
+
+    # Re-fetch after tentative inputs are resolved so inputs are Final
+    stages = await get_full_tournament_details(tournament_id, stage_id=stage_id)
+    activated_stage = next((s for s in stages if s.id == stage_id), None)
+    if activated_stage is None:
+        return
+
+    for stage_item in activated_stage.stage_items:
+        if stage_item.type == StageType.SWISS:
+            await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
 
 
 async def update_matches_in_deactivated_stage(
