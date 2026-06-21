@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import timedelta
 
 import pytest
@@ -1085,3 +1086,109 @@ async def test_placeholder_referee_slot_auto_assigned_when_enabled(
     for m in all_matches:
         assert m.referee_slot != m.input1_slot, "referee slot must not be a playing slot"
         assert m.referee_slot != m.input2_slot, "referee slot must not be a playing slot"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_referee_slot_not_playing_in_concurrent_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A referee slot must never be scheduled to play in another match at the same time.
+
+    Setup: two matches whose referee candidates are exactly each other's playing slots.
+      Match A: slots 1v2 → eligible referees {3, 4}
+      Match B: slots 3v4 → eligible referees {1, 2}
+    With 2 courts the solver can place both at T=0, but doing so would mean match A's
+    referee (3 or 4) is playing in match B at the same time — a hard constraint violation.
+    The solver must stagger the matches so the referee slot is free while it referees.
+
+    Without the no-overlap constraint on auto-assigned abstract referee intervals the
+    solver can freely put both matches at T=0 with a conflicting referee, so this test
+    is the guard for that guarantee.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_id = await sql_create_round(
+                RoundInsertable(
+                    stage_item_id=si.id,
+                    name="Round 1",
+                    lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                    created=MOCK_NOW,
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=1, input2_slot=2
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=3, input2_slot=4
+                )
+            )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be placed on a court"
+    )
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "each placeholder match must have a referee_slot assigned"
+    )
+
+    # With 2 courts and 4 slots where each match's only referee candidates are the other
+    # match's playing slots, concurrent scheduling is impossible — the solver must stagger.
+    start_times = {m.start_time for m in all_matches}
+    assert len(start_times) == 2, (
+        "solver must stagger matches when every eligible referee of each match is also "
+        "a player in the other match — otherwise the referee would be playing at the same time"
+    )
+
+    by_time: dict = defaultdict(list)
+    for m in all_matches:
+        by_time[m.start_time].append(m)
+
+    for concurrent in by_time.values():
+        for m in concurrent:
+            concurrent_playing_slots = {
+                slot
+                for other in concurrent
+                if other.id != m.id
+                for slot in (other.input1_slot, other.input2_slot)
+                if slot is not None
+            }
+            assert m.referee_slot not in concurrent_playing_slots, (
+                f"match {m.id} referee_slot={m.referee_slot} is playing in a concurrent match"
+            )
