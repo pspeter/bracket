@@ -58,6 +58,9 @@ class MatchInsertable(MatchBaseInsertable):
     stage_item_input2_id: StageItemInputId | None = None
     stage_item_input1_winner_from_match_id: MatchId | None = None
     stage_item_input2_winner_from_match_id: MatchId | None = None
+    input1_slot: int | None = None
+    input2_slot: int | None = None
+    referee_slot: int | None = None
 
 
 class Match(MatchInsertable):
@@ -152,6 +155,9 @@ class MatchCreateBodyFrontend(BaseModelORM):
 class MatchCreateBody(MatchCreateBodyFrontend):
     duration_minutes: int
     custom_duration_minutes: int | None = None
+    input1_slot: int | None = None
+    input2_slot: int | None = None
+    referee_slot: int | None = None
 
 
 class MatchRescheduleBody(BaseModelORM):

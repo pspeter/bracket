@@ -8,8 +8,8 @@ from bracket.utils.id_types import RoundId, StageItemId, TournamentId
 
 async def sql_create_round(round_: RoundInsertable) -> RoundId:
     query = """
-        INSERT INTO rounds (created, is_draft, name, stage_item_id)
-        VALUES (NOW(), :is_draft, :name, :stage_item_id)
+        INSERT INTO rounds (created, is_draft, name, stage_item_id, lifecycle_state, is_pinned)
+        VALUES (NOW(), :is_draft, :name, :stage_item_id, :lifecycle_state, :is_pinned)
         RETURNING id
         """
     result: RoundId = await database.fetch_val(
@@ -18,6 +18,10 @@ async def sql_create_round(round_: RoundInsertable) -> RoundId:
             "name": round_.name,
             "is_draft": round_.is_draft,
             "stage_item_id": round_.stage_item_id,
+            "lifecycle_state": round_.lifecycle_state.value
+            if round_.lifecycle_state is not None
+            else None,
+            "is_pinned": round_.is_pinned,
         },
     )
     return result

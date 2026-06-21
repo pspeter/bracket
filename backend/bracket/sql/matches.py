@@ -57,7 +57,10 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             stage_item_input1_conflict,
             stage_item_input2_conflict,
             created,
-            state
+            state,
+            input1_slot,
+            input2_slot,
+            referee_slot
         )
         VALUES (
             :round_id,
@@ -73,7 +76,10 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             false,
             false,
             NOW(),
-            'NOT_STARTED'
+            'NOT_STARTED',
+            :input1_slot,
+            :input2_slot,
+            :referee_slot
         )
         RETURNING *
     """
