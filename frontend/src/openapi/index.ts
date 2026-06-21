@@ -388,6 +388,7 @@ export type {
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponse,
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses,
   RoundCreateBody,
+  RoundLifecycleState,
   RoundUpdateBody,
   RoundWithMatches,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData,

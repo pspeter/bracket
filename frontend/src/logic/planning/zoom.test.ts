@@ -32,4 +32,3 @@ describe('defaultZoomLevel', () => {
     expect(defaultZoomLevel(1920)).toBe('compact');
   });
 });
-

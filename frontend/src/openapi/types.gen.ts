@@ -290,6 +290,14 @@ export type Match = {
    */
   id: number;
   /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
    * Precedence Conflict
    */
   precedence_conflict: boolean;
@@ -301,6 +309,10 @@ export type Match = {
    * Referee Name
    */
   referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
   /**
    * Referee Stage Item Input Id
    */
@@ -531,6 +543,14 @@ export type MatchWithDetails = {
    */
   id: number;
   /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
    * Level Id
    */
   level_id: number | null;
@@ -550,6 +570,10 @@ export type MatchWithDetails = {
    * Referee Name
    */
   referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
   /**
    * Referee Stage Item Input Id
    */
@@ -643,6 +667,14 @@ export type MatchWithDetailsDefinitive = {
    */
   id: number;
   /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
    * Level Id
    */
   level_id: number | null;
@@ -662,6 +694,10 @@ export type MatchWithDetailsDefinitive = {
    * Referee Name
    */
   referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
   /**
    * Referee Stage Item Input Id
    */
@@ -1031,6 +1067,11 @@ export type RoundCreateBody = {
 };
 
 /**
+ * RoundLifecycleState
+ */
+export type RoundLifecycleState = 'PLACEHOLDER' | 'RESOLVED' | 'LOCKED';
+
+/**
  * RoundUpdateBody
  */
 export type RoundUpdateBody = {
@@ -1060,6 +1101,11 @@ export type RoundWithMatches = {
    * Is Draft
    */
   is_draft: boolean;
+  /**
+   * Is Pinned
+   */
+  is_pinned: boolean | null;
+  lifecycle_state: RoundLifecycleState | null;
   /**
    * Matches
    */
@@ -1328,6 +1374,10 @@ export type StageItemActivateNextBody = {
  * StageItemCreateBody
  */
 export type StageItemCreateBody = {
+  /**
+   * Games Per Player
+   */
+  games_per_player: number | null;
   /**
    * Name
    */
@@ -1618,6 +1668,10 @@ export type StageItemWithRounds = {
    * Created
    */
   created: string;
+  /**
+   * Games Per Player
+   */
+  games_per_player: number | null;
   /**
    * Id
    */
