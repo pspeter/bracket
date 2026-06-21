@@ -33,6 +33,7 @@ from bracket.utils.id_types import (
     CourtId,
     LevelId,
     MatchId,
+    RoundId,
     StageId,
     StageItemId,
     StageItemInputId,
@@ -115,7 +116,34 @@ def _pinned_match_ids(contexts: list[_MatchContext], reoptimize: bool) -> frozen
     return frozenset(pinned)
 
 
-def _input_ids(match: ScheduleMatch) -> tuple[StageItemInputId, ...]:
+# Maps (round_id, abstract_slot_number) → synthetic negative StageItemInputId.
+# Placeholder matches have no real stage_item_input_id values; we assign them synthetic
+# negative IDs so the CP-SAT no-overlap machinery treats abstract slots like real ones.
+_SlotIdMap = dict[tuple[RoundId, int], StageItemInputId]
+
+
+def _make_slot_id_map(stages: list[StageWithStageItems]) -> _SlotIdMap:
+    pairs: set[tuple[RoundId, int]] = set()
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            for round_ in stage_item.rounds:
+                for match in round_.matches:
+                    if match.stage_item_input1_id is None and match.input1_slot is not None:
+                        pairs.add((match.round_id, match.input1_slot))
+                    if match.stage_item_input2_id is None and match.input2_slot is not None:
+                        pairs.add((match.round_id, match.input2_slot))
+                    if match.stage_item_input1_id is None and match.referee_slot is not None:
+                        pairs.add((match.round_id, match.referee_slot))
+    return {pair: StageItemInputId(-i - 1) for i, pair in enumerate(sorted(pairs))}
+
+
+def _input_ids(match: ScheduleMatch, slot_id_map: _SlotIdMap) -> tuple[StageItemInputId, ...]:
+    if match.stage_item_input1_id is None and match.stage_item_input2_id is None:
+        return tuple(
+            slot_id_map[(match.round_id, slot)]
+            for slot in (match.input1_slot, match.input2_slot)
+            if slot is not None and (match.round_id, slot) in slot_id_map
+        )
     return tuple(
         input_id
         for input_id in (match.stage_item_input1_id, match.stage_item_input2_id)
@@ -196,7 +224,12 @@ def eligible_referee_slot_ids(
     return frozenset()
 
 
-def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext]:
+def _get_match_contexts(
+    stages: list[StageWithStageItems],
+    slot_id_map: _SlotIdMap | None = None,
+) -> list[_MatchContext]:
+    if slot_id_map is None:
+        slot_id_map = _make_slot_id_map(stages)
     return [
         _MatchContext(
             match=match,
@@ -204,7 +237,7 @@ def _get_match_contexts(stages: list[StageWithStageItems]) -> list[_MatchContext
             stage_id=stage.id,
             stage_item_id=stage_item.id,
             round_index=round_index,
-            input_ids=_input_ids(match),
+            input_ids=_input_ids(match, slot_id_map),
             cross_stage_source_ids=_cross_stage_source_ids(match),
             stage_item_has_open_slot=_has_open_slot(stage_item),
         )
@@ -707,6 +740,45 @@ def _referee_load_spread(
     return spread
 
 
+def _add_placeholder_referee_slot_constraints(
+    model: Any,
+    movable_contexts: list[_MatchContext],
+    starts: dict[MatchId, Any],
+    input_intervals: dict[StageItemInputId, list[Any]],
+    slot_id_map: _SlotIdMap,
+    horizon: int,
+) -> None:
+    """Add mandatory intervals for placeholder matches that have a pre-set referee_slot.
+
+    A placeholder match has no real stage_item_input_id for its players or referee.
+    When referee_slot is already set (pre-assigned by the skeleton planner), we must
+    still enforce no-overlap: two placeholder matches sharing the same referee_slot
+    cannot run at the same time. We model this by adding a mandatory interval to the
+    synthetic slot ID's interval list; AddNoOverlap (called by the main scheduler after
+    this) then staggeres them automatically, exactly as it does for real playing slots.
+    """
+    for context in movable_contexts:
+        match = context.match
+        if match.stage_item_input1_id is not None or match.referee_slot is None:
+            continue
+        synthetic_id = slot_id_map.get((match.round_id, match.referee_slot))
+        if synthetic_id is None:
+            continue
+        ref_end = model.NewIntVar(
+            0,
+            horizon + match.duration_minutes,
+            f"placeholder_ref_end_{match.id}",
+        )
+        input_intervals[synthetic_id].append(
+            model.NewIntervalVar(
+                starts[match.id],
+                match.duration_minutes,
+                ref_end,
+                f"placeholder_ref_interval_{match.id}",
+            )
+        )
+
+
 def _add_referee_assignment(
     model: Any,
     movable_contexts: list[_MatchContext],
@@ -750,6 +822,11 @@ def _add_referee_assignment(
         if match.referee_stage_item_input_id is not None and not reoptimize:
             preserved_ref_slot[match.id] = match.referee_stage_item_input_id
             match_durations[match.id] = match.duration_minutes
+            continue
+
+        # Placeholder matches have no real input IDs; their referee constraint is handled
+        # by _add_placeholder_referee_slot_constraints, not auto-assignment from real inputs.
+        if match.stage_item_input1_id is None and match.stage_item_input2_id is None:
             continue
 
         candidates = _stage_referee_candidates(
@@ -947,7 +1024,8 @@ def build_schedule_plan(
     if not stages:
         return []
 
-    contexts = _get_match_contexts(stages)
+    slot_id_map = _make_slot_id_map(stages)
+    contexts = _get_match_contexts(stages, slot_id_map)
     pinned_ids = _pinned_match_ids(contexts, reoptimize)
     movable_contexts = [context for context in contexts if context.match.id not in pinned_ids]
     if not movable_contexts:
@@ -974,6 +1052,13 @@ def build_schedule_plan(
         horizon,
     )
     pinned_by_input = _pinned_matches_by_input(contexts, tournament, pinned_ids)
+
+    # Placeholder matches carry pre-assigned referee_slot values (abstract round-slot integers).
+    # Enforce no-overlap on those slots unconditionally, before the referee-enabled branch below,
+    # so the constraint holds even when referees_enabled is False.
+    _add_placeholder_referee_slot_constraints(
+        model, movable_contexts, starts, input_intervals, slot_id_map, horizon
+    )
 
     # Referee assignment treats the referee as a third match slot: it adds its chosen-slot
     # intervals into input_intervals before the no-overlap below, so a slot can never both play
