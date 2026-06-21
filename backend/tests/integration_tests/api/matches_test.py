@@ -5,6 +5,7 @@ from heliclockter import timedelta
 
 from bracket.database import database
 from bracket.models.db.match import Match, MatchState
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputInsertable,
@@ -63,7 +64,7 @@ async def test_create_match(
         ) as stage_item_inserted,
         inserted_round(
             DUMMY_ROUND1.model_copy(
-                update={"stage_item_id": stage_item_inserted.id, "is_draft": True}
+                update={"stage_item_id": stage_item_inserted.id, "lifecycle_state": RoundLifecycleState.DRAFT}
             )
         ) as round_inserted,
         inserted_team(
@@ -109,7 +110,7 @@ async def test_delete_match(
         ) as stage_item_inserted,
         inserted_round(
             DUMMY_ROUND1.model_copy(
-                update={"stage_item_id": stage_item_inserted.id, "is_draft": True}
+                update={"stage_item_id": stage_item_inserted.id, "lifecycle_state": RoundLifecycleState.DRAFT}
             )
         ) as round_inserted,
         inserted_team(
@@ -818,7 +819,7 @@ async def test_upcoming_matches_endpoint(
         inserted_round(
             DUMMY_ROUND1.model_copy(
                 update={
-                    "is_draft": True,
+                    "lifecycle_state": RoundLifecycleState.DRAFT,
                     "stage_item_id": stage_item_inserted.id,
                 }
             )

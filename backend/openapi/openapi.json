@@ -463,6 +463,28 @@
             "title": "Id",
             "type": "integer"
           },
+          "input1_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input1 Slot"
+          },
+          "input2_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input2 Slot"
+          },
           "precedence_conflict": {
             "default": false,
             "title": "Precedence Conflict",
@@ -483,6 +505,17 @@
               }
             ],
             "title": "Referee Name"
+          },
+          "referee_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Slot"
           },
           "referee_stage_item_input_id": {
             "anyOf": [
@@ -638,6 +671,9 @@
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
           "stage_item_input2_winner_from_match_id",
+          "input1_slot",
+          "input2_slot",
+          "referee_slot",
           "id",
           "stage_item_input1",
           "stage_item_input2"
@@ -982,6 +1018,28 @@
             "title": "Id",
             "type": "integer"
           },
+          "input1_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input1 Slot"
+          },
+          "input2_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input2 Slot"
+          },
           "level_id": {
             "anyOf": [
               {
@@ -1030,6 +1088,17 @@
               }
             ],
             "title": "Referee Name"
+          },
+          "referee_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Slot"
           },
           "referee_stage_item_input_id": {
             "anyOf": [
@@ -1185,6 +1254,9 @@
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
           "stage_item_input2_winner_from_match_id",
+          "input1_slot",
+          "input2_slot",
+          "referee_slot",
           "id",
           "stage_item_input1",
           "stage_item_input2",
@@ -1259,6 +1331,28 @@
             "title": "Id",
             "type": "integer"
           },
+          "input1_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input1 Slot"
+          },
+          "input2_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input2 Slot"
+          },
           "level_id": {
             "anyOf": [
               {
@@ -1307,6 +1401,17 @@
               }
             ],
             "title": "Referee Name"
+          },
+          "referee_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referee Slot"
           },
           "referee_stage_item_input_id": {
             "anyOf": [
@@ -1456,6 +1561,9 @@
           "stage_item_input2_id",
           "stage_item_input1_winner_from_match_id",
           "stage_item_input2_winner_from_match_id",
+          "input1_slot",
+          "input2_slot",
+          "referee_slot",
           "id",
           "stage_item_input1",
           "stage_item_input2",
@@ -1988,11 +2096,21 @@
         "title": "RoundCreateBody",
         "type": "object"
       },
+      "RoundLifecycleState": {
+        "enum": [
+          "DRAFT",
+          "ACTIVE",
+          "PLACEHOLDER",
+          "RESOLVED",
+          "LOCKED"
+        ],
+        "title": "RoundLifecycleState",
+        "type": "string"
+      },
       "RoundUpdateBody": {
         "properties": {
-          "is_draft": {
-            "title": "Is Draft",
-            "type": "boolean"
+          "lifecycle_state": {
+            "$ref": "#/components/schemas/RoundLifecycleState"
           },
           "name": {
             "title": "Name",
@@ -2001,7 +2119,7 @@
         },
         "required": [
           "name",
-          "is_draft"
+          "lifecycle_state"
         ],
         "title": "RoundUpdateBody",
         "type": "object"
@@ -2018,8 +2136,24 @@
             "type": "integer"
           },
           "is_draft": {
+            "readOnly": true,
             "title": "Is Draft",
             "type": "boolean"
+          },
+          "is_pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Pinned"
+          },
+          "lifecycle_state": {
+            "$ref": "#/components/schemas/RoundLifecycleState",
+            "default": "ACTIVE"
           },
           "matches": {
             "items": {
@@ -2047,10 +2181,12 @@
         "required": [
           "created",
           "stage_item_id",
-          "is_draft",
           "name",
+          "lifecycle_state",
+          "is_pinned",
           "id",
-          "matches"
+          "matches",
+          "is_draft"
         ],
         "title": "RoundWithMatches",
         "type": "object"
@@ -2501,6 +2637,17 @@
       },
       "StageItemCreateBody": {
         "properties": {
+          "games_per_player": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Games Per Player"
+          },
           "name": {
             "anyOf": [
               {
@@ -2542,7 +2689,8 @@
           "name",
           "type",
           "team_count",
-          "ranking_id"
+          "ranking_id",
+          "games_per_player"
         ],
         "title": "StageItemCreateBody",
         "type": "object"
@@ -2961,6 +3109,17 @@
             "title": "Created",
             "type": "string"
           },
+          "games_per_player": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Games Per Player"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -3029,6 +3188,7 @@
           "type",
           "team_count",
           "ranking_id",
+          "games_per_player",
           "id",
           "rounds",
           "inputs",

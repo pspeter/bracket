@@ -1,5 +1,5 @@
 from bracket.database import database
-from bracket.models.db.round import RoundInsertable
+from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.util import RoundWithMatches
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
@@ -8,16 +8,17 @@ from bracket.utils.id_types import RoundId, StageItemId, TournamentId
 
 async def sql_create_round(round_: RoundInsertable) -> RoundId:
     query = """
-        INSERT INTO rounds (created, is_draft, name, stage_item_id)
-        VALUES (NOW(), :is_draft, :name, :stage_item_id)
+        INSERT INTO rounds (created, name, stage_item_id, lifecycle_state, is_pinned)
+        VALUES (NOW(), :name, :stage_item_id, :lifecycle_state, :is_pinned)
         RETURNING id
         """
     result: RoundId = await database.fetch_val(
         query=query,
         values={
             "name": round_.name,
-            "is_draft": round_.is_draft,
             "stage_item_id": round_.stage_item_id,
+            "lifecycle_state": round_.lifecycle_state.value,
+            "is_pinned": round_.is_pinned,
         },
     )
     return result
@@ -76,15 +77,16 @@ async def sql_delete_round(round_id: RoundId) -> None:
     await database.execute(query=query, values={"round_id": round_id})
 
 
-async def set_round_active_or_draft(
-    round_id: RoundId, tournament_id: TournamentId, *, is_draft: bool
+async def set_round_lifecycle_state(
+    round_id: RoundId, tournament_id: TournamentId, lifecycle_state: RoundLifecycleState
 ) -> None:
     query = """
         UPDATE rounds
         SET
-            is_draft =
-                CASE WHEN rounds.id=:round_id THEN :is_draft
-                     ELSE is_draft AND NOT :is_draft
+            lifecycle_state =
+                CASE WHEN rounds.id=:round_id THEN :lifecycle_state
+                     WHEN :lifecycle_state = 'DRAFT' AND lifecycle_state = 'DRAFT' THEN 'ACTIVE'
+                     ELSE lifecycle_state
                 END
         WHERE rounds.id IN (
             SELECT rounds.id
@@ -99,6 +101,6 @@ async def set_round_active_or_draft(
         values={
             "tournament_id": tournament_id,
             "round_id": round_id,
-            "is_draft": is_draft,
+            "lifecycle_state": lifecycle_state.value,
         },
     )

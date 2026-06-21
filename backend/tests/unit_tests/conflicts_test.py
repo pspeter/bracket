@@ -2,6 +2,7 @@ from datetime import timedelta
 
 import pytest
 
+from bracket.models.db.round import RoundLifecycleState
 from bracket.logic.planning.conflicts import (
     get_conflicting_matches,
     get_match_conflict_flags,
@@ -320,7 +321,7 @@ def test_get_match_conflict_flags_marks_match_before_feeding_stage_item_finishes
         matches=[target_match],
         stage_item_id=StageItemId(-2),
         created=T,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     target_stage_item = get_stage_item_mock(source_inputs, [target_round]).model_copy(
@@ -392,7 +393,7 @@ def test_get_match_conflict_flags_does_not_mark_feeding_stage_item_finishing_bef
         matches=[target_match],
         stage_item_id=StageItemId(-2),
         created=T,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     target_stage_item = get_stage_item_mock(source_inputs, [target_round]).model_copy(
@@ -489,7 +490,7 @@ def _make_stage_with_two_matches(
         matches=[match1],
         stage_item_id=StageItemId(-10),
         created=MOCK_NOW,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     round2 = RoundWithMatches(
@@ -497,7 +498,7 @@ def _make_stage_with_two_matches(
         matches=[match2],
         stage_item_id=StageItemId(-10),
         created=MOCK_NOW,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     stage_item = StageItemWithRounds(
@@ -654,7 +655,7 @@ def test_referee_conflict_no_playing_match_no_conflict() -> None:
         matches=[refereeing_match],
         stage_item_id=StageItemId(-10),
         created=MOCK_NOW,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     stage_item = StageItemWithRounds(
@@ -764,7 +765,7 @@ def test_referee_conflict_team_plays_and_referees_same_match() -> None:
         matches=[match],
         stage_item_id=StageItemId(-10),
         created=MOCK_NOW,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
     stage_item = StageItemWithRounds(

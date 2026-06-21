@@ -114,6 +114,7 @@ stage_items = Table(
         ),
         nullable=False,
     ),
+    Column("games_per_player", Integer, nullable=True),
 )
 
 stage_item_inputs = Table(
@@ -146,8 +147,14 @@ rounds = Table(
     Column("id", BigInteger, primary_key=True, index=True),
     Column("name", Text, nullable=False),
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
-    Column("is_draft", Boolean, nullable=False),
     Column("stage_item_id", BigInteger, ForeignKey("stage_items.id"), nullable=False),
+    Column(
+        "lifecycle_state",
+        Enum("DRAFT", "ACTIVE", "PLACEHOLDER", "RESOLVED", "LOCKED", name="round_lifecycle_state"),
+        nullable=False,
+        server_default="ACTIVE",
+    ),
+    Column("is_pinned", Boolean, nullable=True),
 )
 
 
@@ -206,6 +213,9 @@ matches = Table(
         index=True,
     ),
     Column("completed_at", DateTimeTZ, nullable=True),
+    Column("input1_slot", Integer, nullable=True),
+    Column("input2_slot", Integer, nullable=True),
+    Column("referee_slot", Integer, nullable=True),
     CheckConstraint(
         "referee_stage_item_input_id IS NULL OR referee_name IS NULL",
         name="matches_at_most_one_referee",

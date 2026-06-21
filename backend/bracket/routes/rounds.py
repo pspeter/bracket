@@ -11,6 +11,7 @@ from bracket.models.db.round import (
     Round,
     RoundCreateBody,
     RoundInsertable,
+    RoundLifecycleState,
     RoundUpdateBody,
 )
 from bracket.models.db.tournament import Tournament
@@ -26,7 +27,7 @@ from bracket.routes.util import (
 from bracket.sql.matches import sql_delete_match
 from bracket.sql.rounds import (
     get_next_round_name,
-    set_round_active_or_draft,
+    set_round_lifecycle_state,
     sql_create_round,
     sql_delete_round,
 )
@@ -86,13 +87,12 @@ async def create_round(
     round_id = await sql_create_round(
         RoundInsertable(
             created=MOCK_NOW,
-            is_draft=False,
             stage_item_id=round_body.stage_item_id,
             name=await get_next_round_name(tournament_id, round_body.stage_item_id),
         ),
     )
 
-    await set_round_active_or_draft(round_id, tournament_id, is_draft=True)
+    await set_round_lifecycle_state(round_id, tournament_id, RoundLifecycleState.DRAFT)
     return SuccessResponse()
 
 
@@ -107,7 +107,7 @@ async def update_round_by_id(
 ) -> SuccessResponse:
     query = """
         UPDATE rounds
-        SET name = :name, is_draft = :is_draft
+        SET name = :name, lifecycle_state = :lifecycle_state
         WHERE rounds.id IN (
             SELECT rounds.id
             FROM rounds
@@ -123,7 +123,7 @@ async def update_round_by_id(
             "tournament_id": tournament_id,
             "round_id": round_id,
             "name": round_body.name,
-            "is_draft": round_body.is_draft,
+            "lifecycle_state": round_body.lifecycle_state.value,
         },
     )
     return SuccessResponse()

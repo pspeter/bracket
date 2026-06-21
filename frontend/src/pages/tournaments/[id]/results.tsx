@@ -104,7 +104,12 @@ export default function ResultsPage() {
               onChange={onLevelChange}
             />
           )}
-          <TeamFilterCombobox value={teamId} onChange={onTeamChange} teamOptions={teamOptions} width={160} />
+          <TeamFilterCombobox
+            value={teamId}
+            onChange={onTeamChange}
+            teamOptions={teamOptions}
+            width={160}
+          />
         </Group>
       </Group>
       <Center mt="1rem">

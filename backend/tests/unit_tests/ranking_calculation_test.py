@@ -5,6 +5,7 @@ from heliclockter import datetime_utc
 from bracket.logic.ranking.calculation import determine_ranking_for_stage_item
 from bracket.logic.ranking.statistics import TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.ranking import Ranking
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
@@ -87,7 +88,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                     ],
                     stage_item_id=StageItemId(-1),
                     created=now,
-                    is_draft=False,
+                    lifecycle_state=RoundLifecycleState.ACTIVE,
                     name="",
                 )
             ],
@@ -183,7 +184,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                     ],
                     stage_item_id=StageItemId(-1),
                     created=now,
-                    is_draft=False,
+                    lifecycle_state=RoundLifecycleState.ACTIVE,
                     name="",
                 )
             ],
@@ -241,7 +242,7 @@ def test_determine_ranking_for_stage_item_swiss_no_matches() -> None:
                     matches=[],
                     stage_item_id=StageItemId(-1),
                     created=now,
-                    is_draft=False,
+                    lifecycle_state=RoundLifecycleState.ACTIVE,
                     name="",
                 )
             ],

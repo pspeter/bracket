@@ -161,6 +161,22 @@ function TeamCountInput({ form }: { form: UseFormReturnType<any> }) {
   return <TeamCountInputRoundRobin form={form} />;
 }
 
+function GamesPerPlayerInput({ form }: { form: UseFormReturnType<any> }) {
+  const { t } = useTranslation();
+  if (form.values.type !== 'SWISS') return null;
+  return (
+    <NumberInput
+      withAsterisk
+      label={t('games_per_player_label')}
+      placeholder={t('games_per_player_placeholder')}
+      mt="1rem"
+      maw="50%"
+      min={1}
+      {...form.getInputProps('games_per_player')}
+    />
+  );
+}
+
 function getTeamCount(values: any) {
   return Number(
     values.type === 'SINGLE_ELIMINATION'
@@ -173,6 +189,7 @@ interface FormValues {
   type: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION';
   team_count_round_robin: number;
   team_count_elimination: number;
+  games_per_player: number;
 }
 export function CreateStageItemModal({
   tournament,
@@ -189,10 +206,17 @@ export function CreateStageItemModal({
   const [opened, setOpened] = useState(false);
 
   const form = useForm<FormValues>({
-    initialValues: { type: 'ROUND_ROBIN', team_count_round_robin: 4, team_count_elimination: 2 },
+    initialValues: {
+      type: 'ROUND_ROBIN',
+      team_count_round_robin: 4,
+      team_count_elimination: 2,
+      games_per_player: 3,
+    },
     validate: {
       team_count_round_robin: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
       team_count_elimination: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
+      games_per_player: (value, values) =>
+        values.type !== 'SWISS' || value >= 1 ? null : t('at_least_two_team_validation'),
     },
   });
 
@@ -214,7 +238,13 @@ export function CreateStageItemModal({
       >
         <form
           onSubmit={form.onSubmit(async (values) => {
-            await createStageItem(tournament.id, stage.id, values.type, getTeamCount(values));
+            await createStageItem(
+              tournament.id,
+              stage.id,
+              values.type,
+              getTeamCount(values),
+              values.type === 'SWISS' ? values.games_per_player : null
+            );
             await swrStagesResponse.mutate();
             await swrAvailableInputsResponse.mutate();
             setOpened(false);
@@ -229,6 +259,7 @@ export function CreateStageItemModal({
           />
           <Divider mt="1rem" />
           <TeamCountInput form={form} />
+          <GamesPerPlayerInput form={form} />
 
           <Button fullWidth mt="1.5rem" color="green" type="submit">
             {t('create_stage_item_button')}

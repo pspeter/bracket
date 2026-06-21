@@ -87,12 +87,15 @@ async def test_stages_endpoint(
                                     "stage_item_id": stage_item_inserted.id,
                                     "created": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),
                                     "is_draft": False,
+                                    "lifecycle_state": "ACTIVE",
+                                    "is_pinned": None,
                                     "name": "Round 1",
                                     "matches": [],
                                 }
                             ],
                             "inputs": [],
                             "type_name": "Round robin",
+                            "games_per_player": None,
                         }
                     ],
                 }

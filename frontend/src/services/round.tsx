@@ -19,10 +19,10 @@ export async function updateRound(
   tournament_id: number,
   round_id: number,
   name: string,
-  is_draft: boolean
+  lifecycle_state: string
 ) {
   return createAxios()
-    .put(`tournaments/${tournament_id}/rounds/${round_id}`, { name, is_draft })
+    .put(`tournaments/${tournament_id}/rounds/${round_id}`, { name, lifecycle_state })
     .catch((response: any) => handleRequestError(response));
 }
 

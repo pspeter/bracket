@@ -28,7 +28,7 @@ from bracket.logic.scheduling.round_robin import (
 from bracket.logic.scheduling.upcoming_matches import get_upcoming_matches_for_swiss
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.match import MatchCreateBody, MatchFilter, MatchState, SuggestedMatch
-from bracket.models.db.round import RoundInsertable
+from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.stage_item import (
     StageItemActivateNextBody,
     StageItemCreateBody,
@@ -53,7 +53,7 @@ from bracket.sql.matches import (
 from bracket.sql.rounds import (
     get_next_round_name,
     get_round_by_id,
-    set_round_active_or_draft,
+    set_round_lifecycle_state,
     sql_create_round,
     sql_delete_rounds_for_stage_item_id,
 )
@@ -195,7 +195,6 @@ async def ensure_round_count_for_round_robin(
         await sql_create_round(
             RoundInsertable(
                 created=datetime_utc.now(),
-                is_draft=False,
                 stage_item_id=stage_item_id,
                 name=await get_next_round_name(tournament_id, stage_item_id),
             )
@@ -524,7 +523,7 @@ async def start_next_round(
     round_id = await sql_create_round(
         RoundInsertable(
             created=datetime_utc.now(),
-            is_draft=True,
+            lifecycle_state=RoundLifecycleState.DRAFT,
             stage_item_id=stage_item_id,
             name=await get_next_round_name(tournament_id, stage_item_id),
         ),
@@ -578,6 +577,6 @@ async def start_next_round(
             detail=str(exc),
         ) from exc
 
-    await set_round_active_or_draft(draft_round.id, tournament_id, is_draft=False)
+    await set_round_lifecycle_state(draft_round.id, tournament_id, RoundLifecycleState.ACTIVE)
     await reconcile_conflicts(tournament_id)
     return SuccessResponse()

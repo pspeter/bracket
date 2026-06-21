@@ -67,7 +67,12 @@ export default function RoundModal({
       <Modal opened={opened} onClose={() => setOpened(false)} title={t('edit_round')}>
         <form
           onSubmit={form.onSubmit(async (values) => {
-            await updateRound(tournamentData.id, round.id, values.name, round.is_draft);
+            await updateRound(
+              tournamentData.id,
+              round.id,
+              values.name,
+              round.lifecycle_state ?? 'ACTIVE'
+            );
             await swrStagesResponse.mutate();
             setOpened(false);
           })}
@@ -90,7 +95,7 @@ export default function RoundModal({
           disabled={round.is_draft}
           leftSection={<LuConstruction />}
           onClick={async () => {
-            await updateRound(tournamentData.id, round.id, round.name, true);
+            await updateRound(tournamentData.id, round.id, round.name, 'DRAFT');
             await swrStagesResponse.mutate();
             if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
             setOpened(false);

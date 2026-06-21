@@ -1,5 +1,4 @@
 import { Badge, Card, Center, Flex, Grid, Stack, Text, UnstyledButton } from '@mantine/core';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LevelBadge } from '@components/levels/levels';
@@ -7,7 +6,7 @@ import { Time } from '@components/utils/datetime';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
-import { LevelResponse, MatchWithDetails } from '@openapi';
+import { LevelResponse } from '@openapi';
 import { stringToColour } from '@services/lookups';
 
 export function ScheduleRow({

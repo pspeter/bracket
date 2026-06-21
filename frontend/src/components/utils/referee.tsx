@@ -2,8 +2,8 @@ import { Flex, Text } from '@mantine/core';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
 import { ReactNode } from 'react';
 
-import { MatchWithDetails } from '@openapi';
 import { abbreviateTeamName } from '@logic/planning/labels';
+import { MatchWithDetails } from '@openapi';
 import { formatStageItemInput } from './stage_item_input';
 
 type RefereeFields = Pick<MatchWithDetails, 'referee' | 'referee_name'>;
