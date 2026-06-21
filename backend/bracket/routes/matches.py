@@ -38,6 +38,7 @@ from bracket.models.db.match import (
     MatchSwapBody,
     SchedulerWeights,
 )
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
@@ -208,7 +209,7 @@ async def delete_match(
     round_ = await get_round_by_id(tournament_id, match.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
 
-    if not round_.is_draft or stage_item.type != StageType.SWISS:
+    if round_.lifecycle_state != RoundLifecycleState.DRAFT or stage_item.type != StageType.SWISS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Can only delete matches from draft rounds in Swiss stage items",
@@ -234,7 +235,7 @@ async def create_match(
     round_ = await get_round_by_id(tournament_id, match_body.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
 
-    if not round_.is_draft or stage_item.type != StageType.SWISS:
+    if round_.lifecycle_state != RoundLifecycleState.DRAFT or stage_item.type != StageType.SWISS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Can only create matches in draft rounds of Swiss stage items",

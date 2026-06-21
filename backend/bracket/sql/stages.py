@@ -15,7 +15,7 @@ async def get_full_tournament_details(
     *,
     no_draft_rounds: bool = False,
 ) -> list[StageWithStageItems]:
-    draft_filter = "AND rounds.is_draft IS FALSE" if no_draft_rounds else ""
+    draft_filter = "AND rounds.lifecycle_state != 'DRAFT'" if no_draft_rounds else ""
     round_filter = "AND rounds.id = :round_id" if round_id is not None else ""
     stage_filter = "AND stages.id = :stage_id" if stage_id is not None else ""
     stage_item_filter = (

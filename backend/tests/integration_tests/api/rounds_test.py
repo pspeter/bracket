@@ -80,7 +80,7 @@ async def test_delete_round(
 async def test_update_round(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    body = {"name": "Some new name", "is_draft": True}
+    body = {"name": "Some new name", "lifecycle_state": "DRAFT"}
     async with (
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})),
         inserted_stage(
@@ -105,6 +105,6 @@ async def test_update_round(
             database, Round, query=rounds.select().where(rounds.c.id == round_inserted.id)
         )
         assert updated_round.name == body["name"]
-        assert updated_round.is_draft == body["is_draft"]
+        assert updated_round.lifecycle_state.value == body["lifecycle_state"]
 
         await assert_row_count_and_clear(rounds, 1)

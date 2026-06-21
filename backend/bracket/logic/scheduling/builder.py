@@ -48,7 +48,6 @@ async def create_rounds_for_new_stage_item(
         await sql_create_round(
             RoundInsertable(
                 created=MOCK_NOW,
-                is_draft=False,
                 stage_item_id=stage_item.id,
                 name=await get_next_round_name(tournament_id, stage_item.id),
             ),
@@ -67,7 +66,6 @@ async def build_swiss_placeholder_skeleton(
         round_id = await sql_create_round(
             RoundInsertable(
                 created=datetime_utc.now(),
-                is_draft=False,
                 stage_item_id=stage_item.id,
                 name=await get_next_round_name(tournament_id, stage_item.id),
                 lifecycle_state=RoundLifecycleState.PLACEHOLDER,
@@ -86,6 +84,7 @@ async def build_swiss_placeholder_skeleton(
                     custom_duration_minutes=None,
                     input1_slot=slot1,
                     input2_slot=slot2,
+                    referee_slot=round_skeleton.bye_slot,
                 )
             )
 

@@ -1,7 +1,7 @@
 import pytest
 from heliclockter import datetime_utc
 
-from bracket.models.db.round import RoundInsertable
+from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -71,7 +71,7 @@ async def test_start_next_round(
             RoundInsertable(
                 stage_item_id=stage_item_1.id,
                 name="",
-                is_draft=False,
+                lifecycle_state=RoundLifecycleState.ACTIVE,
                 created=MOCK_NOW,
             ),
         )

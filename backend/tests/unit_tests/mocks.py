@@ -1,6 +1,7 @@
 from heliclockter import datetime_utc
 
 from bracket.models.db.match import Match, MatchState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.team import Team
@@ -163,7 +164,7 @@ def get_one_round_with_two_definitive_matches(
         matches=[match1, match2],
         stage_item_id=StageItemId(-1),
         created=DUMMY_MOCK_TIME,
-        is_draft=False,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
         name="",
     )
 
@@ -177,7 +178,7 @@ def get_two_round_with_one_tentative_match_each(
             matches=[match1],
             stage_item_id=StageItemId(-1),
             created=DUMMY_MOCK_TIME,
-            is_draft=False,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
             name="",
         ),
         RoundWithMatches(
@@ -185,7 +186,7 @@ def get_two_round_with_one_tentative_match_each(
             matches=[match2],
             stage_item_id=StageItemId(-1),
             created=DUMMY_MOCK_TIME,
-            is_draft=False,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
             name="",
         ),
     )

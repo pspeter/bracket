@@ -11,7 +11,7 @@ from bracket.models.db.match import MatchInsertable, MatchState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import RankingInsertable
-from bracket.models.db.round import RoundInsertable
+from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.stage import StageInsertable
 from bracket.models.db.stage_item import StageItemInsertable, StageType
 from bracket.models.db.team import TeamInsertable
@@ -114,21 +114,21 @@ DUMMY_STAGE_ITEM3 = StageItemInsertable(
 DUMMY_ROUND1 = RoundInsertable(
     stage_item_id=StageItemId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    is_draft=False,
+    lifecycle_state=RoundLifecycleState.ACTIVE,
     name="Round 1",
 )
 
 DUMMY_ROUND2 = RoundInsertable(
     stage_item_id=StageItemId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    is_draft=True,
+    lifecycle_state=RoundLifecycleState.DRAFT,
     name="Round 2",
 )
 
 DUMMY_ROUND3 = RoundInsertable(
     stage_item_id=StageItemId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    is_draft=False,
+    lifecycle_state=RoundLifecycleState.ACTIVE,
     name="Round 3",
 )
 

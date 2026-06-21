@@ -147,12 +147,12 @@ rounds = Table(
     Column("id", BigInteger, primary_key=True, index=True),
     Column("name", Text, nullable=False),
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
-    Column("is_draft", Boolean, nullable=False),
     Column("stage_item_id", BigInteger, ForeignKey("stage_items.id"), nullable=False),
     Column(
         "lifecycle_state",
-        Enum("PLACEHOLDER", "RESOLVED", "LOCKED", name="round_lifecycle_state"),
-        nullable=True,
+        Enum("DRAFT", "ACTIVE", "PLACEHOLDER", "RESOLVED", "LOCKED", name="round_lifecycle_state"),
+        nullable=False,
+        server_default="ACTIVE",
     ),
     Column("is_pinned", Boolean, nullable=True),
 )

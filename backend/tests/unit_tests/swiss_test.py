@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from bracket.logic.scheduling.ladder_teams import get_possible_upcoming_matches_for_swiss
 from bracket.models.db.match import Match, MatchFilter, MatchWithDetailsDefinitive, SuggestedMatch
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
     StageItemInputFinal,
@@ -68,7 +69,7 @@ def test_constraints() -> None:
                     input2,
                 )
             ],
-            is_draft=False,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
             stage_item_id=StageItemId(-1),
             name="R1",
             created=MOCK_NOW,
@@ -76,7 +77,7 @@ def test_constraints() -> None:
         RoundWithMatches(
             id=RoundId(-2),
             matches=[],
-            is_draft=True,
+            lifecycle_state=RoundLifecycleState.DRAFT,
             stage_item_id=StageItemId(-1),
             name="R2",
             created=MOCK_NOW,

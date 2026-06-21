@@ -1,6 +1,8 @@
 import pytest
 
 from bracket.logic.scheduling.swiss_skeleton import build_swiss_skeleton
+from bracket.models.db.match import MatchCreateBody
+from bracket.utils.id_types import RoundId
 
 
 def test_even_teams_round_count() -> None:
@@ -82,3 +84,24 @@ def test_slot_indices_are_valid(team_count: int, games_per_player: int) -> None:
             assert s2 in valid, f"slot {s2} out of range for team_count={team_count}"
         if round_.bye_slot is not None:
             assert round_.bye_slot in valid
+
+
+def test_bye_slot_used_as_referee_slot_in_match_create_body() -> None:
+    """Fix #3: referee_slot in MatchCreateBody should be set to the round's bye_slot."""
+    skeleton = build_swiss_skeleton(team_count=5, games_per_player=3)
+    for round_skeleton in skeleton.rounds:
+        for slot1, slot2 in round_skeleton.matches:
+            match_body = MatchCreateBody(
+                round_id=RoundId(-1),
+                court_id=None,
+                stage_item_input1_id=None,
+                stage_item_input2_id=None,
+                stage_item_input1_winner_from_match_id=None,
+                stage_item_input2_winner_from_match_id=None,
+                duration_minutes=15,
+                custom_duration_minutes=None,
+                input1_slot=slot1,
+                input2_slot=slot2,
+                referee_slot=round_skeleton.bye_slot,
+            )
+            assert match_body.referee_slot == round_skeleton.bye_slot

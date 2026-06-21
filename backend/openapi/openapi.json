@@ -2098,6 +2098,8 @@
       },
       "RoundLifecycleState": {
         "enum": [
+          "DRAFT",
+          "ACTIVE",
           "PLACEHOLDER",
           "RESOLVED",
           "LOCKED"
@@ -2107,9 +2109,8 @@
       },
       "RoundUpdateBody": {
         "properties": {
-          "is_draft": {
-            "title": "Is Draft",
-            "type": "boolean"
+          "lifecycle_state": {
+            "$ref": "#/components/schemas/RoundLifecycleState"
           },
           "name": {
             "title": "Name",
@@ -2118,7 +2119,7 @@
         },
         "required": [
           "name",
-          "is_draft"
+          "lifecycle_state"
         ],
         "title": "RoundUpdateBody",
         "type": "object"
@@ -2135,6 +2136,7 @@
             "type": "integer"
           },
           "is_draft": {
+            "readOnly": true,
             "title": "Is Draft",
             "type": "boolean"
           },
@@ -2150,14 +2152,8 @@
             "title": "Is Pinned"
           },
           "lifecycle_state": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoundLifecycleState"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/RoundLifecycleState",
+            "default": "ACTIVE"
           },
           "matches": {
             "items": {
@@ -2185,12 +2181,12 @@
         "required": [
           "created",
           "stage_item_id",
-          "is_draft",
           "name",
           "lifecycle_state",
           "is_pinned",
           "id",
-          "matches"
+          "matches",
+          "is_draft"
         ],
         "title": "RoundWithMatches",
         "type": "object"

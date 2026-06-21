@@ -15,6 +15,7 @@ from bracket.logic.planning.matches import (
     reorder_all_matches,
 )
 from bracket.models.db.court import Court
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.match import (
     MatchState,
     MatchWithDetails,
@@ -96,7 +97,7 @@ def _stage_with_rounds(
                     matches=round_matches,
                     stage_item_id=StageItemId(item_id),
                     created=T0,
-                    is_draft=False,
+                    lifecycle_state=RoundLifecycleState.ACTIVE,
                     name="",
                 )
             )
