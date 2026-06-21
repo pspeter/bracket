@@ -1,20 +1,31 @@
+from collections import defaultdict
 from datetime import timedelta
 
 import pytest
 
 from bracket.database import database
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
-from bracket.models.db.stage_item import StageItemWithInputsCreate
+from bracket.models.db.match import (
+    MatchCreateBody,
+    MatchState,
+    MatchWithDetails,
+    MatchWithDetailsDefinitive,
+)
+from bracket.models.db.round import RoundInsertable, RoundLifecycleState
+from bracket.models.db.stage_item import StageItemCreateBody, StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
 from bracket.models.db.util import StageWithStageItems
 from bracket.schema import tournaments
-from bracket.sql.matches import sql_reschedule_match_and_determine_duration
+from bracket.sql.matches import sql_create_match, sql_reschedule_match_and_determine_duration
+from bracket.sql.rounds import sql_create_round
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
-from bracket.sql.stage_items import sql_create_stage_item_with_inputs
+from bracket.sql.stage_items import (
+    sql_create_stage_item_with_empty_inputs,
+    sql_create_stage_item_with_inputs,
+)
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
     DUMMY_COURT1,
@@ -32,6 +43,7 @@ from tests.integration_tests.api.shared import (
     SUCCESS_RESPONSE,
     send_tournament_request,
 )
+from tests.integration_tests.mocks import MOCK_NOW
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     inserted_court,
@@ -860,3 +872,439 @@ async def test_scheduling_without_courts_returns_actionable_error(
 
     assert "detail" in response
     assert "no courts" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_shared_referee_slot_forces_stagger(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Two placeholder matches sharing referee_slot=5 must land at different times.
+
+    Without the fix both are placed at T=0 on different courts (no constraint links them).
+    With the fix the synthetic slot ID for (round, 5) carries a mandatory interval for each
+    match, and AddNoOverlap forces them apart.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        si = await sql_create_stage_item_with_empty_inputs(
+            tid,
+            StageItemCreateBody(
+                stage_id=stage.id,
+                name="Swiss Group",
+                type=StageType.SWISS,
+                team_count=4,
+            ),
+        )
+        round_id = await sql_create_round(
+            RoundInsertable(
+                stage_item_id=si.id,
+                name="Round 1",
+                lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                created=MOCK_NOW,
+            )
+        )
+        await sql_create_match(
+            MatchCreateBody(
+                round_id=round_id, duration_minutes=15, input1_slot=1, input2_slot=2, referee_slot=5
+            )
+        )
+        await sql_create_match(
+            MatchCreateBody(
+                round_id=round_id, duration_minutes=15, input1_slot=3, input2_slot=4, referee_slot=5
+            )
+        )
+
+        response = await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
+        stages = await get_full_tournament_details(tid)
+
+        await sql_delete_stage_item_with_foreign_keys(si.id)
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be scheduled onto a court"
+    )
+    start_times = {m.start_time for m in all_matches}
+    assert len(start_times) == 2, (
+        "matches sharing referee_slot=5 must be staggered, not placed simultaneously"
+    )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_cross_round_slot_conflict_forces_stagger(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A slot appearing in two different rounds of the same stage item must be staggered.
+
+    With round-id-keyed synthetic IDs the same abstract slot in round-1 and round-2 gets
+    two *different* IDs, so AddNoOverlap lets them run simultaneously on different courts.
+    With stage-item-keyed IDs the slot maps to a single ID across all rounds, enforcing
+    the no-overlap between the two rounds.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        si = await sql_create_stage_item_with_empty_inputs(
+            tid,
+            StageItemCreateBody(
+                stage_id=stage.id,
+                name="Swiss Group",
+                type=StageType.SWISS,
+                team_count=4,
+            ),
+        )
+        round1_id = await sql_create_round(
+            RoundInsertable(
+                stage_item_id=si.id,
+                name="Round 1",
+                lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                created=MOCK_NOW,
+            )
+        )
+        round2_id = await sql_create_round(
+            RoundInsertable(
+                stage_item_id=si.id,
+                name="Round 2",
+                lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                created=MOCK_NOW,
+            )
+        )
+        # Match A: slot 1 vs slot 2 (round 1)
+        await sql_create_match(
+            MatchCreateBody(round_id=round1_id, duration_minutes=15, input1_slot=1, input2_slot=2)
+        )
+        # Match B: slot 1 vs slot 3 (round 2) — slot 1 also plays here
+        await sql_create_match(
+            MatchCreateBody(round_id=round2_id, duration_minutes=15, input1_slot=1, input2_slot=3)
+        )
+
+        response = await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
+        stages = await get_full_tournament_details(tid)
+
+        await sql_delete_stage_item_with_foreign_keys(si.id)
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be scheduled onto a court"
+    )
+    # Slot 1 appears in both matches; with 2 courts the solver would place both at T=0
+    # if there were no cross-round slot constraint, violating the no-double-booking rule.
+    slot1_matches = [m for m in all_matches if m.input1_slot == 1 or m.input2_slot == 1]
+    assert len(slot1_matches) == 2
+    start_times = {m.start_time for m in slot1_matches}
+    assert len(start_times) == 2, (
+        "slot 1 plays in both rounds and must not be double-booked at the same time"
+    )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_referee_slot_auto_assigned_when_enabled(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """When referees_enabled, the scheduler picks an abstract referee_slot for each
+    placeholder match and the chosen slot is never one of the two playing slots.
+
+    Without auto-assignment, every placeholder match keeps referee_slot=NULL after
+    scheduling. The test fails because the assertion requires referee_slot to be set.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_id = await sql_create_round(
+                RoundInsertable(
+                    stage_item_id=si.id,
+                    name="Round 1",
+                    lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                    created=MOCK_NOW,
+                )
+            )
+            # Two matches covering all 4 slots — no referee_slot pre-set.
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=1, input2_slot=2
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=3, input2_slot=4
+                )
+            )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be scheduled onto a court"
+    )
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "scheduler must auto-assign a referee_slot to each placeholder match when referees_enabled"
+    )
+    for m in all_matches:
+        assert m.referee_slot != m.input1_slot, "referee slot must not be a playing slot"
+        assert m.referee_slot != m.input2_slot, "referee slot must not be a playing slot"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_placeholder_referee_slot_not_playing_in_concurrent_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A referee slot must never be scheduled to play in another match at the same time.
+
+    Setup: two matches whose referee candidates are exactly each other's playing slots.
+      Match A: slots 1v2 → eligible referees {3, 4}
+      Match B: slots 3v4 → eligible referees {1, 2}
+    With 2 courts the solver can place both at T=0, but doing so would mean match A's
+    referee (3 or 4) is playing in match B at the same time — a hard constraint violation.
+    The solver must stagger the matches so the referee slot is free while it referees.
+
+    Without the no-overlap constraint on auto-assigned abstract referee intervals the
+    solver can freely put both matches at T=0 with a conflicting referee, so this test
+    is the guard for that guarantee.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_id = await sql_create_round(
+                RoundInsertable(
+                    stage_item_id=si.id,
+                    name="Round 1",
+                    lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                    created=MOCK_NOW,
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=1, input2_slot=2
+                )
+            )
+            await sql_create_match(
+                MatchCreateBody(
+                    round_id=round_id, duration_minutes=15, input1_slot=3, input2_slot=4
+                )
+            )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 2
+    assert all(m.court_id is not None and m.start_time is not None for m in all_matches), (
+        "both placeholder matches must be placed on a court"
+    )
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "each placeholder match must have a referee_slot assigned"
+    )
+
+    # With 2 courts and 4 slots where each match's only referee candidates are the other
+    # match's playing slots, concurrent scheduling is impossible — the solver must stagger.
+    start_times = {m.start_time for m in all_matches}
+    assert len(start_times) == 2, (
+        "solver must stagger matches when every eligible referee of each match is also "
+        "a player in the other match — otherwise the referee would be playing at the same time"
+    )
+
+    by_time: dict = defaultdict(list)
+    for m in all_matches:
+        by_time[m.start_time].append(m)
+
+    for concurrent in by_time.values():
+        for m in concurrent:
+            concurrent_playing_slots = {
+                slot
+                for other in concurrent
+                if other.id != m.id
+                for slot in (other.input1_slot, other.input2_slot)
+                if slot is not None
+            }
+            assert m.referee_slot not in concurrent_playing_slots, (
+                f"match {m.id} referee_slot={m.referee_slot} is playing in a concurrent match"
+            )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_full_placeholder_swiss_skeleton_is_conflict_free(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A complete 4-team Swiss skeleton (3 rounds, 2 matches per round) schedules
+    with no slot double-bookings and valid referee assignments.
+
+    Round-robin pairs for 4 teams (slots 1-4):
+      Round 1: 1v2, 3v4
+      Round 2: 1v3, 2v4
+      Round 3: 1v4, 2v3
+
+    Every slot plays exactly twice and referees once across the skeleton, so any
+    duplicate assignment or referee conflict will manifest here.
+
+    This is the 'full placeholder skeleton' integration test required by AC5 of
+    issue 151 — the prior per-property tests each tested a single guarantee in
+    isolation; this test verifies all guarantees hold together at realistic scale.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_pairs = [
+                (1, 2, 3, 4),  # round 1: 1v2, 3v4
+                (1, 3, 2, 4),  # round 2: 1v3, 2v4
+                (1, 4, 2, 3),  # round 3: 1v4, 2v3
+            ]
+            for s1, s2, s3, s4 in round_pairs:
+                round_id = await sql_create_round(
+                    RoundInsertable(
+                        stage_item_id=si.id,
+                        name="Round",
+                        lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                        created=MOCK_NOW,
+                    )
+                )
+                await sql_create_match(
+                    MatchCreateBody(
+                        round_id=round_id, duration_minutes=15, input1_slot=s1, input2_slot=s2
+                    )
+                )
+                await sql_create_match(
+                    MatchCreateBody(
+                        round_id=round_id, duration_minutes=15, input1_slot=s3, input2_slot=s4
+                    )
+                )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 6
+
+    # Every match must be placed on a court with a start time and a referee slot.
+    assert all(m.court_id is not None for m in all_matches), "every match must be on a court"
+    assert all(m.start_time is not None for m in all_matches), "every match must have a start time"
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "every match must have a referee slot assigned"
+    )
+
+    # Referee slot must not be one of the two playing slots.
+    for m in all_matches:
+        assert m.referee_slot != m.input1_slot, (
+            f"match {m.id}: referee_slot {m.referee_slot} equals input1_slot"
+        )
+        assert m.referee_slot != m.input2_slot, (
+            f"match {m.id}: referee_slot {m.referee_slot} equals input2_slot"
+        )
+
+    # For each time slot, no abstract slot may appear more than once (playing or refereeing).
+    by_time: dict = defaultdict(list)
+    for m in all_matches:
+        by_time[m.start_time].append(m)
+
+    for time, concurrent in by_time.items():
+        slot_occupancy: list[int] = []
+        for m in concurrent:
+            for slot in (m.input1_slot, m.input2_slot, m.referee_slot):
+                if slot is not None:
+                    slot_occupancy.append(slot)
+        duplicates = {s for s in slot_occupancy if slot_occupancy.count(s) > 1}
+        assert not duplicates, (
+            f"at {time}, slot(s) {duplicates} are used more than once "
+            f"(playing or refereeing) across concurrent matches"
+        )

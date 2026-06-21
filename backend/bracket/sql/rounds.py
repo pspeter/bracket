@@ -9,7 +9,8 @@ from bracket.utils.id_types import RoundId, StageItemId, TournamentId
 async def sql_create_round(round_: RoundInsertable) -> RoundId:
     query = """
         INSERT INTO rounds (created, name, stage_item_id, lifecycle_state, is_pinned)
-        VALUES (NOW(), :name, :stage_item_id, :lifecycle_state, :is_pinned)
+        VALUES (NOW(), :name, :stage_item_id,
+                CAST(:lifecycle_state AS round_lifecycle_state), :is_pinned)
         RETURNING id
         """
     result: RoundId = await database.fetch_val(
@@ -84,8 +85,11 @@ async def set_round_lifecycle_state(
         UPDATE rounds
         SET
             lifecycle_state =
-                CASE WHEN rounds.id=:round_id THEN :lifecycle_state
-                     WHEN :lifecycle_state = 'DRAFT' AND lifecycle_state = 'DRAFT' THEN 'ACTIVE'
+                CASE WHEN rounds.id=:round_id
+                        THEN CAST(:lifecycle_state AS round_lifecycle_state)
+                     WHEN CAST(:lifecycle_state AS round_lifecycle_state) = 'DRAFT'
+                          AND lifecycle_state = 'DRAFT'
+                        THEN 'ACTIVE'
                      ELSE lifecycle_state
                 END
         WHERE rounds.id IN (

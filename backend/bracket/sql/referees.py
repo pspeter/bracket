@@ -2,6 +2,15 @@ from bracket.database import database
 from bracket.utils.id_types import MatchId, StageItemInputId, TournamentId
 
 
+async def sql_set_match_abstract_referee_slot(match_id: MatchId, slot: int) -> None:
+    query = """
+        UPDATE matches
+        SET referee_slot = :slot
+        WHERE matches.id = :match_id
+        """
+    await database.execute(query=query, values={"match_id": match_id, "slot": slot})
+
+
 async def sql_get_referee_names(tournament_id: TournamentId) -> list[str]:
     """Return the distinct free-text referee names used within a tournament.
 
