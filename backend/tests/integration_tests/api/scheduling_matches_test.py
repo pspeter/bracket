@@ -1192,3 +1192,119 @@ async def test_placeholder_referee_slot_not_playing_in_concurrent_match(
             assert m.referee_slot not in concurrent_playing_slots, (
                 f"match {m.id} referee_slot={m.referee_slot} is playing in a concurrent match"
             )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_full_placeholder_swiss_skeleton_is_conflict_free(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A complete 4-team Swiss skeleton (3 rounds, 2 matches per round) schedules
+    with no slot double-bookings and valid referee assignments.
+
+    Round-robin pairs for 4 teams (slots 1-4):
+      Round 1: 1v2, 3v4
+      Round 2: 1v3, 2v4
+      Round 3: 1v4, 2v3
+
+    Every slot plays exactly twice and referees once across the skeleton, so any
+    duplicate assignment or referee conflict will manifest here.
+
+    This is the 'full placeholder skeleton' integration test required by AC5 of
+    issue 151 — the prior per-property tests each tested a single guarantee in
+    isolation; this test verifies all guarantees hold together at realistic scale.
+    """
+    tid = auth_context.tournament.id
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_court(DUMMY_COURT2.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE2.model_copy(update={"tournament_id": tid})) as stage,
+    ):
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            si = await sql_create_stage_item_with_empty_inputs(
+                tid,
+                StageItemCreateBody(
+                    stage_id=stage.id,
+                    name="Swiss Group",
+                    type=StageType.SWISS,
+                    team_count=4,
+                ),
+            )
+            round_pairs = [
+                (1, 2, 3, 4),  # round 1: 1v2, 3v4
+                (1, 3, 2, 4),  # round 2: 1v3, 2v4
+                (1, 4, 2, 3),  # round 3: 1v4, 2v3
+            ]
+            for s1, s2, s3, s4 in round_pairs:
+                round_id = await sql_create_round(
+                    RoundInsertable(
+                        stage_item_id=si.id,
+                        name="Round",
+                        lifecycle_state=RoundLifecycleState.PLACEHOLDER,
+                        created=MOCK_NOW,
+                    )
+                )
+                await sql_create_match(
+                    MatchCreateBody(
+                        round_id=round_id, duration_minutes=15, input1_slot=s1, input2_slot=s2
+                    )
+                )
+                await sql_create_match(
+                    MatchCreateBody(
+                        round_id=round_id, duration_minutes=15, input1_slot=s3, input2_slot=s4
+                    )
+                )
+
+            response = await send_tournament_request(
+                HTTPMethod.POST, "schedule_matches", auth_context
+            )
+            stages = await get_full_tournament_details(tid)
+
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+    all_matches = [
+        m for s in stages for item in s.stage_items for r in item.rounds for m in r.matches
+    ]
+    assert len(all_matches) == 6
+
+    # Every match must be placed on a court with a start time and a referee slot.
+    assert all(m.court_id is not None for m in all_matches), "every match must be on a court"
+    assert all(m.start_time is not None for m in all_matches), "every match must have a start time"
+    assert all(m.referee_slot is not None for m in all_matches), (
+        "every match must have a referee slot assigned"
+    )
+
+    # Referee slot must not be one of the two playing slots.
+    for m in all_matches:
+        assert m.referee_slot != m.input1_slot, (
+            f"match {m.id}: referee_slot {m.referee_slot} equals input1_slot"
+        )
+        assert m.referee_slot != m.input2_slot, (
+            f"match {m.id}: referee_slot {m.referee_slot} equals input2_slot"
+        )
+
+    # For each time slot, no abstract slot may appear more than once (playing or refereeing).
+    by_time: dict = defaultdict(list)
+    for m in all_matches:
+        by_time[m.start_time].append(m)
+
+    for time, concurrent in by_time.items():
+        slot_occupancy: list[int] = []
+        for m in concurrent:
+            for slot in (m.input1_slot, m.input2_slot, m.referee_slot):
+                if slot is not None:
+                    slot_occupancy.append(slot)
+        duplicates = {s for s in slot_occupancy if slot_occupancy.count(s) > 1}
+        assert not duplicates, (
+            f"at {time}, slot(s) {duplicates} are used more than once "
+            f"(playing or refereeing) across concurrent matches"
+        )
