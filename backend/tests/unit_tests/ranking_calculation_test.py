@@ -5,8 +5,8 @@ from heliclockter import datetime_utc
 from bracket.logic.ranking.calculation import determine_ranking_for_stage_item
 from bracket.logic.ranking.statistics import TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
-from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.ranking import Ranking
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.team import Team

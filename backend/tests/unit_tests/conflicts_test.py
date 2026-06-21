@@ -2,7 +2,6 @@ from datetime import timedelta
 
 import pytest
 
-from bracket.models.db.round import RoundLifecycleState
 from bracket.logic.planning.conflicts import (
     get_conflicting_matches,
     get_match_conflict_flags,
@@ -10,6 +9,7 @@ from bracket.logic.planning.conflicts import (
 )
 from bracket.logic.planning.team_windows import get_team_playing_windows
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
+from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
