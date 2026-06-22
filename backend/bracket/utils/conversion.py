@@ -20,4 +20,9 @@ def to_string_mapping(obj: BaseModel) -> Mapping[str, Any]:
     """
     Turns a pydantic object into a string mapping to be used as database query
     """
-    return {key: _map_to_str(value) for key, value in obj.model_dump(exclude_none=True).items()}
+    computed = set(type(obj).model_computed_fields.keys())
+    return {
+        key: _map_to_str(value)
+        for key, value in obj.model_dump(exclude_none=True).items()
+        if key not in computed
+    }
