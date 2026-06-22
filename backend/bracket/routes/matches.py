@@ -21,7 +21,10 @@ from bracket.logic.ranking.calculation import (
     recalculate_ranking_for_stage_item,
 )
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
-from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
+from bracket.logic.scheduling.swiss_resolution_orchestrator import (
+    auto_re_resolve_downstream_swiss_rounds,
+    auto_resolve_next_swiss_round,
+)
 from bracket.logic.scheduling.upcoming_matches import (
     get_draft_round_in_stage_item,
     get_upcoming_matches_for_swiss,
@@ -408,6 +411,7 @@ async def update_match_by_id(
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
     await recalculate_ranking_for_stage_item(tournament_id, stage_item)
     await auto_resolve_next_swiss_round(tournament_id, stage_item)
+    await auto_re_resolve_downstream_swiss_rounds(tournament_id, stage_item)
 
     if (
         match_body.custom_duration_minutes != match.custom_duration_minutes

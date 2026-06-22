@@ -5,7 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from bracket.config import config
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
-from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
+from bracket.logic.scheduling.swiss_resolution_orchestrator import (
+    auto_re_resolve_downstream_swiss_rounds,
+    auto_resolve_next_swiss_round,
+)
 from bracket.models.db.match import Match, MatchScoreTrackingBody
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import LevelResponse, Tournament
@@ -149,6 +152,7 @@ async def update_authenticated_score_tracking_match(
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
     await recalculate_ranking_for_stage_item(tournament_id, stage_item)
     await auto_resolve_next_swiss_round(tournament_id, stage_item)
+    await auto_re_resolve_downstream_swiss_rounds(tournament_id, stage_item)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
@@ -189,6 +193,7 @@ async def update_score_tracking_match(
     stage_item = await get_stage_item(tournament.id, round_.stage_item_id)
     await recalculate_ranking_for_stage_item(tournament.id, stage_item)
     await auto_resolve_next_swiss_round(tournament.id, stage_item)
+    await auto_re_resolve_downstream_swiss_rounds(tournament.id, stage_item)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})

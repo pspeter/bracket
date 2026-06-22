@@ -3,6 +3,26 @@ from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.util import RoundWithMatches
 
 
+def get_rounds_to_re_resolve(rounds: list[RoundWithMatches]) -> list[RoundWithMatches]:
+    """Return RESOLVED not-started not-pinned rounds to re-pair after a score correction.
+
+    A round is eligible if its lifecycle is RESOLVED, it is not pinned (hand-edited),
+    and every match in it is still NOT_STARTED (i.e. play has not yet begun).
+    LOCKED rounds (any match IN_PROGRESS or COMPLETED) are frozen and never returned.
+    """
+    result = []
+    for round_ in sorted(rounds, key=lambda r: r.id):
+        if round_.lifecycle_state != RoundLifecycleState.RESOLVED:
+            continue
+        if round_.is_pinned:
+            continue
+        if not round_.matches:
+            continue
+        if all(m.state == MatchState.NOT_STARTED for m in round_.matches):
+            result.append(round_)
+    return result
+
+
 def get_next_round_to_resolve(rounds: list[RoundWithMatches]) -> RoundWithMatches | None:
     """Return the next PLACEHOLDER round that is ready to resolve, or None.
 

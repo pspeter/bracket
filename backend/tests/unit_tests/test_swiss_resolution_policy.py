@@ -1,4 +1,4 @@
-"""Unit tests for the Swiss resolution policy (issue #153)."""
+"""Unit tests for the Swiss resolution policy (issues #153 and #154)."""
 
 from bracket.models.db.match import MatchState, MatchWithDetails
 from bracket.models.db.round import RoundLifecycleState
@@ -24,6 +24,7 @@ def _make_round(
     round_id: int,
     lifecycle_state: RoundLifecycleState,
     match_states: list[MatchState],
+    is_pinned: bool = False,
 ) -> RoundWithMatches:
     return RoundWithMatches(
         id=RoundId(round_id),
@@ -32,6 +33,7 @@ def _make_round(
         stage_item_id=StageItemId(-1),
         name=f"R{round_id}",
         created=DUMMY_MOCK_TIME,
+        is_pinned=is_pinned,
     )
 
 
@@ -94,3 +96,79 @@ def test_sequential_only_next_placeholder_returned() -> None:
     result = get_next_round_to_resolve([r1, r2, r3])
     assert result is not None
     assert result.id == r2.id
+
+
+# ── Tests for get_rounds_to_re_resolve (issue #154) ───────────────────────────
+
+
+def test_re_resolve_returns_empty_when_no_rounds() -> None:
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    assert get_rounds_to_re_resolve([]) == []
+
+
+def test_re_resolve_includes_resolved_not_started_round() -> None:
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
+    result = get_rounds_to_re_resolve([r2])
+    assert len(result) == 1
+    assert result[0].id == r2.id
+
+
+def test_re_resolve_excludes_locked_round() -> None:
+    """A LOCKED round (any match started) is never re-resolved."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.LOCKED, [MatchState.IN_PROGRESS])
+    assert get_rounds_to_re_resolve([r2]) == []
+
+
+def test_re_resolve_excludes_placeholder_round() -> None:
+    """PLACEHOLDER rounds are handled by forward resolution, not re-resolution."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.PLACEHOLDER, [MatchState.NOT_STARTED])
+    assert get_rounds_to_re_resolve([r2]) == []
+
+
+def test_re_resolve_excludes_pinned_resolved_round() -> None:
+    """A hand-edited (pinned) round must not be overwritten by re-resolution."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED], is_pinned=True)
+    assert get_rounds_to_re_resolve([r2]) == []
+
+
+def test_re_resolve_excludes_resolved_round_with_in_progress_match() -> None:
+    """A RESOLVED round whose match has already started is frozen (defensive match-state check)."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.IN_PROGRESS])
+    assert get_rounds_to_re_resolve([r2]) == []
+
+
+def test_re_resolve_returns_multiple_eligible_rounds() -> None:
+    """All RESOLVED not-started not-pinned rounds are returned, not just the first."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
+    r3 = _make_round(3, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
+    result = get_rounds_to_re_resolve([r2, r3])
+    assert [r.id for r in result] == [r2.id, r3.id]
+
+
+def test_re_resolve_skips_locked_but_includes_subsequent_not_started() -> None:
+    """A locked round is skipped; subsequent eligible rounds are still re-resolved.
+
+    AC: 'If round 2 is already in progress/completed, the correction leaves it untouched
+    and only affects round 3+.'
+    """
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
+    r2 = _make_round(2, RoundLifecycleState.LOCKED, [MatchState.IN_PROGRESS])
+    r3 = _make_round(3, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
+    result = get_rounds_to_re_resolve([r1, r2, r3])
+    assert len(result) == 1
+    assert result[0].id == r3.id
