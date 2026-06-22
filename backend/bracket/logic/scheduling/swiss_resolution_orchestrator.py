@@ -1,0 +1,75 @@
+from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
+from bracket.logic.scheduling.swiss_slot_assigner import (
+    assign_pairs_to_slots,
+    skeleton_from_slot_pairs,
+)
+from bracket.models.db.round import RoundLifecycleState
+from bracket.models.db.stage_item import StageType
+from bracket.models.db.stage_item_inputs import StageItemInputFinal
+from bracket.models.db.util import StageItemWithRounds
+from bracket.sql.matches import sql_set_input_ids_for_match
+from bracket.sql.referees import sql_set_match_referee_slot
+from bracket.sql.rounds import set_round_lifecycle_state
+from bracket.sql.stage_items import get_stage_item
+from bracket.utils.id_types import TournamentId
+
+
+async def auto_resolve_next_swiss_round(
+    tournament_id: TournamentId,
+    stage_item: StageItemWithRounds,
+) -> None:
+    """After ranking recalculation, auto-resolve the next PLACEHOLDER Swiss round if ready."""
+    if stage_item.type != StageType.SWISS:
+        return
+
+    next_round = get_next_round_to_resolve(stage_item.rounds)
+    if next_round is None:
+        return
+
+    # Re-fetch with up-to-date ELO after recalculate_ranking_for_stage_item
+    fresh = await get_stage_item(tournament_id, stage_item.id)
+    round_ = next((r for r in fresh.rounds if r.id == next_round.id), None)
+    if round_ is None or round_.lifecycle_state != RoundLifecycleState.PLACEHOLDER:
+        return
+
+    inputs = [i for i in fresh.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
+    if not inputs:
+        return
+
+    previous_rounds = [
+        r
+        for r in fresh.rounds
+        if r.lifecycle_state not in (RoundLifecycleState.PLACEHOLDER, RoundLifecycleState.DRAFT)
+        and r.id != round_.id
+    ]
+
+    slot_pairs = [
+        (m.input1_slot, m.input2_slot)
+        for m in round_.matches
+        if m.input1_slot is not None and m.input2_slot is not None
+    ]
+    bye_slot = next(
+        (m.referee_slot for m in round_.matches if m.referee_slot is not None),
+        None,
+    )
+
+    pairs, bye = select_round_pairing(inputs, previous_rounds)
+    skeleton = skeleton_from_slot_pairs(slot_pairs, bye_slot)
+    slot_mapping = assign_pairs_to_slots(pairs, bye, skeleton)
+
+    for match in round_.matches:
+        if match.input1_slot is None or match.input2_slot is None:
+            continue
+        input1_id = slot_mapping.get(match.input1_slot)
+        input2_id = slot_mapping.get(match.input2_slot)
+        if input1_id is None or input2_id is None:
+            continue
+        await sql_set_input_ids_for_match(round_.id, match.id, [input1_id, input2_id])
+
+        if match.referee_slot is not None:
+            ref_id = slot_mapping.get(match.referee_slot)
+            if ref_id is not None:
+                await sql_set_match_referee_slot(match.id, ref_id)
+
+    await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.RESOLVED)
