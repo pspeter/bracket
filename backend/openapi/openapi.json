@@ -3472,6 +3472,24 @@
         "title": "SuggestedMatch",
         "type": "object"
       },
+      "SwapMatchInputsBody": {
+        "properties": {
+          "match1_id": {
+            "title": "Match1 Id",
+            "type": "integer"
+          },
+          "match2_id": {
+            "title": "Match2 Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "match1_id",
+          "match2_id"
+        ],
+        "title": "SwapMatchInputsBody",
+        "type": "object"
+      },
       "Team": {
         "properties": {
           "active": {
@@ -6920,6 +6938,73 @@
           }
         ],
         "summary": "Update Round By Id",
+        "tags": [
+          "Rounds"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/rounds/{round_id}/swap_inputs": {
+      "post": {
+        "description": "Swap team assignments between two matches in a RESOLVED not-started round.\n\nPins the round so the manual override is preserved through upstream score corrections.\nValidated so that no referee ends up playing in the match they referee.",
+        "operationId": "swap_match_inputs_tournaments__tournament_id__rounds__round_id__swap_inputs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "title": "Round Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapMatchInputsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Swap Match Inputs",
         "tags": [
           "Rounds"
         ]

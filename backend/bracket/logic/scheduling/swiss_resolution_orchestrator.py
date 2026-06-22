@@ -1,4 +1,7 @@
-from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+from bracket.logic.scheduling.swiss_resolution_policy import (
+    get_next_round_to_resolve,
+    get_rounds_to_re_resolve,
+)
 from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
 from bracket.logic.scheduling.swiss_slot_assigner import (
     assign_pairs_to_slots,
@@ -7,7 +10,7 @@ from bracket.logic.scheduling.swiss_slot_assigner import (
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
-from bracket.models.db.util import StageItemWithRounds
+from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
 from bracket.sql.matches import sql_set_input_ids_for_match
 from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.rounds import set_round_lifecycle_state
@@ -15,24 +18,14 @@ from bracket.sql.stage_items import get_stage_item
 from bracket.utils.id_types import TournamentId
 
 
-async def auto_resolve_next_swiss_round(
+async def _assign_teams_to_round(
     tournament_id: TournamentId,
-    stage_item: StageItemWithRounds,
+    fresh: StageItemWithRounds,
+    round_: RoundWithMatches,
+    *,
+    advance_to_resolved: bool,
 ) -> None:
-    """After ranking recalculation, auto-resolve the next PLACEHOLDER Swiss round if ready."""
-    if stage_item.type != StageType.SWISS:
-        return
-
-    next_round = get_next_round_to_resolve(stage_item.rounds)
-    if next_round is None:
-        return
-
-    # Re-fetch with up-to-date ELO after recalculate_ranking_for_stage_item
-    fresh = await get_stage_item(tournament_id, stage_item.id)
-    round_ = next((r for r in fresh.rounds if r.id == next_round.id), None)
-    if round_ is None or round_.lifecycle_state != RoundLifecycleState.PLACEHOLDER:
-        return
-
+    """Run pairing selection + slot assignment for a single round and persist the result."""
     inputs = [i for i in fresh.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
     if not inputs:
         return
@@ -72,4 +65,42 @@ async def auto_resolve_next_swiss_round(
             if ref_id is not None:
                 await sql_set_match_referee_slot(match.id, ref_id)
 
-    await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.RESOLVED)
+    if advance_to_resolved:
+        await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.RESOLVED)
+
+
+async def auto_resolve_next_swiss_round(
+    tournament_id: TournamentId,
+    stage_item: StageItemWithRounds,
+) -> None:
+    """After ranking recalculation, resolve or re-resolve Swiss rounds as the policy dictates.
+
+    Two passes:
+    1. Resolve the next PLACEHOLDER round ready for initial resolution.
+    2. Re-resolve any RESOLVED not-started non-pinned rounds (so upstream score corrections
+       flow into future pairings while leaving pinned and locked rounds untouched).
+    """
+    if stage_item.type != StageType.SWISS:
+        return
+
+    # Re-fetch with up-to-date ELO after recalculate_ranking_for_stage_item
+    fresh = await get_stage_item(tournament_id, stage_item.id)
+
+    # Pass 1: initial resolution of next PLACEHOLDER round
+    next_placeholder = get_next_round_to_resolve(fresh.rounds)
+    if next_placeholder is not None:
+        round_ = next((r for r in fresh.rounds if r.id == next_placeholder.id), None)
+        if round_ is not None and round_.lifecycle_state == RoundLifecycleState.PLACEHOLDER:
+            await _assign_teams_to_round(
+                tournament_id, fresh, round_, advance_to_resolved=True
+            )
+            # Refresh after the first resolution so pass 2 sees the updated state
+            fresh = await get_stage_item(tournament_id, stage_item.id)
+
+    # Pass 2: re-resolve RESOLVED not-started non-pinned rounds
+    for candidate in get_rounds_to_re_resolve(fresh.rounds):
+        round_ = next((r for r in fresh.rounds if r.id == candidate.id), None)
+        if round_ is not None and round_.lifecycle_state == RoundLifecycleState.RESOLVED:
+            await _assign_teams_to_round(
+                tournament_id, fresh, round_, advance_to_resolved=False
+            )
