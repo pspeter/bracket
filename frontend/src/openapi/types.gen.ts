@@ -1358,16 +1358,6 @@ export type StageCreateBody = {
 };
 
 /**
- * StageItemActivateNextBody
- */
-export type StageItemActivateNextBody = {
-  /**
-   * Adjust To Time
-   */
-  adjust_to_time: string | null;
-};
-
-/**
  * StageItemCreateBody
  */
 export type StageItemCreateBody = {
@@ -1644,6 +1634,10 @@ export type StageItemInputUpdateBodyTentative = {
  */
 export type StageItemUpdateBody = {
   /**
+   * Games Per Player
+   */
+  games_per_player: number | null;
+  /**
    * Name
    */
   name: string;
@@ -1824,37 +1818,17 @@ export type SuccessResponse = {
 };
 
 /**
- * SuggestedMatch
+ * SwapMatchInputsBody
  */
-export type SuggestedMatch = {
+export type SwapMatchInputsBody = {
   /**
-   * Elo Diff
+   * Match1 Id
    */
-  elo_diff: string;
+  match1_id: number;
   /**
-   * Is Recommended
+   * Match2 Id
    */
-  is_recommended: boolean;
-  /**
-   * Player Behind Schedule Count
-   */
-  player_behind_schedule_count: number;
-  /**
-   * Stage Item Input1
-   */
-  stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
-  /**
-   * Stage Item Input2
-   */
-  stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
-  /**
-   * Swiss Diff
-   */
-  swiss_diff: string;
-  /**
-   * Times Played Sum
-   */
-  times_played_sum: number;
+  match2_id: number;
 };
 
 /**
@@ -2233,16 +2207,6 @@ export type TournamentsResponse = {
    * Data
    */
   data: Array<TournamentWithLevels>;
-};
-
-/**
- * UpcomingMatchesResponse
- */
-export type UpcomingMatchesResponse = {
-  /**
-   * Data
-   */
-  data: Array<SuggestedMatch>;
 };
 
 /**
@@ -4063,6 +4027,42 @@ export type UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses = {
 export type UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponse =
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses[keyof UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses];
 
+export type SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostData = {
+  body: SwapMatchInputsBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Round Id
+     */
+    round_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/rounds/{round_id}/swap_inputs';
+};
+
+export type SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostError =
+  SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostErrors[keyof SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostErrors];
+
+export type SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponse =
+  SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponses[keyof SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponses];
+
 export type ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData = {
   body?: SchedulerWeights;
   path: {
@@ -4362,112 +4362,6 @@ export type UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInpu
 
 export type UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutResponse =
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutResponses[keyof UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutResponses];
-
-export type StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostData = {
-  body: StageItemActivateNextBody;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-    /**
-     * Stage Item Id
-     */
-    stage_item_id: number;
-  };
-  query?: {
-    /**
-     * Elo Diff Threshold
-     */
-    elo_diff_threshold?: number;
-    /**
-     * Iterations
-     */
-    iterations?: number;
-    /**
-     * Only Recommended
-     */
-    only_recommended?: boolean;
-  };
-  url: '/tournaments/{tournament_id}/stage_items/{stage_item_id}/start_next_round';
-};
-
-export type StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostError =
-  StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors[keyof StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors];
-
-export type StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: SuccessResponse;
-  };
-
-export type StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponse =
-  StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses[keyof StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses];
-
-export type GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetData =
-  {
-    body?: never;
-    path: {
-      /**
-       * Tournament Id
-       */
-      tournament_id: number;
-      /**
-       * Stage Item Id
-       */
-      stage_item_id: number;
-    };
-    query?: {
-      /**
-       * Elo Diff Threshold
-       */
-      elo_diff_threshold?: number;
-      /**
-       * Iterations
-       */
-      iterations?: number;
-      /**
-       * Only Recommended
-       */
-      only_recommended?: boolean;
-      /**
-       * Limit
-       */
-      limit?: number;
-    };
-    url: '/tournaments/{tournament_id}/stage_items/{stage_item_id}/upcoming_matches';
-  };
-
-export type GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetErrors =
-  {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-  };
-
-export type GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetError =
-  GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetErrors[keyof GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetErrors];
-
-export type GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: UpcomingMatchesResponse;
-  };
-
-export type GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponse =
-  GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponses[keyof GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponses];
 
 export type GetStagesTournamentsTournamentIdStagesGetData = {
   body?: never;

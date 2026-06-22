@@ -1,12 +1,34 @@
-import { Center, Grid, Title } from '@mantine/core';
+import { Badge, Center, Grid, Group, Title } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
 import RoundModal from '@components/modals/round_modal';
 import { BracketDisplaySettings } from '@components/utils/brackets';
 import { isMatchHappening, isMatchInTheFutureOrPresent } from '@components/utils/match';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { MatchWithDetails, RoundWithMatches, StagesWithStageItemsResponse } from '@openapi';
+import {
+  MatchWithDetails,
+  RoundLifecycleState,
+  RoundWithMatches,
+  StagesWithStageItemsResponse,
+} from '@openapi';
 import Match from './match';
+
+function lifecycleBadge(t: any, state: RoundLifecycleState) {
+  const cfg: Record<RoundLifecycleState, { color: string; label: string }> = {
+    PLACEHOLDER: { color: 'gray', label: t('round_lifecycle_placeholder') },
+    RESOLVED: { color: 'blue', label: t('round_lifecycle_resolved') },
+    ACTIVE: { color: 'green', label: t('round_lifecycle_active') },
+    LOCKED: { color: 'dark', label: t('round_lifecycle_locked') },
+    DRAFT: { color: 'yellow', label: 'Draft' },
+  };
+  const { color, label } = cfg[state] ?? { color: 'gray', label: state };
+  return (
+    <Badge color={color} variant="light" size="sm">
+      {label}
+    </Badge>
+  );
+}
 
 export default function RoundComponent({
   tournamentData,
@@ -15,6 +37,7 @@ export default function RoundComponent({
   swrUpcomingMatchesResponse,
   readOnly,
   displaySettings,
+  showLifecycleState = false,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
@@ -22,7 +45,9 @@ export default function RoundComponent({
   swrUpcomingMatchesResponse: SWRResponse | null;
   readOnly: boolean;
   displaySettings: BracketDisplaySettings;
+  showLifecycleState?: boolean;
 }) {
+  const { t } = useTranslation();
   const matches = round.matches
     .sort((m1, m2) =>
       (m1.court ? m1.court.name : 'y') > (m2.court ? m2.court.name : 'z') ? 1 : -1
@@ -44,15 +69,11 @@ export default function RoundComponent({
         round={round}
       />
     ));
-  const active_round_style = round.is_draft
-    ? {
-        borderStyle: 'dashed',
-        borderColor: 'gray',
-      }
-    : {
-        borderStyle: 'solid',
-        borderColor: 'gray',
-      };
+  const isPlaceholder = round.lifecycle_state === 'PLACEHOLDER';
+  const roundBorderStyle = {
+    borderStyle: isPlaceholder ? 'dashed' : 'solid',
+    borderColor: 'gray',
+  };
 
   const modal = readOnly ? (
     <Title order={3}>{round.name}</Title>
@@ -76,10 +97,15 @@ export default function RoundComponent({
         minHeight: 320,
         padding: '15px',
         borderRadius: '20px',
-        ...active_round_style,
+        ...roundBorderStyle,
       }}
     >
-      <Center>{modal}</Center>
+      <Center>
+        <Group gap="xs" justify="center">
+          {modal}
+          {showLifecycleState && lifecycleBadge(t, round.lifecycle_state)}
+        </Group>
+      </Center>
       {matches}
     </div>
   );

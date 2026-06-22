@@ -3,17 +3,6 @@ import dayjs from 'dayjs';
 import { formatStageItemInput } from './stage_item_input';
 import { Translator } from './types';
 
-export interface SchedulerSettings {
-  eloThreshold: number;
-  setEloThreshold: any;
-  limit: number;
-  setLimit: any;
-  iterations: number;
-  setIterations: any;
-  onlyRecommended: string;
-  setOnlyRecommended: any;
-}
-
 export function getMatchStartTime(match: MatchWithDetails) {
   return dayjs(match.start_time || '');
 }

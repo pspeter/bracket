@@ -485,7 +485,7 @@ function MatchModalForm({
           {t('save_button')}
         </Button>
       </form>
-      {round && round.is_draft && (
+      {match && match.state === 'NOT_STARTED' && (
         <MatchDeleteButton
           swrStagesResponse={swrStagesResponse}
           swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}

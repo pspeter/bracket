@@ -22,13 +22,15 @@ export async function updateStageItem(
   stage_item_id: number,
   name: string,
   ranking_id: string,
-  team_count: number
+  team_count: number,
+  games_per_player: number | null = null
 ) {
   return createAxios()
     .put(`tournaments/${tournament_id}/stage_items/${stage_item_id}`, {
       name,
       ranking_id,
       team_count,
+      games_per_player,
     })
     .catch((response: any) => handleRequestError(response));
 }

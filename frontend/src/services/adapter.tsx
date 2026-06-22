@@ -3,7 +3,6 @@ import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { useNavigate } from 'react-router';
 import useSWR, { SWRResponse } from 'swr';
 
-import { SchedulerSettings } from '@components/utils/match';
 import { TournamentFilter } from '@components/utils/tournament';
 import { Pagination } from '@components/utils/util';
 import {
@@ -13,14 +12,12 @@ import {
   PlayersResponse,
   RankingsResponse,
   RefereeNamesResponse,
-  RoundWithMatches,
   StageItemInputOptionsResponse,
   StageRankingResponse,
   StagesWithStageItemsResponse,
   TeamsWithPlayersResponse,
   TournamentResponse,
   TournamentsResponse,
-  UpcomingMatchesResponse,
   UserPublicResponse,
 } from '@openapi';
 import dayjs from 'dayjs';
@@ -286,20 +283,6 @@ export function getCourtsLive(tournament_id: number | null): SWRResponse<CourtsR
 
 export function getUser(): SWRResponse<UserPublicResponse> {
   return useSWR('users/me', fetcher);
-}
-
-export function getUpcomingMatches(
-  tournament_id: number,
-  stage_item_id: number,
-  draftRound: RoundWithMatches | null,
-  schedulerSettings: SchedulerSettings
-): SWRResponse<UpcomingMatchesResponse> {
-  return useSWR(
-    stage_item_id == null || draftRound == null
-      ? null
-      : `tournaments/${tournament_id}/stage_items/${stage_item_id}/upcoming_matches?elo_diff_threshold=${schedulerSettings.eloThreshold}&only_recommended=${schedulerSettings.onlyRecommended}&limit=${schedulerSettings.limit}&iterations=${schedulerSettings.iterations}`,
-    fetcher
-  );
 }
 
 export async function uploadTournamentLogo(tournament_id: number, file: any) {
