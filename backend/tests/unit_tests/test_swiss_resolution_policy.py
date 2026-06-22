@@ -24,6 +24,7 @@ def _make_round(
     round_id: int,
     lifecycle_state: RoundLifecycleState,
     match_states: list[MatchState],
+    is_pinned: bool | None = None,
 ) -> RoundWithMatches:
     return RoundWithMatches(
         id=RoundId(round_id),
@@ -32,6 +33,7 @@ def _make_round(
         stage_item_id=StageItemId(-1),
         name=f"R{round_id}",
         created=DUMMY_MOCK_TIME,
+        is_pinned=is_pinned,
     )
 
 
@@ -94,3 +96,37 @@ def test_sequential_only_next_placeholder_returned() -> None:
     result = get_next_round_to_resolve([r1, r2, r3])
     assert result is not None
     assert result.id == r2.id
+
+
+# ── Tests for get_rounds_to_re_resolve (issue #155) ──────────────────────────
+
+
+def test_pinned_resolved_round_excluded_from_re_resolution() -> None:
+    """A RESOLVED pinned round must never be returned for re-resolution."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED], is_pinned=True)
+    result = get_rounds_to_re_resolve([r1, r2])
+    assert result == []
+
+
+def test_resolved_not_started_not_pinned_eligible_for_re_resolution() -> None:
+    """A RESOLVED not-started non-pinned round IS returned for re-resolution."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
+    result = get_rounds_to_re_resolve([r1, r2])
+    assert len(result) == 1
+    assert result[0].id == r2.id
+
+
+def test_locked_resolved_round_not_eligible_for_re_resolution() -> None:
+    """A RESOLVED round that has started (LOCKED) must never be re-resolved."""
+    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+
+    r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
+    r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.IN_PROGRESS])
+    result = get_rounds_to_re_resolve([r1, r2])
+    assert result == []

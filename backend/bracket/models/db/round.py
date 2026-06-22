@@ -4,7 +4,7 @@ from heliclockter import datetime_utc
 from pydantic import computed_field
 
 from bracket.models.db.shared import BaseModelORM
-from bracket.utils.id_types import RoundId, StageItemId
+from bracket.utils.id_types import MatchId, RoundId, StageItemId
 from bracket.utils.types import EnumAutoStr
 
 
@@ -41,3 +41,8 @@ class RoundUpdateBody(BaseModelORM):
 class RoundCreateBody(BaseModelORM):
     name: str | None = None
     stage_item_id: StageItemId
+
+
+class SwapMatchInputsBody(BaseModelORM):
+    match1_id: MatchId
+    match2_id: MatchId

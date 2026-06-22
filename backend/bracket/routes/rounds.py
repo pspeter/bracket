@@ -7,12 +7,14 @@ from bracket.logic.ranking.calculation import (
     recalculate_ranking_for_stage_item,
 )
 from bracket.logic.subscriptions import check_requirement
+from bracket.models.db.match import MatchState
 from bracket.models.db.round import (
     Round,
     RoundCreateBody,
     RoundInsertable,
     RoundLifecycleState,
     RoundUpdateBody,
+    SwapMatchInputsBody,
 )
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
@@ -24,12 +26,13 @@ from bracket.routes.util import (
     round_dependency,
     round_with_matches_dependency,
 )
-from bracket.sql.matches import sql_delete_match
+from bracket.sql.matches import sql_delete_match, sql_set_input_ids_for_match
 from bracket.sql.rounds import (
     get_next_round_name,
     set_round_lifecycle_state,
     sql_create_round,
     sql_delete_round,
+    sql_set_round_is_pinned,
 )
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
@@ -126,4 +129,79 @@ async def update_round_by_id(
             "lifecycle_state": round_body.lifecycle_state.value,
         },
     )
+    return SuccessResponse()
+
+
+@router.post(
+    "/tournaments/{tournament_id}/rounds/{round_id}/swap_inputs",
+    response_model=SuccessResponse,
+)
+async def swap_match_inputs(
+    tournament_id: TournamentId,
+    round_id: RoundId,
+    body: SwapMatchInputsBody,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    __: Tournament = Depends(disallow_archived_tournament),
+    round_with_matches: RoundWithMatches = Depends(round_with_matches_dependency),
+) -> SuccessResponse:
+    """Swap team assignments between two matches in a RESOLVED not-started round.
+
+    Pins the round so the manual override is preserved through upstream score corrections.
+    Validated so that no referee ends up playing in the match they referee.
+    """
+    if round_with_matches.lifecycle_state != RoundLifecycleState.RESOLVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only swap inputs in a RESOLVED round",
+        )
+
+    if any(m.state != MatchState.NOT_STARTED for m in round_with_matches.matches):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot swap inputs in a round that has already started",
+        )
+
+    matches_by_id = {m.id: m for m in round_with_matches.matches}
+    match1 = matches_by_id.get(body.match1_id)
+    match2 = matches_by_id.get(body.match2_id)
+
+    if match1 is None or match2 is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both matches must belong to the specified round",
+        )
+
+    if match1.id == match2.id:
+        return SuccessResponse()
+
+    # Validate referee eligibility after swap: referee must not be one of the playing inputs.
+    new_m1_inputs = {match2.stage_item_input1_id, match2.stage_item_input2_id}
+    new_m2_inputs = {match1.stage_item_input1_id, match1.stage_item_input2_id}
+
+    if (
+        match1.referee_stage_item_input_id is not None
+        and match1.referee_stage_item_input_id in new_m1_inputs
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Swap would cause a referee to play in their own match",
+        )
+
+    if (
+        match2.referee_stage_item_input_id is not None
+        and match2.referee_stage_item_input_id in new_m2_inputs
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Swap would cause a referee to play in their own match",
+        )
+
+    await sql_set_input_ids_for_match(
+        round_id, body.match1_id, [match2.stage_item_input1_id, match2.stage_item_input2_id]
+    )
+    await sql_set_input_ids_for_match(
+        round_id, body.match2_id, [match1.stage_item_input1_id, match1.stage_item_input2_id]
+    )
+    await sql_set_round_is_pinned(round_id, is_pinned=True)
+
     return SuccessResponse()

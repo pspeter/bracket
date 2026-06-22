@@ -62,6 +62,15 @@ async def get_next_round_name(tournament_id: TournamentId, stage_item_id: StageI
     return f"Round {round_count + 1:02d}"
 
 
+async def sql_set_round_is_pinned(round_id: RoundId, is_pinned: bool) -> None:
+    query = """
+        UPDATE rounds
+        SET is_pinned = :is_pinned
+        WHERE rounds.id = :round_id
+    """
+    await database.execute(query=query, values={"round_id": round_id, "is_pinned": is_pinned})
+
+
 async def sql_delete_rounds_for_stage_item_id(stage_item_id: StageItemId) -> None:
     query = """
         DELETE FROM rounds
