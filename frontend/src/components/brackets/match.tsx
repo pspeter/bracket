@@ -39,14 +39,12 @@ export function MatchBadge({ match, theme }: { match: MatchWithDetails; theme: a
 
 export default function Match({
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
   tournamentData,
   match,
   readOnly,
   round,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
   tournamentData: TournamentMinimal;
   match: MatchWithDetails;
   readOnly: boolean;
@@ -67,8 +65,11 @@ export default function Match({
   const team2_style =
     match.stage_item_input1_score < match.stage_item_input2_score ? winner_style : {};
 
-  const team1_label = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
-  const team2_label = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+  // Placeholder rounds have no resolved teams yet, so show "TBD" for their unresolved
+  // slots instead of the generic "Empty slot" fallback (PRD US 21).
+  const emptyLabelKey = round.lifecycle_state === 'PLACEHOLDER' ? 'tbd_label' : 'empty_slot';
+  const team1_label = formatMatchInput1(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
+  const team2_label = formatMatchInput2(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
 
   const [opened, setOpened] = useState(false);
 
@@ -102,7 +103,6 @@ export default function Match({
       </UnstyledButton>
       <MatchModal
         swrStagesResponse={assert_not_none(swrStagesResponse)}
-        swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
         tournamentData={tournamentData}
         match={match}
         opened={opened}

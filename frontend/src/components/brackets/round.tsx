@@ -20,7 +20,6 @@ function lifecycleBadge(t: any, state: RoundLifecycleState) {
     RESOLVED: { color: 'blue', label: t('round_lifecycle_resolved') },
     ACTIVE: { color: 'green', label: t('round_lifecycle_active') },
     LOCKED: { color: 'dark', label: t('round_lifecycle_locked') },
-    DRAFT: { color: 'yellow', label: 'Draft' },
   };
   const { color, label } = cfg[state] ?? { color: 'gray', label: state };
   return (
@@ -34,7 +33,6 @@ export default function RoundComponent({
   tournamentData,
   round,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
   readOnly,
   displaySettings,
   showLifecycleState = false,
@@ -42,7 +40,6 @@ export default function RoundComponent({
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
   readOnly: boolean;
   displaySettings: BracketDisplaySettings;
   showLifecycleState?: boolean;
@@ -63,7 +60,6 @@ export default function RoundComponent({
         key={match.id}
         tournamentData={tournamentData}
         swrStagesResponse={swrStagesResponse}
-        swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
         match={match}
         readOnly={readOnly}
         round={round}
@@ -82,7 +78,6 @@ export default function RoundComponent({
       tournamentData={tournamentData}
       round={round}
       swrStagesResponse={swrStagesResponse}
-      swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
     />
   );
 

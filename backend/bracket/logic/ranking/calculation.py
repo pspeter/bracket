@@ -73,7 +73,6 @@ def determine_ranking_for_stage_item(
     matches = [
         match
         for round_ in stage_item.rounds
-        if not round_.is_draft
         for match in round_.matches
         if isinstance(match, MatchWithDetailsDefinitive)
         if match.state is MatchState.COMPLETED

@@ -84,7 +84,6 @@ export default function ResultsPage() {
     <TournamentLayout tournament_id={tournamentData.id}>
       <MatchModal
         swrStagesResponse={swrStagesResponse}
-        swrUpcomingMatchesResponse={null}
         tournamentData={tournamentData}
         match={match}
         opened={modalOpened}

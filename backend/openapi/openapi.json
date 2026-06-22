@@ -2098,7 +2098,6 @@
       },
       "RoundLifecycleState": {
         "enum": [
-          "DRAFT",
           "ACTIVE",
           "PLACEHOLDER",
           "RESOLVED",
@@ -2134,11 +2133,6 @@
           "id": {
             "title": "Id",
             "type": "integer"
-          },
-          "is_draft": {
-            "readOnly": true,
-            "title": "Is Draft",
-            "type": "boolean"
           },
           "is_pinned": {
             "anyOf": [
@@ -2185,8 +2179,7 @@
           "lifecycle_state",
           "is_pinned",
           "id",
-          "matches",
-          "is_draft"
+          "matches"
         ],
         "title": "RoundWithMatches",
         "type": "object"
@@ -7429,16 +7422,6 @@
             "schema": {
               "title": "Tournament Id",
               "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "no_draft_rounds",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "No Draft Rounds",
-              "type": "boolean"
             }
           }
         ],

@@ -89,16 +89,9 @@ def validate_stage_template_body(stage_body: StageTemplateCreateBody) -> None:
 @router.get("/tournaments/{tournament_id}/stages", response_model=StagesWithStageItemsResponse)
 async def get_stages(
     tournament_id: TournamentId,
-    user: UserPublic = Depends(user_authenticated_or_public_dashboard),
-    no_draft_rounds: bool = False,
+    _: UserPublic = Depends(user_authenticated_or_public_dashboard),
 ) -> StagesWithStageItemsResponse:
-    if no_draft_rounds is False and user is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can't view draft rounds when not authorized",
-        )
-
-    stages_ = await get_full_tournament_details(tournament_id, no_draft_rounds=no_draft_rounds)
+    stages_ = await get_full_tournament_details(tournament_id)
     return StagesWithStageItemsResponse(data=stages_)
 
 

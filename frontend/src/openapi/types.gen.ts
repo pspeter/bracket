@@ -1069,7 +1069,7 @@ export type RoundCreateBody = {
 /**
  * RoundLifecycleState
  */
-export type RoundLifecycleState = 'DRAFT' | 'ACTIVE' | 'PLACEHOLDER' | 'RESOLVED' | 'LOCKED';
+export type RoundLifecycleState = 'ACTIVE' | 'PLACEHOLDER' | 'RESOLVED' | 'LOCKED';
 
 /**
  * RoundUpdateBody
@@ -1094,10 +1094,6 @@ export type RoundWithMatches = {
    * Id
    */
   id: number;
-  /**
-   * Is Draft
-   */
-  readonly is_draft: boolean;
   /**
    * Is Pinned
    */
@@ -2316,128 +2312,6 @@ export type ValidationError = {
    * Error Type
    */
   type: string;
-};
-
-/**
- * RoundWithMatches
- */
-export type RoundWithMatchesWritable = {
-  /**
-   * Created
-   */
-  created: string;
-  /**
-   * Id
-   */
-  id: number;
-  /**
-   * Is Pinned
-   */
-  is_pinned: boolean | null;
-  lifecycle_state: RoundLifecycleState;
-  /**
-   * Matches
-   */
-  matches: Array<MatchWithDetailsDefinitive | MatchWithDetails>;
-  /**
-   * Name
-   */
-  name: string;
-  /**
-   * Stage Item Id
-   */
-  stage_item_id: number;
-};
-
-/**
- * StageItemWithRounds
- */
-export type StageItemWithRoundsWritable = {
-  /**
-   * Created
-   */
-  created: string;
-  /**
-   * Games Per Player
-   */
-  games_per_player: number | null;
-  /**
-   * Id
-   */
-  id: number;
-  /**
-   * Inputs
-   */
-  inputs: Array<StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty>;
-  /**
-   * Name
-   */
-  name: string;
-  /**
-   * Ranking Id
-   */
-  ranking_id: number | null;
-  /**
-   * Rounds
-   */
-  rounds: Array<RoundWithMatchesWritable>;
-  /**
-   * Stage Id
-   */
-  stage_id: number;
-  /**
-   * Team Count
-   */
-  team_count: number;
-  type: StageType;
-  /**
-   * Type Name
-   */
-  type_name: string;
-};
-
-/**
- * StageWithStageItems
- */
-export type StageWithStageItemsWritable = {
-  /**
-   * Created
-   */
-  created: string;
-  /**
-   * Id
-   */
-  id: number;
-  /**
-   * Is Active
-   */
-  is_active: boolean;
-  /**
-   * Level Id
-   */
-  level_id: number | null;
-  /**
-   * Name
-   */
-  name: string;
-  /**
-   * Stage Items
-   */
-  stage_items: Array<StageItemWithRoundsWritable>;
-  /**
-   * Tournament Id
-   */
-  tournament_id: number;
-};
-
-/**
- * StagesWithStageItemsResponse
- */
-export type StagesWithStageItemsResponseWritable = {
-  /**
-   * Data
-   */
-  data: Array<StageWithStageItemsWritable>;
 };
 
 export type GetClubsClubsGetData = {
@@ -4371,12 +4245,7 @@ export type GetStagesTournamentsTournamentIdStagesGetData = {
      */
     tournament_id: number;
   };
-  query?: {
-    /**
-     * No Draft Rounds
-     */
-    no_draft_rounds?: boolean;
-  };
+  query?: never;
   url: '/tournaments/{tournament_id}/stages';
 };
 

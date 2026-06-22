@@ -1,4 +1,3 @@
-
 import pytest
 from heliclockter import timedelta
 
@@ -40,7 +39,7 @@ from tests.integration_tests.sql import (
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_create_match(
+async def test_create_match_is_blocked(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     async with (
@@ -83,13 +82,14 @@ async def test_create_match(
         response = await send_tournament_request(
             HTTPMethod.POST, "matches", auth_context, json=body
         )
-        assert response["data"]["id"], response
+        assert response["detail"] == "Matches cannot be created individually", response
 
-        await assert_row_count_and_clear(matches, 1)
+        # No match should have been created.
+        await assert_row_count_and_clear(matches, 0)
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_delete_match(
+async def test_delete_match_is_blocked(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     async with (
@@ -151,13 +151,13 @@ async def test_delete_match(
             )
         ) as match_inserted,
     ):
-        assert (
-            await send_tournament_request(
-                HTTPMethod.DELETE, f"matches/{match_inserted.id}", auth_context, {}
-            )
-            == SUCCESS_RESPONSE
+        response = await send_tournament_request(
+            HTTPMethod.DELETE, f"matches/{match_inserted.id}", auth_context, {}
         )
-        await assert_row_count_and_clear(matches, 0)
+        assert response["detail"] == "Matches cannot be deleted individually", response
+
+        # The match must still exist; deletion is blocked.
+        await assert_row_count_and_clear(matches, 1)
 
 
 @pytest.mark.asyncio(loop_scope="session")

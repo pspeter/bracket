@@ -36,6 +36,7 @@
     "archive_tournament_button": "Archive Tournament",
     "archived_header_label": "This tournament is archived. It is now read-only.",
     "archived_label": "Archived",
+    "at_least_one_game_validation": "Need at least one game per player",
     "at_least_one_player_validation": "Enter at least one player",
     "at_least_one_team_validation": "Enter at least one team",
     "assign_missing_referees_description": "Assign missing referees",

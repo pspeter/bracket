@@ -102,7 +102,6 @@ export function SwissRoundsGrid({
             tournamentData={tournamentData}
             round={round}
             swrStagesResponse={swrStagesResponse}
-            swrUpcomingMatchesResponse={null}
             readOnly={false}
             displaySettings={displaySettings}
             showLifecycleState={true}

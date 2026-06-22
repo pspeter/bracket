@@ -12,10 +12,7 @@ async def get_full_tournament_details(
     round_id: RoundId | None = None,
     stage_id: StageId | None = None,
     stage_item_ids: set[StageItemId] | None = None,
-    *,
-    no_draft_rounds: bool = False,
 ) -> list[StageWithStageItems]:
-    draft_filter = "AND rounds.lifecycle_state != 'DRAFT'" if no_draft_rounds else ""
     round_filter = "AND rounds.id = :round_id" if round_id is not None else ""
     stage_filter = "AND stages.id = :stage_id" if stage_id is not None else ""
     stage_item_filter = (
@@ -64,7 +61,6 @@ async def get_full_tournament_details(
             LEFT JOIN stage_items si on rounds.stage_item_id = si.id
             LEFT JOIN stages s2 on s2.id = si.stage_id
             WHERE s2.tournament_id = :tournament_id
-            {draft_filter}
             {round_filter}
             GROUP BY rounds.id
         ), stage_items_with_rounds AS (

@@ -33,9 +33,7 @@ async def get_rounds_for_stage_item(
 
 
 async def get_round_by_id(tournament_id: TournamentId, round_id: RoundId) -> RoundWithMatches:
-    stages = await get_full_tournament_details(
-        tournament_id, no_draft_rounds=False, round_id=round_id
-    )
+    stages = await get_full_tournament_details(tournament_id, round_id=round_id)
 
     for stage in stages:
         for stage_item in stage.stage_items:
@@ -92,16 +90,9 @@ async def set_round_lifecycle_state(
 ) -> None:
     query = """
         UPDATE rounds
-        SET
-            lifecycle_state =
-                CASE WHEN rounds.id=:round_id
-                        THEN CAST(:lifecycle_state AS round_lifecycle_state)
-                     WHEN CAST(:lifecycle_state AS round_lifecycle_state) = 'DRAFT'
-                          AND lifecycle_state = 'DRAFT'
-                        THEN 'ACTIVE'
-                     ELSE lifecycle_state
-                END
-        WHERE rounds.id IN (
+        SET lifecycle_state = CAST(:lifecycle_state AS round_lifecycle_state)
+        WHERE rounds.id = :round_id
+        AND rounds.id IN (
             SELECT rounds.id
             FROM rounds
             JOIN stage_items ON rounds.stage_item_id = stage_items.id

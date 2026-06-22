@@ -14,12 +14,10 @@ function RoundDeleteButton({
   tournamentData,
   round,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -28,7 +26,6 @@ function RoundDeleteButton({
       onClick={async () => {
         await deleteRound(tournamentData.id, round.id);
         await swrStagesResponse.mutate();
-        if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
       }}
       style={{ marginTop: '15px' }}
       size="sm"
@@ -41,12 +38,10 @@ export default function RoundModal({
   tournamentData,
   round,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
@@ -88,7 +83,6 @@ export default function RoundModal({
         </form>
         <RoundDeleteButton
           swrStagesResponse={swrStagesResponse}
-          swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
           tournamentData={tournamentData}
           round={round}
         />

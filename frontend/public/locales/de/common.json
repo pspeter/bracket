@@ -36,6 +36,7 @@
     "archive_tournament_button": "Turnier archivieren",
     "archived_header_label": "Dieses Turnier ist archiviert. Es ist jetzt schreibgeschützt.",
     "archived_label": "Archiviert",
+    "at_least_one_game_validation": "Mindestens ein Spiel pro Spieler erforderlich",
     "at_least_one_player_validation": "Mindestens einen Spieler eingeben",
     "at_least_one_team_validation": "Mindestens ein Team eingeben",
     "assign_missing_referees_description": "Fehlende Schiedsrichter zuweisen",

@@ -71,8 +71,6 @@ export default function SwissTournamentPage() {
     setMatchVisibility,
     teamNamesDisplay,
     setTeamNamesDisplay,
-    showManualSchedulingOptions: 'false',
-    setShowManualSchedulingOptions: () => {},
   };
 
   const tournamentDataFull = swrTournamentResponse.data?.data;

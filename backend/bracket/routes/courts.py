@@ -65,7 +65,7 @@ async def delete_court(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
-    stages = await get_full_tournament_details(tournament_id, no_draft_rounds=False)
+    stages = await get_full_tournament_details(tournament_id)
     used_in_matches_count = 0
     for stage in stages:
         for stage_item in stage.stage_items:

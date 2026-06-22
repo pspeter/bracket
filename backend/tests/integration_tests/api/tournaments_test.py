@@ -399,7 +399,7 @@ async def test_non_public_tournament_endpoints_blocked_for_unauthenticated_users
             f"tournaments/{tournament_id}/courts",
             f"tournaments/{tournament_id}/teams",
             f"tournaments/{tournament_id}/rankings",
-            f"tournaments/{tournament_id}/stages?no_draft_rounds=true",
+            f"tournaments/{tournament_id}/stages",
         ):
             response = await send_request(HTTPMethod.GET, endpoint)
             assert response == UNAUTHORIZED_RESPONSE, (
@@ -433,7 +433,7 @@ async def test_archived_tournament_endpoints_blocked_for_unauthenticated_users(
             f"tournaments/{tournament_id}/courts",
             f"tournaments/{tournament_id}/teams",
             f"tournaments/{tournament_id}/rankings",
-            f"tournaments/{tournament_id}/stages?no_draft_rounds=true",
+            f"tournaments/{tournament_id}/stages",
         ):
             response = await send_request(HTTPMethod.GET, endpoint)
             assert response == UNAUTHORIZED_RESPONSE, (

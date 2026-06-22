@@ -531,5 +531,3 @@ async def update_stage_item(
     if team_count_changed:
         await update_start_times_of_matches(tournament_id)
     return SuccessResponse()
-
-

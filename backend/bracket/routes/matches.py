@@ -25,7 +25,6 @@ from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_
 from bracket.models.db.match import (
     Match,
     MatchBody,
-    MatchCreateBody,
     MatchCreateBodyFrontend,
     MatchRescheduleBody,
     MatchResizeBreakBody,
@@ -45,8 +44,6 @@ from bracket.routes.models import (
 )
 from bracket.routes.util import disallow_archived_tournament, match_dependency
 from bracket.sql.matches import (
-    sql_create_match,
-    sql_delete_match,
     sql_get_match_with_details,
     sql_unschedule_match,
     sql_update_match,
@@ -167,20 +164,14 @@ async def delete_match(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
-    match: Match = Depends(match_dependency),
+    ___: Match = Depends(match_dependency),
 ) -> SuccessResponse:
-    if match.state in {MatchState.IN_PROGRESS, MatchState.COMPLETED}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete matches that are in progress or completed",
-        )
-
-    round_ = await get_round_by_id(tournament_id, match.round_id)
-    await sql_delete_match(match.id)
-
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    return SuccessResponse()
+    # Matches are managed automatically (the Swiss skeleton is fixed; other stage types
+    # generate their full bracket up front), so individual matches can't be deleted.
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Matches cannot be deleted individually",
+    )
 
 
 @router.post("/tournaments/{tournament_id}/matches", response_model=SingleMatchResponse)
@@ -190,15 +181,12 @@ async def create_match(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SingleMatchResponse:
-    await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
-
-    tournament = await sql_get_tournament(tournament_id)
-    body_with_durations = MatchCreateBody(
-        **match_body.model_dump(),
-        duration_minutes=tournament.duration_minutes,
+    # Matches are generated automatically for every stage type, so they can't be created
+    # manually anymore (this was previously only allowed inside Swiss draft rounds).
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Matches cannot be created individually",
     )
-
-    return SingleMatchResponse(data=await sql_create_match(body_with_durations))
 
 
 @router.post("/tournaments/{tournament_id}/schedule_matches", response_model=SuccessResponse)
