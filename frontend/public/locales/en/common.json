@@ -172,6 +172,8 @@
     "match_context_level_label": "Level",
     "match_context_match_label": "Match",
     "match_context_match_number": "Match {{number}}",
+    "match_context_round_label": "Round",
+    "match_context_round_number": "Round {{number}}",
     "match_context_stage_item_label": "Stage item",
     "match_context_stage_label": "Stage",
     "max_results_input_label": "Max results",

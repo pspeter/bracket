@@ -45,6 +45,7 @@ function entry(
     stage: parentStage,
     stageItem: parentStageItem,
     matchNumber: 1,
+    roundNumber: 1,
   };
 }
 

@@ -156,10 +156,13 @@ function MatchCard({
   }
 
   // The match's identity badge, shown at every card height: the stage item plus
-  // its running match number ("Group C · 3"). The colour already carries the
-  // level (and, via its hue cluster, the stage), so the level name is never
-  // written; the stage name is prepended only when the card has a line to spare.
-  const counter = entry?.matchNumber;
+  // its running counter. For round-robin the counter is the match number ("Group C · 3");
+  // for swiss and single-elimination it is the round number ("Group A · R2") so the badge
+  // communicates which round of the bracket the match belongs to. The colour already carries
+  // the level (and, via its hue cluster, the stage), so the level name is never written;
+  // the stage name is prepended only when the card has a line to spare.
+  const isRoundRobin = entry?.stageItem.type === 'ROUND_ROBIN';
+  const counter = isRoundRobin ? entry?.matchNumber : entry?.roundNumber;
   const itemName = entry?.stageItem.name;
   const stageName = entry?.stage.name;
   const coreFull =

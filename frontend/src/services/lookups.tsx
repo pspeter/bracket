@@ -104,6 +104,8 @@ export type MatchLookupEntry = {
    * where the match sits on the schedule.
    */
   matchNumber: number;
+  /** 1-based position of the round within its stage item. */
+  roundNumber: number;
 };
 
 /**
@@ -116,10 +118,12 @@ export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, M
   for (const stage of swrStagesResponse.data.data as StageWithStageItems[]) {
     for (const stageItem of stage.stage_items) {
       let matchNumber = 0;
-      for (const round of stageItem.rounds) {
+      for (let roundIdx = 0; roundIdx < stageItem.rounds.length; roundIdx++) {
+        const round = stageItem.rounds[roundIdx];
+        const roundNumber = roundIdx + 1;
         for (const match of round.matches) {
           matchNumber += 1;
-          result.push([match.id, { match, round, stageItem, stage, matchNumber }]);
+          result.push([match.id, { match, round, stageItem, stage, matchNumber, roundNumber }]);
         }
       }
     }

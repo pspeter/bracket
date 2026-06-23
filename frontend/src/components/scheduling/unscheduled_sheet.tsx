@@ -72,9 +72,11 @@ export default function UnscheduledSheet({
     const entry = matchesLookup[match.id];
     const baseLabel =
       badgeLabel ?? (entry != null ? `${entry.stage.name} · ${entry.stageItem.name}` : null);
-    // Mirror the grid badge: append the running match number ("Group C · 3").
+    // Mirror the grid badge: round number for swiss/elimination, match number for round-robin.
+    const isRoundRobin = entry?.stageItem.type === 'ROUND_ROBIN';
+    const counter = isRoundRobin ? entry?.matchNumber : entry?.roundNumber;
     const label =
-      baseLabel != null && entry != null ? `${baseLabel} · ${entry.matchNumber}` : baseLabel;
+      baseLabel != null && entry != null ? `${baseLabel} · ${counter}` : baseLabel;
     const colour =
       (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
       NEUTRAL_STAGE_ITEM_COLOUR;
