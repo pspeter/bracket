@@ -365,11 +365,6 @@ export function ScoreTrackingMatchView({
           </Button>
         </Group>
         <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
-        {showSideSwitchReminder && (
-          <Alert color="orange" title={t('side_switch_reminder_title')}>
-            {t('side_switch_reminder_description')}
-          </Alert>
-        )}
         {match.state === 'NOT_STARTED' ? (
           <Center>
             <Button
@@ -388,16 +383,18 @@ export function ScoreTrackingMatchView({
           </Center>
         ) : (
           <>
-            <Group justify="center">
+            <Stack align="center" gap={4}>
               <Button
-                variant={showSideSwitchReminder ? 'filled' : 'light'}
-                color={showSideSwitchReminder ? 'orange' : undefined}
+                variant="light"
                 leftSection={<IconArrowsExchange size={18} />}
                 onClick={toggleSides}
               >
                 {t('switch_sides_button')}
               </Button>
-            </Group>
+              <Text fz="sm" c="red" style={{ visibility: showSideSwitchReminder ? 'visible' : 'hidden' }}>
+                {t('side_switch_reminder_description')}
+              </Text>
+            </Stack>
             <Grid>
               {displayedTeams.map((team) => (
                 <Grid.Col span={6} key={team.slot}>
