@@ -6,6 +6,7 @@ from heliclockter import datetime_utc
 from bracket.database import database
 from bracket.logic.planning.team_windows import PlayingWindow, get_team_playing_windows
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import StageWithStageItems
 from bracket.utils.id_types import (
     CourtId,
@@ -387,9 +388,13 @@ def _set_round_order_conflicts(
 
     Rounds within a stage item must complete in sequence. If any match in a later round
     starts before the previous round's last scheduled match has ended, flag it.
+
+    Round-robin stage items are excluded: their rounds have no required ordering.
     """
     for stage in stages:
         for stage_item in stage.stage_items:
+            if stage_item.type == StageType.ROUND_ROBIN:
+                continue
             rounds = sorted(stage_item.rounds, key=lambda r: r.id)
             for prev_round, curr_round in zip(rounds, rounds[1:], strict=False):
                 prev_round_end: datetime_utc | None = None

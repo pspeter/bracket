@@ -1064,3 +1064,58 @@ def test_round_order_conflict_skips_rounds_with_no_scheduled_matches() -> None:
     flags = get_match_conflict_flags([stage], default_break_minutes=0)
 
     assert flags[r2_match.id].round_order_conflict is False
+
+
+def test_round_order_conflict_not_flagged_for_round_robin() -> None:
+    """Round-robin stage items are never flagged for round order conflicts."""
+    # Build an overlapping two-round scenario (same as the "flags" test) but with ROUND_ROBIN type.
+    # Despite round 2 starting before round 1 ends, no conflict should be raised.
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    r1_match = _make_definitive_match(
+        MatchId(-41), inp[0], inp[1], RoundId(-41), CourtId(-1), T
+    )
+    r2_match = _make_definitive_match(
+        MatchId(-40), inp[2], inp[3], RoundId(-40), CourtId(-2), T + timedelta(minutes=30)
+    )
+    round1 = RoundWithMatches(
+        id=RoundId(-41),
+        matches=[r1_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 1",
+    )
+    round2 = RoundWithMatches(
+        id=RoundId(-40),
+        matches=[r2_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 2",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1, round2],
+        inputs=[inp[0], inp[1]],
+        type_name="Round Robin",
+        team_count=4,
+        ranking_id=None,
+        id=StageItemId(-40),
+        stage_id=StageId(-40),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.ROUND_ROBIN,
+    )
+    stage = StageWithStageItems(
+        id=StageId(-40),
+        tournament_id=tid,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[r1_match.id].round_order_conflict is False
+    assert flags[r2_match.id].round_order_conflict is False
