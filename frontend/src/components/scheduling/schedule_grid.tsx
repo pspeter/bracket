@@ -116,6 +116,7 @@ function MatchCard({
   const { t } = useTranslation();
   const { match } = block;
   const entry = matchesLookup[match.id];
+  const isPlaceholder = entry?.round.lifecycle_state === 'PLACEHOLDER';
 
   // The card covers only the playing time; the margin after the match shows as a
   // calendar-style gap before the next card.
@@ -146,8 +147,9 @@ function MatchCard({
   // four-line card, and on the compact three-line card where both teams share a line.
   const showReferee = lines >= 3 || (lines === 2 && combineTeams);
 
-  let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
-  let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+  const emptyLabelKey = isPlaceholder ? 'tbd_label' : 'empty_slot';
+  let input1 = formatMatchInput1(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
+  let input2 = formatMatchInput2(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
   if (zoom === 'compact') {
     input1 = abbreviateTeamName(input1);
     input2 = abbreviateTeamName(input2);
@@ -514,6 +516,7 @@ function MatchCard({
             stageItemsLookup={stageItemsLookup}
             conflictIcon={mergeConflictIcons ? null : refereeConflictIcon}
             abbreviated={zoom === 'compact'}
+            placeholderLabel={isPlaceholder ? t('tbd_label') : undefined}
           />
         )}
       </Box>

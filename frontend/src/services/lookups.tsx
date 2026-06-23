@@ -4,6 +4,7 @@ import { groupBy, responseIsValid } from '@components/utils/util';
 import {
   FullTeamWithPlayers,
   MatchWithDetails,
+  RoundWithMatches,
   StageItemWithRounds,
   StageWithStageItems,
 } from '@openapi';
@@ -94,6 +95,7 @@ export function getStageItemTeamsLookup(swrStagesResponse: SWRResponse) {
 /** One match in the schedule tree with its parent stage item and top-level stage. */
 export type MatchLookupEntry = {
   match: MatchWithDetails;
+  round: RoundWithMatches;
   stageItem: StageItemWithRounds;
   stage: StageWithStageItems;
   /**
@@ -117,7 +119,7 @@ export function getMatchLookup(swrStagesResponse: SWRResponse): Record<number, M
       for (const round of stageItem.rounds) {
         for (const match of round.matches) {
           matchNumber += 1;
-          result.push([match.id, { match, stageItem, stage, matchNumber }]);
+          result.push([match.id, { match, round, stageItem, stage, matchNumber }]);
         }
       }
     }
