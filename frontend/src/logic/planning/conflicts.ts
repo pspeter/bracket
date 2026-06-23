@@ -5,8 +5,10 @@
  * `computeConflictFlags(stages, defaultBreakMinutes, matchesOfInterest)` returns a
  * `Map<matchId, ConflictFlags>` covering every conflict type the backend persists:
  *
- *   - team double-booking (`stage_item_input{1,2}_conflict`), resolved by **team_id**
- *     and restricted to definitive matches;
+ *   - team double-booking (`stage_item_input{1,2}_conflict`), flagged two ways: a
+ *     **team_id** pass (definitive matches only, catching the same team under different
+ *     slot ids across stage items) and a **slot-id** pass that also covers placeholder
+ *     (tentative/empty) playing slots not yet resolved to a team;
  *   - winner-of precedence (`precedence_conflict` / `feeder_precedence_conflict`);
  *   - cross-stage precedence (a stage item must wait for the group it feeds off);
  *   - short break (`short_break_conflict`);
