@@ -18,6 +18,7 @@ from bracket.models.db.match import (
     MatchWithDetailsDefinitive,
     SchedulerWeights,
 )
+from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputEmpty
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
@@ -78,6 +79,7 @@ class _MatchContext:
     # True when the match's stage item has at least one unwired (empty) input slot, e.g. a
     # knockout place filled manually only once the previous stage is fully played.
     stage_item_has_open_slot: bool
+    is_swiss: bool = False
 
 
 @dataclass(frozen=True)
@@ -245,6 +247,7 @@ def _get_match_contexts(
             input_ids=_input_ids(match, slot_id_map, stage_item.id),
             cross_stage_source_ids=_cross_stage_source_ids(match),
             stage_item_has_open_slot=_has_open_slot(stage_item),
+            is_swiss=stage_item.type == StageType.SWISS,
         )
         for stage in stages
         for stage_item in stage.stage_items
@@ -554,6 +557,23 @@ def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext
         for source_stage_item_id in successor.cross_stage_source_ids:
             for feeder in contexts_by_stage_item[source_stage_item_id]:
                 if feeder.match.id != successor.match.id:
+                    pair_ids.add((feeder.match.id, successor.match.id))
+
+    # Swiss stage items require strictly sequential rounds: every match in round N must
+    # finish (plus the default break) before any match in round N+1 can start, because
+    # Swiss pairings for round N+1 are determined by the results of round N.
+    swiss_by_item: dict[StageItemId, dict[int, list[_MatchContext]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for context in contexts:
+        if context.is_swiss:
+            swiss_by_item[context.stage_item_id][context.round_index].append(context)
+    for rounds_by_index in swiss_by_item.values():
+        for round_index in sorted(rounds_by_index):
+            if round_index + 1 not in rounds_by_index:
+                continue
+            for feeder in rounds_by_index[round_index]:
+                for successor in rounds_by_index[round_index + 1]:
                     pair_ids.add((feeder.match.id, successor.match.id))
 
     pair_ids |= _open_slot_precedence_ids(contexts)
