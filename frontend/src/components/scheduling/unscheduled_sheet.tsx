@@ -75,12 +75,12 @@ export default function UnscheduledSheet({
     // Mirror the grid badge: round number for swiss/elimination, match number for round-robin.
     const isRoundRobin = entry?.stageItem.type === 'ROUND_ROBIN';
     const counter = isRoundRobin ? entry?.matchNumber : entry?.roundNumber;
-    const label =
-      baseLabel != null && entry != null ? `${baseLabel} · ${counter}` : baseLabel;
+    const label = baseLabel != null && entry != null ? `${baseLabel} · ${counter}` : baseLabel;
     const colour =
       (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
       NEUTRAL_STAGE_ITEM_COLOUR;
-    const emptyLabelKey = entry?.round.lifecycle_state === 'PLACEHOLDER' ? 'tbd_label' : 'empty_slot';
+    const emptyLabelKey =
+      entry?.round.lifecycle_state === 'PLACEHOLDER' ? 'tbd_label' : 'empty_slot';
 
     return (
       <UnstyledButton key={match.id} onClick={() => onSelectMatch(match)} w="100%" py="xs">

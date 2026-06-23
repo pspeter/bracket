@@ -57,6 +57,8 @@ class MatchConflictFlags:
     feeder_precedence_conflict: bool = False
     short_break_conflict: bool = False
     referee_conflict: bool = False
+    # Set on a match in round N whose start_time is before the last match of round N-1 ends.
+    round_order_conflict: bool = False
 
 
 def _get_all_matches(
@@ -377,6 +379,34 @@ def _set_slot_overlap_conflicts(
                 _flag_slot_occupancy(occupancy2, flags)
 
 
+def _set_round_order_conflicts(
+    stages: list[StageWithStageItems],
+    flags: dict[MatchId, MatchConflictFlags],
+) -> None:
+    """Flag matches in round N that start before all matches of round N-1 have ended.
+
+    Rounds within a stage item must complete in sequence. If any match in a later round
+    starts before the previous round's last scheduled match has ended, flag it.
+    """
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            rounds = sorted(stage_item.rounds, key=lambda r: r.id)
+            for prev_round, curr_round in zip(rounds, rounds[1:], strict=False):
+                prev_round_end: datetime_utc | None = None
+                for match in prev_round.matches:
+                    if match.start_time is None:
+                        continue
+                    if prev_round_end is None or match.end_time > prev_round_end:
+                        prev_round_end = match.end_time
+
+                if prev_round_end is None:
+                    continue
+
+                for match in curr_round.matches:
+                    if match.start_time is not None and match.start_time < prev_round_end:
+                        flags[match.id].round_order_conflict = True
+
+
 def get_match_conflict_flags(
     stages: list[StageWithStageItems], default_break_minutes: int
 ) -> dict[MatchId, MatchConflictFlags]:
@@ -390,6 +420,7 @@ def get_match_conflict_flags(
     _set_cross_stage_precedence_conflicts(stages, flags)
     _set_cross_stage_feeder_precedence_conflicts(stages, flags)
     _set_short_break_conflicts(matches, default_break_minutes, flags)
+    _set_round_order_conflicts(stages, flags)
 
     return flags
 
@@ -428,7 +459,8 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 precedence_conflict = :precedence_conflict,
                 feeder_precedence_conflict = :feeder_precedence_conflict,
                 short_break_conflict = :short_break_conflict,
-                referee_conflict = :referee_conflict
+                referee_conflict = :referee_conflict,
+                round_order_conflict = :round_order_conflict
             WHERE id = :match_id
             """,
             values={
@@ -439,6 +471,7 @@ async def set_conflicts(match_conflicts: dict[MatchId, MatchConflictFlags]) -> N
                 "feeder_precedence_conflict": conflict.feeder_precedence_conflict,
                 "short_break_conflict": conflict.short_break_conflict,
                 "referee_conflict": conflict.referee_conflict,
+                "round_order_conflict": conflict.round_order_conflict,
             },
         )
 

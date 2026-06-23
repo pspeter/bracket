@@ -901,3 +901,166 @@ def test_conflict_placeholder_playing_slots_non_overlapping_no_conflict() -> Non
 
     assert flags[match1.id].stage_item_input1_conflict is False
     assert flags[match2.id].stage_item_input1_conflict is False
+
+
+# ---------------------------------------------------------------------------
+# Round order conflict tests
+# ---------------------------------------------------------------------------
+
+
+def _make_two_round_stage(
+    round1_match_start: object,
+    round2_match_start: object,
+    duration_minutes: int = 60,
+) -> tuple[StageWithStageItems, MatchId, MatchId]:
+    """Build a single-stage-item with two rounds, one match each; return their IDs.
+
+    Round 1 has a lower (more negative) ID so sorting by id puts it before round 2,
+    matching the real database where earlier rounds are created first and get lower auto-increment
+    IDs.
+    """
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    r1_match = _make_definitive_match(
+        MatchId(-41),
+        inp[0],
+        inp[1],
+        RoundId(-41),
+        CourtId(-1),
+        round1_match_start,
+        duration_minutes,
+    )
+    r2_match = _make_definitive_match(
+        MatchId(-40),
+        inp[2],
+        inp[3],
+        RoundId(-40),
+        CourtId(-2),
+        round2_match_start,
+        duration_minutes,
+    )
+    round1 = RoundWithMatches(
+        id=RoundId(-41),
+        matches=[r1_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 1",
+    )
+    round2 = RoundWithMatches(
+        id=RoundId(-40),
+        matches=[r2_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 2",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1, round2],
+        inputs=[inp[0], inp[1]],
+        type_name="Single Elimination",
+        team_count=4,
+        ranking_id=None,
+        id=StageItemId(-40),
+        stage_id=StageId(-40),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.SINGLE_ELIMINATION,
+    )
+    stage = StageWithStageItems(
+        id=StageId(-40),
+        tournament_id=tid,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+    return stage, r1_match.id, r2_match.id
+
+
+def test_round_order_conflict_flags_match_starting_before_previous_round_ends() -> None:
+    """A match in round 2 that starts before round 1's match ends is flagged."""
+    # Round 1: T → T+60; Round 2 starts at T+30 (before round 1 ends) → conflict
+    stage, r1_id, r2_id = _make_two_round_stage(T, T + timedelta(minutes=30))
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[r1_id].round_order_conflict is False
+    assert flags[r2_id].round_order_conflict is True
+
+
+def test_round_order_conflict_not_flagged_when_previous_round_finishes_first() -> None:
+    """A match in round 2 that starts after round 1's last match ends is not flagged."""
+    # Round 1: T → T+60; Round 2 starts at T+90 (after round 1 ends) → no conflict
+    stage, r1_id, r2_id = _make_two_round_stage(T, T + timedelta(minutes=90))
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[r1_id].round_order_conflict is False
+    assert flags[r2_id].round_order_conflict is False
+
+
+def test_round_order_conflict_not_flagged_for_back_to_back_rounds() -> None:
+    """A round 2 match starting exactly when round 1's last match ends is not a conflict."""
+    # Round 1: T → T+60; Round 2 starts at T+60 (back-to-back) → no conflict
+    stage, r1_id, r2_id = _make_two_round_stage(T, T + timedelta(minutes=60))
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[r1_id].round_order_conflict is False
+    assert flags[r2_id].round_order_conflict is False
+
+
+def test_round_order_conflict_skips_rounds_with_no_scheduled_matches() -> None:
+    """If round 1 has no scheduled matches, round 2 is not flagged."""
+    tid = TournamentId(-1)
+    inp = _make_inputs(tid)
+    r1_match = _make_definitive_match(
+        MatchId(-41),
+        inp[0],
+        inp[1],
+        RoundId(-41),
+        CourtId(-1),
+        None,  # no start_time
+    )
+    r2_match = _make_definitive_match(MatchId(-40), inp[2], inp[3], RoundId(-40), CourtId(-2), T)
+    round1 = RoundWithMatches(
+        id=RoundId(-41),
+        matches=[r1_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 1",
+    )
+    round2 = RoundWithMatches(
+        id=RoundId(-40),
+        matches=[r2_match],
+        stage_item_id=StageItemId(-40),
+        created=MOCK_NOW,
+        lifecycle_state=RoundLifecycleState.ACTIVE,
+        name="Round 2",
+    )
+    stage_item = StageItemWithRounds(
+        rounds=[round1, round2],
+        inputs=[inp[0], inp[1]],
+        type_name="Single Elimination",
+        team_count=4,
+        ranking_id=None,
+        id=StageItemId(-40),
+        stage_id=StageId(-40),
+        name="",
+        created=MOCK_NOW,
+        type=StageType.SINGLE_ELIMINATION,
+    )
+    stage = StageWithStageItems(
+        id=StageId(-40),
+        tournament_id=tid,
+        name="",
+        created=MOCK_NOW,
+        is_active=False,
+        stage_items=[stage_item],
+    )
+
+    flags = get_match_conflict_flags([stage], default_break_minutes=0)
+
+    assert flags[r2_match.id].round_order_conflict is False

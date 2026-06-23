@@ -44,6 +44,7 @@ class MatchBaseInsertable(BaseModelORM):
     feeder_precedence_conflict: bool = False
     short_break_conflict: bool = False
     referee_conflict: bool = False
+    round_order_conflict: bool = False
     state: MatchState = MatchState.NOT_STARTED
     completed_at: datetime_utc | None = None
 

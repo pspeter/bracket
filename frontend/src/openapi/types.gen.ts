@@ -322,6 +322,10 @@ export type Match = {
    */
   round_id: number;
   /**
+   * Round Order Conflict
+   */
+  round_order_conflict: boolean;
+  /**
    * Short Break Conflict
    */
   short_break_conflict: boolean;
@@ -583,6 +587,10 @@ export type MatchWithDetails = {
    */
   round_id: number;
   /**
+   * Round Order Conflict
+   */
+  round_order_conflict: boolean;
+  /**
    * Short Break Conflict
    */
   short_break_conflict: boolean;
@@ -706,6 +714,10 @@ export type MatchWithDetailsDefinitive = {
    * Round Id
    */
   round_id: number;
+  /**
+   * Round Order Conflict
+   */
+  round_order_conflict: boolean;
   /**
    * Short Break Conflict
    */
