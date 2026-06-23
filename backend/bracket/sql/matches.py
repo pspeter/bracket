@@ -302,7 +302,6 @@ async def sql_get_scheduled_matches_with_details(
         LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
         WHERE stages.tournament_id = :tournament_id
         AND stages.is_active IS TRUE
-        AND rounds.lifecycle_state != 'DRAFT'
         AND matches.start_time IS NOT NULL
         {court_filter}
         ORDER BY matches.id, matches.start_time, c.name, matches.id

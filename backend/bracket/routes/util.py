@@ -54,9 +54,7 @@ async def round_with_matches_dependency(
 
 
 async def stage_dependency(tournament_id: TournamentId, stage_id: StageId) -> StageWithStageItems:
-    stages = await get_full_tournament_details(
-        tournament_id, no_draft_rounds=False, stage_id=stage_id
-    )
+    stages = await get_full_tournament_details(tournament_id, stage_id=stage_id)
 
     if len(stages) < 1:
         raise HTTPException(

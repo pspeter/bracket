@@ -672,7 +672,6 @@ export default function SchedulePage() {
               tournamentData={tournamentData}
               match={detailsMatch}
               swrStagesResponse={swrStagesResponse}
-              swrUpcomingMatchesResponse={null}
               opened={detailsMatch != null}
               setOpened={(value: boolean) => {
                 if (!value) setDetailsMatchId(null);

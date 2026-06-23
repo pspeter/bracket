@@ -33,8 +33,7 @@ async def _assign_teams_to_round(
     previous_rounds = [
         r
         for r in fresh.rounds
-        if r.lifecycle_state not in (RoundLifecycleState.PLACEHOLDER, RoundLifecycleState.DRAFT)
-        and r.id != round_.id
+        if r.lifecycle_state != RoundLifecycleState.PLACEHOLDER and r.id != round_.id
     ]
 
     slot_pairs = [
@@ -91,9 +90,7 @@ async def auto_resolve_next_swiss_round(
     if next_placeholder is not None:
         round_ = next((r for r in fresh.rounds if r.id == next_placeholder.id), None)
         if round_ is not None and round_.lifecycle_state == RoundLifecycleState.PLACEHOLDER:
-            await _assign_teams_to_round(
-                tournament_id, fresh, round_, advance_to_resolved=True
-            )
+            await _assign_teams_to_round(tournament_id, fresh, round_, advance_to_resolved=True)
             # Refresh after the first resolution so pass 2 sees the updated state
             fresh = await get_stage_item(tournament_id, stage_item.id)
 
@@ -101,6 +98,4 @@ async def auto_resolve_next_swiss_round(
     for candidate in get_rounds_to_re_resolve(fresh.rounds):
         round_ = next((r for r in fresh.rounds if r.id == candidate.id), None)
         if round_ is not None and round_.lifecycle_state == RoundLifecycleState.RESOLVED:
-            await _assign_teams_to_round(
-                tournament_id, fresh, round_, advance_to_resolved=False
-            )
+            await _assign_teams_to_round(tournament_id, fresh, round_, advance_to_resolved=False)

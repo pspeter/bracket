@@ -8,6 +8,7 @@ import MatchModal from '@components/modals/match_modal';
 import { assert_not_none } from '@components/utils/assert';
 import { Time } from '@components/utils/datetime';
 import { formatMatchInput1, formatMatchInput2, isMatchHappening } from '@components/utils/match';
+import { RefereeDisplay } from '@components/utils/referee';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { MatchWithDetails, RoundWithMatches, StagesWithStageItemsResponse } from '@openapi';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
@@ -39,19 +40,19 @@ export function MatchBadge({ match, theme }: { match: MatchWithDetails; theme: a
 
 export default function Match({
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
   tournamentData,
   match,
   readOnly,
   round,
+  refereesEnabled = false,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
   tournamentData: TournamentMinimal;
   match: MatchWithDetails;
   readOnly: boolean;
 
   round: RoundWithMatches;
+  refereesEnabled?: boolean;
 }) {
   const { t } = useTranslation();
   const theme = useMantineTheme();
@@ -67,8 +68,11 @@ export default function Match({
   const team2_style =
     match.stage_item_input1_score < match.stage_item_input2_score ? winner_style : {};
 
-  const team1_label = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
-  const team2_label = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
+  // Placeholder rounds have no resolved teams yet, so show "TBD" for their unresolved
+  // slots instead of the generic "Empty slot" fallback (PRD US 21).
+  const emptyLabelKey = round.lifecycle_state === 'PLACEHOLDER' ? 'tbd_label' : 'empty_slot';
+  const team1_label = formatMatchInput1(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
+  const team2_label = formatMatchInput2(t, stageItemsLookup, matchesLookup, match, emptyLabelKey);
 
   const [opened, setOpened] = useState(false);
 
@@ -88,6 +92,16 @@ export default function Match({
           <Grid.Col span={2}>{match.stage_item_input2_score}</Grid.Col>
         </Grid>
       </div>
+      {refereesEnabled && (
+        <div style={{ padding: '6px 8px 0px 15px' }}>
+          <RefereeDisplay
+            match={match}
+            refereesEnabled={refereesEnabled}
+            stageItemsLookup={stageItemsLookup}
+            placeholderLabel={round.lifecycle_state === 'PLACEHOLDER' ? t('tbd_label') : undefined}
+          />
+        </div>
+      )}
     </>
   );
 
@@ -102,7 +116,6 @@ export default function Match({
       </UnstyledButton>
       <MatchModal
         swrStagesResponse={assert_not_none(swrStagesResponse)}
-        swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
         tournamentData={tournamentData}
         match={match}
         opened={opened}

@@ -137,9 +137,7 @@ async def test_swap_inputs_pins_round_and_swaps_match_assignments(
             )
             assert resp == SUCCESS_RESPONSE
 
-            stage_item: StageItemWithRounds = await get_stage_item(
-                tournament_id, stage_item_raw.id
-            )
+            stage_item: StageItemWithRounds = await get_stage_item(tournament_id, stage_item_raw.id)
             round2_pinned = sorted(stage_item.rounds, key=lambda r: r.id)[1]
             assert round2_pinned.is_pinned is True
 
@@ -186,9 +184,7 @@ async def test_pinned_round_survives_upstream_correction(
             )
             assert resp == SUCCESS_RESPONSE
 
-            stage_item: StageItemWithRounds = await get_stage_item(
-                tournament_id, stage_item_raw.id
-            )
+            stage_item: StageItemWithRounds = await get_stage_item(tournament_id, stage_item_raw.id)
             round2_pinned = sorted(stage_item.rounds, key=lambda r: r.id)[1]
             assert round2_pinned.is_pinned is True
 

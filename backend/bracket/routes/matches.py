@@ -22,16 +22,10 @@ from bracket.logic.ranking.calculation import (
 )
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
 from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
-from bracket.logic.scheduling.upcoming_matches import (
-    get_draft_round_in_stage_item,
-    get_upcoming_matches_for_swiss,
-)
 from bracket.models.db.match import (
     Match,
     MatchBody,
-    MatchCreateBody,
     MatchCreateBodyFrontend,
-    MatchFilter,
     MatchRescheduleBody,
     MatchResizeBreakBody,
     MatchScoreTrackingBody,
@@ -39,7 +33,6 @@ from bracket.models.db.match import (
     MatchSwapBody,
     SchedulerWeights,
 )
-from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
@@ -48,13 +41,9 @@ from bracket.routes.models import (
     ScoreTrackingMatchResponse,
     SingleMatchResponse,
     SuccessResponse,
-    UpcomingMatchesResponse,
 )
 from bracket.routes.util import disallow_archived_tournament, match_dependency
-from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.matches import (
-    sql_create_match,
-    sql_delete_match,
     sql_get_match_with_details,
     sql_unschedule_match,
     sql_update_match,
@@ -69,7 +58,7 @@ from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
-from bracket.utils.id_types import MatchId, StageItemId, StageItemInputId, TournamentId
+from bracket.utils.id_types import MatchId, StageItemInputId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -170,58 +159,19 @@ def get_full_match_body_from_score_tracking(
     )
 
 
-@router.get(
-    "/tournaments/{tournament_id}/stage_items/{stage_item_id}/upcoming_matches",
-    response_model=UpcomingMatchesResponse,
-)
-async def get_matches_to_schedule(
-    tournament_id: TournamentId,
-    stage_item_id: StageItemId,
-    elo_diff_threshold: int = 200,
-    iterations: int = 2_000,
-    only_recommended: bool = False,
-    limit: int = 50,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-) -> UpcomingMatchesResponse:
-    match_filter = MatchFilter(
-        elo_diff_threshold=elo_diff_threshold,
-        only_recommended=only_recommended,
-        limit=limit,
-        iterations=iterations,
-    )
-
-    draft_round, stage_item = await get_draft_round_in_stage_item(tournament_id, stage_item_id)
-    courts = await get_all_courts_in_tournament(tournament_id)
-    if len(courts) <= len(draft_round.matches):
-        return UpcomingMatchesResponse(data=[])
-
-    return UpcomingMatchesResponse(
-        data=get_upcoming_matches_for_swiss(match_filter, stage_item, draft_round)
-    )
-
-
 @router.delete("/tournaments/{tournament_id}/matches/{match_id}", response_model=SuccessResponse)
 async def delete_match(
     tournament_id: TournamentId,
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
-    match: Match = Depends(match_dependency),
+    ___: Match = Depends(match_dependency),
 ) -> SuccessResponse:
-    round_ = await get_round_by_id(tournament_id, match.round_id)
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-
-    if round_.lifecycle_state != RoundLifecycleState.DRAFT or stage_item.type != StageType.SWISS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only delete matches from draft rounds in Swiss stage items",
-        )
-
-    await sql_delete_match(match.id)
-
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    return SuccessResponse()
+    # Matches are managed automatically (the Swiss skeleton is fixed; other stage types
+    # generate their full bracket up front), so individual matches can't be deleted.
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Matches cannot be deleted individually",
+    )
 
 
 @router.post("/tournaments/{tournament_id}/matches", response_model=SingleMatchResponse)
@@ -231,24 +181,12 @@ async def create_match(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SingleMatchResponse:
-    await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
-
-    round_ = await get_round_by_id(tournament_id, match_body.round_id)
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-
-    if round_.lifecycle_state != RoundLifecycleState.DRAFT or stage_item.type != StageType.SWISS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only create matches in draft rounds of Swiss stage items",
-        )
-
-    tournament = await sql_get_tournament(tournament_id)
-    body_with_durations = MatchCreateBody(
-        **match_body.model_dump(),
-        duration_minutes=tournament.duration_minutes,
+    # Matches are generated automatically for every stage type, so they can't be created
+    # manually anymore (this was previously only allowed inside Swiss draft rounds).
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Matches cannot be created individually",
     )
-
-    return SingleMatchResponse(data=await sql_create_match(body_with_durations))
 
 
 @router.post("/tournaments/{tournament_id}/schedule_matches", response_model=SuccessResponse)

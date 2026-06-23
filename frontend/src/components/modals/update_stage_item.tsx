@@ -13,11 +13,14 @@ import {
 } from '@openapi';
 import { updateStageItem } from '@services/stage_item';
 
+const DEFAULT_GAMES_PER_PLAYER = 3;
+
 interface FormValues {
   name: string;
   ranking_id: string;
   team_count_round_robin: number;
   team_count_elimination: string;
+  games_per_player: number;
 }
 
 function TeamCountSelectElimination({
@@ -97,6 +100,7 @@ export function UpdateStageItemModal({
       rankings.filter((ranking) => ranking.position === 0)[0].id.toString(),
     team_count_round_robin: stageItem.team_count,
     team_count_elimination: stageItem.team_count.toString(),
+    games_per_player: stageItem.games_per_player ?? DEFAULT_GAMES_PER_PLAYER,
   };
   const form = useForm<FormValues>({
     initialValues: formValues,
@@ -104,6 +108,7 @@ export function UpdateStageItemModal({
       team_count_round_robin: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
       team_count_elimination: (value) =>
         Number(value) >= 2 ? null : t('at_least_two_team_validation'),
+      games_per_player: (value) => (value >= 1 ? null : t('at_least_one_game_validation')),
     },
   });
 
@@ -121,6 +126,7 @@ export function UpdateStageItemModal({
       ranking_id: defaultRankingId,
       team_count_round_robin: stageItem.team_count,
       team_count_elimination: stageItem.team_count.toString(),
+      games_per_player: stageItem.games_per_player ?? DEFAULT_GAMES_PER_PLAYER,
     });
   }, [
     defaultRankingId,
@@ -129,6 +135,7 @@ export function UpdateStageItemModal({
     stageItem.name,
     stageItem.ranking_id,
     stageItem.team_count,
+    stageItem.games_per_player,
   ]);
 
   const teamCount =
@@ -150,7 +157,8 @@ export function UpdateStageItemModal({
             stageItem.id,
             values.name,
             values.ranking_id,
-            teamCount
+            teamCount,
+            stageItem.type === 'SWISS' ? values.games_per_player : null
           );
           await swrStagesResponse.mutate();
           setOpened(false);
@@ -173,6 +181,17 @@ export function UpdateStageItemModal({
           <TeamCountInputRoundRobin
             value={form.values.team_count_round_robin}
             onChange={(value) => form.setFieldValue('team_count_round_robin', Number(value))}
+          />
+        )}
+        {stageItem.type === 'SWISS' && (
+          <NumberInput
+            withAsterisk
+            label={t('games_per_player_label')}
+            placeholder={t('games_per_player_placeholder')}
+            my="lg"
+            maw="50%"
+            min={1}
+            {...form.getInputProps('games_per_player')}
           />
         )}
         <RankingSelect form={form} rankings={rankings} />

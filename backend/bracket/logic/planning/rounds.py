@@ -3,21 +3,12 @@ from heliclockter import datetime_utc, timedelta
 from bracket.logic.planning.matches import get_scheduled_matches_per_court
 from bracket.models.db.match import MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.tournament import Tournament
-from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, StageWithStageItems
+from bracket.models.db.util import StageWithStageItems
 from bracket.utils.id_types import CourtId
 
 
 class MatchTimingAdjustmentInfeasible(Exception):
     pass
-
-
-def get_draft_round(
-    stage_item: StageItemWithRounds,
-) -> RoundWithMatches | None:
-    return next(
-        (round_ for round_ in sorted(stage_item.rounds, key=lambda r: r.id) if round_.is_draft),
-        None,
-    )
 
 
 def get_all_scheduling_operations_for_swiss_round(

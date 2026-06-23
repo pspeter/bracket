@@ -101,9 +101,6 @@ import type {
   GetCourtsTournamentsTournamentIdCourtsGetData,
   GetCourtsTournamentsTournamentIdCourtsGetErrors,
   GetCourtsTournamentsTournamentIdCourtsGetResponses,
-  GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetData,
-  GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetErrors,
-  GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponses,
   GetMetricsMetricsGetData,
   GetMetricsMetricsGetResponses,
   GetMeUsersUserIdGetData,
@@ -173,12 +170,12 @@ import type {
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostErrors,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponses,
-  StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostData,
-  StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors,
-  StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostData,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses,
+  SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostData,
+  SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostErrors,
+  SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponses,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
@@ -1232,6 +1229,37 @@ export const updateRoundByIdTournamentsTournamentIdRoundsRoundIdPut = <
   });
 
 /**
+ * Swap Match Inputs
+ *
+ * Swap team assignments between two matches in a RESOLVED not-started round.
+ *
+ * Pins the round so the manual override is preserved through upstream score corrections.
+ * Validated so that no referee ends up playing in the match they referee.
+ */
+export const swapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostResponses,
+    SwapMatchInputsTournamentsTournamentIdRoundsRoundIdSwapInputsPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/rounds/{round_id}/swap_inputs',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
  * Schedule Matches
  */
 export const scheduleMatchesTournamentsTournamentIdScheduleMatchesPost = <
@@ -1414,54 +1442,6 @@ export const updateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInp
         ...options.headers,
       },
     });
-
-/**
- * Start Next Round
- */
-export const startNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostData,
-    ThrowOnError
-  >
-) =>
-  (options.client ?? client).post<
-    StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostResponses,
-    StartNextRoundTournamentsTournamentIdStageItemsStageItemIdStartNextRoundPostErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/stage_items/{stage_item_id}/start_next_round',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * Get Matches To Schedule
- */
-export const getMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGet = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetData,
-    ThrowOnError
-  >
-) =>
-  (options.client ?? client).get<
-    GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetResponses,
-    GetMatchesToScheduleTournamentsTournamentIdStageItemsStageItemIdUpcomingMatchesGetErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/stage_items/{stage_item_id}/upcoming_matches',
-    ...options,
-  });
 
 /**
  * Get Stages

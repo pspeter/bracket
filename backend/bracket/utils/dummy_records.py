@@ -121,7 +121,7 @@ DUMMY_ROUND1 = RoundInsertable(
 DUMMY_ROUND2 = RoundInsertable(
     stage_item_id=StageItemId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    lifecycle_state=RoundLifecycleState.DRAFT,
+    lifecycle_state=RoundLifecycleState.ACTIVE,
     name="Round 2",
 )
 

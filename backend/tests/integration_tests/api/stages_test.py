@@ -61,7 +61,7 @@ async def test_stages_endpoint(
         else:
             response = await send_request(
                 HTTPMethod.GET,
-                f"tournaments/{auth_context.tournament.id}/stages?no_draft_rounds=true",
+                f"tournaments/{auth_context.tournament.id}/stages",
             )
         assert response == {
             "data": [
@@ -86,7 +86,6 @@ async def test_stages_endpoint(
                                     "id": round_inserted.id,
                                     "stage_item_id": stage_item_inserted.id,
                                     "created": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),
-                                    "is_draft": False,
                                     "lifecycle_state": "ACTIVE",
                                     "is_pinned": None,
                                     "name": "Round 1",

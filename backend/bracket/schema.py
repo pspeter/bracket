@@ -150,7 +150,7 @@ rounds = Table(
     Column("stage_item_id", BigInteger, ForeignKey("stage_items.id"), nullable=False),
     Column(
         "lifecycle_state",
-        Enum("DRAFT", "ACTIVE", "PLACEHOLDER", "RESOLVED", "LOCKED", name="round_lifecycle_state"),
+        Enum("ACTIVE", "PLACEHOLDER", "RESOLVED", "LOCKED", name="round_lifecycle_state"),
         nullable=False,
         server_default="ACTIVE",
     ),

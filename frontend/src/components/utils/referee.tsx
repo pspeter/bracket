@@ -6,7 +6,7 @@ import { abbreviateTeamName } from '@logic/planning/labels';
 import { MatchWithDetails } from '@openapi';
 import { formatStageItemInput } from './stage_item_input';
 
-type RefereeFields = Pick<MatchWithDetails, 'referee' | 'referee_name'>;
+type RefereeFields = Pick<MatchWithDetails, 'referee' | 'referee_name' | 'referee_slot'>;
 
 /**
  * The display name of a match's referee: the free-text name when set, otherwise the referee
@@ -24,15 +24,23 @@ export function RefereeDisplay({
   stageItemsLookup = {},
   conflictIcon = null,
   abbreviated = false,
+  placeholderLabel,
 }: {
   match: RefereeFields;
   refereesEnabled: boolean;
   stageItemsLookup?: any;
   conflictIcon?: ReactNode;
   abbreviated?: boolean;
+  placeholderLabel?: string;
 }) {
+  if (!refereesEnabled) return null;
   let name = getRefereeName(match, stageItemsLookup);
-  if (!refereesEnabled || name == null) return null;
+  // A referee slot that is planned but not yet resolved to a team (Swiss placeholder rounds):
+  // show the placeholder label ("TBD") so the referee fills in alongside the playing teams.
+  if (name == null && placeholderLabel != null && match.referee_slot != null) {
+    name = placeholderLabel;
+  }
+  if (name == null) return null;
   if (abbreviated) name = abbreviateTeamName(name);
 
   return (

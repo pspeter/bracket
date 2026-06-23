@@ -23,10 +23,12 @@ def upgrade() -> None:
 
     # Migrate existing is_draft data into lifecycle_state
     op.execute(
-        "UPDATE rounds SET lifecycle_state = 'DRAFT' WHERE is_draft = TRUE AND lifecycle_state IS NULL"
+        "UPDATE rounds SET lifecycle_state = 'DRAFT' "
+        "WHERE is_draft = TRUE AND lifecycle_state IS NULL"
     )
     op.execute(
-        "UPDATE rounds SET lifecycle_state = 'ACTIVE' WHERE is_draft = FALSE AND lifecycle_state IS NULL"
+        "UPDATE rounds SET lifecycle_state = 'ACTIVE' "
+        "WHERE is_draft = FALSE AND lifecycle_state IS NULL"
     )
 
     # Make lifecycle_state NOT NULL with a default of ACTIVE

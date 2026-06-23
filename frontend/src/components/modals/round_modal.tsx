@@ -3,7 +3,6 @@ import { useForm } from '@mantine/form';
 import { IconPencil } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LuConstruction } from 'react-icons/lu';
 import { SWRResponse } from 'swr';
 
 import DeleteButton from '@components/buttons/delete';
@@ -15,12 +14,10 @@ function RoundDeleteButton({
   tournamentData,
   round,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -29,7 +26,6 @@ function RoundDeleteButton({
       onClick={async () => {
         await deleteRound(tournamentData.id, round.id);
         await swrStagesResponse.mutate();
-        if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
       }}
       style={{ marginTop: '15px' }}
       size="sm"
@@ -42,12 +38,10 @@ export default function RoundModal({
   tournamentData,
   round,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
@@ -87,25 +81,8 @@ export default function RoundModal({
             {t('save_button')}
           </Button>
         </form>
-        <Button
-          fullWidth
-          mt="1rem"
-          color="yellow"
-          variant="outline"
-          disabled={round.is_draft}
-          leftSection={<LuConstruction />}
-          onClick={async () => {
-            await updateRound(tournamentData.id, round.id, round.name, 'DRAFT');
-            await swrStagesResponse.mutate();
-            if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
-            setOpened(false);
-          }}
-        >
-          {t('mark_round_as_draft')}
-        </Button>
         <RoundDeleteButton
           swrStagesResponse={swrStagesResponse}
-          swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
           tournamentData={tournamentData}
           round={round}
         />

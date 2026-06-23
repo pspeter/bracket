@@ -80,7 +80,7 @@ async def test_delete_round(
 async def test_update_round(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    body = {"name": "Some new name", "lifecycle_state": "DRAFT"}
+    body = {"name": "Some new name", "lifecycle_state": "ACTIVE"}
     async with (
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})),
         inserted_stage(

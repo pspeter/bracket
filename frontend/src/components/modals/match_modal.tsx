@@ -19,7 +19,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
-import DeleteButton from '@components/buttons/delete';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
@@ -32,7 +31,7 @@ import {
 } from '@openapi';
 import { getReferees, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
-import { deleteMatch, updateMatch } from '@services/match';
+import { updateMatch } from '@services/match';
 
 type RefereeValue = { kind: 'slot'; inputId: string } | { kind: 'name'; name: string } | null;
 
@@ -43,33 +42,6 @@ type MatchModalFormValues = {
   state: MatchWithDetails['state'];
   referee: RefereeValue;
 };
-
-function MatchDeleteButton({
-  tournamentData,
-  match,
-  swrStagesResponse,
-  swrUpcomingMatchesResponse,
-}: {
-  tournamentData: TournamentMinimal;
-  match: MatchWithDetails;
-  swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <DeleteButton
-      fullWidth
-      onClick={async () => {
-        await deleteMatch(tournamentData.id, match.id);
-        await swrStagesResponse.mutate();
-        if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
-      }}
-      style={{ marginTop: '1rem' }}
-      size="sm"
-      title={t('remove_match_button')}
-    />
-  );
-}
 
 function RefereeCombobox({
   value,
@@ -200,7 +172,6 @@ function MatchModalForm({
   tournamentData,
   match,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
   setOpened,
   round,
   levels,
@@ -208,7 +179,6 @@ function MatchModalForm({
   tournamentData: TournamentMinimal;
   match: MatchWithDetails | null;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
   setOpened: any;
   round: RoundWithMatches | null;
   levels?: LevelResponse[];
@@ -387,7 +357,6 @@ function MatchModalForm({
           };
           await updateMatch(tournamentData.id, match.id, updatedMatch);
           await swrStagesResponse.mutate();
-          if (swrUpcomingMatchesResponse != null) await swrUpcomingMatchesResponse.mutate();
           setOpened(false);
         })}
       >
@@ -485,14 +454,6 @@ function MatchModalForm({
           {t('save_button')}
         </Button>
       </form>
-      {round && round.is_draft && (
-        <MatchDeleteButton
-          swrStagesResponse={swrStagesResponse}
-          swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
-          tournamentData={tournamentData}
-          match={match}
-        />
-      )}
     </>
   );
 }
@@ -501,7 +462,6 @@ export default function MatchModal({
   tournamentData,
   match,
   swrStagesResponse,
-  swrUpcomingMatchesResponse,
   opened,
   setOpened,
   round,
@@ -510,7 +470,6 @@ export default function MatchModal({
   tournamentData: TournamentMinimal;
   match: MatchWithDetails | null;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrUpcomingMatchesResponse: SWRResponse | null;
   opened: boolean;
   setOpened: any;
   round: RoundWithMatches | null;
@@ -524,7 +483,6 @@ export default function MatchModal({
         <MatchModalForm
           key={match?.id ?? 'no-match'}
           swrStagesResponse={swrStagesResponse}
-          swrUpcomingMatchesResponse={swrUpcomingMatchesResponse}
           tournamentData={tournamentData}
           match={match}
           setOpened={setOpened}

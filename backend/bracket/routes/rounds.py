@@ -29,7 +29,6 @@ from bracket.routes.util import (
 from bracket.sql.matches import sql_delete_match, sql_set_input_ids_for_match
 from bracket.sql.rounds import (
     get_next_round_name,
-    set_round_lifecycle_state,
     sql_create_round,
     sql_delete_round,
     sql_set_round_is_pinned,
@@ -87,7 +86,7 @@ async def create_round(
             detail=f"Stage type {stage_item.type} doesn't support manual creation of rounds",
         )
 
-    round_id = await sql_create_round(
+    await sql_create_round(
         RoundInsertable(
             created=MOCK_NOW,
             stage_item_id=round_body.stage_item_id,
@@ -95,7 +94,6 @@ async def create_round(
         ),
     )
 
-    await set_round_lifecycle_state(round_id, tournament_id, RoundLifecycleState.DRAFT)
     return SuccessResponse()
 
 
