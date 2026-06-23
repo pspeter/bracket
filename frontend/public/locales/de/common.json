@@ -172,6 +172,8 @@
     "match_context_level_label": "Level",
     "match_context_match_label": "Spiel",
     "match_context_match_number": "Spiel {{number}}",
+    "match_context_round_label": "Runde",
+    "match_context_round_number": "Runde {{number}}",
     "match_context_stage_item_label": "Stage-Element",
     "match_context_stage_label": "Phase",
     "max_results_input_label": "Maximale Ergebnisse",

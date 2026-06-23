@@ -255,6 +255,7 @@ function MatchModalForm({
     : [];
   const contextColour =
     level != null && levels != null ? levelSwatchColour(level.id, levels) : 'gray';
+  const isRoundRobin = matchEntry?.stageItem.type === 'ROUND_ROBIN';
   const contextBadges = [
     level != null ? { label: t('match_context_level_label'), value: level.name } : null,
     matchEntry != null
@@ -263,10 +264,16 @@ function MatchModalForm({
     matchEntry != null
       ? { label: t('match_context_stage_item_label'), value: matchEntry.stageItem.name }
       : null,
-    matchEntry != null
+    matchEntry != null && isRoundRobin
       ? {
           label: t('match_context_match_label'),
           value: t('match_context_match_number', { number: matchEntry.matchNumber }),
+        }
+      : null,
+    matchEntry != null && !isRoundRobin
+      ? {
+          label: t('match_context_round_label'),
+          value: t('match_context_round_number', { number: matchEntry.roundNumber }),
         }
       : null,
   ].filter((badge): badge is { label: string; value: string } => badge != null);
