@@ -385,7 +385,8 @@ export function ScoreTrackingMatchView({
           <>
             <Stack align="center" gap={4}>
               <Button
-                variant="light"
+                variant={showSideSwitchReminder ? 'filled' : 'light'}
+                color={showSideSwitchReminder ? 'red' : undefined}
                 leftSection={<IconArrowsExchange size={18} />}
                 onClick={toggleSides}
               >
