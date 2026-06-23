@@ -263,24 +263,14 @@ export function ScoreTrackingMatchView({
   const [dismissedThreshold, setDismissedThreshold] = useState<number | null>(null);
   const prevCombinedRef = useRef<number | null>(null);
 
-  if (!responseIsValid(swrResponse)) {
-    if (swrResponse.error != null) {
-      return (
-        <Container size="sm" py="xl">
-          <Alert color="red">{t('score_tracking_invalid_link')}</Alert>
-        </Container>
-      );
-    }
-    return null;
-  }
+  const matchData = responseIsValid(swrResponse) ? swrResponse.data!.data : null;
+  const n = matchData?.side_switch_every_n_points ?? null;
+  const combinedScore = matchData
+    ? matchData.stage_item_input1_score + matchData.stage_item_input2_score
+    : 0;
 
-  const responseData = swrResponse.data!;
-  const match = responseData.data;
-  const n = match.side_switch_every_n_points ?? null;
-  const combinedScore = match.stage_item_input1_score + match.stage_item_input2_score;
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
+    if (matchData === null) return;
     const prev = prevCombinedRef.current;
     if (prev === null) {
       // On first load: show reminder if currently at a threshold (page reload safety net).
@@ -295,7 +285,21 @@ export function ScoreTrackingMatchView({
     setDismissedThreshold(next.dismissedThreshold);
     prevCombinedRef.current = combinedScore;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [combinedScore]);
+  }, [combinedScore, matchData]);
+
+  if (!responseIsValid(swrResponse)) {
+    if (swrResponse.error != null) {
+      return (
+        <Container size="sm" py="xl">
+          <Alert color="red">{t('score_tracking_invalid_link')}</Alert>
+        </Container>
+      );
+    }
+    return null;
+  }
+
+  const responseData = swrResponse.data!;
+  const match = responseData.data;
 
   const pseudoStagesResponse = getPseudoStagesResponse([match]);
   const stageItemsLookup = getStageItemLookup(pseudoStagesResponse as any);
