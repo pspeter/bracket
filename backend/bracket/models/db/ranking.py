@@ -15,6 +15,7 @@ class RankingInsertable(BaseModel):
     add_score_points: bool
     position: int
     level_id: LevelId | None = None
+    side_switch_every_n_points: int | None = None
 
 
 class Ranking(BaseModelORM, RankingInsertable):
@@ -28,6 +29,7 @@ class RankingBody(BaseModel):
     loss_points: Decimal
     add_score_points: bool
     position: int
+    side_switch_every_n_points: int | None = None
 
 
 class RankingCreateBody(BaseModel):
@@ -35,3 +37,4 @@ class RankingCreateBody(BaseModel):
     draw_points: Decimal = Decimal("0.5")
     loss_points: Decimal = Decimal("0.0")
     add_score_points: bool = False
+    side_switch_every_n_points: int | None = None

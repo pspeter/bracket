@@ -322,4 +322,5 @@ rankings = Table(
     Column("loss_points", Float, nullable=False),
     Column("add_score_points", Boolean, nullable=False),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
+    Column("side_switch_every_n_points", Integer, nullable=True),
 )

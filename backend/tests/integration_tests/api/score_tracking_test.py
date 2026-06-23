@@ -10,6 +10,7 @@ from bracket.utils.dummy_records import (
     DUMMY_COURT2,
     DUMMY_LEVEL1,
     DUMMY_MATCH1,
+    DUMMY_RANKING1,
     DUMMY_ROUND1,
     DUMMY_STAGE1,
     DUMMY_STAGE2,
@@ -24,6 +25,7 @@ from tests.integration_tests.sql import (
     inserted_court,
     inserted_level,
     inserted_match,
+    inserted_ranking,
     inserted_round,
     inserted_stage,
     inserted_stage_item,
@@ -498,3 +500,72 @@ async def test_score_tracking_filters_matches_by_court_id(
                 .where(tournaments.c.id == auth_context.tournament.id)
                 .values(score_tracking_enabled=False, score_tracking_token=None),
             )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_score_tracking_match_includes_side_switch_every_n_points(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(
+                update={
+                    "tournament_id": auth_context.tournament.id,
+                    "position": 99,
+                    "side_switch_every_n_points": 7,
+                }
+            )
+        ) as ranking_with_side_switch,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={
+                    "stage_id": stage_inserted.id,
+                    "ranking_id": ranking_with_side_switch.id,
+                }
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(
+            DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team1_inserted,
+        inserted_team(
+            DUMMY_TEAM2.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as team2_inserted,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=0,
+                team_id=team1_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as sii1,
+        inserted_stage_item_input(
+            StageItemInputInsertable(
+                slot=1,
+                team_id=team2_inserted.id,
+                tournament_id=auth_context.tournament.id,
+                stage_item_id=stage_item_inserted.id,
+            )
+        ) as sii2,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": sii1.id,
+                    "stage_item_input2_id": sii2.id,
+                    "court_id": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.GET,
+            f"score-tracking/matches/{match_inserted.id}",
+            auth_context,
+        )
+        assert response["data"]["side_switch_every_n_points"] == 7

@@ -250,11 +250,13 @@ async def sql_get_match_with_details(
             to_json(sii2) AS stage_item_input2,
             to_json(c) AS court,
             to_json(ref_sii) AS referee,
-            stages.level_id AS level_id
+            stages.level_id AS level_id,
+            rankings.side_switch_every_n_points AS side_switch_every_n_points
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id
         JOIN stages ON stages.id = stage_items.stage_id
+        JOIN rankings ON rankings.id = stage_items.ranking_id
         LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
         LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
         LEFT JOIN courts c ON c.id = matches.court_id
@@ -291,11 +293,13 @@ async def sql_get_scheduled_matches_with_details(
             to_json(sii2) AS stage_item_input2,
             to_json(c) AS court,
             to_json(ref_sii) AS referee,
-            stages.level_id AS level_id
+            stages.level_id AS level_id,
+            rankings.side_switch_every_n_points AS side_switch_every_n_points
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id
         JOIN stages ON stages.id = stage_items.stage_id
+        JOIN rankings ON rankings.id = stage_items.ranking_id
         LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
         LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
         LEFT JOIN courts c ON c.id = matches.court_id

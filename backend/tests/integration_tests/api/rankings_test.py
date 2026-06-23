@@ -37,6 +37,7 @@ async def test_rankings_endpoint(
                     "add_score_points": False,
                     "tournament_id": auth_context.tournament.id,
                     "level_id": None,
+                    "side_switch_every_n_points": None,
                 }
             ],
         }
@@ -100,3 +101,33 @@ async def test_update_ranking(
             )
             assert response["success"] is True
             assert updated_ranking.win_points == Decimal("7.5")
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_side_switch(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    body = {
+        "win_points": "1.0",
+        "draw_points": "0.5",
+        "loss_points": "0.0",
+        "add_score_points": False,
+        "position": 0,
+        "side_switch_every_n_points": 7,
+    }
+    async with inserted_team(
+        DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ):
+        async with inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as ranking_inserted:
+            response = await send_tournament_request(
+                HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+            )
+            updated_ranking = await fetch_one_parsed_certain(
+                database,
+                Ranking,
+                query=rankings.select().where(rankings.c.id == ranking_inserted.id),
+            )
+            assert response["success"] is True
+            assert updated_ranking.side_switch_every_n_points == 7

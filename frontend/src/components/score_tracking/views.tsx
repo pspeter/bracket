@@ -15,7 +15,7 @@ import {
   Title,
 } from '@mantine/core';
 import { IconArrowsExchange, IconMinus, IconPlus } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
@@ -26,6 +26,7 @@ import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { responseIsValid } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
+import { computeSideSwitchState } from '@logic/side_switch';
 import {
   LevelResponse,
   MatchWithDetails,
@@ -258,6 +259,10 @@ export function ScoreTrackingMatchView({
   }, [storageKey]);
   const [isSwapped, setIsSwapped] = useState(swapped);
 
+  const [showSideSwitchReminder, setShowSideSwitchReminder] = useState(false);
+  const [dismissedThreshold, setDismissedThreshold] = useState<number | null>(null);
+  const prevCombinedRef = useRef<number | null>(null);
+
   if (!responseIsValid(swrResponse)) {
     if (swrResponse.error != null) {
       return (
@@ -271,6 +276,27 @@ export function ScoreTrackingMatchView({
 
   const responseData = swrResponse.data!;
   const match = responseData.data;
+  const n = match.side_switch_every_n_points ?? null;
+  const combinedScore = match.stage_item_input1_score + match.stage_item_input2_score;
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const prev = prevCombinedRef.current;
+    if (prev === null) {
+      // On first load: show reminder if currently at a threshold (page reload safety net).
+      if (n !== null && combinedScore > 0 && combinedScore % n === 0) {
+        setShowSideSwitchReminder(true);
+      }
+      prevCombinedRef.current = combinedScore;
+      return;
+    }
+    const next = computeSideSwitchState(combinedScore, prev, n, false, dismissedThreshold);
+    setShowSideSwitchReminder(next.showReminder);
+    setDismissedThreshold(next.dismissedThreshold);
+    prevCombinedRef.current = combinedScore;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combinedScore]);
+
   const pseudoStagesResponse = getPseudoStagesResponse([match]);
   const stageItemsLookup = getStageItemLookup(pseudoStagesResponse as any);
   const matchesLookup = getMatchLookup(pseudoStagesResponse as any);
@@ -316,6 +342,10 @@ export function ScoreTrackingMatchView({
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(storageKey, `${nextValue}`);
     }
+    if (showSideSwitchReminder) {
+      setShowSideSwitchReminder(false);
+      setDismissedThreshold(combinedScore);
+    }
   }
 
   return (
@@ -331,6 +361,11 @@ export function ScoreTrackingMatchView({
           </Button>
         </Group>
         <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
+        {showSideSwitchReminder && (
+          <Alert color="orange" title={t('side_switch_reminder_title')}>
+            {t('side_switch_reminder_description')}
+          </Alert>
+        )}
         {match.state === 'NOT_STARTED' ? (
           <Center>
             <Button
@@ -351,7 +386,8 @@ export function ScoreTrackingMatchView({
           <>
             <Group justify="center">
               <Button
-                variant="light"
+                variant={showSideSwitchReminder ? 'filled' : 'light'}
+                color={showSideSwitchReminder ? 'orange' : undefined}
                 leftSection={<IconArrowsExchange size={18} />}
                 onClick={toggleSides}
               >
