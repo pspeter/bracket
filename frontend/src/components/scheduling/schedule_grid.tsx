@@ -15,7 +15,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { format } from 'date-fns';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
@@ -27,6 +27,7 @@ import {
   type StageItemColour,
 } from '@logic/colors';
 import { ConflictPreview, insertionLineKey } from '@logic/planning/conflict_preview';
+import { ConflictFlags, ConflictStage, computeConflictFlags } from '@logic/planning/conflicts';
 import { HighlightTarget, matchInvolvesHighlight } from '@logic/planning/highlight';
 import { abbreviateStageItem, abbreviateTeamName, shortCourtLabel } from '@logic/planning/labels';
 import {
@@ -44,6 +45,17 @@ import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
 
 import { COURT_CONTENT_ATTRIBUTE, PLANNER_GRID_ATTRIBUTE } from './planner_anchor';
 import classes from './schedule_grid.module.css';
+
+/** Fallback for a match with no computed flags entry (every match normally has one). */
+const NO_CONFLICTS: ConflictFlags = {
+  stage_item_input1_conflict: false,
+  stage_item_input2_conflict: false,
+  precedence_conflict: false,
+  feeder_precedence_conflict: false,
+  short_break_conflict: false,
+  referee_conflict: false,
+  round_order_conflict: false,
+};
 
 const RULER_WIDTH = '3.25rem';
 const HEADER_HEIGHT = '2.5rem';
@@ -88,6 +100,7 @@ function MatchCard({
   block,
   zoom,
   pxPerMinute,
+  conflicts,
   isViolation,
   hasPlacementWarning,
   isSelected,
@@ -102,6 +115,7 @@ function MatchCard({
   block: MatchBlock<MatchWithDetails>;
   zoom: 'agenda' | 'compact';
   pxPerMinute: number;
+  conflicts: ConflictFlags;
   isViolation: boolean;
   hasPlacementWarning: boolean;
   isSelected: boolean;
@@ -264,19 +278,19 @@ function MatchCard({
   // ordering violation or a round-order conflict — collect every applicable description so the
   // tooltip explains them all.
   const precedenceWarningLabels = [
-    match.precedence_conflict
+    conflicts.precedence_conflict
       ? t(
           'precedence_conflict_label',
           'Starts before a match it depends on the results of has finished'
         )
       : null,
-    match.feeder_precedence_conflict
+    conflicts.feeder_precedence_conflict
       ? t(
           'feeder_precedence_conflict_label',
           'Ends after a match depending on the results of this one starts'
         )
       : null,
-    match.round_order_conflict
+    conflicts.round_order_conflict
       ? t(
           'round_order_conflict_label',
           'Starts before all matches of the previous round have ended'
@@ -302,7 +316,7 @@ function MatchCard({
         </Box>
       </Tooltip>
     ) : null;
-  const shortBreakIcon = match.short_break_conflict ? (
+  const shortBreakIcon = conflicts.short_break_conflict ? (
     <Tooltip
       label={t('short_break_conflict_label', 'Break before this match is shorter than the default')}
     >
@@ -315,7 +329,7 @@ function MatchCard({
     </Tooltip>
   ) : null;
   const refereeConflictIcon =
-    refereesEnabled && match.referee_conflict ? (
+    refereesEnabled && conflicts.referee_conflict ? (
       <Tooltip
         label={t(
           'referee_conflict_label',
@@ -344,27 +358,27 @@ function MatchCard({
   // The colour follows the same severity order as the overview blocks; the tooltip
   // lists every active conflict so nothing is silently hidden.
   const allConflictLabels: string[] = [
-    ...(match.stage_item_input1_conflict
+    ...(conflicts.stage_item_input1_conflict
       ? [t('team_double_booked_conflict_label', { team: input1 })]
       : []),
-    ...(match.stage_item_input2_conflict
+    ...(conflicts.stage_item_input2_conflict
       ? [t('team_double_booked_conflict_label', { team: input2 })]
       : []),
     ...precedenceWarningLabels,
-    ...(match.short_break_conflict ? [t('short_break_conflict_label')] : []),
-    ...(refereesEnabled && match.referee_conflict ? [t('referee_conflict_label')] : []),
+    ...(conflicts.short_break_conflict ? [t('short_break_conflict_label')] : []),
+    ...(refereesEnabled && conflicts.referee_conflict ? [t('referee_conflict_label')] : []),
     ...(hasPlacementWarning ? [t('placement_conflict_preview_label')] : []),
   ];
   const mergedConflictColour =
-    match.stage_item_input1_conflict || match.stage_item_input2_conflict
+    conflicts.stage_item_input1_conflict || conflicts.stage_item_input2_conflict
       ? CONFLICT_COLOURS.teamDoubleBooked
-      : refereesEnabled && match.referee_conflict
+      : refereesEnabled && conflicts.referee_conflict
         ? CONFLICT_COLOURS.referee
         : precedenceWarningLabels.length > 0
           ? CONFLICT_COLOURS.precedence
           : hasPlacementWarning
             ? 'var(--mantine-color-orange-filled)'
-            : match.short_break_conflict
+            : conflicts.short_break_conflict
               ? CONFLICT_COLOURS.shortBreak
               : null;
   const mergedConflictIcon =
@@ -464,7 +478,7 @@ function MatchCard({
             mergedConflictIcon
           ) : (
             <>
-              {match.stage_item_input1_conflict && (
+              {conflicts.stage_item_input1_conflict && (
                 <Tooltip label={t('team_double_booked_conflict_label', { team: input1 })}>
                   <Box
                     component="span"
@@ -476,7 +490,7 @@ function MatchCard({
               )}
               {!metaLine && placementWarningIcon}
               {!metaLine && shortBreakIcon}
-              {combineTeams && match.stage_item_input2_conflict && (
+              {combineTeams && conflicts.stage_item_input2_conflict && (
                 <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
                   <Box
                     component="span"
@@ -503,7 +517,7 @@ function MatchCard({
         </Flex>
         {lines >= 2 && !combineTeams && (
           <Flex gap={4} align="center" wrap="nowrap">
-            {match.stage_item_input2_conflict && (
+            {conflicts.stage_item_input2_conflict && (
               <Tooltip label={t('team_double_booked_conflict_label', { team: input2 })}>
                 <Box
                   component="span"
@@ -544,6 +558,7 @@ function OverviewBlock({
   block,
   pxPerMinute,
   colour,
+  conflicts,
   isViolation,
   refereesEnabled,
   isSelected,
@@ -553,6 +568,7 @@ function OverviewBlock({
   block: MatchBlock<MatchWithDetails>;
   pxPerMinute: number;
   colour: StageItemColour;
+  conflicts: ConflictFlags;
   isViolation: boolean;
   refereesEnabled: boolean;
   isSelected: boolean;
@@ -574,14 +590,14 @@ function OverviewBlock({
   // precedence/referee violation (orange), which outranks a short break (yellow).
   // This is the same palette the cards use for each conflict.
   const conflictColour =
-    match.stage_item_input1_conflict || match.stage_item_input2_conflict
+    conflicts.stage_item_input1_conflict || conflicts.stage_item_input2_conflict
       ? 'red'
       : isViolation ||
-          match.precedence_conflict ||
-          match.feeder_precedence_conflict ||
-          (refereesEnabled && match.referee_conflict)
+          conflicts.precedence_conflict ||
+          conflicts.feeder_precedence_conflict ||
+          (refereesEnabled && conflicts.referee_conflict)
         ? 'orange'
-        : match.short_break_conflict
+        : conflicts.short_break_conflict
           ? 'var(--mantine-color-yellow-filled)'
           : null;
   // The marker must stay legible on the smallest blocks (a 10-minute match is only
@@ -946,6 +962,7 @@ function InsertionLineTarget({
  */
 export default function ScheduleGrid({
   layout,
+  stages,
   violations,
   conflictPreview,
   stageItemsLookup,
@@ -960,6 +977,7 @@ export default function ScheduleGrid({
   onSelectionEvent,
 }: {
   layout: ScheduleGridLayout<Court, MatchWithDetails>;
+  stages: ConflictStage[];
   violations: Set<number>;
   conflictPreview: ConflictPreview;
   stageItemsLookup: ReturnType<typeof getStageItemLookup> | never[];
@@ -974,6 +992,13 @@ export default function ScheduleGrid({
   onSelectionEvent: (event: PlannerEvent) => void;
 }) {
   const pxPerMinute = ZOOM_PX_PER_MINUTE[zoom];
+  // Conflict icons are derived client-side from the current (optimistic) schedule, so
+  // they update the instant a drag/swap repacks the grid — no server round-trip. The
+  // backend still persists the conflict columns, but they are ignored here.
+  const conflictFlags = useMemo(
+    () => computeConflictFlags(stages, layout.defaultBreakMinutes),
+    [stages, layout.defaultBreakMinutes]
+  );
   const gridHeight = layout.totalMinutes * pxPerMinute;
   // On phones an anchored break popover can open off-screen, so the editor
   // switches to a centered modal at the same breakpoint as the default zoom.
@@ -1212,6 +1237,7 @@ export default function ScheduleGrid({
                 const colour =
                   (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
                   NEUTRAL_STAGE_ITEM_COLOUR;
+                const conflicts = conflictFlags.get(block.match.id) ?? NO_CONFLICTS;
                 if (isOverview) {
                   return (
                     <OverviewBlock
@@ -1219,6 +1245,7 @@ export default function ScheduleGrid({
                       block={block}
                       pxPerMinute={pxPerMinute}
                       colour={colour}
+                      conflicts={conflicts}
                       isViolation={violations.has(block.match.id)}
                       refereesEnabled={refereesEnabled}
                       isSelected={selectedMatch?.matchId === block.match.id}
@@ -1240,6 +1267,7 @@ export default function ScheduleGrid({
                     block={block}
                     zoom={zoom}
                     pxPerMinute={pxPerMinute}
+                    conflicts={conflicts}
                     isViolation={violations.has(block.match.id)}
                     hasPlacementWarning={conflictPreview.swapTargets.has(block.match.id)}
                     isSelected={selectedMatch?.matchId === block.match.id}
