@@ -8,6 +8,7 @@ import MatchModal from '@components/modals/match_modal';
 import { assert_not_none } from '@components/utils/assert';
 import { Time } from '@components/utils/datetime';
 import { formatMatchInput1, formatMatchInput2, isMatchHappening } from '@components/utils/match';
+import { RefereeDisplay } from '@components/utils/referee';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { MatchWithDetails, RoundWithMatches, StagesWithStageItemsResponse } from '@openapi';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
@@ -43,6 +44,7 @@ export default function Match({
   match,
   readOnly,
   round,
+  refereesEnabled = false,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   tournamentData: TournamentMinimal;
@@ -50,6 +52,7 @@ export default function Match({
   readOnly: boolean;
 
   round: RoundWithMatches;
+  refereesEnabled?: boolean;
 }) {
   const { t } = useTranslation();
   const theme = useMantineTheme();
@@ -89,6 +92,16 @@ export default function Match({
           <Grid.Col span={2}>{match.stage_item_input2_score}</Grid.Col>
         </Grid>
       </div>
+      {refereesEnabled && (
+        <div style={{ padding: '6px 8px 0px 15px' }}>
+          <RefereeDisplay
+            match={match}
+            refereesEnabled={refereesEnabled}
+            stageItemsLookup={stageItemsLookup}
+            placeholderLabel={round.lifecycle_state === 'PLACEHOLDER' ? t('tbd_label') : undefined}
+          />
+        </div>
+      )}
     </>
   );
 

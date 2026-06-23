@@ -36,6 +36,7 @@ export default function RoundComponent({
   readOnly,
   displaySettings,
   showLifecycleState = false,
+  refereesEnabled = false,
 }: {
   tournamentData: TournamentMinimal;
   round: RoundWithMatches;
@@ -43,6 +44,7 @@ export default function RoundComponent({
   readOnly: boolean;
   displaySettings: BracketDisplaySettings;
   showLifecycleState?: boolean;
+  refereesEnabled?: boolean;
 }) {
   const { t } = useTranslation();
   const matches = round.matches
@@ -63,6 +65,7 @@ export default function RoundComponent({
         match={match}
         readOnly={readOnly}
         round={round}
+        refereesEnabled={refereesEnabled}
       />
     ));
   const isPlaceholder = round.lifecycle_state === 'PLACEHOLDER';

@@ -105,6 +105,7 @@ export function SwissRoundsGrid({
             readOnly={false}
             displaySettings={displaySettings}
             showLifecycleState={true}
+            refereesEnabled={tournamentData.referees_enabled}
           />
         ))}
       </Group>
