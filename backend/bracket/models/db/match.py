@@ -89,6 +89,7 @@ class MatchWithDetails(Match):
     # The hydrated referee slot (resolves to a team like a playing slot), if slot-based.
     referee: StageItemInput | None = None
     level_id: LevelId | None = None
+    side_switch_every_n_points: int | None = None
 
     @field_validator("stage_item_input1", "stage_item_input2", "court", "referee", mode="before")
     @staticmethod
@@ -110,6 +111,7 @@ class MatchWithDetailsDefinitive(Match):
     stage_item_input2: StageItemInput  # pyrefly: ignore [bad-override]
     court: Court | None = None
     referee: StageItemInput | None = None
+    side_switch_every_n_points: int | None = None
 
     @property
     def stage_item_inputs(self) -> list[StageItemInput]:

@@ -595,6 +595,10 @@ export type MatchWithDetails = {
    */
   short_break_conflict: boolean;
   /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
    * Stage Item Input1
    */
   stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
@@ -722,6 +726,10 @@ export type MatchWithDetailsDefinitive = {
    * Short Break Conflict
    */
   short_break_conflict: boolean;
+  /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
   /**
    * Stage Item Input1
    */
@@ -987,6 +995,10 @@ export type Ranking = {
    */
   position: number;
   /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
    * Tournament Id
    */
   tournament_id: number;
@@ -1017,6 +1029,10 @@ export type RankingBody = {
    */
   position: number;
   /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
    * Win Points
    */
   win_points: number | string;
@@ -1038,6 +1054,10 @@ export type RankingCreateBody = {
    * Loss Points
    */
   loss_points: number | string;
+  /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
   /**
    * Win Points
    */

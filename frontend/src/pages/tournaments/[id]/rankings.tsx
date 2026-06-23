@@ -64,6 +64,8 @@ function EditRankingForm({
       loss_points: ranking.loss_points,
       add_score_points: ranking.add_score_points,
       position: ranking.position,
+      side_switch_enabled: ranking.side_switch_every_n_points != null,
+      side_switch_every_n_points: ranking.side_switch_every_n_points ?? 7,
     },
     validate: {},
   });
@@ -79,7 +81,8 @@ function EditRankingForm({
           values.draw_points,
           values.loss_points,
           values.add_score_points,
-          values.position
+          values.position,
+          values.side_switch_enabled ? values.side_switch_every_n_points : null
         );
         await swrRankingsResponse.mutate();
       })}
@@ -119,6 +122,20 @@ function EditRankingForm({
             label={t('add_score_points_label')}
             {...form.getInputProps('add_score_points', { type: 'checkbox' })}
           />
+          <Checkbox
+            mt="lg"
+            label={t('side_switch_reminder_enabled_label')}
+            {...form.getInputProps('side_switch_enabled', { type: 'checkbox' })}
+          />
+          {form.values.side_switch_enabled && (
+            <NumberInput
+              mt="sm"
+              withAsterisk
+              min={1}
+              label={t('side_switch_every_n_points_label')}
+              {...form.getInputProps('side_switch_every_n_points')}
+            />
+          )}
           <Button fullWidth style={{ marginTop: 16 }} color="green" type="submit">
             {`${t('save_button')} ${rankingTitle}`}
           </Button>

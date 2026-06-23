@@ -1131,6 +1131,17 @@
             "title": "Short Break Conflict",
             "type": "boolean"
           },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
           "stage_item_input1": {
             "anyOf": [
               {
@@ -1274,7 +1285,8 @@
           "stage_item_input2",
           "court",
           "referee",
-          "level_id"
+          "level_id",
+          "side_switch_every_n_points"
         ],
         "title": "MatchWithDetails",
         "type": "object"
@@ -1450,6 +1462,17 @@
             "title": "Short Break Conflict",
             "type": "boolean"
           },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
           "stage_item_input1": {
             "anyOf": [
               {
@@ -1587,7 +1610,8 @@
           "stage_item_input2",
           "level_id",
           "court",
-          "referee"
+          "referee",
+          "side_switch_every_n_points"
         ],
         "title": "MatchWithDetailsDefinitive",
         "type": "object"
@@ -1920,6 +1944,17 @@
             "title": "Position",
             "type": "integer"
           },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
           "tournament_id": {
             "title": "Tournament Id",
             "type": "integer"
@@ -1938,6 +1973,7 @@
           "add_score_points",
           "position",
           "level_id",
+          "side_switch_every_n_points",
           "id",
           "created"
         ],
@@ -1978,6 +2014,17 @@
             "title": "Position",
             "type": "integer"
           },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
           "win_points": {
             "anyOf": [
               {
@@ -1996,7 +2043,8 @@
           "draw_points",
           "loss_points",
           "add_score_points",
-          "position"
+          "position",
+          "side_switch_every_n_points"
         ],
         "title": "RankingBody",
         "type": "object"
@@ -2034,6 +2082,17 @@
             "default": "0.0",
             "title": "Loss Points"
           },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
           "win_points": {
             "anyOf": [
               {
@@ -2052,7 +2111,8 @@
           "win_points",
           "draw_points",
           "loss_points",
-          "add_score_points"
+          "add_score_points",
+          "side_switch_every_n_points"
         ],
         "title": "RankingCreateBody",
         "type": "object"

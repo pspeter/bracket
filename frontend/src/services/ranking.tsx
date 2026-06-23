@@ -13,7 +13,8 @@ export async function editRanking(
   draw_points: string,
   loss_points: string,
   add_score_points: boolean,
-  position: number
+  position: number,
+  side_switch_every_n_points: number | null
 ) {
   return createAxios()
     .put(`tournaments/${tournament_id}/rankings/${ranking_id}`, {
@@ -22,6 +23,7 @@ export async function editRanking(
       loss_points,
       add_score_points,
       position,
+      side_switch_every_n_points,
     })
     .catch((response: any) => handleRequestError(response));
 }
