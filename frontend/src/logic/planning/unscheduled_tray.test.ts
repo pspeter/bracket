@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   LevelResponse,
   MatchWithDetails,
+  RoundWithMatches,
   StageItemWithRounds,
   StageWithStageItems,
 } from '@openapi';
@@ -40,6 +41,7 @@ function entry(
 ): MatchLookupEntry {
   return {
     match: matchDetails,
+    round: { lifecycle_state: 'ACTIVE' } as RoundWithMatches,
     stage: parentStage,
     stageItem: parentStageItem,
     matchNumber: 1,

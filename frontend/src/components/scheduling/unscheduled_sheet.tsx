@@ -78,16 +78,17 @@ export default function UnscheduledSheet({
     const colour =
       (entry != null ? stageItemColours[entry.stageItem.id] : undefined) ??
       NEUTRAL_STAGE_ITEM_COLOUR;
+    const emptyLabelKey = entry?.round.lifecycle_state === 'PLACEHOLDER' ? 'tbd_label' : 'empty_slot';
 
     return (
       <UnstyledButton key={match.id} onClick={() => onSelectMatch(match)} w="100%" py="xs">
         <Flex justify="space-between" align="center" gap="xs" wrap="nowrap">
           <Box style={{ minWidth: 0 }}>
             <Text size="sm" fw={500} truncate>
-              {formatMatchInput1(t, stageItemsLookup, matchesLookup, match)}
+              {formatMatchInput1(t, stageItemsLookup, matchesLookup, match, emptyLabelKey)}
             </Text>
             <Text size="sm" fw={500} truncate>
-              {formatMatchInput2(t, stageItemsLookup, matchesLookup, match)}
+              {formatMatchInput2(t, stageItemsLookup, matchesLookup, match, emptyLabelKey)}
             </Text>
           </Box>
           {entry != null && label != null && (
