@@ -84,6 +84,7 @@ def _stage_with_rounds(
     rounds_per_item: list[list[list[MatchWithDetails]]],
     level_id: LevelId | None = None,
     inputs_per_item: list[list[StageItemInput]] | None = None,
+    stage_type: StageType = StageType.SINGLE_ELIMINATION,
 ) -> StageWithStageItems:
     stage_items = []
     for item_idx, rounds in enumerate(rounds_per_item):
@@ -112,7 +113,7 @@ def _stage_with_rounds(
                 ranking_id=None,
                 created=T0,
                 name=f"Group {item_idx}",
-                type=StageType.SINGLE_ELIMINATION,
+                type=stage_type,
             )
         )
     return StageWithStageItems(
@@ -630,6 +631,35 @@ def test_groups_in_a_stage_progress_round_for_round_when_free() -> None:
     # Each round's matches across the two groups finish at the same time (zero spread).
     assert _end_time(by_id[a1.id]) == _end_time(by_id[b1.id])
     assert _end_time(by_id[a2.id]) == _end_time(by_id[b2.id])
+
+
+# ── Swiss round sequencing ────────────────────────────────────────────────────
+
+
+def test_swiss_rounds_are_scheduled_sequentially() -> None:
+    """Swiss skeleton rounds must run in order: all round-N matches must end
+    (plus the default break) before any round-N+1 match can start.
+
+    Setup: one Swiss stage item, round 0 has 1 match, round 1 has 4 matches,
+    3 courts available.  Without a hard ordering constraint the optimizer can
+    fill spare courts in round 1 while round 0 is still running, producing a
+    smaller makespan — so without the fix the solver reliably picks that
+    invalid layout.
+    """
+    r0 = _match(1)
+    r1a, r1b, r1c, r1d = _match(2), _match(3), _match(4), _match(5)
+    stages = [_stage_with_rounds(1, [[[r0], [r1a, r1b, r1c, r1d]]], stage_type=StageType.SWISS)]
+
+    ops = build_schedule_plan(stages, [_court(1), _court(2), _court(3)], _tournament())
+
+    _assert_match_ids_scheduled(ops, [r0, r1a, r1b, r1c, r1d])
+    by_id = {op.match.id: op for op in ops}
+    r0_end = _end_time(by_id[r0.id])
+    r1_start = min(by_id[m.id].start_time for m in [r1a, r1b, r1c, r1d])
+    assert r1_start >= r0_end + timedelta(minutes=MARGIN), (
+        f"Round 1 starts at {r1_start} before round 0 ends at {r0_end} "
+        f"(margin={MARGIN}min); Swiss rounds must be strictly sequential"
+    )
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────
