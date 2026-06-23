@@ -128,10 +128,10 @@ def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBo
         existing_match.stage_item_input1_score != match_body.stage_item_input1_score
         or existing_match.stage_item_input2_score != match_body.stage_item_input2_score
     )
-    if scores_changed and match_body.state is not MatchState.IN_PROGRESS:
+    if scores_changed and match_body.state not in {MatchState.IN_PROGRESS, MatchState.COMPLETED}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Scores can only be changed while the match is in progress",
+            detail="Scores can only be changed while the match is in progress or being completed",
         )
 
     completed_at = None
