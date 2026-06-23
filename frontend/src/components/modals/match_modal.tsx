@@ -314,6 +314,13 @@ function MatchModalForm({
           label: t('feeder_precedence_conflict_label'),
         }
       : null,
+    match.round_order_conflict
+      ? {
+          key: 'round_order',
+          colour: CONFLICT_COLOURS.roundOrder,
+          label: t('round_order_conflict_label'),
+        }
+      : null,
     match.short_break_conflict
       ? {
           key: 'short_break',

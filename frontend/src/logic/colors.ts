@@ -294,6 +294,8 @@ export const CONFLICT_COLOURS = {
   precedence: 'orange',
   /** The break before the match is shorter than the tournament default. */
   shortBreak: 'var(--mantine-color-yellow-filled)',
+  /** The match starts before all matches of the previous round have ended. */
+  roundOrder: 'orange',
 } as const;
 
 // ── Score colours ───────────────────────────────────────────────────────────

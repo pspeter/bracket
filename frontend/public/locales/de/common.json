@@ -276,6 +276,7 @@
     "round_lifecycle_placeholder": "Ausstehend",
     "round_lifecycle_resolved": "Aufgelöst",
     "round_name_input_placeholder": "Beste Runde aller Zeiten",
+    "round_order_conflict_label": "Beginnt, bevor alle Spiele der vorherigen Runde beendet sind",
     "round_robin_label": "Jeder gegen Jeden",
     "round_robin_description": "Jedes Team spiel einmal gegen jedes andere Team.",
     "save_button": "Speichern",

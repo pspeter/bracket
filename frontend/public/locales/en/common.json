@@ -276,6 +276,7 @@
     "round_lifecycle_placeholder": "Pending",
     "round_lifecycle_resolved": "Resolved",
     "round_name_input_placeholder": "Best Round Ever",
+    "round_order_conflict_label": "Starts before all matches of the previous round have ended",
     "round_robin_label": "Round Robin",
     "round_robin_description": "Each team plays every other team once.",
     "save_button": "Save",

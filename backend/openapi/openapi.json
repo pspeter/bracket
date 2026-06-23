@@ -532,6 +532,11 @@
             "title": "Round Id",
             "type": "integer"
           },
+          "round_order_conflict": {
+            "default": false,
+            "title": "Round Order Conflict",
+            "type": "boolean"
+          },
           "short_break_conflict": {
             "default": false,
             "title": "Short Break Conflict",
@@ -665,6 +670,7 @@
           "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
+          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1115,6 +1121,11 @@
             "title": "Round Id",
             "type": "integer"
           },
+          "round_order_conflict": {
+            "default": false,
+            "title": "Round Order Conflict",
+            "type": "boolean"
+          },
           "short_break_conflict": {
             "default": false,
             "title": "Short Break Conflict",
@@ -1248,6 +1259,7 @@
           "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
+          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1428,6 +1440,11 @@
             "title": "Round Id",
             "type": "integer"
           },
+          "round_order_conflict": {
+            "default": false,
+            "title": "Round Order Conflict",
+            "type": "boolean"
+          },
           "short_break_conflict": {
             "default": false,
             "title": "Short Break Conflict",
@@ -1555,6 +1572,7 @@
           "feeder_precedence_conflict",
           "short_break_conflict",
           "referee_conflict",
+          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",

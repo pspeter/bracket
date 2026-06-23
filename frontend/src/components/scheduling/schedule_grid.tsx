@@ -261,7 +261,8 @@ function MatchCard({
     </Box>
   );
   // A match can sit on either (or both) sides of a precedence dependency, plus the earlier-stage
-  // ordering violation — collect every applicable description so the tooltip explains them all.
+  // ordering violation or a round-order conflict — collect every applicable description so the
+  // tooltip explains them all.
   const precedenceWarningLabels = [
     match.precedence_conflict
       ? t(
@@ -273,6 +274,12 @@ function MatchCard({
       ? t(
           'feeder_precedence_conflict_label',
           'Ends after a match depending on the results of this one starts'
+        )
+      : null,
+    match.round_order_conflict
+      ? t(
+          'round_order_conflict_label',
+          'Starts before all matches of the previous round have ended'
         )
       : null,
     isViolation ? t('match_scheduled_before_previous_stage_label') : null,
