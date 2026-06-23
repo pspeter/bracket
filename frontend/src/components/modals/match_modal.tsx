@@ -407,16 +407,28 @@ function MatchModalForm({
           withAsterisk
           label={`${t('score_of_label')} ${team1Name}`}
           placeholder={`${t('score_of_label')} ${team1Name}`}
-          disabled={form.values.state !== 'IN_PROGRESS'}
+          disabled={form.values.state === 'COMPLETED'}
           {...form.getInputProps('stage_item_input1_score')}
+          onChange={(value) => {
+            form.setFieldValue('stage_item_input1_score', value as number);
+            if (form.values.state === 'NOT_STARTED') {
+              form.setFieldValue('state', 'IN_PROGRESS');
+            }
+          }}
         />
         <NumberInput
           withAsterisk
           mt="lg"
           label={`${t('score_of_label')} ${team2Name}`}
           placeholder={`${t('score_of_label')} ${team2Name}`}
-          disabled={form.values.state !== 'IN_PROGRESS'}
+          disabled={form.values.state === 'COMPLETED'}
           {...form.getInputProps('stage_item_input2_score')}
+          onChange={(value) => {
+            form.setFieldValue('stage_item_input2_score', value as number);
+            if (form.values.state === 'NOT_STARTED') {
+              form.setFieldValue('state', 'IN_PROGRESS');
+            }
+          }}
         />
         <Select
           mt="lg"
@@ -427,6 +439,15 @@ function MatchModalForm({
             { value: 'COMPLETED', label: t('match_state_completed') },
           ]}
           {...form.getInputProps('state')}
+          onChange={(value) => {
+            if (value != null) {
+              form.setFieldValue('state', value as MatchWithDetails['state']);
+              if (value === 'NOT_STARTED') {
+                form.setFieldValue('stage_item_input1_score', 0);
+                form.setFieldValue('stage_item_input2_score', 0);
+              }
+            }
+          }}
         />
         {refereesEnabled && (
           <RefereeCombobox
