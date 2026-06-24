@@ -87,6 +87,7 @@ describe('computeConflictPreview', () => {
         match: { matchId: 1, courtId: 1, position: 0 },
       },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(2, 0));
@@ -113,6 +114,7 @@ describe('computeConflictPreview', () => {
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(1, 0));
@@ -150,6 +152,7 @@ describe('computeConflictPreview', () => {
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(1, 0));
@@ -188,6 +191,7 @@ describe('computeConflictPreview', () => {
       layout,
       selection: { kind: 'tray-match-selected', matchId: 2 },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(2, 0));
@@ -214,6 +218,7 @@ describe('computeConflictPreview', () => {
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.swapTargets]).toContain(2);
@@ -247,6 +252,7 @@ describe('computeConflictPreview', () => {
         match: { matchId: 1, courtId: 1, position: 0 },
       },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.swapTargets]).toContain(2);
@@ -284,6 +290,7 @@ describe('computeConflictPreview', () => {
         match: { matchId: 1, courtId: 1, position: 0 },
       },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.swapTargets]).toContain(4);
@@ -318,6 +325,7 @@ describe('computeConflictPreview', () => {
         match: { matchId: 1, courtId: 1, position: 0 },
       },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.swapTargets]).toContain(2);
@@ -347,6 +355,7 @@ describe('computeConflictPreview', () => {
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
       tournamentStartTime: START,
+      refereesEnabled: true,
     });
 
     expect([...preview.swapTargets]).toContain(2);

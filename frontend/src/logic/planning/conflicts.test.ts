@@ -686,6 +686,156 @@ describe('computeConflictFlags — placeholder slot overlap', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Referees disabled (tournament.referees_enabled === false, issue #181)
+// ---------------------------------------------------------------------------
+
+describe('computeConflictFlags — referees disabled', () => {
+  it('does not flag a team that plays and referees overlapping matches', () => {
+    // Same fixture as the "team plays and referees" case above, which DOES flag when
+    // referees are enabled; with referees disabled the referee slot is not a resource.
+    const team20 = teamInput(-20);
+    const playingMatch = makeMatch({
+      id: -20,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -1,
+      input1: team20,
+      input2: teamInput(-21),
+    });
+    const refereeingMatch = makeMatch({
+      id: -21,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -2,
+      input1: teamInput(-22),
+      input2: teamInput(-23),
+      referee: teamInput(-20),
+    });
+
+    const flags = computeConflictFlags([twoMatchStage(playingMatch, refereeingMatch)], 0, {
+      refereesEnabled: false,
+    });
+
+    expect(flags.get(-21)!.referee_conflict).toBe(false);
+    expect(flags.get(-20)!.stage_item_input1_conflict).toBe(false);
+  });
+
+  it('does not flag a team refereeing two overlapping matches', () => {
+    const team20 = teamInput(-20);
+    const refMatch1 = makeMatch({
+      id: -20,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -1,
+      input1: teamInput(-21),
+      input2: teamInput(-22),
+      referee: team20,
+    });
+    const refMatch2 = makeMatch({
+      id: -21,
+      startMinutes: 30,
+      durationMinutes: 60,
+      courtId: -2,
+      input1: teamInput(-23),
+      input2: teamInput(-24),
+      referee: teamInput(-20),
+    });
+
+    const flags = computeConflictFlags([twoMatchStage(refMatch1, refMatch2)], 0, {
+      refereesEnabled: false,
+    });
+
+    expect(flags.get(-20)!.referee_conflict).toBe(false);
+    expect(flags.get(-21)!.referee_conflict).toBe(false);
+  });
+
+  it('does not flag a placeholder slot refereeing two overlapping matches', () => {
+    // The slot-id (placeholder) referee pass must also be gated off.
+    const refMatch1 = makeMatch({
+      id: -20,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -1,
+      input1: teamInput(-20),
+      input2: teamInput(-21),
+      referee: tentativeInput(null, -30),
+    });
+    const refMatch2 = makeMatch({
+      id: -21,
+      startMinutes: 30,
+      durationMinutes: 60,
+      courtId: -2,
+      input1: teamInput(-22),
+      input2: teamInput(-23),
+      referee: tentativeInput(null, -30),
+    });
+
+    const flags = computeConflictFlags([twoMatchStage(refMatch1, refMatch2)], 0, {
+      refereesEnabled: false,
+    });
+
+    expect(flags.get(-20)!.referee_conflict).toBe(false);
+    expect(flags.get(-21)!.referee_conflict).toBe(false);
+  });
+
+  it('still flags overlapping playing slots when referees are disabled', () => {
+    // Disabling referees must not suppress genuine team double-booking.
+    const team20 = teamInput(-20);
+    const match1 = makeMatch({
+      id: -20,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -1,
+      input1: team20,
+      input2: teamInput(-21),
+    });
+    const match2 = makeMatch({
+      id: -21,
+      startMinutes: 30,
+      durationMinutes: 60,
+      courtId: -2,
+      input1: teamInput(-20),
+      input2: teamInput(-22),
+    });
+
+    const flags = computeConflictFlags([twoMatchStage(match1, match2)], 0, {
+      refereesEnabled: false,
+    });
+
+    expect(flags.get(-20)!.stage_item_input1_conflict).toBe(true);
+    expect(flags.get(-21)!.stage_item_input1_conflict).toBe(true);
+  });
+
+  it('flags referee conflicts when refereesEnabled is true (explicit option)', () => {
+    const team20 = teamInput(-20);
+    const playingMatch = makeMatch({
+      id: -20,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -1,
+      input1: team20,
+      input2: teamInput(-21),
+    });
+    const refereeingMatch = makeMatch({
+      id: -21,
+      startMinutes: 0,
+      durationMinutes: 60,
+      courtId: -2,
+      input1: teamInput(-22),
+      input2: teamInput(-23),
+      referee: teamInput(-20),
+    });
+
+    const flags = computeConflictFlags([twoMatchStage(playingMatch, refereeingMatch)], 0, {
+      refereesEnabled: true,
+    });
+
+    expect(flags.get(-21)!.referee_conflict).toBe(true);
+    expect(flags.get(-20)!.stage_item_input1_conflict).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Round order conflicts
 // ---------------------------------------------------------------------------
 
@@ -774,7 +924,9 @@ describe('computeConflictFlags — matches of interest', () => {
       input2: teamInput(-4),
     });
 
-    const flags = computeConflictFlags([twoMatchStage(match1, match2)], 0, 'all');
+    const flags = computeConflictFlags([twoMatchStage(match1, match2)], 0, {
+      matchesOfInterest: 'all',
+    });
 
     expect(new Set(flags.keys())).toEqual(new Set([-1, -2]));
   });
@@ -793,7 +945,9 @@ describe('computeConflictFlags — matches of interest', () => {
       input2: teamInput(-4),
     });
 
-    const flags = computeConflictFlags([twoMatchStage(match1, match2)], 0, new Set([-1]));
+    const flags = computeConflictFlags([twoMatchStage(match1, match2)], 0, {
+      matchesOfInterest: new Set([-1]),
+    });
 
     expect(new Set(flags.keys())).toEqual(new Set([-1]));
     // The conflict is still detected using the full schedule, only the output is filtered.
