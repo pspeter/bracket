@@ -3,6 +3,9 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
+from bracket.logic.scheduling.handle_stage_activation import (
+    try_resolve_first_swiss_round_in_active_stage,
+)
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
     StageItemInputUpdateBody,
@@ -127,4 +130,10 @@ async def update_stage_item_input(
                 else None,
             },
         )
+
+    # A Swiss stage item added to an already-active stage misses the stage-activation hook that
+    # resolves round 1, so resolve it here once all of its teams have been assigned.
+    if target_stage.is_active:
+        await try_resolve_first_swiss_round_in_active_stage(tournament_id, stage_item_id)
+
     return SuccessResponse()
