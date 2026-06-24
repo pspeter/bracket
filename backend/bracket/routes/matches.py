@@ -128,10 +128,23 @@ def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBo
         existing_match.stage_item_input1_score != match_body.stage_item_input1_score
         or existing_match.stage_item_input2_score != match_body.stage_item_input2_score
     )
-    if scores_changed and match_body.state not in {MatchState.IN_PROGRESS, MatchState.COMPLETED}:
+    scores_are_zero = (
+        match_body.stage_item_input1_score == 0 and match_body.stage_item_input2_score == 0
+    )
+    # A score only carries meaning while a match is in progress or completed. Outside those
+    # states the only valid score is 0–0, so resetting the score (e.g. moving a match back to
+    # "not started") is allowed, but recording a real score there is not.
+    if (
+        scores_changed
+        and match_body.state not in {MatchState.IN_PROGRESS, MatchState.COMPLETED}
+        and not scores_are_zero
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Scores can only be changed while the match is in progress or being completed",
+            detail=(
+                "Scores can only be set while the match is in progress or being completed; "
+                "moving a match to another state requires resetting its score to 0–0"
+            ),
         )
 
     completed_at = None
