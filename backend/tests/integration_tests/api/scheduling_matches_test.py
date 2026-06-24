@@ -300,7 +300,7 @@ async def test_schedule_does_not_move_already_scheduled_matches(
 async def test_schedule_succeeds_with_conflicting_pinned_matches(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """Pre-existing pinned conflicts stay flagged; new placements avoid those slots."""
+    """Pinned matches stay put even when they conflict; new placements avoid those slots."""
     tid = auth_context.tournament.id
     async with (
         inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})) as court,
@@ -347,7 +347,6 @@ async def test_schedule_succeeds_with_conflicting_pinned_matches(
     assert matches_after[pinned1.id].start_time == auth_context.tournament.start_time
     assert matches_after[pinned2.id].court_id == court.id
     assert matches_after[pinned2.id].start_time == auth_context.tournament.start_time
-    assert any(matches_after[match_id].short_break_conflict for match_id in pinned_match_ids)
     _assert_no_new_match_overlaps_pins(
         stages_after, pinned_match_ids, auth_context.tournament.margin_minutes
     )

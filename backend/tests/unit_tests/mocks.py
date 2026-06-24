@@ -1,6 +1,6 @@
 from heliclockter import datetime_utc
 
-from bracket.models.db.match import Match, MatchState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
@@ -58,25 +58,6 @@ def get_stage_item_inputs_mock(tournament_id: TournamentId) -> list[StageItemInp
     ]
 
 
-def make_simple_match(
-    start_time: datetime_utc | None,
-    duration_minutes: int,
-    _margin_minutes: int,
-    match_id: MatchId = MatchId(-1),
-) -> Match:
-    return Match(
-        id=match_id,
-        created=DUMMY_MOCK_TIME,
-        start_time=start_time,
-        duration_minutes=duration_minutes,
-        round_id=RoundId(-1),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
-    )
-
-
 def get_2_definitive_matches_mock(
     stage_item_inputs: list[StageItemInputFinal],
     match1_start_time: datetime_utc = DUMMY_MOCK_TIME,
@@ -97,8 +78,6 @@ def get_2_definitive_matches_mock(
         court_id=CourtId(-1),
         stage_item_input1_score=2,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         state=MatchState.COMPLETED,
         completed_at=DUMMY_MOCK_TIME,
     )
@@ -115,8 +94,6 @@ def get_2_definitive_matches_mock(
         court_id=CourtId(-2),
         stage_item_input1_score=2,
         stage_item_input2_score=3,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         state=MatchState.COMPLETED,
         completed_at=DUMMY_MOCK_TIME,
     )
@@ -136,8 +113,6 @@ def get_2_definitive_and_2_tentative_matches_mock(
         round_id=RoundId(-2),
         stage_item_input1_score=4,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_winner_from_match_id=match1.id,
         stage_item_input2_winner_from_match_id=match2.id,
     )
@@ -148,8 +123,6 @@ def get_2_definitive_and_2_tentative_matches_mock(
         round_id=RoundId(-1),
         stage_item_input1_score=3,
         stage_item_input2_score=2,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_winner_from_match_id=match2.id,
         stage_item_input2_winner_from_match_id=match3.id,
     )

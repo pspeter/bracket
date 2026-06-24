@@ -454,11 +454,6 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
-          "feeder_precedence_conflict": {
-            "default": false,
-            "title": "Feeder Precedence Conflict",
-            "type": "boolean"
-          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -484,16 +479,6 @@
               }
             ],
             "title": "Input2 Slot"
-          },
-          "precedence_conflict": {
-            "default": false,
-            "title": "Precedence Conflict",
-            "type": "boolean"
-          },
-          "referee_conflict": {
-            "default": false,
-            "title": "Referee Conflict",
-            "type": "boolean"
           },
           "referee_name": {
             "anyOf": [
@@ -532,16 +517,6 @@
             "title": "Round Id",
             "type": "integer"
           },
-          "round_order_conflict": {
-            "default": false,
-            "title": "Round Order Conflict",
-            "type": "boolean"
-          },
-          "short_break_conflict": {
-            "default": false,
-            "title": "Short Break Conflict",
-            "type": "boolean"
-          },
           "stage_item_input1": {
             "anyOf": [
               {
@@ -558,10 +533,6 @@
               }
             ],
             "title": "Stage Item Input1"
-          },
-          "stage_item_input1_conflict": {
-            "title": "Stage Item Input1 Conflict",
-            "type": "boolean"
           },
           "stage_item_input1_id": {
             "anyOf": [
@@ -605,10 +576,6 @@
               }
             ],
             "title": "Stage Item Input2"
-          },
-          "stage_item_input2_conflict": {
-            "title": "Stage Item Input2 Conflict",
-            "type": "boolean"
           },
           "stage_item_input2_id": {
             "anyOf": [
@@ -664,13 +631,6 @@
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "stage_item_input1_conflict",
-          "stage_item_input2_conflict",
-          "precedence_conflict",
-          "feeder_precedence_conflict",
-          "short_break_conflict",
-          "referee_conflict",
-          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1015,11 +975,6 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
-          "feeder_precedence_conflict": {
-            "default": false,
-            "title": "Feeder Precedence Conflict",
-            "type": "boolean"
-          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -1057,11 +1012,6 @@
             ],
             "title": "Level Id"
           },
-          "precedence_conflict": {
-            "default": false,
-            "title": "Precedence Conflict",
-            "type": "boolean"
-          },
           "referee": {
             "anyOf": [
               {
@@ -1078,11 +1028,6 @@
               }
             ],
             "title": "Referee"
-          },
-          "referee_conflict": {
-            "default": false,
-            "title": "Referee Conflict",
-            "type": "boolean"
           },
           "referee_name": {
             "anyOf": [
@@ -1121,16 +1066,6 @@
             "title": "Round Id",
             "type": "integer"
           },
-          "round_order_conflict": {
-            "default": false,
-            "title": "Round Order Conflict",
-            "type": "boolean"
-          },
-          "short_break_conflict": {
-            "default": false,
-            "title": "Short Break Conflict",
-            "type": "boolean"
-          },
           "side_switch_every_n_points": {
             "anyOf": [
               {
@@ -1158,10 +1093,6 @@
               }
             ],
             "title": "Stage Item Input1"
-          },
-          "stage_item_input1_conflict": {
-            "title": "Stage Item Input1 Conflict",
-            "type": "boolean"
           },
           "stage_item_input1_id": {
             "anyOf": [
@@ -1205,10 +1136,6 @@
               }
             ],
             "title": "Stage Item Input2"
-          },
-          "stage_item_input2_conflict": {
-            "title": "Stage Item Input2 Conflict",
-            "type": "boolean"
           },
           "stage_item_input2_id": {
             "anyOf": [
@@ -1264,13 +1191,6 @@
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "stage_item_input1_conflict",
-          "stage_item_input2_conflict",
-          "precedence_conflict",
-          "feeder_precedence_conflict",
-          "short_break_conflict",
-          "referee_conflict",
-          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
@@ -1346,11 +1266,6 @@
             "title": "Duration Minutes",
             "type": "integer"
           },
-          "feeder_precedence_conflict": {
-            "default": false,
-            "title": "Feeder Precedence Conflict",
-            "type": "boolean"
-          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -1388,11 +1303,6 @@
             ],
             "title": "Level Id"
           },
-          "precedence_conflict": {
-            "default": false,
-            "title": "Precedence Conflict",
-            "type": "boolean"
-          },
           "referee": {
             "anyOf": [
               {
@@ -1409,11 +1319,6 @@
               }
             ],
             "title": "Referee"
-          },
-          "referee_conflict": {
-            "default": false,
-            "title": "Referee Conflict",
-            "type": "boolean"
           },
           "referee_name": {
             "anyOf": [
@@ -1452,16 +1357,6 @@
             "title": "Round Id",
             "type": "integer"
           },
-          "round_order_conflict": {
-            "default": false,
-            "title": "Round Order Conflict",
-            "type": "boolean"
-          },
-          "short_break_conflict": {
-            "default": false,
-            "title": "Short Break Conflict",
-            "type": "boolean"
-          },
           "side_switch_every_n_points": {
             "anyOf": [
               {
@@ -1486,10 +1381,6 @@
               }
             ],
             "title": "Stage Item Input1"
-          },
-          "stage_item_input1_conflict": {
-            "title": "Stage Item Input1 Conflict",
-            "type": "boolean"
           },
           "stage_item_input1_id": {
             "anyOf": [
@@ -1530,10 +1421,6 @@
               }
             ],
             "title": "Stage Item Input2"
-          },
-          "stage_item_input2_conflict": {
-            "title": "Stage Item Input2 Conflict",
-            "type": "boolean"
           },
           "stage_item_input2_id": {
             "anyOf": [
@@ -1589,13 +1476,6 @@
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "stage_item_input1_conflict",
-          "stage_item_input2_conflict",
-          "precedence_conflict",
-          "feeder_precedence_conflict",
-          "short_break_conflict",
-          "referee_conflict",
-          "round_order_conflict",
           "state",
           "completed_at",
           "stage_item_input1_id",
