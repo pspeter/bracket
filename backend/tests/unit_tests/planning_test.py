@@ -60,8 +60,6 @@ def _match(id_: int) -> MatchWithDetails:
         round_id=RoundId(id_),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
     )
 
 
@@ -693,8 +691,6 @@ def test_already_scheduled_matches_are_skipped() -> None:
         court_id=CourtId(1),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
     )
     unscheduled = _match(1)
     stages = [_stage(1, [[scheduled, unscheduled]])]
@@ -944,8 +940,6 @@ def _match_with_teams(
         round_id=RoundId(id_),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=inp_a.id,
         stage_item_input2_id=inp_b.id,
         stage_item_input1=inp_a,
@@ -1213,8 +1207,6 @@ def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
         round_id=RoundId(1),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=inp31.id,
         stage_item_input2_id=inp32.id,
         stage_item_input1=inp31,
@@ -1438,8 +1430,6 @@ def test_referee_assigned_to_placeholder_match() -> None:
         round_id=RoundId(2),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=tentative_a.id,
         stage_item_input2_id=tentative_b.id,
         stage_item_input1=tentative_a,
@@ -1497,8 +1487,6 @@ def _scheduled_match_with_teams(
         round_id=RoundId(id_),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=inp_a.id,
         stage_item_input2_id=inp_b.id,
         stage_item_input1=inp_a,
@@ -1801,8 +1789,6 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         round_id=RoundId(1),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=_final_input(1, level).id,
         stage_item_input2_id=_final_input(2, level).id,
         stage_item_input1=_final_input(1, level),
@@ -1818,8 +1804,6 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         round_id=RoundId(2),
         stage_item_input1_score=0,
         stage_item_input2_score=0,
-        stage_item_input1_conflict=False,
-        stage_item_input2_conflict=False,
         stage_item_input1_id=inp3_a.id,
         stage_item_input2_id=inp3_b.id,
         stage_item_input1=inp3_a,

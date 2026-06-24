@@ -54,8 +54,6 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             custom_duration_minutes,
             stage_item_input1_score,
             stage_item_input2_score,
-            stage_item_input1_conflict,
-            stage_item_input2_conflict,
             created,
             state,
             input1_slot,
@@ -73,8 +71,6 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             :custom_duration_minutes,
             0,
             0,
-            false,
-            false,
             NOW(),
             'NOT_STARTED',
             :input1_slot,
@@ -156,17 +152,13 @@ async def sql_reschedule_match(
     start_time: datetime_utc,
     duration_minutes: int,
     custom_duration_minutes: int | None,
-    stage_item_input1_conflict: bool,
-    stage_item_input2_conflict: bool,
 ) -> None:
     query = """
         UPDATE matches
         SET court_id = :court_id,
             start_time = :start_time,
             duration_minutes = :duration_minutes,
-            custom_duration_minutes = :custom_duration_minutes,
-            stage_item_input1_conflict = :stage_item_input1_conflict,
-            stage_item_input2_conflict = :stage_item_input2_conflict
+            custom_duration_minutes = :custom_duration_minutes
         WHERE matches.id = :match_id
         """
     await database.execute(
@@ -177,8 +169,6 @@ async def sql_reschedule_match(
             "start_time": datetime.fromisoformat(start_time.isoformat()),
             "duration_minutes": duration_minutes,
             "custom_duration_minutes": custom_duration_minutes,
-            "stage_item_input1_conflict": stage_item_input1_conflict,
-            "stage_item_input2_conflict": stage_item_input2_conflict,
         },
     )
 
@@ -200,8 +190,6 @@ async def sql_reschedule_match_and_determine_duration(
         start_time,
         duration_minutes,
         match.custom_duration_minutes,
-        match.stage_item_input1_conflict,
-        match.stage_item_input2_conflict,
     )
 
 

@@ -145,8 +145,6 @@ DUMMY_MATCH1 = MatchInsertable(
     stage_item_input2_winner_from_match_id=None,
     duration_minutes=10,
     custom_duration_minutes=None,
-    stage_item_input1_conflict=False,
-    stage_item_input2_conflict=False,
     state=MatchState.COMPLETED,
     completed_at=DUMMY_MOCK_TIME,
 )

@@ -282,10 +282,6 @@ export type Match = {
    */
   duration_minutes: number;
   /**
-   * Feeder Precedence Conflict
-   */
-  feeder_precedence_conflict: boolean;
-  /**
    * Id
    */
   id: number;
@@ -297,14 +293,6 @@ export type Match = {
    * Input2 Slot
    */
   input2_slot: number | null;
-  /**
-   * Precedence Conflict
-   */
-  precedence_conflict: boolean;
-  /**
-   * Referee Conflict
-   */
-  referee_conflict: boolean;
   /**
    * Referee Name
    */
@@ -322,21 +310,9 @@ export type Match = {
    */
   round_id: number;
   /**
-   * Round Order Conflict
-   */
-  round_order_conflict: boolean;
-  /**
-   * Short Break Conflict
-   */
-  short_break_conflict: boolean;
-  /**
    * Stage Item Input1
    */
   stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Stage Item Input1 Conflict
-   */
-  stage_item_input1_conflict: boolean;
   /**
    * Stage Item Input1 Id
    */
@@ -353,10 +329,6 @@ export type Match = {
    * Stage Item Input2
    */
   stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Stage Item Input2 Conflict
-   */
-  stage_item_input2_conflict: boolean;
   /**
    * Stage Item Input2 Id
    */
@@ -539,10 +511,6 @@ export type MatchWithDetails = {
    */
   duration_minutes: number;
   /**
-   * Feeder Precedence Conflict
-   */
-  feeder_precedence_conflict: boolean;
-  /**
    * Id
    */
   id: number;
@@ -559,17 +527,9 @@ export type MatchWithDetails = {
    */
   level_id: number | null;
   /**
-   * Precedence Conflict
-   */
-  precedence_conflict: boolean;
-  /**
    * Referee
    */
   referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Referee Conflict
-   */
-  referee_conflict: boolean;
   /**
    * Referee Name
    */
@@ -587,14 +547,6 @@ export type MatchWithDetails = {
    */
   round_id: number;
   /**
-   * Round Order Conflict
-   */
-  round_order_conflict: boolean;
-  /**
-   * Short Break Conflict
-   */
-  short_break_conflict: boolean;
-  /**
    * Side Switch Every N Points
    */
   side_switch_every_n_points: number | null;
@@ -602,10 +554,6 @@ export type MatchWithDetails = {
    * Stage Item Input1
    */
   stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Stage Item Input1 Conflict
-   */
-  stage_item_input1_conflict: boolean;
   /**
    * Stage Item Input1 Id
    */
@@ -622,10 +570,6 @@ export type MatchWithDetails = {
    * Stage Item Input2
    */
   stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Stage Item Input2 Conflict
-   */
-  stage_item_input2_conflict: boolean;
   /**
    * Stage Item Input2 Id
    */
@@ -671,10 +615,6 @@ export type MatchWithDetailsDefinitive = {
    */
   duration_minutes: number;
   /**
-   * Feeder Precedence Conflict
-   */
-  feeder_precedence_conflict: boolean;
-  /**
    * Id
    */
   id: number;
@@ -691,17 +631,9 @@ export type MatchWithDetailsDefinitive = {
    */
   level_id: number | null;
   /**
-   * Precedence Conflict
-   */
-  precedence_conflict: boolean;
-  /**
    * Referee
    */
   referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
-  /**
-   * Referee Conflict
-   */
-  referee_conflict: boolean;
   /**
    * Referee Name
    */
@@ -719,14 +651,6 @@ export type MatchWithDetailsDefinitive = {
    */
   round_id: number;
   /**
-   * Round Order Conflict
-   */
-  round_order_conflict: boolean;
-  /**
-   * Short Break Conflict
-   */
-  short_break_conflict: boolean;
-  /**
    * Side Switch Every N Points
    */
   side_switch_every_n_points: number | null;
@@ -734,10 +658,6 @@ export type MatchWithDetailsDefinitive = {
    * Stage Item Input1
    */
   stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
-  /**
-   * Stage Item Input1 Conflict
-   */
-  stage_item_input1_conflict: boolean;
   /**
    * Stage Item Input1 Id
    */
@@ -754,10 +674,6 @@ export type MatchWithDetailsDefinitive = {
    * Stage Item Input2
    */
   stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
-  /**
-   * Stage Item Input2 Conflict
-   */
-  stage_item_input2_conflict: boolean;
   /**
    * Stage Item Input2 Id
    */

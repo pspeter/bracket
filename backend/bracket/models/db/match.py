@@ -38,13 +38,6 @@ class MatchBaseInsertable(BaseModelORM):
     # like the playing slots, or a free-text external referee name. At most one is set.
     referee_stage_item_input_id: StageItemInputId | None = None
     referee_name: str | None = None
-    stage_item_input1_conflict: bool
-    stage_item_input2_conflict: bool
-    precedence_conflict: bool = False
-    feeder_precedence_conflict: bool = False
-    short_break_conflict: bool = False
-    referee_conflict: bool = False
-    round_order_conflict: bool = False
     state: MatchState = MatchState.NOT_STARTED
     completed_at: datetime_utc | None = None
 

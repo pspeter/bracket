@@ -4,7 +4,6 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
-from bracket.logic.planning.conflicts import reconcile_conflicts
 from bracket.logic.planning.matches import (
     assign_missing_referees_only,
     eligible_referee_slot_ids,
@@ -211,7 +210,6 @@ async def schedule_matches(
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await schedule_all_unscheduled_matches(tournament_id, stages, weights)
-    await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -224,7 +222,6 @@ async def reoptimize_matches(
 ) -> SuccessResponse:
     stages = await get_full_tournament_details(tournament_id)
     await reoptimize_all_matches(tournament_id, stages, weights)
-    await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -244,7 +241,6 @@ async def auto_assign_referees(
         )
     stages = await get_full_tournament_details(tournament_id)
     await assign_missing_referees_only(tournament, stages, weights)
-    await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -260,7 +256,6 @@ async def unschedule_match(
     validate_match_can_be_unscheduled(match_row)
     await sql_unschedule_match(match_row.id)
 
-    await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -276,7 +271,6 @@ async def reschedule_match(
 ) -> SuccessResponse:
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     await handle_match_reschedule(tournament, body, match_id)
-    await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -293,7 +287,6 @@ async def resize_match_break(
 ) -> SuccessResponse:
     async with database.transaction():
         await handle_match_resize_break(tournament, match_id, body.new_duration_minutes)
-        await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -307,7 +300,6 @@ async def swap_matches(
     await check_foreign_keys_belong_to_tournament(body, tournament_id)
     async with database.transaction():
         await handle_match_swap(tournament, body)
-        await reconcile_conflicts(tournament_id)
     return SuccessResponse()
 
 
@@ -353,7 +345,6 @@ async def update_match_by_id(
             await sql_set_match_referee_name(match_id, referee_name)
         else:
             await sql_clear_match_referee(match_id)
-        await reconcile_conflicts(tournament_id)
 
     round_ = await get_round_by_id(tournament_id, match.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
@@ -373,11 +364,6 @@ async def update_match_by_id(
             if match_pos.match.court_id == match.court_id
         ]
         await reorder_all_matches(tournament, court_matches)
-
-        # The match's new footprint and the shifted start times behind it can
-        # create or resolve overlaps with any court, so refresh the persisted
-        # conflict flags like the reschedule/swap/unschedule endpoints do.
-        await reconcile_conflicts(tournament_id)
 
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
