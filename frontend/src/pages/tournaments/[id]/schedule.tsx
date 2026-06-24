@@ -588,6 +588,7 @@ export default function SchedulePage() {
             )}
             <ScheduleGrid
               layout={layout}
+              stages={rawStages}
               violations={violations}
               conflictPreview={conflictPreview}
               stageItemsLookup={stageItemsLookup}

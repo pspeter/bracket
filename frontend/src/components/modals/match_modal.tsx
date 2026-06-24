@@ -15,7 +15,7 @@ import {
 import { useForm } from '@mantine/form';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { GiWhistle } from '@react-icons/all-files/gi/GiWhistle';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
@@ -23,6 +23,7 @@ import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { CONFLICT_COLOURS, levelSwatchColour } from '@logic/colors';
+import { computeConflictFlags } from '@logic/planning/conflicts';
 import {
   LevelResponse,
   MatchWithDetails,
@@ -281,54 +282,64 @@ function MatchModalForm({
   const team1Name = formatMatchInput1(t, stageItemsLookup, matchesLookup, match);
   const team2Name = formatMatchInput2(t, stageItemsLookup, matchesLookup, match);
 
+  // Conflict flags are derived client-side from the current schedule with the same engine
+  // the planner grid uses, so the modal and the grid always agree — and update together on
+  // an optimistic move — instead of reading the backend-persisted columns.
+  const marginMinutes = swrTournamentResponse.data?.data.margin_minutes ?? 0;
+  const conflictFlags = useMemo(
+    () => computeConflictFlags(swrStagesResponse.data?.data ?? [], marginMinutes),
+    [swrStagesResponse.data?.data, marginMinutes]
+  );
+  const conflicts = conflictFlags.get(match.id);
+
   // Surface the same scheduling conflicts the planner grid flags on this match, each as an
   // icon plus a brief description. Colours come from the shared CONFLICT_COLOURS so the
   // grid and this list always agree.
   type ActiveConflict = { key: string; colour: string; label: string };
   const activeConflicts: (ActiveConflict | null)[] = [
-    match.stage_item_input1_conflict
+    conflicts?.stage_item_input1_conflict
       ? {
           key: 'input1',
           colour: CONFLICT_COLOURS.teamDoubleBooked,
           label: t('team_double_booked_conflict_label', { team: team1Name }),
         }
       : null,
-    match.stage_item_input2_conflict
+    conflicts?.stage_item_input2_conflict
       ? {
           key: 'input2',
           colour: CONFLICT_COLOURS.teamDoubleBooked,
           label: t('team_double_booked_conflict_label', { team: team2Name }),
         }
       : null,
-    match.precedence_conflict
+    conflicts?.precedence_conflict
       ? {
           key: 'precedence',
           colour: CONFLICT_COLOURS.precedence,
           label: t('precedence_conflict_label'),
         }
       : null,
-    match.feeder_precedence_conflict
+    conflicts?.feeder_precedence_conflict
       ? {
           key: 'feeder_precedence',
           colour: CONFLICT_COLOURS.precedence,
           label: t('feeder_precedence_conflict_label'),
         }
       : null,
-    match.round_order_conflict
+    conflicts?.round_order_conflict
       ? {
           key: 'round_order',
           colour: CONFLICT_COLOURS.roundOrder,
           label: t('round_order_conflict_label'),
         }
       : null,
-    match.short_break_conflict
+    conflicts?.short_break_conflict
       ? {
           key: 'short_break',
           colour: CONFLICT_COLOURS.shortBreak,
           label: t('short_break_conflict_label'),
         }
       : null,
-    refereesEnabled && match.referee_conflict
+    refereesEnabled && conflicts?.referee_conflict
       ? {
           key: 'referee',
           colour: CONFLICT_COLOURS.referee,
