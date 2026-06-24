@@ -1,35 +1,35 @@
-import { InsertionLine, LayoutCourt, ScheduleGridLayout, computeInsertionLines } from './layout';
-import { OptimisticMatch, OptimisticStage, applyPlanningActions } from './optimistic';
+/**
+ * Conflict preview for the planning grid, built on the shared client conflict
+ * engine (`computeConflictFlags`).
+ *
+ * Every placement affordance — an insertion line on a court, or a scheduled match
+ * the current selection could swap with — is previewed by simulating the candidate
+ * action with `applyPlanningActions`, recomputing the conflict flags for the
+ * resulting schedule, and diffing them against the pre-action flags. An affordance
+ * is highlighted when the action would introduce a conflict that was not already
+ * present, so the highlight reflects every conflict type the engine detects
+ * (team/slot double-booking, referee, winner-of and cross-stage precedence, short
+ * break, round order) rather than just team overlap.
+ */
+import { ConflictFlags, ConflictStage, computeConflictFlags } from './conflicts';
+import { ScheduleGridLayout, computeInsertionLines } from './layout';
+import { applyPlanningActions } from './optimistic';
 import { PlanningAction, SelectionState, selectionReducer } from './selection';
-
-export interface ConflictPreviewMatch extends OptimisticMatch {
-  stage_item_input1_id: number | null;
-  stage_item_input2_id: number | null;
-  referee_stage_item_input_id: number | null;
-}
-
-export interface ConflictPreviewStage extends OptimisticStage {
-  stage_items: { rounds: { matches: ConflictPreviewMatch[] }[] }[];
-}
 
 export interface ConflictPreview {
   insertionLines: Set<string>;
   swapTargets: Set<number>;
 }
 
-interface PreviewBlock {
-  courtId: number;
-  match: ConflictPreviewMatch;
-  startMinutes: number;
-}
-
-interface PreparedPreview {
-  matchesById: Map<number, ConflictPreviewMatch>;
-  blocksByCourtId: Map<number, PreviewBlock[]>;
-  blockByMatchId: Map<number, PreviewBlock>;
-  defaultBreakMinutes: number;
-  refereesEnabled: boolean;
-}
+const CONFLICT_FLAG_KEYS = [
+  'stage_item_input1_conflict',
+  'stage_item_input2_conflict',
+  'precedence_conflict',
+  'feeder_precedence_conflict',
+  'short_break_conflict',
+  'referee_conflict',
+  'round_order_conflict',
+] as const satisfies readonly (keyof ConflictFlags)[];
 
 export function insertionLineKey(courtId: number, index: number): string {
   return `${courtId}:${index}`;
@@ -50,379 +50,73 @@ function getSelectedMatchId(selection: SelectionState): number | null {
   }
 }
 
-function getMatches(stages: ConflictPreviewStage[]): ConflictPreviewMatch[] {
-  return stages.flatMap((stage) =>
-    stage.stage_items.flatMap((stageItem) => stageItem.rounds.flatMap((round) => round.matches))
-  );
+/**
+ * The actions a tap would trigger from the current selection. A tap that needs a
+ * move confirmation stashes its action in the resulting `confirm-move` state
+ * rather than emitting it, so the preview reaches in to recover the pending action.
+ */
+function transitionActions(transition: ReturnType<typeof selectionReducer>): PlanningAction[] {
+  if (transition.actions.length > 0) return transition.actions;
+  return transition.state.kind === 'confirm-move' ? [transition.state.action] : [];
 }
 
 /**
- * The stage-item-input slots a match occupies for conflict purposes: its two
- * playing slots and — when referees are enabled — the referee slot, mirroring the
- * backend's "referee is a third match slot" model. This is the single place that
- * decides which slots a match ties up; both the simulated-action check and the
- * block-based preview share it, so referee double-booking is handled identically.
+ * Whether applying `actions` to `stages` introduces a conflict flag the pre-action
+ * `baseline` did not already carry. Conflicts are relational, so the whole schedule
+ * is re-evaluated and every match compared — a move can push an unrelated match
+ * into a conflict, not just the one being placed.
  */
-function occupiedSlotIds(match: ConflictPreviewMatch, refereesEnabled: boolean): Set<number> {
-  const slotIds = [match.stage_item_input1_id, match.stage_item_input2_id];
-  if (refereesEnabled) slotIds.push(match.referee_stage_item_input_id);
-  return new Set(slotIds.filter((id): id is number => id != null));
-}
-
-function sharesSlot(
-  match1: ConflictPreviewMatch,
-  match2: ConflictPreviewMatch,
-  refereesEnabled: boolean
+function actionsIntroduceConflict(
+  stages: ConflictStage[],
+  baseline: Map<number, ConflictFlags>,
+  defaultBreakMinutes: number,
+  tournamentStartTime: string | Date,
+  actions: PlanningAction[]
 ): boolean {
-  const slots1 = occupiedSlotIds(match1, refereesEnabled);
-  return [...occupiedSlotIds(match2, refereesEnabled)].some((id) => slots1.has(id));
-}
+  if (actions.length === 0) return false;
 
-function playingIntervalMillis(match: ConflictPreviewMatch): [number, number] | null {
-  if (match.start_time == null) return null;
+  const simulated = applyPlanningActions(stages, actions, tournamentStartTime, defaultBreakMinutes);
+  const postFlags = computeConflictFlags(simulated, defaultBreakMinutes);
 
-  const start = new Date(match.start_time).getTime();
-  return [start, start + slotLengthMinutes(match) * 60_000];
-}
-
-function playingTimesOverlap(match1: ConflictPreviewMatch, match2: ConflictPreviewMatch): boolean {
-  const interval1 = playingIntervalMillis(match1);
-  const interval2 = playingIntervalMillis(match2);
-  if (interval1 == null || interval2 == null) return false;
-
-  // Half-open intervals [start, end): adjacent playing windows do not conflict.
-  return interval1[0] < interval2[1] && interval2[0] < interval1[1];
-}
-
-function slotLengthMinutes(match: ConflictPreviewMatch): number {
-  return match.duration_minutes;
-}
-
-function playingMinutesOverlap(
-  startMinutes1: number,
-  durationMinutes1: number,
-  startMinutes2: number,
-  durationMinutes2: number
-): boolean {
-  return (
-    startMinutes1 < startMinutes2 + durationMinutes2 &&
-    startMinutes2 < startMinutes1 + durationMinutes1
-  );
-}
-
-export function actionCreatesSelectedConflict({
-  stages,
-  selectedMatchId,
-  tournamentStartTime,
-  defaultBreakMinutes = 0,
-  refereesEnabled = true,
-  action,
-}: {
-  stages: ConflictPreviewStage[];
-  selectedMatchId: number;
-  tournamentStartTime: string | Date;
-  defaultBreakMinutes?: number;
-  refereesEnabled?: boolean;
-  action: PlanningAction;
-}): boolean {
-  const simulated = applyPlanningActions(
-    stages,
-    [action],
-    tournamentStartTime,
-    defaultBreakMinutes
-  );
-  const matches = getMatches(simulated);
-  const selected = matches.find((match) => match.id === selectedMatchId);
-  if (selected == null || occupiedSlotIds(selected, refereesEnabled).size === 0) return false;
-
-  return matches.some(
-    (match) =>
-      match.id !== selected.id &&
-      sharesSlot(selected, match, refereesEnabled) &&
-      playingTimesOverlap(selected, match)
-  );
-}
-
-function preparePreview(
-  stages: ConflictPreviewStage[],
-  layout: ScheduleGridLayout<LayoutCourt, ConflictPreviewMatch>,
-  selection: SelectionState,
-  refereesEnabled: boolean
-): PreparedPreview | null {
-  const selectedMatchId = getSelectedMatchId(selection);
-  if (selectedMatchId == null) return null;
-
-  const matchesById = new Map(getMatches(stages).map((match) => [match.id, match]));
-  if (!matchesById.has(selectedMatchId)) return null;
-
-  const blocksByCourtId = new Map<number, PreviewBlock[]>();
-  const blockByMatchId = new Map<number, PreviewBlock>();
-
-  for (const { court, blocks } of layout.courts) {
-    const previewBlocks = blocks.map((block) => ({
-      courtId: court.id,
-      match: block.match,
-      startMinutes: block.startMinutes,
-    }));
-    blocksByCourtId.set(court.id, previewBlocks);
-    for (const block of previewBlocks) {
-      blockByMatchId.set(block.match.id, block);
-    }
-  }
-
-  return {
-    matchesById,
-    blocksByCourtId,
-    blockByMatchId,
-    defaultBreakMinutes: layout.defaultBreakMinutes,
-    refereesEnabled,
-  };
-}
-
-/**
- * A match queued for a court, paired with the start it would keep if nothing
- * forced it later. Matches that stay put carry their existing start; a match
- * that moves into a slot adopts that slot's start (mirroring the backend, which
- * copies the swapped match's `start_time` or resets a rescheduled one to None).
- */
-interface RescheduleEntry {
-  match: ConflictPreviewMatch;
-  baseStartMinutes: number;
-}
-
-function rescheduleCourt(
-  prepared: PreparedPreview,
-  courtId: number,
-  entries: RescheduleEntry[]
-): PreviewBlock[] {
-  let previousEnd: number | null = null;
-  return entries.map(({ match, baseStartMinutes }) => {
-    let startMinutes = baseStartMinutes;
-    if (previousEnd != null) {
-      startMinutes = Math.max(startMinutes, previousEnd + prepared.defaultBreakMinutes);
-    }
-    const block = { courtId, match, startMinutes };
-    previousEnd = startMinutes + slotLengthMinutes(match);
-    return block;
-  });
-}
-
-/** Existing matches on a court as entries that keep their current starts. */
-function courtEntries(
-  prepared: PreparedPreview,
-  courtId: number,
-  excludeMatchId?: number
-): RescheduleEntry[] {
-  return (prepared.blocksByCourtId.get(courtId) ?? [])
-    .filter((block) => block.match.id !== excludeMatchId)
-    .map((block) => ({ match: block.match, baseStartMinutes: block.startMinutes }));
-}
-
-function blocksConflict(
-  block1: PreviewBlock,
-  block2: PreviewBlock,
-  refereesEnabled: boolean
-): boolean {
-  return (
-    sharesSlot(block1.match, block2.match, refereesEnabled) &&
-    playingMinutesOverlap(
-      block1.startMinutes,
-      slotLengthMinutes(block1.match),
-      block2.startMinutes,
-      slotLengthMinutes(block2.match)
-    )
-  );
-}
-
-function postScheduleBlocks(
-  prepared: PreparedPreview,
-  affectedCourts: Map<number, PreviewBlock[]>
-): PreviewBlock[] {
-  const courtIds = new Set([...prepared.blocksByCourtId.keys(), ...affectedCourts.keys()]);
-  return [...courtIds].flatMap(
-    (courtId) => affectedCourts.get(courtId) ?? prepared.blocksByCourtId.get(courtId) ?? []
-  );
-}
-
-function changedPostBlocks(prepared: PreparedPreview, postBlocks: PreviewBlock[]): PreviewBlock[] {
-  return postBlocks.filter((block) => {
-    const previous = prepared.blockByMatchId.get(block.match.id);
-    return (
-      previous == null ||
-      previous.courtId !== block.courtId ||
-      previous.startMinutes !== block.startMinutes
-    );
-  });
-}
-
-function affectedScheduleCreatesConflict(
-  prepared: PreparedPreview,
-  affectedCourts: Map<number, PreviewBlock[]>
-): boolean {
-  const postBlocks = postScheduleBlocks(prepared, affectedCourts);
-  const changedBlocks = changedPostBlocks(prepared, postBlocks);
-
-  for (const changedBlock of changedBlocks) {
-    for (const block of postBlocks) {
-      if (
-        changedBlock.match.id !== block.match.id &&
-        blocksConflict(changedBlock, block, prepared.refereesEnabled)
-      ) {
+  for (const [matchId, flags] of postFlags) {
+    const before = baseline.get(matchId);
+    for (const key of CONFLICT_FLAG_KEYS) {
+      if (flags[key] && before?.[key] !== true) {
         return true;
       }
     }
   }
-
   return false;
-}
-
-function rescheduleAffectedCourts(
-  prepared: PreparedPreview,
-  action: Extract<PlanningAction, { type: 'reschedule' }>
-): Map<number, PreviewBlock[]> | null {
-  const match = prepared.matchesById.get(action.matchId);
-  if (match == null) return null;
-
-  const { old_court_id, new_court_id, new_position } = action.body;
-  const targetEntries = courtEntries(prepared, new_court_id, match.id);
-  const index = Math.min(Math.max(new_position, 0), targetEntries.length);
-  // The moved match seeds at the tournament start (backend resets start_time to None).
-  const newCourtEntries: RescheduleEntry[] = [
-    ...targetEntries.slice(0, index),
-    { match, baseStartMinutes: 0 },
-    ...targetEntries.slice(index),
-  ];
-  const affectedCourts = new Map<number, PreviewBlock[]>();
-  affectedCourts.set(new_court_id, rescheduleCourt(prepared, new_court_id, newCourtEntries));
-
-  if (old_court_id != null && old_court_id !== new_court_id) {
-    affectedCourts.set(
-      old_court_id,
-      rescheduleCourt(prepared, old_court_id, courtEntries(prepared, old_court_id, match.id))
-    );
-  }
-
-  return affectedCourts;
-}
-
-function swapAffectedCourts(
-  prepared: PreparedPreview,
-  action: Extract<PlanningAction, { type: 'swap' }>
-): Map<number, PreviewBlock[]> | null {
-  const match1 = prepared.matchesById.get(action.matchId1);
-  const match2 = prepared.matchesById.get(action.matchId2);
-  if (match1 == null || match2 == null) return null;
-
-  const block1 = prepared.blockByMatchId.get(match1.id);
-  const block2 = prepared.blockByMatchId.get(match2.id);
-  if (block1 == null && block2 == null) return null;
-
-  const affectedCourts = new Map<number, PreviewBlock[]>();
-
-  if (block1 != null && block2 != null) {
-    // Two scheduled matches trade slots: each adopts the other slot's start.
-    const swapEntry = (block: PreviewBlock): RescheduleEntry => {
-      if (block.match.id === match1.id)
-        return { match: match2, baseStartMinutes: block.startMinutes };
-      if (block.match.id === match2.id)
-        return { match: match1, baseStartMinutes: block.startMinutes };
-      return { match: block.match, baseStartMinutes: block.startMinutes };
-    };
-
-    if (block1.courtId === block2.courtId) {
-      const entries = (prepared.blocksByCourtId.get(block1.courtId) ?? []).map(swapEntry);
-      affectedCourts.set(block1.courtId, rescheduleCourt(prepared, block1.courtId, entries));
-      return affectedCourts;
-    }
-
-    affectedCourts.set(
-      block1.courtId,
-      rescheduleCourt(
-        prepared,
-        block1.courtId,
-        (prepared.blocksByCourtId.get(block1.courtId) ?? []).map(swapEntry)
-      )
-    );
-    affectedCourts.set(
-      block2.courtId,
-      rescheduleCourt(
-        prepared,
-        block2.courtId,
-        (prepared.blocksByCourtId.get(block2.courtId) ?? []).map(swapEntry)
-      )
-    );
-    return affectedCourts;
-  }
-
-  // Mixed swap: the tray match takes over the scheduled match's slot.
-  const scheduledBlock = block1 ?? block2!;
-  const incomingMatch = block1 == null ? match1 : match2;
-  const entries = (prepared.blocksByCourtId.get(scheduledBlock.courtId) ?? []).map(
-    (block): RescheduleEntry =>
-      block.match.id === scheduledBlock.match.id
-        ? { match: incomingMatch, baseStartMinutes: block.startMinutes }
-        : { match: block.match, baseStartMinutes: block.startMinutes }
-  );
-  affectedCourts.set(
-    scheduledBlock.courtId,
-    rescheduleCourt(prepared, scheduledBlock.courtId, entries)
-  );
-  return affectedCourts;
-}
-
-function planningActionCreatesConflict(prepared: PreparedPreview, action: PlanningAction): boolean {
-  let affectedCourts: Map<number, PreviewBlock[]> | null = null;
-
-  switch (action.type) {
-    case 'reschedule':
-      affectedCourts = rescheduleAffectedCourts(prepared, action);
-      break;
-    case 'swap':
-      affectedCourts = swapAffectedCourts(prepared, action);
-      break;
-    default:
-      return false;
-  }
-
-  return affectedCourts != null && affectedScheduleCreatesConflict(prepared, affectedCourts);
 }
 
 export function computeConflictPreview({
   stages,
   layout,
   selection,
-  refereesEnabled = true,
+  tournamentStartTime,
 }: {
-  stages: ConflictPreviewStage[];
-  layout: ScheduleGridLayout<LayoutCourt, ConflictPreviewMatch>;
+  stages: ConflictStage[];
+  layout: ScheduleGridLayout;
   selection: SelectionState;
-  refereesEnabled?: boolean;
+  tournamentStartTime: string | Date;
 }): ConflictPreview {
-  if (selection.kind === 'idle') return emptyPreview();
-  const prepared = preparePreview(stages, layout, selection, refereesEnabled);
-  if (prepared == null) return emptyPreview();
-  const preparedPreview = prepared;
+  if (getSelectedMatchId(selection) == null) return emptyPreview();
 
+  const defaultBreakMinutes = layout.defaultBreakMinutes;
+  const baseline = computeConflictFlags(stages, defaultBreakMinutes);
   const preview = emptyPreview();
 
-  function hasConflict(actions: PlanningAction[]): boolean {
-    return actions.some((action) => planningActionCreatesConflict(preparedPreview, action));
-  }
-
-  function transitionActions(transition: ReturnType<typeof selectionReducer>): PlanningAction[] {
-    if (transition.actions.length > 0) return transition.actions;
-    return transition.state.kind === 'confirm-move' ? [transition.state.action] : [];
-  }
+  const introducesConflict = (actions: PlanningAction[]): boolean =>
+    actionsIntroduceConflict(stages, baseline, defaultBreakMinutes, tournamentStartTime, actions);
 
   for (const { court, blocks } of layout.courts) {
-    const lines: InsertionLine[] = computeInsertionLines(blocks);
-    for (const line of lines) {
+    for (const line of computeInsertionLines(blocks)) {
       const transition = selectionReducer(selection, {
         type: 'tap-insertion-line',
         courtId: court.id,
         index: line.index,
       });
-      if (hasConflict(transitionActions(transition))) {
+      if (introducesConflict(transitionActions(transition))) {
         preview.insertionLines.add(insertionLineKey(court.id, line.index));
       }
     }
@@ -430,13 +124,9 @@ export function computeConflictPreview({
     blocks.forEach((block, blockIndex) => {
       const transition = selectionReducer(selection, {
         type: 'tap-match',
-        match: {
-          matchId: block.match.id,
-          courtId: court.id,
-          position: blockIndex,
-        },
+        match: { matchId: block.match.id, courtId: court.id, position: blockIndex },
       });
-      if (hasConflict(transitionActions(transition))) {
+      if (introducesConflict(transitionActions(transition))) {
         preview.swapTargets.add(block.match.id);
       }
     });

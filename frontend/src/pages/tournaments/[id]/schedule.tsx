@@ -27,7 +27,7 @@ import {
   IconWand,
 } from '@tabler/icons-react';
 import { isAxiosError } from 'axios';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import CourtModal from '@components/modals/create_court_modal';
@@ -36,7 +36,7 @@ import { NoContent } from '@components/no_content/empty_table_info';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import { computeStageItemColours, levelSwatchColour } from '@logic/colors';
-import { computeConflictPreview } from '@logic/planning/conflict_preview';
+import { ConflictPreview, computeConflictPreview } from '@logic/planning/conflict_preview';
 import { stageHighlightOptions } from '@logic/planning/highlight';
 import { computeScheduleLayout } from '@logic/planning/layout';
 import { currentTimeOffsetMinutes } from '@logic/planning/now_line';
@@ -244,6 +244,46 @@ export default function SchedulePage() {
     previousSelectionRef.current = planner.selection;
   }, [planner.selection, refreshSchedule]);
 
+  // The conflict preview simulates every candidate placement against the shared
+  // conflict engine, so it is memoized on the inputs that actually change its
+  // result — the schedule, courts, tournament settings, the active selection and
+  // the zoom level — instead of being recomputed on every unrelated re-render
+  // (e.g. the minute clock tick). At overview zoom placement is disabled, so there
+  // is nothing to preview.
+  const conflictPreview = useMemo<ConflictPreview>(() => {
+    if (
+      planner.zoom === 'overview' ||
+      !responseIsValid(swrStagesResponse) ||
+      !responseIsValid(swrCourtsResponse) ||
+      !responseIsValid(swrTournamentResponse)
+    ) {
+      return { insertionLines: new Set<string>(), swapTargets: new Set<number>() };
+    }
+    const tournamentValue = swrTournamentResponse.data!.data;
+    const courtsValue: Court[] = swrCourtsResponse.data?.data ?? [];
+    const stagesValue: StageWithStageItems[] = swrStagesResponse.data?.data ?? [];
+    const previewLayout = computeScheduleLayout({
+      courts: courtsValue,
+      matchesByCourtId: getMatchLookupByCourt(swrStagesResponse),
+      tournamentStartTime: tournamentValue.start_time,
+      defaultBreakMinutes: tournamentValue.margin_minutes,
+      tickIntervalMinutes: ZOOM_TICK_INTERVAL_MINUTES[planner.zoom],
+    });
+    return computeConflictPreview({
+      stages: stagesValue,
+      layout: previewLayout,
+      selection: planner.selection,
+      tournamentStartTime: tournamentValue.start_time,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    swrStagesResponse.data?.data,
+    swrCourtsResponse.data?.data,
+    swrTournamentResponse.data?.data,
+    planner.selection,
+    planner.zoom,
+  ]);
+
   const stageItemsLookup = responseIsValid(swrStagesResponse)
     ? getStageItemLookup(swrStagesResponse)
     : [];
@@ -418,14 +458,6 @@ export default function SchedulePage() {
   const detailsMatch =
     detailsMatchId != null ? (matchesLookup[detailsMatchId]?.match ?? null) : null;
   const isOverview = planner.zoom === 'overview';
-  const conflictPreview = isOverview
-    ? { insertionLines: new Set<string>(), swapTargets: new Set<number>() }
-    : computeConflictPreview({
-        stages: rawStages,
-        layout,
-        selection: planner.selection,
-        refereesEnabled: tournament.referees_enabled,
-      });
 
   // Pieces of the selection pill, extracted so the mobile (stacked) and desktop
   // (single row) layouts can compose them without duplicating the markup.

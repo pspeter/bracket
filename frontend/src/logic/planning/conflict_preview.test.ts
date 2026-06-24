@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  ConflictPreviewMatch,
-  actionCreatesSelectedConflict,
-  computeConflictPreview,
-  insertionLineKey,
-} from './conflict_preview';
+import { computeConflictPreview, insertionLineKey } from './conflict_preview';
+import { ConflictMatch, ConflictStage } from './conflicts';
 import { computeScheduleLayout } from './layout';
 
 const START = '2026-06-10T09:00:00.000Z';
@@ -23,6 +19,8 @@ function match({
   input2,
   referee = null,
   durationMinutes = 90,
+  winnerFromMatch1 = null,
+  winnerFromMatch2 = null,
 }: {
   id: number;
   courtId: number | null;
@@ -31,165 +29,42 @@ function match({
   input2: number;
   referee?: number | null;
   durationMinutes?: number;
-}): ConflictPreviewMatch {
+  winnerFromMatch1?: number | null;
+  winnerFromMatch2?: number | null;
+}): ConflictMatch {
   return {
     id,
     court_id: courtId,
     start_time: startMinutes == null ? null : minutesAfterStart(startMinutes),
     duration_minutes: durationMinutes,
+    stage_item_input1: null,
+    stage_item_input2: null,
     stage_item_input1_id: input1,
     stage_item_input2_id: input2,
+    stage_item_input1_winner_from_match_id: winnerFromMatch1,
+    stage_item_input2_winner_from_match_id: winnerFromMatch2,
     referee_stage_item_input_id: referee,
+    referee: null,
   };
 }
 
-function stagesWith(matches: ConflictPreviewMatch[]) {
-  return [{ stage_items: [{ rounds: [{ matches }] }] }];
+function stagesWith(matches: ConflictMatch[]): ConflictStage[] {
+  return [
+    {
+      stage_items: [
+        { id: 1, type: 'SINGLE_ELIMINATION', inputs: [], rounds: [{ id: 1, matches }] },
+      ],
+    },
+  ];
 }
-
-describe('actionCreatesSelectedConflict', () => {
-  it('detects a selected-match team overlap after a simulated insertion repacks courts', () => {
-    const stages = stagesWith([
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
-      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
-    ]);
-
-    expect(
-      actionCreatesSelectedConflict({
-        stages,
-        selectedMatchId: 1,
-        tournamentStartTime: START,
-        action: {
-          type: 'reschedule',
-          matchId: 1,
-          body: {
-            old_court_id: 1,
-            old_position: 0,
-            new_court_id: 2,
-            new_position: 0,
-          },
-        },
-      })
-    ).toBe(true);
-  });
-
-  it('applies the default break when repacking, pushing the moved match into a team overlap', () => {
-    // Inserted after match 2, match 1 lands at 20 (end) + 10 break = 30, playing
-    // [30, 50). With no break it would sit at [20, 40) and clear match 3 at [45, 65).
-    const stages = stagesWith([
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, durationMinutes: 20 }),
-      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50, durationMinutes: 20 }),
-      match({ id: 3, courtId: 3, startMinutes: 45, input1: 10, input2: 30, durationMinutes: 20 }),
-    ]);
-
-    expect(
-      actionCreatesSelectedConflict({
-        stages,
-        selectedMatchId: 1,
-        tournamentStartTime: START,
-        defaultBreakMinutes: 10,
-        action: {
-          type: 'reschedule',
-          matchId: 1,
-          body: {
-            old_court_id: 1,
-            old_position: 0,
-            new_court_id: 2,
-            new_position: 1,
-          },
-        },
-      })
-    ).toBe(true);
-  });
-
-  it('detects a conflict when the selected match referees a team that is playing an overlapping match', () => {
-    // Match 1 referees team 60; match 3 plays team 60 at the same time. They share
-    // no playing input, so only the referee slot makes them conflict.
-    const stages = stagesWith([
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
-      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, startMinutes: 0, input1: 60, input2: 30 }),
-    ]);
-
-    expect(
-      actionCreatesSelectedConflict({
-        stages,
-        selectedMatchId: 1,
-        tournamentStartTime: START,
-        action: {
-          type: 'reschedule',
-          matchId: 1,
-          body: {
-            old_court_id: 1,
-            old_position: 0,
-            new_court_id: 2,
-            new_position: 0,
-          },
-        },
-      })
-    ).toBe(true);
-  });
-
-  it('detects a conflict when the selected match referees a team that referees an overlapping match', () => {
-    // Both match 1 and match 3 have team 60 as referee, at the same time.
-    const stages = stagesWith([
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
-      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, startMinutes: 0, input1: 70, input2: 30, referee: 60 }),
-    ]);
-
-    expect(
-      actionCreatesSelectedConflict({
-        stages,
-        selectedMatchId: 1,
-        tournamentStartTime: START,
-        action: {
-          type: 'reschedule',
-          matchId: 1,
-          body: {
-            old_court_id: 1,
-            old_position: 0,
-            new_court_id: 2,
-            new_position: 0,
-          },
-        },
-      })
-    ).toBe(true);
-  });
-
-  it('ignores the referee slot when referees are disabled', () => {
-    const stages = stagesWith([
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, referee: 60 }),
-      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
-      match({ id: 3, courtId: 3, startMinutes: 0, input1: 60, input2: 30 }),
-    ]);
-
-    expect(
-      actionCreatesSelectedConflict({
-        stages,
-        selectedMatchId: 1,
-        tournamentStartTime: START,
-        refereesEnabled: false,
-        action: {
-          type: 'reschedule',
-          matchId: 1,
-          body: {
-            old_court_id: 1,
-            old_position: 0,
-            new_court_id: 2,
-            new_position: 0,
-          },
-        },
-      })
-    ).toBe(false);
-  });
-});
 
 describe('computeConflictPreview', () => {
   it('flags insertion lines that would create a selected-match team overlap', () => {
+    // Match 1 starts at minute 200, so it does not overlap its slot-10 twin (match
+    // 4) where it currently sits; inserting it into court 2 reseeds it to minute 0,
+    // where it would collide with match 4.
     const matches = [
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({ id: 1, courtId: 1, startMinutes: 200, input1: 10, input2: 20 }),
       match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
       match({ id: 3, courtId: 2, startMinutes: PACKED_SLOT_MINUTES, input1: 40, input2: 50 }),
       match({ id: 4, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
@@ -211,6 +86,7 @@ describe('computeConflictPreview', () => {
         kind: 'match-selected',
         match: { matchId: 1, courtId: 1, position: 0 },
       },
+      tournamentStartTime: START,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(2, 0));
@@ -236,6 +112,7 @@ describe('computeConflictPreview', () => {
       stages: stagesWith(matches),
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
+      tournamentStartTime: START,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(1, 0));
@@ -272,10 +149,49 @@ describe('computeConflictPreview', () => {
       stages: stagesWith(matches),
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
+      tournamentStartTime: START,
     });
 
     expect([...preview.insertionLines]).toContain(insertionLineKey(1, 0));
     expect([...preview.insertionLines]).not.toContain(insertionLineKey(1, 2));
+  });
+
+  it('flags insertion lines that would create a winner-of precedence conflict', () => {
+    // Match 2 is fed by match 1's winner. Match 1 plays [0, 90) on court 1. Placed
+    // ahead of court 2's existing match, the dependent reseeds to minute 0 and would
+    // start before its feeder finishes — a precedence conflict the team-overlap-only
+    // preview never saw, since the two share no playing slot.
+    const matches = [
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({
+        id: 2,
+        courtId: null,
+        startMinutes: null,
+        input1: 60,
+        input2: 70,
+        winnerFromMatch1: 1,
+      }),
+      match({ id: 3, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
+    ];
+    const layout = computeScheduleLayout({
+      courts: [
+        { id: 1, name: 'Court 1' },
+        { id: 2, name: 'Court 2' },
+      ],
+      matchesByCourtId: { 1: [matches[0]], 2: [matches[2]] },
+      tournamentStartTime: START,
+      defaultBreakMinutes: 10,
+    });
+
+    const preview = computeConflictPreview({
+      stages: stagesWith(matches),
+      layout,
+      selection: { kind: 'tray-match-selected', matchId: 2 },
+      tournamentStartTime: START,
+    });
+
+    expect([...preview.insertionLines]).toContain(insertionLineKey(2, 0));
+    expect([...preview.insertionLines]).not.toContain(insertionLineKey(2, 1));
   });
 
   it('flags swap targets that would put the selected match into a conflicting slot', () => {
@@ -297,6 +213,7 @@ describe('computeConflictPreview', () => {
       stages: stagesWith(matches),
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
+      tournamentStartTime: START,
     });
 
     expect([...preview.swapTargets]).toContain(2);
@@ -304,8 +221,10 @@ describe('computeConflictPreview', () => {
   });
 
   it('flags scheduled-match swap targets after simulating the traded slots', () => {
+    // Match 1 sits at minute 200, clear of its slot-10 twin (match 3 at minute 0).
+    // Swapping it into match 2's minute-0 slot would drop it onto match 3.
     const matches = [
-      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20 }),
+      match({ id: 1, courtId: 1, startMinutes: 200, input1: 10, input2: 20 }),
       match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 50 }),
       match({ id: 3, courtId: 3, startMinutes: 0, input1: 10, input2: 30 }),
       match({ id: 4, courtId: 2, startMinutes: PACKED_SLOT_MINUTES, input1: 60, input2: 70 }),
@@ -327,6 +246,7 @@ describe('computeConflictPreview', () => {
         kind: 'match-selected',
         match: { matchId: 1, courtId: 1, position: 0 },
       },
+      tournamentStartTime: START,
     });
 
     expect([...preview.swapTargets]).toContain(2);
@@ -363,10 +283,45 @@ describe('computeConflictPreview', () => {
         kind: 'match-selected',
         match: { matchId: 1, courtId: 1, position: 0 },
       },
+      tournamentStartTime: START,
     });
 
     expect([...preview.swapTargets]).toContain(4);
     expect([...preview.swapTargets]).not.toContain(2);
+  });
+
+  it('flags swap targets that would create a short-break conflict', () => {
+    // Court 1 packs match 1 [0, 20) then match 3 [30, 50) — a clean 10-minute break.
+    // Court 2's match 2 runs 40 minutes. Swapping match 2 into match 1's slot lands a
+    // [0, 40) block in front of match 3, leaving a negative break: a short-break
+    // conflict between matches that share no playing slot.
+    const matches = [
+      match({ id: 1, courtId: 1, startMinutes: 0, input1: 10, input2: 20, durationMinutes: 20 }),
+      match({ id: 2, courtId: 2, startMinutes: 0, input1: 40, input2: 41, durationMinutes: 40 }),
+      match({ id: 3, courtId: 1, startMinutes: 30, input1: 30, input2: 31, durationMinutes: 20 }),
+    ];
+    const layout = computeScheduleLayout({
+      courts: [
+        { id: 1, name: 'Court 1' },
+        { id: 2, name: 'Court 2' },
+      ],
+      matchesByCourtId: { 1: [matches[0], matches[2]], 2: [matches[1]] },
+      tournamentStartTime: START,
+      defaultBreakMinutes: 10,
+    });
+
+    const preview = computeConflictPreview({
+      stages: stagesWith(matches),
+      layout,
+      selection: {
+        kind: 'match-selected',
+        match: { matchId: 1, courtId: 1, position: 0 },
+      },
+      tournamentStartTime: START,
+    });
+
+    expect([...preview.swapTargets]).toContain(2);
+    expect([...preview.swapTargets]).not.toContain(3);
   });
 
   it('flags a swap target whose slot would double-book the selected match referee', () => {
@@ -391,7 +346,7 @@ describe('computeConflictPreview', () => {
       stages: stagesWith(matches),
       layout,
       selection: { kind: 'tray-match-selected', matchId: 1 },
-      refereesEnabled: true,
+      tournamentStartTime: START,
     });
 
     expect([...preview.swapTargets]).toContain(2);
