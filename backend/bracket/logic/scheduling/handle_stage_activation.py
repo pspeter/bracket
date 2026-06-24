@@ -205,6 +205,38 @@ async def _resolve_round_1_for_swiss_stage_item(
     )
 
 
+async def try_resolve_first_swiss_round_in_active_stage(
+    tournament_id: TournamentId,
+    stage_item: StageItemWithRounds,
+) -> None:
+    """Resolve round 1 of a Swiss stage item without waiting for stage activation.
+
+    Round 1 of a Swiss stage item is normally resolved when its stage is activated. A Swiss
+    stage item created inside an already-active stage would never get that hook again, so this
+    resolves round 1 as soon as every input has a concrete team assigned. It is a no-op unless
+    round 1 is still a placeholder, which keeps it safe to call repeatedly (e.g. once per team
+    assignment). Callers must only invoke this for stage items in an active stage.
+
+    Only round 1 is pre-resolved today; later rounds are resolved sequentially as matches
+    complete. If we ever want to pre-resolve more than one round up front, this is the place to
+    extend (the skeleton already defines slot pairings for every round).
+    """
+    if stage_item.type is not StageType.SWISS:
+        return
+
+    # All inputs must reference concrete teams before we can pair round 1.
+    if not stage_item.inputs or not all(
+        isinstance(input_, StageItemInputFinal) for input_ in stage_item.inputs
+    ):
+        return
+
+    first_round = min(stage_item.rounds, key=lambda round_: round_.id, default=None)
+    if first_round is None or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER:
+        return
+
+    await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+
+
 async def update_matches_in_activated_stage(tournament_id: TournamentId, stage_id: StageId) -> None:
     """
     Sets the team_id for stage item inputs of the newly activated stage.
