@@ -163,12 +163,16 @@ async def _resolve_round_1_for_swiss_stage_item(
     stage_item: StageItemWithRounds,
 ) -> None:
     """Fill in concrete team assignments for round 1 of a Swiss stage item."""
-    placeholder_round = next(
-        (r for r in stage_item.rounds if r.lifecycle_state == RoundLifecycleState.PLACEHOLDER),
-        None,
-    )
-    if placeholder_round is None:
+    # Round 1 is the lowest-id round. Resolve that specific round rather than the first
+    # placeholder in iteration order: the rounds can arrive in any order, so picking the first
+    # placeholder could resolve a later round (leaving the real round 1 a placeholder that shows
+    # TBD), and — once round 1 is resolved — could even mistake round 2 for round 1 and pair it
+    # with round-1 logic. If the first round is already resolved, there is nothing to do here.
+    first_round = min(stage_item.rounds, key=lambda round_: round_.id, default=None)
+    if first_round is None or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER:
         return
+
+    placeholder_round = first_round
 
     inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
     if not inputs:

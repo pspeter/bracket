@@ -22,6 +22,16 @@ class RoundWithMatches(Round):
             return []
         return values
 
+    @field_validator("matches", mode="after")
+    @staticmethod
+    def sort_matches_by_id(
+        values: list[MatchWithDetailsDefinitive | MatchWithDetails],
+    ) -> list[MatchWithDetailsDefinitive | MatchWithDetails]:
+        # Guarantee a stable, deterministic match order (by id, i.e. creation order) regardless of
+        # how the database happened to aggregate them. The SQL already orders these, but this keeps
+        # the contract from silently regressing if that query is ever changed.
+        return sorted(values, key=lambda match: match.id)
+
 
 class StageItemWithRounds(StageItem):
     rounds: list[RoundWithMatches]
@@ -45,6 +55,15 @@ class StageItemWithRounds(StageItem):
         if values is None:
             return []
         return [value for value in values if value is not None]
+
+    @field_validator("rounds", mode="after")
+    @staticmethod
+    def sort_rounds_by_id(values: list[RoundWithMatches]) -> list[RoundWithMatches]:
+        # Guarantee a stable, deterministic round order (by id, i.e. round 1, 2, 3 …) regardless of
+        # how the database aggregated them. The SQL already orders these, but this keeps the
+        # contract from silently regressing if that query is ever changed, and ensures round-1
+        # logic (e.g. Swiss resolution) always sees the real round 1 first.
+        return sorted(values, key=lambda round_: round_.id)
 
 
 class StageWithStageItems(Stage):
