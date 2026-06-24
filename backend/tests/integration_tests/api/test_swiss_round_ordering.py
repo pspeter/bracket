@@ -139,6 +139,89 @@ async def test_rounds_and_matches_returned_in_id_order_after_heap_reuse(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_inactive_stage_resolves_round_1_when_all_slots_filled(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Round 1 of a Swiss stage item resolves as soon as all of its slots are filled — it does
+    not wait for the stage to be activated. So a resolved round 1 shows its real matchups instead
+    of TBD even in a not-yet-activated stage."""
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+        ) as stage_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t3,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t4,
+    ):
+        assert (
+            await send_tournament_request(
+                HTTPMethod.POST,
+                "stage_items",
+                auth_context,
+                json={
+                    "type": StageType.SWISS.value,
+                    "team_count": 4,
+                    "stage_id": stage_inserted.id,
+                    "games_per_player": 3,
+                },
+            )
+            == SUCCESS_RESPONSE
+        )
+
+        try:
+            stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
+            inputs_sorted = sorted(stage_item.inputs, key=lambda input_: input_.slot)
+            teams = [t1, t2, t3, t4]
+
+            # While a slot is still empty, round 1 stays a placeholder.
+            for input_, team in zip(inputs_sorted[:-1], teams[:-1]):
+                assert (
+                    await send_tournament_request(
+                        HTTPMethod.PUT,
+                        f"stage_items/{stage_item.id}/inputs/{input_.id}",
+                        auth_context,
+                        json={"team_id": team.id},
+                    )
+                    == SUCCESS_RESPONSE
+                )
+
+            stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
+            first_round = min(stage_item.rounds, key=lambda round_: round_.id)
+            assert first_round.lifecycle_state == RoundLifecycleState.PLACEHOLDER
+
+            # Filling the last slot resolves round 1 — even though the stage is still inactive.
+            assert (
+                await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"stage_items/{stage_item.id}/inputs/{inputs_sorted[-1].id}",
+                    auth_context,
+                    json={"team_id": teams[-1].id},
+                )
+                == SUCCESS_RESPONSE
+            )
+
+            stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
+            rounds_sorted = sorted(stage_item.rounds, key=lambda round_: round_.id)
+
+            # The real round 1 (lowest id) is resolved with concrete inputs; later rounds wait.
+            assert rounds_sorted[0].lifecycle_state == RoundLifecycleState.RESOLVED
+            for match in rounds_sorted[0].matches:
+                assert match.stage_item_input1_id is not None
+                assert match.stage_item_input2_id is not None
+            for round_ in rounds_sorted[1:]:
+                assert round_.lifecycle_state == RoundLifecycleState.PLACEHOLDER
+        finally:
+            await assert_row_count_and_clear(matches, 0)
+            await assert_row_count_and_clear(rounds, 0)
+            await assert_row_count_and_clear(stage_item_inputs, 0)
+            await assert_row_count_and_clear(stage_items, 0)
+            await assert_row_count_and_clear(stages, 0)
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_resolve_round_1_targets_lowest_id_round_regardless_of_order(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
@@ -176,17 +259,14 @@ async def test_resolve_round_1_targets_lowest_id_round_regardless_of_order(
             stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
             inputs_sorted = sorted(stage_item.inputs, key=lambda input_: input_.slot)
 
-            # Assign every team. The stage is inactive, so this does not auto-resolve round 1;
-            # every round stays a placeholder with concrete (Final) inputs.
+            # Assign every team directly in SQL so the route's auto-resolve does not fire: this
+            # leaves every round a placeholder with concrete (Final) inputs, which is the state in
+            # which round-1 resolution then has to pick the right round.
             for input_, team in zip(inputs_sorted, [t1, t2, t3, t4]):
-                assert (
-                    await send_tournament_request(
-                        HTTPMethod.PUT,
-                        f"stage_items/{stage_item.id}/inputs/{input_.id}",
-                        auth_context,
-                        json={"team_id": team.id},
-                    )
-                    == SUCCESS_RESPONSE
+                await database.execute(
+                    stage_item_inputs.update()
+                    .where(stage_item_inputs.c.id == input_.id)
+                    .values(team_id=team.id)
                 )
 
             stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
