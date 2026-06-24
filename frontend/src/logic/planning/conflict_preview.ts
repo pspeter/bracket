@@ -71,12 +71,13 @@ function actionsIntroduceConflict(
   baseline: Map<number, ConflictFlags>,
   defaultBreakMinutes: number,
   tournamentStartTime: string | Date,
+  refereesEnabled: boolean,
   actions: PlanningAction[]
 ): boolean {
   if (actions.length === 0) return false;
 
   const simulated = applyPlanningActions(stages, actions, tournamentStartTime, defaultBreakMinutes);
-  const postFlags = computeConflictFlags(simulated, defaultBreakMinutes);
+  const postFlags = computeConflictFlags(simulated, defaultBreakMinutes, { refereesEnabled });
 
   for (const [matchId, flags] of postFlags) {
     const before = baseline.get(matchId);
@@ -94,20 +95,29 @@ export function computeConflictPreview({
   layout,
   selection,
   tournamentStartTime,
+  refereesEnabled,
 }: {
   stages: ConflictStage[];
   layout: ScheduleGridLayout;
   selection: SelectionState;
   tournamentStartTime: string | Date;
+  refereesEnabled: boolean;
 }): ConflictPreview {
   if (getSelectedMatchId(selection) == null) return emptyPreview();
 
   const defaultBreakMinutes = layout.defaultBreakMinutes;
-  const baseline = computeConflictFlags(stages, defaultBreakMinutes);
+  const baseline = computeConflictFlags(stages, defaultBreakMinutes, { refereesEnabled });
   const preview = emptyPreview();
 
   const introducesConflict = (actions: PlanningAction[]): boolean =>
-    actionsIntroduceConflict(stages, baseline, defaultBreakMinutes, tournamentStartTime, actions);
+    actionsIntroduceConflict(
+      stages,
+      baseline,
+      defaultBreakMinutes,
+      tournamentStartTime,
+      refereesEnabled,
+      actions
+    );
 
   for (const { court, blocks } of layout.courts) {
     for (const line of computeInsertionLines(blocks)) {

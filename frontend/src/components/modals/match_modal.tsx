@@ -287,8 +287,9 @@ function MatchModalForm({
   // an optimistic move — instead of reading the backend-persisted columns.
   const marginMinutes = swrTournamentResponse.data?.data.margin_minutes ?? 0;
   const conflictFlags = useMemo(
-    () => computeConflictFlags(swrStagesResponse.data?.data ?? [], marginMinutes),
-    [swrStagesResponse.data?.data, marginMinutes]
+    () =>
+      computeConflictFlags(swrStagesResponse.data?.data ?? [], marginMinutes, { refereesEnabled }),
+    [swrStagesResponse.data?.data, marginMinutes, refereesEnabled]
   );
   const conflicts = conflictFlags.get(match.id);
 

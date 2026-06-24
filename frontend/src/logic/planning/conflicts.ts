@@ -2,7 +2,7 @@
  * Client-side conflict engine: a faithful 1:1 port of the backend
  * `bracket/logic/planning/conflicts.py`.
  *
- * `computeConflictFlags(stages, defaultBreakMinutes, matchesOfInterest)` returns a
+ * `computeConflictFlags(stages, defaultBreakMinutes, options)` returns a
  * `Map<matchId, ConflictFlags>` covering every conflict type the backend persists:
  *
  *   - team double-booking (`stage_item_input{1,2}_conflict`), flagged two ways: a
@@ -521,7 +521,11 @@ function flagSlotOccupancy(occupancy: SlotOccupancy, flags: Map<number, Conflict
  * slots too — a slot that isn't yet resolved to a concrete team is still a resource
  * that cannot play and/or referee two overlapping matches.
  */
-function setSlotOverlapConflicts(stages: ConflictStage[], flags: Map<number, ConflictFlags>): void {
+function setSlotOverlapConflicts(
+  stages: ConflictStage[],
+  flags: Map<number, ConflictFlags>,
+  refereesEnabled: boolean
+): void {
   const occupanciesBySlot = new Map<number, SlotOccupancy[]>();
   for (const match of getAllMatches(stages)) {
     const start = startMillis(match);
@@ -531,8 +535,12 @@ function setSlotOverlapConflicts(stages: ConflictStage[], flags: Map<number, Con
     const slots: [number | null, 1 | 2 | null][] = [
       [match.stage_item_input1_id, 1],
       [match.stage_item_input2_id, 2],
-      [match.referee_stage_item_input_id, null],
     ];
+    // When referees are disabled for the tournament, the referee slot is not a conflict
+    // resource, so it is excluded from the overlap pass (matching the team-backed pass).
+    if (refereesEnabled) {
+      slots.push([match.referee_stage_item_input_id, null]);
+    }
     for (const [slotId, playingSide] of slots) {
       if (slotId == null) {
         continue;
@@ -612,17 +620,36 @@ function setRoundOrderConflicts(stages: ConflictStage[], flags: Map<number, Conf
   }
 }
 
+export interface ComputeConflictFlagsOptions {
+  /**
+   * Restrict the returned map to these match ids. Conflicts are relational, so they are
+   * always computed over the whole schedule; only the returned map is narrowed. Defaults
+   * to every match.
+   */
+  matchesOfInterest?: 'all' | ReadonlySet<number>;
+  /**
+   * Mirrors the tournament's `referees_enabled` toggle. When false, referee slots are not
+   * treated as a conflict resource: referee double-booking is skipped in both the
+   * team-backed pass (`setRefereeOverlapConflicts`) and the referee-slot pass
+   * (`setSlotOverlapConflicts`). Defaults to true.
+   */
+  refereesEnabled?: boolean;
+}
+
 export function computeConflictFlags(
   stages: ConflictStage[],
   defaultBreakMinutes: number,
-  matchesOfInterest: 'all' | ReadonlySet<number> = 'all'
+  options: ComputeConflictFlagsOptions = {}
 ): Map<number, ConflictFlags> {
+  const { matchesOfInterest = 'all', refereesEnabled = true } = options;
   const matches = getAllMatches(stages);
   const flags = new Map<number, ConflictFlags>(matches.map((match) => [match.id, emptyFlags()]));
 
   setTeamOverlapConflicts(stages, flags);
-  setRefereeOverlapConflicts(stages, flags);
-  setSlotOverlapConflicts(stages, flags);
+  if (refereesEnabled) {
+    setRefereeOverlapConflicts(stages, flags);
+  }
+  setSlotOverlapConflicts(stages, flags, refereesEnabled);
   setWinnerOfPrecedenceConflicts(matches, flags);
   setCrossStagePrecedenceConflicts(stages, flags);
   setCrossStageFeederPrecedenceConflicts(stages, flags);

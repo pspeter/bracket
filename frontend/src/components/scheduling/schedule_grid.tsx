@@ -996,8 +996,8 @@ export default function ScheduleGrid({
   // they update the instant a drag/swap repacks the grid — no server round-trip. The
   // backend still persists the conflict columns, but they are ignored here.
   const conflictFlags = useMemo(
-    () => computeConflictFlags(stages, layout.defaultBreakMinutes),
-    [stages, layout.defaultBreakMinutes]
+    () => computeConflictFlags(stages, layout.defaultBreakMinutes, { refereesEnabled }),
+    [stages, layout.defaultBreakMinutes, refereesEnabled]
   );
   const gridHeight = layout.totalMinutes * pxPerMinute;
   // On phones an anchored break popover can open off-screen, so the editor

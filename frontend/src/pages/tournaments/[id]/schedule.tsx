@@ -274,6 +274,7 @@ export default function SchedulePage() {
       layout: previewLayout,
       selection: planner.selection,
       tournamentStartTime: tournamentValue.start_time,
+      refereesEnabled: tournamentValue.referees_enabled,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
