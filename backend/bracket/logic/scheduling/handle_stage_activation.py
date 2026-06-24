@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from starlette import status
 
+from bracket.database import database
 from bracket.logic.ranking.calculation import (
     determine_team_ranking_for_stage_item,
 )
@@ -31,6 +32,7 @@ from bracket.sql.stage_item_inputs import (
     get_stage_item_input_by_id,
     sql_set_team_id_for_stage_item_input,
 )
+from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.id_types import (
     StageId,
@@ -207,7 +209,7 @@ async def _resolve_round_1_for_swiss_stage_item(
 
 async def try_resolve_first_swiss_round_in_active_stage(
     tournament_id: TournamentId,
-    stage_item: StageItemWithRounds,
+    stage_item_id: StageItemId,
 ) -> None:
     """Resolve round 1 of a Swiss stage item without waiting for stage activation.
 
@@ -217,24 +219,39 @@ async def try_resolve_first_swiss_round_in_active_stage(
     round 1 is still a placeholder, which keeps it safe to call repeatedly (e.g. once per team
     assignment). Callers must only invoke this for stage items in an active stage.
 
+    The whole check-and-resolve runs under a transaction-scoped advisory lock keyed on the
+    stage item, so concurrent team assignments (e.g. the parallel "auto-assign teams" feature)
+    serialize: the first caller resolves round 1, the rest observe it is no longer a placeholder
+    and return. This prevents two callers from interleaving their slot writes.
+
     Only round 1 is pre-resolved today; later rounds are resolved sequentially as matches
     complete. If we ever want to pre-resolve more than one round up front, this is the place to
     extend (the skeleton already defines slot pairings for every round).
     """
-    if stage_item.type is not StageType.SWISS:
-        return
+    async with database.transaction():
+        await database.execute(
+            query="SELECT pg_advisory_xact_lock(:lock_key)",
+            values={"lock_key": int(stage_item_id)},
+        )
 
-    # All inputs must reference concrete teams before we can pair round 1.
-    if not stage_item.inputs or not all(
-        isinstance(input_, StageItemInputFinal) for input_ in stage_item.inputs
-    ):
-        return
+        stage_item = await get_stage_item(tournament_id, stage_item_id)
+        if stage_item.type is not StageType.SWISS:
+            return
 
-    first_round = min(stage_item.rounds, key=lambda round_: round_.id, default=None)
-    if first_round is None or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER:
-        return
+        # All inputs must reference concrete teams before we can pair round 1.
+        if not stage_item.inputs or not all(
+            isinstance(input_, StageItemInputFinal) for input_ in stage_item.inputs
+        ):
+            return
 
-    await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+        first_round = min(stage_item.rounds, key=lambda round_: round_.id, default=None)
+        if (
+            first_round is None
+            or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER
+        ):
+            return
+
+        await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
 
 
 async def update_matches_in_activated_stage(tournament_id: TournamentId, stage_id: StageId) -> None:

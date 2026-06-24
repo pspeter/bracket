@@ -21,7 +21,6 @@ from bracket.routes.auth import (
 from bracket.routes.models import SuccessResponse
 from bracket.routes.util import disallow_archived_tournament, stage_item_dependency
 from bracket.sql.stage_item_inputs import get_stage_item_input_by_id
-from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.teams import get_team_by_id
 from bracket.utils.errors import (
@@ -135,7 +134,6 @@ async def update_stage_item_input(
     # A Swiss stage item added to an already-active stage misses the stage-activation hook that
     # resolves round 1, so resolve it here once all of its teams have been assigned.
     if target_stage.is_active:
-        updated_stage_item = await get_stage_item(tournament_id, stage_item_id)
-        await try_resolve_first_swiss_round_in_active_stage(tournament_id, updated_stage_item)
+        await try_resolve_first_swiss_round_in_active_stage(tournament_id, stage_item_id)
 
     return SuccessResponse()
