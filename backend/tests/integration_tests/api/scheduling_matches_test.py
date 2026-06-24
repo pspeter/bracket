@@ -140,7 +140,13 @@ async def test_schedule_all_matches(
 
     assert response == SUCCESS_RESPONSE
 
-    stage_item = stages[0].stage_items[0]
+    # Look the stage item up by id rather than indexing into stages[0].stage_items[0]:
+    # get_full_tournament_details aggregates stage items with array_agg, whose order is
+    # not guaranteed, so a positional index intermittently returned the sibling 1-round
+    # single-elimination item instead of this 3-round round-robin one (issue #182).
+    stage_item = next(
+        item for stage in stages for item in stage.stage_items if item.id == stage_item_1.id
+    )
     assert len(stage_item.rounds) == 3
     for round_ in stage_item.rounds:
         assert len(round_.matches) == 2
