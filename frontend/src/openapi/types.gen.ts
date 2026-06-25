@@ -954,7 +954,7 @@ export type RankingMatchPointsBody = {
   /**
    * Position
    */
-  position: number;
+  position: number | null;
   /**
    * Scoring Type
    */
@@ -1010,7 +1010,7 @@ export type RankingSetPointsBody = {
   /**
    * Position
    */
-  position: number;
+  position: number | null;
   /**
    * Scoring Type
    */
@@ -1048,7 +1048,7 @@ export type RankingSetPointsWithMatchBonusBody = {
   /**
    * Position
    */
-  position: number;
+  position: number | null;
   /**
    * Scoring Type
    */

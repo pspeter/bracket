@@ -180,6 +180,37 @@ async def test_update_ranking_changes_scoring_type(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_preserves_position_when_omitted(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A PUT without `position` keeps the existing position instead of resetting it to 0."""
+    base_body = {
+        "scoring_type": "MATCH_POINTS",
+        "win_points": "1.0",
+        "draw_points": "0.5",
+        "loss_points": "0.0",
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        # First set an explicit non-zero position
+        await send_tournament_request(
+            HTTPMethod.PUT,
+            f"rankings/{ranking_inserted.id}",
+            auth_context,
+            json={**base_body, "position": 7},
+        )
+        # Now update again without sending a position
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=base_body
+        )
+        assert response["success"] is True
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.position == 7
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_update_ranking_side_switch(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

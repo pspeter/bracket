@@ -1944,9 +1944,15 @@
             "type": "integer"
           },
           "position": {
-            "default": 0,
-            "title": "Position",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "scoring_type": {
             "const": "MATCH_POINTS",
@@ -2049,9 +2055,15 @@
             "type": "integer"
           },
           "position": {
-            "default": 0,
-            "title": "Position",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "scoring_type": {
             "const": "SET_POINTS",
@@ -2125,9 +2137,15 @@
             "type": "integer"
           },
           "position": {
-            "default": 0,
-            "title": "Position",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "scoring_type": {
             "const": "SET_POINTS_WITH_MATCH_BONUS",

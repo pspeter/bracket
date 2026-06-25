@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from databases.interfaces import Record
+
 from bracket.database import database
 from bracket.models.db.ranking import (
     Ranking,
@@ -27,8 +29,8 @@ _RANKING_SELECT = """
 """
 
 
-def _row_to_ranking(row: object) -> Ranking:
-    m = dict(row._mapping)  # type: ignore[union-attr]
+def _row_to_ranking(row: Record) -> Ranking:
+    m = dict(row._mapping)
     match_points = None
     if m.get("mp_win_points") is not None:
         match_points = RankingMatchPointsData(
@@ -162,7 +164,7 @@ async def sql_update_ranking(
     await database.execute(
         query="""
             UPDATE rankings
-            SET position = :position,
+            SET position = COALESCE(:position, position),
                 scoring_type = :scoring_type,
                 num_sets = :num_sets,
                 max_points = :max_points,

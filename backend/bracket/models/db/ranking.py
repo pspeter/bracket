@@ -62,7 +62,7 @@ class RankingMatchPointsBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
-    position: int = 0
+    position: int | None = None
     side_switch_every_n_points: int | None = None
 
 
@@ -72,7 +72,7 @@ class RankingSetPointsBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
-    position: int = 0
+    position: int | None = None
     side_switch_every_n_points: int | None = None
 
 
@@ -83,7 +83,7 @@ class RankingSetPointsWithMatchBonusBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
-    position: int = 0
+    position: int | None = None
     side_switch_every_n_points: int | None = None
 
 

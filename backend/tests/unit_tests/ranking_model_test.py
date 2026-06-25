@@ -169,7 +169,7 @@ def test_migration_redesign_exists_and_chains_from_side_switch() -> None:
     spec = importlib.util.spec_from_file_location("migration", path)
     assert spec is not None and spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)  # type: ignore[attr-defined]
+    spec.loader.exec_module(migration)
     assert migration.down_revision == "d3b8f1c4e2a9"
     assert callable(migration.upgrade)
     assert callable(migration.downgrade)
