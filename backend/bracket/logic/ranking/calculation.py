@@ -32,18 +32,25 @@ def set_statistics_for_stage_item_input(
 
     if has_won:
         stats[stage_item_input_id].wins += 1
-        swiss_score_diff = ranking.win_points
+        if ranking.match_points is not None:
+            swiss_score_diff = ranking.match_points.win_points
+        else:
+            # TODO: Issue 5 — implement set-points win logic
+            swiss_score_diff = Decimal("1.0")
     elif was_draw:
         stats[stage_item_input_id].draws += 1
-        swiss_score_diff = ranking.draw_points
+        if ranking.match_points is not None:
+            swiss_score_diff = ranking.match_points.draw_points
+        else:
+            # TODO: Issue 5 — implement set-points draw logic
+            swiss_score_diff = Decimal("0.5")
     else:
         stats[stage_item_input_id].losses += 1
-        swiss_score_diff = ranking.loss_points
-
-    if ranking.add_score_points:
-        swiss_score_diff += (
-            match.stage_item_input1_score if is_team1 else match.stage_item_input2_score
-        )
+        if ranking.match_points is not None:
+            swiss_score_diff = ranking.match_points.loss_points
+        else:
+            # TODO: Issue 5 — implement set-points loss logic
+            swiss_score_diff = Decimal("0.0")
 
     match stage_item.type:
         case StageType.ROUND_ROBIN | StageType.SINGLE_ELIMINATION:

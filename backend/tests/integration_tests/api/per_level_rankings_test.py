@@ -171,7 +171,9 @@ async def test_extra_tournament_wide_ranking_can_be_assigned_to_leveled_stage_it
 
     temp_context = auth_context.model_copy(update={"tournament": tournament})
     assert (
-        await send_tournament_request(HTTPMethod.POST, "rankings", temp_context, json={})
+        await send_tournament_request(
+            HTTPMethod.POST, "rankings", temp_context, json={"scoring_type": "MATCH_POINTS"}
+        )
         == SUCCESS_RESPONSE
     )
 

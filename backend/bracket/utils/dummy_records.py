@@ -1,4 +1,3 @@
-from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from heliclockter import datetime_utc
@@ -10,7 +9,7 @@ from bracket.models.db.level import LevelInsertable
 from bracket.models.db.match import MatchInsertable, MatchState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
-from bracket.models.db.ranking import RankingInsertable
+from bracket.models.db.ranking import RankingBase
 from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.stage import StageInsertable
 from bracket.models.db.stage_item import StageItemInsertable, StageType
@@ -259,11 +258,7 @@ DUMMY_COURT2 = CourtInsertable(
     tournament_id=TournamentId(DB_PLACEHOLDER_ID),
 )
 
-DUMMY_RANKING1 = RankingInsertable(
+DUMMY_RANKING1 = RankingBase(
     tournament_id=TournamentId(DB_PLACEHOLDER_ID),
-    win_points=Decimal("1.0"),
-    draw_points=Decimal("0.5"),
-    loss_points=Decimal("0.0"),
-    add_score_points=False,
     position=0,
 )

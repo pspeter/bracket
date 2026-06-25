@@ -883,33 +883,36 @@ export type PlayersResponse = {
  */
 export type Ranking = {
   /**
-   * Add Score Points
-   */
-  add_score_points: boolean;
-  /**
    * Created
    */
   created: string;
-  /**
-   * Draw Points
-   */
-  draw_points: string;
   /**
    * Id
    */
   id: number;
   /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
    * Level Id
    */
   level_id: number | null;
+  match_points: RankingMatchPointsData | null;
   /**
-   * Loss Points
+   * Max Points
    */
-  loss_points: string;
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
   /**
    * Position
    */
   position: number;
+  scoring_type: ScoringType;
+  set_points_with_bonus: RankingSetPointsWithMatchBonusData | null;
   /**
    * Side Switch Every N Points
    */
@@ -919,65 +922,155 @@ export type Ranking = {
    */
   tournament_id: number;
   /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
+};
+
+/**
+ * RankingMatchPointsBody
+ */
+export type RankingMatchPointsBody = {
+  /**
+   * Draw Points
+   */
+  draw_points: number | string;
+  /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
+   * Loss Points
+   */
+  loss_points: number | string;
+  /**
+   * Max Points
+   */
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
+  /**
+   * Position
+   */
+  position: number;
+  /**
+   * Scoring Type
+   */
+  scoring_type: 'MATCH_POINTS';
+  /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
+  /**
+   * Win Points
+   */
+  win_points: number | string;
+};
+
+/**
+ * RankingMatchPointsData
+ */
+export type RankingMatchPointsData = {
+  /**
+   * Draw Points
+   */
+  draw_points: string;
+  /**
+   * Loss Points
+   */
+  loss_points: string;
+  /**
    * Win Points
    */
   win_points: string;
 };
 
 /**
- * RankingBody
+ * RankingSetPointsBody
  */
-export type RankingBody = {
+export type RankingSetPointsBody = {
   /**
-   * Add Score Points
+   * Last Set Max Points
    */
-  add_score_points: boolean;
+  last_set_max_points: number | null;
   /**
-   * Draw Points
+   * Max Points
    */
-  draw_points: number | string;
+  max_points: number;
   /**
-   * Loss Points
+   * Num Sets
    */
-  loss_points: number | string;
+  num_sets: number;
   /**
    * Position
    */
   position: number;
   /**
+   * Scoring Type
+   */
+  scoring_type: 'SET_POINTS';
+  /**
    * Side Switch Every N Points
    */
   side_switch_every_n_points: number | null;
   /**
-   * Win Points
+   * Two Point Advantage
    */
-  win_points: number | string;
+  two_point_advantage: boolean;
 };
 
 /**
- * RankingCreateBody
+ * RankingSetPointsWithMatchBonusBody
  */
-export type RankingCreateBody = {
+export type RankingSetPointsWithMatchBonusBody = {
   /**
-   * Add Score Points
+   * Last Set Max Points
    */
-  add_score_points: boolean;
+  last_set_max_points: number | null;
   /**
-   * Draw Points
+   * Match Bonus Points
    */
-  draw_points: number | string;
+  match_bonus_points: number | string;
   /**
-   * Loss Points
+   * Max Points
    */
-  loss_points: number | string;
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
+  /**
+   * Position
+   */
+  position: number;
+  /**
+   * Scoring Type
+   */
+  scoring_type: 'SET_POINTS_WITH_MATCH_BONUS';
   /**
    * Side Switch Every N Points
    */
   side_switch_every_n_points: number | null;
   /**
-   * Win Points
+   * Two Point Advantage
    */
-  win_points: number | string;
+  two_point_advantage: boolean;
+};
+
+/**
+ * RankingSetPointsWithMatchBonusData
+ */
+export type RankingSetPointsWithMatchBonusData = {
+  /**
+   * Match Bonus Points
+   */
+  match_bonus_points: string;
 };
 
 /**
@@ -1147,6 +1240,11 @@ export type ScoreTrackingInfoResponse = {
 export type ScoreTrackingMatchResponse = {
   data: MatchWithDetails;
 };
+
+/**
+ * ScoringType
+ */
+export type ScoringType = 'MATCH_POINTS' | 'SET_POINTS' | 'SET_POINTS_WITH_MATCH_BONUS';
 
 /**
  * SignupBody
@@ -3578,7 +3676,19 @@ export type GetRankingsTournamentsTournamentIdRankingsGetResponse =
   GetRankingsTournamentsTournamentIdRankingsGetResponses[keyof GetRankingsTournamentsTournamentIdRankingsGetResponses];
 
 export type CreateRankingTournamentsTournamentIdRankingsPostData = {
-  body: RankingCreateBody;
+  /**
+   * Ranking Body
+   */
+  body:
+    | ({
+        scoring_type: 'MATCH_POINTS';
+      } & RankingMatchPointsBody)
+    | ({
+        scoring_type: 'SET_POINTS';
+      } & RankingSetPointsBody)
+    | ({
+        scoring_type: 'SET_POINTS_WITH_MATCH_BONUS';
+      } & RankingSetPointsWithMatchBonusBody);
   path: {
     /**
      * Tournament Id
@@ -3646,7 +3756,19 @@ export type DeleteRankingTournamentsTournamentIdRankingsRankingIdDeleteResponse 
   DeleteRankingTournamentsTournamentIdRankingsRankingIdDeleteResponses[keyof DeleteRankingTournamentsTournamentIdRankingsRankingIdDeleteResponses];
 
 export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutData = {
-  body: RankingBody;
+  /**
+   * Ranking Body
+   */
+  body:
+    | ({
+        scoring_type: 'MATCH_POINTS';
+      } & RankingMatchPointsBody)
+    | ({
+        scoring_type: 'SET_POINTS';
+      } & RankingSetPointsBody)
+    | ({
+        scoring_type: 'SET_POINTS_WITH_MATCH_BONUS';
+      } & RankingSetPointsWithMatchBonusBody);
   path: {
     /**
      * Tournament Id
