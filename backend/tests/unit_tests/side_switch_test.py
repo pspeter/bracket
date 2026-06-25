@@ -1,8 +1,10 @@
+from typing import Any
+
 from bracket.models.db.ranking import RankingInsertable, RankingMatchPointsBody
 from bracket.utils.id_types import TournamentId
 
 
-def _base_insertable(**overrides: object) -> RankingInsertable:
+def _base_insertable(**overrides: Any) -> RankingInsertable:
     return RankingInsertable(
         tournament_id=TournamentId(-1),
         position=0,
@@ -101,7 +103,7 @@ def test_migration_revision_and_chain() -> None:
     spec = importlib.util.spec_from_file_location("migration", path)
     assert spec is not None and spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)  # type: ignore[attr-defined]
+    spec.loader.exec_module(migration)
     assert migration.revision == "c2e4f9a1b7d3"
     assert migration.down_revision == "a2c4e6f8b1d3"
     assert callable(migration.upgrade)

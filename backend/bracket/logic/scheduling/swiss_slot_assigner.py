@@ -1,6 +1,7 @@
 """Pure pair→slot assigner for Swiss round resolution (issue #152)."""
 
 import itertools
+from collections.abc import Sequence
 
 from bracket.logic.scheduling.swiss_skeleton import RoundSkeleton
 from bracket.models.db.stage_item_inputs import StageItemInput
@@ -8,7 +9,7 @@ from bracket.utils.id_types import StageItemInputId
 
 
 def assign_pairs_to_slots(
-    pairs: list[tuple[StageItemInput, StageItemInput]],
+    pairs: Sequence[tuple[StageItemInput, StageItemInput]],
     bye: StageItemInput | None,
     round_skeleton: RoundSkeleton,
     previous_slot_assignments: list[dict[int, StageItemInputId]] | None = None,

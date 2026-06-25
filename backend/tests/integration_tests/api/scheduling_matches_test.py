@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
@@ -1181,7 +1182,7 @@ async def test_placeholder_referee_slot_not_playing_in_concurrent_match(
         "a player in the other match — otherwise the referee would be playing at the same time"
     )
 
-    by_time: dict = defaultdict(list)
+    by_time: dict[Any, list[Any]] = defaultdict(list)
     for m in all_matches:
         by_time[m.start_time].append(m)
 
@@ -1298,7 +1299,7 @@ async def test_full_placeholder_swiss_skeleton_is_conflict_free(
         )
 
     # For each time slot, no abstract slot may appear more than once (playing or refereeing).
-    by_time: dict = defaultdict(list)
+    by_time: dict[Any, list[Any]] = defaultdict(list)
     for m in all_matches:
         by_time[m.start_time].append(m)
 
