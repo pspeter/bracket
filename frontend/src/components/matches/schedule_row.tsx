@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { LevelBadge } from '@components/levels/levels';
 import { Time } from '@components/utils/datetime';
-import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import {
+  formatMatchInput1,
+  formatMatchInput2,
+  getMatchScore1,
+  getMatchScore2,
+} from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
 import { LevelResponse } from '@openapi';
@@ -78,7 +83,7 @@ export function ScheduleRow({
                 fontWeight: 800,
               }}
             >
-              <Center>{data.match.stage_item_input1_score}</Center>
+              <Center>{getMatchScore1(data.match)}</Center>
             </div>
           </Grid.Col>
         </Grid>
@@ -98,7 +103,7 @@ export function ScheduleRow({
                 fontWeight: 800,
               }}
             >
-              <Center>{data.match.stage_item_input2_score}</Center>
+              <Center>{getMatchScore2(data.match)}</Center>
             </div>
           </Grid.Col>
         </Grid>

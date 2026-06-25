@@ -333,6 +333,7 @@
     "scoring_type_set_points_with_match_bonus": "Set points with match bonus",
     "search_placeholder": "Search ...",
     "set_default_duration_button": "Set default",
+    "set_label": "Set {{number}}",
     "set_to_new_button": "Set To Now",
     "sign_in_title": "Sign in",
     "single_elimination_label": "Single Elimination",

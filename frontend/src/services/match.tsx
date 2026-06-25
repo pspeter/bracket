@@ -3,6 +3,7 @@ import {
   MatchCreateBodyFrontend,
   MatchRescheduleBody,
   MatchResizeBreakBody,
+  MatchSetBody,
   MatchSwapBody,
   SchedulerWeights,
 } from '@openapi';
@@ -31,31 +32,27 @@ export async function updateMatch(
     .catch((response: any) => handleRequestError(response));
 }
 
-export async function updateScoreTrackingMatch(
-  score_tracking_token: string,
+// Scores live on sets now. Updating a single set is the unit of change for both the
+// authenticated match modal and the token-authenticated score-tracking screens.
+export async function updateMatchSet(
+  tournament_id: number,
   match_id: number,
-  match: {
-    stage_item_input1_score: number;
-    stage_item_input2_score: number;
-    state: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  }
+  set_id: number,
+  body: MatchSetBody
 ) {
   return createAxios()
-    .put(`score-tracking/${score_tracking_token}/matches/${match_id}`, match)
+    .put(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
 }
 
-export async function updateTournamentScoreTrackingMatch(
-  tournament_id: number,
+export async function updateScoreTrackingMatchSet(
+  score_tracking_token: string,
   match_id: number,
-  match: {
-    stage_item_input1_score: number;
-    stage_item_input2_score: number;
-    state: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  }
+  set_id: number,
+  body: MatchSetBody
 ) {
   return createAxios()
-    .put(`tournaments/${tournament_id}/score-tracking/matches/${match_id}`, match)
+    .put(`score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
 }
 

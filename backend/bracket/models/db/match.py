@@ -168,6 +168,11 @@ class MatchWithDetailsDefinitive(Match):
     court: Court | None = None
     referee: StageItemInput | None = None
     side_switch_every_n_points: int | None = None
+    # Set configuration copied from the ranking applicable to this match's stage item.
+    num_sets: int = 1
+    max_points: int = 21
+    last_set_max_points: int | None = None
+    two_point_advantage: bool = True
 
     @property
     def stage_item_inputs(self) -> list[StageItemInput]:

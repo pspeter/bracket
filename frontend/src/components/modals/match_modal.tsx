@@ -32,15 +32,21 @@ import {
 } from '@openapi';
 import { getReferees, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
-import { updateMatch } from '@services/match';
+import { updateMatch, updateMatchSet } from '@services/match';
 
 type RefereeValue = { kind: 'slot'; inputId: string } | { kind: 'name'; name: string } | null;
 
-type MatchModalFormValues = {
+type SetFormValue = {
+  id: number;
+  set_number: number;
   stage_item_input1_score: number;
   stage_item_input2_score: number;
+  state: MatchWithDetails['match_sets'][number]['state'];
+};
+
+type MatchModalFormValues = {
+  sets: SetFormValue[];
   custom_duration_minutes: number | string;
-  state: MatchWithDetails['state'];
   referee: RefereeValue;
 };
 
@@ -199,16 +205,22 @@ function MatchModalForm({
 
   const form = useForm<MatchModalFormValues>({
     initialValues: {
-      stage_item_input1_score: match.stage_item_input1_score,
-      stage_item_input2_score: match.stage_item_input2_score,
+      sets: match.match_sets.map((set) => ({
+        id: set.id,
+        set_number: set.set_number,
+        stage_item_input1_score: set.stage_item_input1_score,
+        stage_item_input2_score: set.stage_item_input2_score,
+        state: set.state,
+      })),
       custom_duration_minutes: match.custom_duration_minutes ?? match.duration_minutes,
-      state: match.state,
       referee: initialReferee,
     },
 
     validate: {
-      stage_item_input1_score: (value) => (value >= 0 ? null : t('negative_score_validation')),
-      stage_item_input2_score: (value) => (value >= 0 ? null : t('negative_score_validation')),
+      sets: {
+        stage_item_input1_score: (value) => (value >= 0 ? null : t('negative_score_validation')),
+        stage_item_input2_score: (value) => (value >= 0 ? null : t('negative_score_validation')),
+      },
       custom_duration_minutes: (value) => {
         const numericValue = Number(value);
         return Number.isFinite(numericValue) && numericValue >= 0
@@ -368,17 +380,33 @@ function MatchModalForm({
               }
             : {};
 
+          // Persist each changed set one at a time so the ranking recalculation the backend
+          // runs per set never races with the next write.
+          for (let i = 0; i < values.sets.length; i += 1) {
+            const set = values.sets[i];
+            const initial = match.match_sets[i];
+            const changed =
+              initial == null ||
+              set.stage_item_input1_score !== initial.stage_item_input1_score ||
+              set.stage_item_input2_score !== initial.stage_item_input2_score ||
+              set.state !== initial.state;
+            if (changed) {
+              // eslint-disable-next-line no-await-in-loop
+              await updateMatchSet(tournamentData.id, match.id, set.id, {
+                stage_item_input1_score: set.stage_item_input1_score,
+                stage_item_input2_score: set.stage_item_input2_score,
+                state: set.state,
+              });
+            }
+          }
+
           const updatedMatch = {
             id: match.id,
             round_id: match.round_id,
-            stage_item_input1_score: values.stage_item_input1_score,
-            stage_item_input2_score: values.stage_item_input2_score,
             court_id: match.court_id || null,
             custom_duration_minutes: durationIsCustom
               ? Number(values.custom_duration_minutes)
               : null,
-            state: values.state,
-            completed_at: match.completed_at,
             ...refereeFields,
           };
           await updateMatch(tournamentData.id, match.id, updatedMatch);
@@ -415,52 +443,45 @@ function MatchModalForm({
             ))}
           </Stack>
         )}
-        <NumberInput
-          withAsterisk
-          label={`${t('score_of_label')} ${team1Name}`}
-          placeholder={`${t('score_of_label')} ${team1Name}`}
-          disabled={form.values.state === 'COMPLETED'}
-          {...form.getInputProps('stage_item_input1_score')}
-          onChange={(value) => {
-            form.setFieldValue('stage_item_input1_score', value as number);
-            if (form.values.state === 'NOT_STARTED') {
-              form.setFieldValue('state', 'IN_PROGRESS');
-            }
-          }}
-        />
-        <NumberInput
-          withAsterisk
-          mt="lg"
-          label={`${t('score_of_label')} ${team2Name}`}
-          placeholder={`${t('score_of_label')} ${team2Name}`}
-          disabled={form.values.state === 'COMPLETED'}
-          {...form.getInputProps('stage_item_input2_score')}
-          onChange={(value) => {
-            form.setFieldValue('stage_item_input2_score', value as number);
-            if (form.values.state === 'NOT_STARTED') {
-              form.setFieldValue('state', 'IN_PROGRESS');
-            }
-          }}
-        />
-        <Select
-          mt="lg"
-          label={t('match_state_label')}
-          data={[
-            { value: 'NOT_STARTED', label: t('match_state_not_started') },
-            { value: 'IN_PROGRESS', label: t('match_state_in_progress') },
-            { value: 'COMPLETED', label: t('match_state_completed') },
-          ]}
-          {...form.getInputProps('state')}
-          onChange={(value) => {
-            if (value != null) {
-              form.setFieldValue('state', value as MatchWithDetails['state']);
-              if (value === 'NOT_STARTED') {
-                form.setFieldValue('stage_item_input1_score', 0);
-                form.setFieldValue('stage_item_input2_score', 0);
-              }
-            }
-          }}
-        />
+        <Stack gap="md">
+          {form.values.sets.map((set, index) => (
+            <Stack key={set.id} gap={6}>
+              {form.values.sets.length > 1 && (
+                <Text size="sm" fw={600}>
+                  {t('set_label', { number: set.set_number })}
+                </Text>
+              )}
+              <Group grow align="start" wrap="nowrap">
+                <NumberInput
+                  withAsterisk
+                  label={`${t('score_of_label')} ${team1Name}`}
+                  placeholder={`${t('score_of_label')} ${team1Name}`}
+                  {...form.getInputProps(`sets.${index}.stage_item_input1_score`)}
+                />
+                <NumberInput
+                  withAsterisk
+                  label={`${t('score_of_label')} ${team2Name}`}
+                  placeholder={`${t('score_of_label')} ${team2Name}`}
+                  {...form.getInputProps(`sets.${index}.stage_item_input2_score`)}
+                />
+              </Group>
+              <Select
+                label={t('match_state_label')}
+                data={[
+                  { value: 'NOT_STARTED', label: t('match_state_not_started') },
+                  { value: 'IN_PROGRESS', label: t('match_state_in_progress') },
+                  { value: 'COMPLETED', label: t('match_state_completed') },
+                ]}
+                {...form.getInputProps(`sets.${index}.state`)}
+                onChange={(value) => {
+                  if (value != null) {
+                    form.setFieldValue(`sets.${index}.state`, value as SetFormValue['state']);
+                  }
+                }}
+              />
+            </Stack>
+          ))}
+        </Stack>
         {refereesEnabled && (
           <RefereeCombobox
             value={form.values.referee}

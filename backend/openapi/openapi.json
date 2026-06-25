@@ -1336,6 +1336,17 @@
             ],
             "title": "Input2 Slot"
           },
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
+          },
           "level_id": {
             "anyOf": [
               {
@@ -1354,6 +1365,16 @@
             },
             "title": "Match Sets",
             "type": "array"
+          },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
           },
           "referee": {
             "anyOf": [
@@ -1507,6 +1528,11 @@
           "state": {
             "$ref": "#/components/schemas/MatchState",
             "readOnly": true
+          },
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1534,6 +1560,10 @@
           "court",
           "referee",
           "side_switch_every_n_points",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
           "state"
         ],
         "title": "MatchWithDetailsDefinitive",
