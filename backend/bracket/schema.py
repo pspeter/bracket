@@ -4,6 +4,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Table,
     UniqueConstraint,
@@ -310,10 +311,59 @@ rankings = Table(
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
     Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), nullable=False, index=True),
     Column("position", Integer, nullable=False),
-    Column("win_points", Float, nullable=False),
-    Column("draw_points", Float, nullable=False),
-    Column("loss_points", Float, nullable=False),
-    Column("add_score_points", Boolean, nullable=False),
+    Column(
+        "scoring_type",
+        Enum("MATCH_POINTS", "SET_POINTS", "SET_POINTS_WITH_MATCH_BONUS", name="scoring_type"),
+        nullable=False,
+        server_default="MATCH_POINTS",
+    ),
+    Column("num_sets", Integer, nullable=False, server_default="1"),
+    Column("max_points", Integer, nullable=False, server_default="21"),
+    Column("last_set_max_points", Integer, nullable=True),
+    Column("two_point_advantage", Boolean, nullable=False, server_default="true"),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
     Column("side_switch_every_n_points", Integer, nullable=True),
+)
+
+ranking_match_points = Table(
+    "ranking_match_points",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True),
+    Column(
+        "ranking_id",
+        BigInteger,
+        ForeignKey("rankings.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("win_points", Numeric, nullable=False),
+    Column("draw_points", Numeric, nullable=False),
+    Column("loss_points", Numeric, nullable=False),
+)
+
+ranking_set_points = Table(
+    "ranking_set_points",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True),
+    Column(
+        "ranking_id",
+        BigInteger,
+        ForeignKey("rankings.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+)
+
+ranking_set_points_with_match_bonus = Table(
+    "ranking_set_points_with_match_bonus",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True),
+    Column(
+        "ranking_id",
+        BigInteger,
+        ForeignKey("rankings.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("match_bonus_points", Numeric, nullable=False, server_default="1.0"),
 )

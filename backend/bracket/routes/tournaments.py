@@ -12,7 +12,7 @@ from bracket.database import database
 from bracket.logic.planning.matches import update_start_times_of_matches
 from bracket.logic.subscriptions import check_requirement
 from bracket.logic.tournaments import get_tournament_logo_path
-from bracket.models.db.ranking import RankingCreateBody
+from bracket.models.db.ranking import RankingMatchPointsBody
 from bracket.models.db.tournament import (
     LevelResponse,
     Tournament,
@@ -215,10 +215,10 @@ async def create_tournament(
             for position, level_name in enumerate(tournament_to_insert.levels):
                 level = await sql_create_level(tournament_id, level_name, position)
                 await sql_create_ranking(
-                    tournament_id, RankingCreateBody(), position=0, level_id=level.id
+                    tournament_id, RankingMatchPointsBody(), position=0, level_id=level.id
                 )
         else:
-            await sql_create_ranking(tournament_id, RankingCreateBody(), position=0)
+            await sql_create_ranking(tournament_id, RankingMatchPointsBody(), position=0)
 
     return SuccessResponse()
 

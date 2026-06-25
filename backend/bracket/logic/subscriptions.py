@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubCreateBody
-from bracket.models.db.ranking import RankingCreateBody
+from bracket.models.db.ranking import RankingMatchPointsBody
 from bracket.models.db.tournament import TournamentBody
 from bracket.sql.clubs import create_club
 from bracket.sql.rankings import sql_create_ranking
@@ -94,5 +94,5 @@ async def setup_demo_account(user_id: UserId) -> None:
     )
     tournament_id = await sql_create_tournament(tournament)
 
-    ranking = RankingCreateBody()
+    ranking = RankingMatchPointsBody()
     await sql_create_ranking(tournament_id=tournament_id, ranking_body=ranking, position=0)
