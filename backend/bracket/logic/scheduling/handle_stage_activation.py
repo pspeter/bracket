@@ -163,12 +163,16 @@ async def _resolve_round_1_for_swiss_stage_item(
     stage_item: StageItemWithRounds,
 ) -> None:
     """Fill in concrete team assignments for round 1 of a Swiss stage item."""
-    placeholder_round = next(
-        (r for r in stage_item.rounds if r.lifecycle_state == RoundLifecycleState.PLACEHOLDER),
-        None,
-    )
-    if placeholder_round is None:
+    # Round 1 is the lowest-id round. Resolve that specific round rather than the first
+    # placeholder in iteration order: the rounds can arrive in any order, so picking the first
+    # placeholder could resolve a later round (leaving the real round 1 a placeholder that shows
+    # TBD), and — once round 1 is resolved — could even mistake round 2 for round 1 and pair it
+    # with round-1 logic. If the first round is already resolved, there is nothing to do here.
+    first_round = min(stage_item.rounds, key=lambda round_: round_.id, default=None)
+    if first_round is None or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER:
         return
+
+    placeholder_round = first_round
 
     inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
     if not inputs:
@@ -207,17 +211,17 @@ async def _resolve_round_1_for_swiss_stage_item(
     )
 
 
-async def try_resolve_first_swiss_round_in_active_stage(
+async def try_resolve_first_swiss_round_when_inputs_filled(
     tournament_id: TournamentId,
     stage_item_id: StageItemId,
 ) -> None:
-    """Resolve round 1 of a Swiss stage item without waiting for stage activation.
+    """Resolve round 1 of a Swiss stage item as soon as all of its slots are filled.
 
-    Round 1 of a Swiss stage item is normally resolved when its stage is activated. A Swiss
-    stage item created inside an already-active stage would never get that hook again, so this
-    resolves round 1 as soon as every input has a concrete team assigned. It is a no-op unless
-    round 1 is still a placeholder, which keeps it safe to call repeatedly (e.g. once per team
-    assignment). Callers must only invoke this for stage items in an active stage.
+    Round 1 is resolved once every input has a concrete team assigned — it does not wait for
+    the stage to be activated. So a resolved round 1 shows its real matchups (not TBD) even in a
+    stage that has not started yet. It is a no-op unless round 1 is still a placeholder and every
+    input is concrete, which keeps it safe to call repeatedly (e.g. once per team assignment) and
+    on stage items whose inputs are still tentative (those resolve on stage activation instead).
 
     The whole check-and-resolve runs under a transaction-scoped advisory lock keyed on the
     stage item, so concurrent team assignments (e.g. the parallel "auto-assign teams" feature)

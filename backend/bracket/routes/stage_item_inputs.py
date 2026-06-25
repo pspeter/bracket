@@ -4,7 +4,7 @@ from starlette import status
 from bracket.config import config
 from bracket.database import database
 from bracket.logic.scheduling.handle_stage_activation import (
-    try_resolve_first_swiss_round_in_active_stage,
+    try_resolve_first_swiss_round_when_inputs_filled,
 )
 from bracket.models.db.stage_item_inputs import (
     StageItemInput,
@@ -131,9 +131,9 @@ async def update_stage_item_input(
             },
         )
 
-    # A Swiss stage item added to an already-active stage misses the stage-activation hook that
-    # resolves round 1, so resolve it here once all of its teams have been assigned.
-    if target_stage.is_active:
-        await try_resolve_first_swiss_round_in_active_stage(tournament_id, stage_item_id)
+    # Resolve round 1 of a Swiss stage item as soon as all of its slots are filled, regardless of
+    # whether the stage is active, so a resolved round 1 shows real matchups instead of TBD. It is
+    # a no-op while any input is still tentative (those resolve on stage activation instead).
+    await try_resolve_first_swiss_round_when_inputs_filled(tournament_id, stage_item_id)
 
     return SuccessResponse()
