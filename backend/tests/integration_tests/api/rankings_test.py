@@ -103,11 +103,7 @@ async def test_create_ranking_set_points_with_match_bonus(
     tournament_id = auth_context.tournament.id
     rankings_list = await get_all_rankings_in_tournament(tournament_id)
     bonus_ranking = next(
-        (
-            r
-            for r in rankings_list
-            if r.scoring_type == ScoringType.SET_POINTS_WITH_MATCH_BONUS
-        ),
+        (r for r in rankings_list if r.scoring_type == ScoringType.SET_POINTS_WITH_MATCH_BONUS),
         None,
     )
     assert bonus_ranking is not None

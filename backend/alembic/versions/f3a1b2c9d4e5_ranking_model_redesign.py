@@ -1,7 +1,7 @@
 """Ranking model redesign: scoring_type, set config, subtype tables
 
 Revision ID: f3a1b2c9d4e5
-Revises: e1f4a9c7b2d3
+Revises: d3b8f1c4e2a9
 Create Date: 2026-06-25 00:00:00.000000
 
 """
@@ -120,7 +120,9 @@ def downgrade() -> None:
         "FROM ranking_match_points rmp WHERE rmp.ranking_id = rankings.id"
     )
 
-    # Set defaults for any that didn't match
+    # Rankings with SET_POINTS or SET_POINTS_WITH_MATCH_BONUS have no row in ranking_match_points,
+    # so their win/draw/loss values remain NULL here and get hardcoded defaults below.
+    # This is acceptable because no production data of those types exists yet.
     op.execute(
         "UPDATE rankings SET win_points = 1, draw_points = 0.5, loss_points = 0, "
         "add_score_points = false WHERE win_points IS NULL"
