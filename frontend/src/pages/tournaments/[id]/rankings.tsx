@@ -1,4 +1,13 @@
-import { Accordion, Badge, Button, Center, Checkbox, Container, NumberInput } from '@mantine/core';
+import {
+  Accordion,
+  Badge,
+  Button,
+  Center,
+  Checkbox,
+  Container,
+  NumberInput,
+  Select,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
@@ -9,7 +18,7 @@ import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter } from '@components/utils/util';
-import { Ranking, RankingsResponse, TournamentWithLevels } from '@openapi';
+import { Ranking, RankingsResponse, ScoringType, TournamentWithLevels } from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getRankings, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
@@ -64,10 +73,15 @@ function EditRankingForm({
 }) {
   const form = useForm({
     initialValues: {
-      win_points: ranking.win_points,
-      draw_points: ranking.draw_points,
-      loss_points: ranking.loss_points,
-      add_score_points: ranking.add_score_points,
+      scoring_type: ranking.scoring_type as ScoringType,
+      win_points: ranking.match_points?.win_points ?? '1.0',
+      draw_points: ranking.match_points?.draw_points ?? '0.5',
+      loss_points: ranking.match_points?.loss_points ?? '0.0',
+      match_bonus_points: ranking.set_points_with_bonus?.match_bonus_points ?? '1.0',
+      num_sets: ranking.num_sets,
+      max_points: ranking.max_points,
+      last_set_max_points: ranking.last_set_max_points ?? 15,
+      two_point_advantage: ranking.two_point_advantage,
       position: ranking.position,
       side_switch_enabled: ranking.side_switch_every_n_points != null,
       side_switch_every_n_points: ranking.side_switch_every_n_points ?? 7,
@@ -82,12 +96,17 @@ function EditRankingForm({
         await editRanking(
           tournament.id,
           ranking.id,
+          values.scoring_type,
+          values.position,
+          values.side_switch_enabled ? values.side_switch_every_n_points : null,
+          values.num_sets,
+          values.max_points,
+          values.num_sets > 2 ? values.last_set_max_points : null,
+          values.two_point_advantage,
           values.win_points,
           values.draw_points,
           values.loss_points,
-          values.add_score_points,
-          values.position,
-          values.side_switch_enabled ? values.side_switch_every_n_points : null
+          values.match_bonus_points
         );
         await swrRankingsResponse.mutate();
       })}
@@ -105,28 +124,76 @@ function EditRankingForm({
           </Center>
         </Center>
         <Accordion.Panel>
+          <Select
+            label={t('scoring_type_label')}
+            data={[
+              { value: 'MATCH_POINTS', label: t('scoring_type_match_points') },
+              { value: 'SET_POINTS', label: t('scoring_type_set_points') },
+              {
+                value: 'SET_POINTS_WITH_MATCH_BONUS',
+                label: t('scoring_type_set_points_with_match_bonus'),
+              },
+            ]}
+            {...form.getInputProps('scoring_type')}
+          />
+          {form.values.scoring_type === 'MATCH_POINTS' && (
+            <>
+              <NumberInput
+                mt="1rem"
+                withAsterisk
+                label={t('win_points_input_label')}
+                {...form.getInputProps('win_points')}
+              />
+              <NumberInput
+                mt="1rem"
+                withAsterisk
+                label={t('draw_points_input_label')}
+                {...form.getInputProps('draw_points')}
+              />
+              <NumberInput
+                mt="1rem"
+                withAsterisk
+                label={t('loss_points_input_label')}
+                {...form.getInputProps('loss_points')}
+              />
+            </>
+          )}
+          {form.values.scoring_type === 'SET_POINTS_WITH_MATCH_BONUS' && (
+            <NumberInput
+              mt="1rem"
+              withAsterisk
+              label={t('match_bonus_points_label')}
+              {...form.getInputProps('match_bonus_points')}
+            />
+          )}
           <NumberInput
+            mt="1rem"
             withAsterisk
-            label={t('win_points_input_label')}
-            {...form.getInputProps('win_points')}
+            min={1}
+            label={t('num_sets_label')}
+            {...form.getInputProps('num_sets')}
           />
           <NumberInput
             mt="1rem"
             withAsterisk
-            label={t('draw_points_input_label')}
-            {...form.getInputProps('draw_points')}
-          />
-          <NumberInput
-            mt="1rem"
-            withAsterisk
-            label={t('loss_points_input_label')}
-            {...form.getInputProps('loss_points')}
+            min={1}
+            label={t('max_points_label')}
+            {...form.getInputProps('max_points')}
           />
           <Checkbox
             mt="lg"
-            label={t('add_score_points_label')}
-            {...form.getInputProps('add_score_points', { type: 'checkbox' })}
+            label={t('two_point_advantage_label')}
+            {...form.getInputProps('two_point_advantage', { type: 'checkbox' })}
           />
+          {form.values.num_sets > 2 && (
+            <NumberInput
+              mt="1rem"
+              withAsterisk
+              min={1}
+              label={t('last_set_max_points_label')}
+              {...form.getInputProps('last_set_max_points')}
+            />
+          )}
           <Checkbox
             mt="lg"
             label={t('side_switch_reminder_enabled_label')}

@@ -1,16 +1,12 @@
-from bracket.models.db.ranking import RankingBody, RankingCreateBody, RankingInsertable
+from typing import Any
+
+from bracket.models.db.ranking import RankingInsertable, RankingMatchPointsBody
 from bracket.utils.id_types import TournamentId
 
 
-def _base_insertable(**overrides: object) -> RankingInsertable:
-    from decimal import Decimal
-
+def _base_insertable(**overrides: Any) -> RankingInsertable:
     return RankingInsertable(
         tournament_id=TournamentId(-1),
-        win_points=Decimal("1.0"),
-        draw_points=Decimal("0.5"),
-        loss_points=Decimal("0.0"),
-        add_score_points=False,
         position=0,
         **overrides,
     )
@@ -37,34 +33,17 @@ def test_ranking_insertable_side_switch_defaults_to_none() -> None:
 
 
 def test_ranking_body_accepts_side_switch_field() -> None:
-    from decimal import Decimal
-
-    body = RankingBody(
-        win_points=Decimal("1.0"),
-        draw_points=Decimal("0.5"),
-        loss_points=Decimal("0.0"),
-        add_score_points=False,
-        position=0,
-        side_switch_every_n_points=7,
-    )
+    body = RankingMatchPointsBody(position=0, side_switch_every_n_points=7)
     assert body.side_switch_every_n_points == 7
 
 
 def test_ranking_body_side_switch_defaults_to_none() -> None:
-    from decimal import Decimal
-
-    body = RankingBody(
-        win_points=Decimal("1.0"),
-        draw_points=Decimal("0.5"),
-        loss_points=Decimal("0.0"),
-        add_score_points=False,
-        position=0,
-    )
+    body = RankingMatchPointsBody(position=0)
     assert body.side_switch_every_n_points is None
 
 
 def test_ranking_create_body_side_switch_defaults_to_none() -> None:
-    body = RankingCreateBody()
+    body = RankingMatchPointsBody()
     assert body.side_switch_every_n_points is None
 
 
@@ -124,7 +103,7 @@ def test_migration_revision_and_chain() -> None:
     spec = importlib.util.spec_from_file_location("migration", path)
     assert spec is not None and spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)  # type: ignore[attr-defined]
+    spec.loader.exec_module(migration)
     assert migration.revision == "c2e4f9a1b7d3"
     assert migration.down_revision == "a2c4e6f8b1d3"
     assert callable(migration.upgrade)

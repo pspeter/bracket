@@ -14,6 +14,9 @@ class UniqueIndex(EnumAutoStr):
     ix_stages_one_active_per_level = auto()
     ix_tournaments_dashboard_endpoint = auto()
     ix_users_email = auto()
+    ranking_match_points_ranking_id_key = auto()
+    ranking_set_points_ranking_id_key = auto()
+    ranking_set_points_with_match_bonus_ranking_id_key = auto()
     stage_item_inputs_stage_item_id_team_id_key = auto()
     stage_item_inputs_stage_item_id_winner_from_stage_item_id_w_key = auto()
 
@@ -36,6 +39,15 @@ unique_index_violation_error_lookup = {
     UniqueIndex.ix_stages_one_active_per_level: ("Only one stage can be active per level"),
     UniqueIndex.ix_tournaments_dashboard_endpoint: "This dashboard link is already taken",
     UniqueIndex.ix_users_email: "This email is already taken",
+    UniqueIndex.ranking_match_points_ranking_id_key: (
+        "A ranking can only have one match-points configuration"
+    ),
+    UniqueIndex.ranking_set_points_ranking_id_key: (
+        "A ranking can only have one set-points configuration"
+    ),
+    UniqueIndex.ranking_set_points_with_match_bonus_ranking_id_key: (
+        "A ranking can only have one set-points-with-match-bonus configuration"
+    ),
     UniqueIndex.stage_item_inputs_stage_item_id_team_id_key: (
         "This team is already assigned to another stage item"
     ),

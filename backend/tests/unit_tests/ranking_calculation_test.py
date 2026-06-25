@@ -5,7 +5,7 @@ from heliclockter import datetime_utc
 from bracket.logic.ranking.calculation import determine_ranking_for_stage_item
 from bracket.logic.ranking.statistics import TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
-from bracket.models.db.ranking import Ranking
+from bracket.models.db.ranking import Ranking, RankingMatchPointsData, ScoringType
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
@@ -22,6 +22,21 @@ from bracket.utils.id_types import (
     TeamId,
     TournamentId,
 )
+
+
+def _ranking(tournament_id: TournamentId, now: datetime_utc, win: str, draw: str) -> Ranking:
+    return Ranking(
+        id=RankingId(-1),
+        tournament_id=tournament_id,
+        created=now,
+        position=0,
+        scoring_type=ScoringType.MATCH_POINTS,
+        match_points=RankingMatchPointsData(
+            win_points=Decimal(win),
+            draw_points=Decimal(draw),
+            loss_points=Decimal("0.0"),
+        ),
+    )
 
 
 def test_determine_ranking_for_stage_item_elimination() -> None:
@@ -96,16 +111,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
             created=now,
             type=StageType.SINGLE_ELIMINATION,
         ),
-        Ranking(
-            id=RankingId(-1),
-            tournament_id=tournament_id,
-            created=now,
-            win_points=Decimal("3.5"),
-            draw_points=Decimal("1.25"),
-            loss_points=Decimal("0.0"),
-            add_score_points=False,
-            position=0,
-        ),
+        _ranking(tournament_id, now, win="3.5", draw="1.25"),
     )
 
     assert ranking == {
@@ -186,16 +192,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
             created=now,
             type=StageType.SWISS,
         ),
-        Ranking(
-            id=RankingId(-1),
-            tournament_id=tournament_id,
-            created=now,
-            win_points=Decimal("3.5"),
-            draw_points=Decimal("1.25"),
-            loss_points=Decimal("0.0"),
-            add_score_points=False,
-            position=0,
-        ),
+        _ranking(tournament_id, now, win="3.5", draw="1.25"),
     )
 
     assert ranking == {
@@ -244,16 +241,7 @@ def test_determine_ranking_for_stage_item_swiss_no_matches() -> None:
             created=now,
             type=StageType.SWISS,
         ),
-        Ranking(
-            id=RankingId(-1),
-            tournament_id=tournament_id,
-            created=now,
-            win_points=Decimal("3.5"),
-            draw_points=Decimal("1.25"),
-            loss_points=Decimal("0.0"),
-            add_score_points=False,
-            position=0,
-        ),
+        _ranking(tournament_id, now, win="3.5", draw="1.25"),
     )
 
     assert ranking == {

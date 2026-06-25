@@ -1786,23 +1786,25 @@
       },
       "Ranking": {
         "properties": {
-          "add_score_points": {
-            "title": "Add Score Points",
-            "type": "boolean"
-          },
           "created": {
             "format": "date-time",
             "title": "Created",
             "type": "string"
           },
-          "draw_points": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Draw Points",
-            "type": "string"
-          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
           },
           "level_id": {
             "anyOf": [
@@ -1815,14 +1817,43 @@
             ],
             "title": "Level Id"
           },
-          "loss_points": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Loss Points",
-            "type": "string"
+          "match_points": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingMatchPointsData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
           },
           "position": {
             "title": "Position",
             "type": "integer"
+          },
+          "scoring_type": {
+            "$ref": "#/components/schemas/ScoringType",
+            "default": "MATCH_POINTS"
+          },
+          "set_points_with_bonus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingSetPointsWithMatchBonusData"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "side_switch_every_n_points": {
             "anyOf": [
@@ -1839,103 +1870,32 @@
             "title": "Tournament Id",
             "type": "integer"
           },
-          "win_points": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Win Points",
-            "type": "string"
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
           }
         },
         "required": [
           "tournament_id",
-          "win_points",
-          "draw_points",
-          "loss_points",
-          "add_score_points",
           "position",
           "level_id",
+          "scoring_type",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
           "side_switch_every_n_points",
           "id",
-          "created"
+          "created",
+          "match_points",
+          "set_points_with_bonus"
         ],
         "title": "Ranking",
         "type": "object"
       },
-      "RankingBody": {
+      "RankingMatchPointsBody": {
         "properties": {
-          "add_score_points": {
-            "title": "Add Score Points",
-            "type": "boolean"
-          },
-          "draw_points": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Draw Points"
-          },
-          "loss_points": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Loss Points"
-          },
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "side_switch_every_n_points": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Side Switch Every N Points"
-          },
-          "win_points": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Win Points"
-          }
-        },
-        "required": [
-          "win_points",
-          "draw_points",
-          "loss_points",
-          "add_score_points",
-          "position",
-          "side_switch_every_n_points"
-        ],
-        "title": "RankingBody",
-        "type": "object"
-      },
-      "RankingCreateBody": {
-        "properties": {
-          "add_score_points": {
-            "default": false,
-            "title": "Add Score Points",
-            "type": "boolean"
-          },
           "draw_points": {
             "anyOf": [
               {
@@ -1948,6 +1908,17 @@
             ],
             "default": "0.5",
             "title": "Draw Points"
+          },
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
           },
           "loss_points": {
             "anyOf": [
@@ -1962,6 +1933,33 @@
             "default": "0.0",
             "title": "Loss Points"
           },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "scoring_type": {
+            "const": "MATCH_POINTS",
+            "default": "MATCH_POINTS",
+            "title": "Scoring Type",
+            "type": "string"
+          },
           "side_switch_every_n_points": {
             "anyOf": [
               {
@@ -1972,6 +1970,11 @@
               }
             ],
             "title": "Side Switch Every N Points"
+          },
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
           },
           "win_points": {
             "anyOf": [
@@ -1988,13 +1991,211 @@
           }
         },
         "required": [
+          "scoring_type",
           "win_points",
           "draw_points",
           "loss_points",
-          "add_score_points",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
+          "position",
           "side_switch_every_n_points"
         ],
-        "title": "RankingCreateBody",
+        "title": "RankingMatchPointsBody",
+        "type": "object"
+      },
+      "RankingMatchPointsData": {
+        "properties": {
+          "draw_points": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Draw Points",
+            "type": "string"
+          },
+          "loss_points": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Loss Points",
+            "type": "string"
+          },
+          "win_points": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Win Points",
+            "type": "string"
+          }
+        },
+        "required": [
+          "win_points",
+          "draw_points",
+          "loss_points"
+        ],
+        "title": "RankingMatchPointsData",
+        "type": "object"
+      },
+      "RankingSetPointsBody": {
+        "properties": {
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
+          },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "scoring_type": {
+            "const": "SET_POINTS",
+            "default": "SET_POINTS",
+            "title": "Scoring Type",
+            "type": "string"
+          },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scoring_type",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
+          "position",
+          "side_switch_every_n_points"
+        ],
+        "title": "RankingSetPointsBody",
+        "type": "object"
+      },
+      "RankingSetPointsWithMatchBonusBody": {
+        "properties": {
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
+          },
+          "match_bonus_points": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1.0",
+            "title": "Match Bonus Points"
+          },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "scoring_type": {
+            "const": "SET_POINTS_WITH_MATCH_BONUS",
+            "default": "SET_POINTS_WITH_MATCH_BONUS",
+            "title": "Scoring Type",
+            "type": "string"
+          },
+          "side_switch_every_n_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side Switch Every N Points"
+          },
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scoring_type",
+          "match_bonus_points",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
+          "position",
+          "side_switch_every_n_points"
+        ],
+        "title": "RankingSetPointsWithMatchBonusBody",
+        "type": "object"
+      },
+      "RankingSetPointsWithMatchBonusData": {
+        "properties": {
+          "match_bonus_points": {
+            "default": "1.0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Match Bonus Points",
+            "type": "string"
+          }
+        },
+        "required": [
+          "match_bonus_points"
+        ],
+        "title": "RankingSetPointsWithMatchBonusData",
         "type": "object"
       },
       "RankingsResponse": {
@@ -2271,6 +2472,15 @@
         ],
         "title": "ScoreTrackingMatchResponse",
         "type": "object"
+      },
+      "ScoringType": {
+        "enum": [
+          "MATCH_POINTS",
+          "SET_POINTS",
+          "SET_POINTS_WITH_MATCH_BONUS"
+        ],
+        "title": "ScoringType",
+        "type": "string"
       },
       "SignupBody": {
         "properties": {
@@ -6345,7 +6555,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RankingCreateBody"
+                "discriminator": {
+                  "mapping": {
+                    "MATCH_POINTS": "#/components/schemas/RankingMatchPointsBody",
+                    "SET_POINTS": "#/components/schemas/RankingSetPointsBody",
+                    "SET_POINTS_WITH_MATCH_BONUS": "#/components/schemas/RankingSetPointsWithMatchBonusBody"
+                  },
+                  "propertyName": "scoring_type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RankingMatchPointsBody"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RankingSetPointsBody"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RankingSetPointsWithMatchBonusBody"
+                  }
+                ],
+                "title": "Ranking Body"
               }
             }
           },
@@ -6465,7 +6694,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RankingBody"
+                "discriminator": {
+                  "mapping": {
+                    "MATCH_POINTS": "#/components/schemas/RankingMatchPointsBody",
+                    "SET_POINTS": "#/components/schemas/RankingSetPointsBody",
+                    "SET_POINTS_WITH_MATCH_BONUS": "#/components/schemas/RankingSetPointsWithMatchBonusBody"
+                  },
+                  "propertyName": "scoring_type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RankingMatchPointsBody"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RankingSetPointsBody"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RankingSetPointsWithMatchBonusBody"
+                  }
+                ],
+                "title": "Ranking Body"
               }
             }
           },

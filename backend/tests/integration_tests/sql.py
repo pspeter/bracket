@@ -12,7 +12,15 @@ from bracket.models.db.level import Level, LevelInsertable
 from bracket.models.db.match import Match, MatchInsertable
 from bracket.models.db.player import Player, PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
-from bracket.models.db.ranking import Ranking, RankingInsertable
+from bracket.models.db.ranking import (
+    Ranking,
+    RankingBase,
+    RankingBody,
+    RankingMatchPointsBody,
+    RankingSetPointsBody,
+    RankingSetPointsWithMatchBonusBody,
+    ScoringType,
+)
 from bracket.models.db.round import Round, RoundInsertable
 from bracket.models.db.stage import Stage, StageInsertable
 from bracket.models.db.stage_item import StageItem, StageItemInsertable
@@ -99,9 +107,30 @@ async def inserted_court(court: CourtInsertable) -> AsyncIterator[Court]:
 
 
 @asynccontextmanager
-async def inserted_ranking(ranking: RankingInsertable) -> AsyncIterator[Ranking]:
-    async with inserted_generic(ranking, rankings, Ranking) as row_inserted:
-        yield cast("Ranking", row_inserted)
+async def inserted_ranking(ranking: RankingBase) -> AsyncIterator[Ranking]:
+    from bracket.sql.rankings import _insert_subtype_row
+
+    # Insert the base ranking row
+    last_record_id, row_inserted = await insert_generic(database, ranking, rankings, Ranking)
+    # Insert the correct subtype row based on scoring_type
+    subtype_body: RankingBody
+    if ranking.scoring_type == ScoringType.MATCH_POINTS:
+        subtype_body = RankingMatchPointsBody(position=ranking.position)
+    elif ranking.scoring_type == ScoringType.SET_POINTS:
+        subtype_body = RankingSetPointsBody(position=ranking.position)
+    else:
+        subtype_body = RankingSetPointsWithMatchBonusBody(position=ranking.position)
+    await _insert_subtype_row(last_record_id, subtype_body)
+
+    from bracket.sql.rankings import get_all_rankings_in_tournament
+
+    all_rankings = await get_all_rankings_in_tournament(ranking.tournament_id)
+    full_ranking = next(r for r in all_rankings if r.id == last_record_id)
+
+    try:
+        yield full_ranking
+    finally:
+        await database.execute(query=rankings.delete().where(rankings.c.id == last_record_id))
 
 
 @asynccontextmanager
