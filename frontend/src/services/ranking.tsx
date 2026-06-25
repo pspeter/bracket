@@ -14,12 +14,24 @@ export async function editRanking(
   scoring_type: ScoringType,
   position: number,
   side_switch_every_n_points: number | null,
+  num_sets: number,
+  max_points: number,
+  last_set_max_points: number | null,
+  two_point_advantage: boolean,
   win_points?: string,
   draw_points?: string,
   loss_points?: string,
   match_bonus_points?: string
 ) {
-  const body: Record<string, unknown> = { scoring_type, position, side_switch_every_n_points };
+  const body: Record<string, unknown> = {
+    scoring_type,
+    position,
+    side_switch_every_n_points,
+    num_sets,
+    max_points,
+    last_set_max_points,
+    two_point_advantage,
+  };
   if (scoring_type === 'MATCH_POINTS') {
     body.win_points = win_points;
     body.draw_points = draw_points;

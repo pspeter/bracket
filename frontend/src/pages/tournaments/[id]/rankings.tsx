@@ -78,6 +78,10 @@ function EditRankingForm({
       draw_points: ranking.match_points?.draw_points ?? '0.5',
       loss_points: ranking.match_points?.loss_points ?? '0.0',
       match_bonus_points: ranking.set_points_with_bonus?.match_bonus_points ?? '1.0',
+      num_sets: ranking.num_sets,
+      max_points: ranking.max_points,
+      last_set_max_points: ranking.last_set_max_points ?? 15,
+      two_point_advantage: ranking.two_point_advantage,
       position: ranking.position,
       side_switch_enabled: ranking.side_switch_every_n_points != null,
       side_switch_every_n_points: ranking.side_switch_every_n_points ?? 7,
@@ -95,6 +99,10 @@ function EditRankingForm({
           values.scoring_type,
           values.position,
           values.side_switch_enabled ? values.side_switch_every_n_points : null,
+          values.num_sets,
+          values.max_points,
+          values.num_sets > 2 ? values.last_set_max_points : null,
+          values.two_point_advantage,
           values.win_points,
           values.draw_points,
           values.loss_points,
@@ -156,6 +164,34 @@ function EditRankingForm({
               withAsterisk
               label={t('match_bonus_points_label')}
               {...form.getInputProps('match_bonus_points')}
+            />
+          )}
+          <NumberInput
+            mt="1rem"
+            withAsterisk
+            min={1}
+            label={t('num_sets_label')}
+            {...form.getInputProps('num_sets')}
+          />
+          <NumberInput
+            mt="1rem"
+            withAsterisk
+            min={1}
+            label={t('max_points_label')}
+            {...form.getInputProps('max_points')}
+          />
+          <Checkbox
+            mt="lg"
+            label={t('two_point_advantage_label')}
+            {...form.getInputProps('two_point_advantage', { type: 'checkbox' })}
+          />
+          {form.values.num_sets > 2 && (
+            <NumberInput
+              mt="1rem"
+              withAsterisk
+              min={1}
+              label={t('last_set_max_points_label')}
+              {...form.getInputProps('last_set_max_points')}
             />
           )}
           <Checkbox

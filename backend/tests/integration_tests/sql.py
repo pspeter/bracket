@@ -12,7 +12,15 @@ from bracket.models.db.level import Level, LevelInsertable
 from bracket.models.db.match import Match, MatchInsertable
 from bracket.models.db.player import Player, PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
-from bracket.models.db.ranking import Ranking, RankingBase, RankingMatchPointsBody
+from bracket.models.db.ranking import (
+    Ranking,
+    RankingBase,
+    RankingBody,
+    RankingMatchPointsBody,
+    RankingSetPointsBody,
+    RankingSetPointsWithMatchBonusBody,
+    ScoringType,
+)
 from bracket.models.db.round import Round, RoundInsertable
 from bracket.models.db.stage import Stage, StageInsertable
 from bracket.models.db.stage_item import StageItem, StageItemInsertable
@@ -100,13 +108,19 @@ async def inserted_court(court: CourtInsertable) -> AsyncIterator[Court]:
 
 @asynccontextmanager
 async def inserted_ranking(ranking: RankingBase) -> AsyncIterator[Ranking]:
-    from bracket.sql.rankings import _insert_subtype_row, sql_create_ranking
+    from bracket.sql.rankings import _insert_subtype_row
 
     # Insert the base ranking row
     last_record_id, row_inserted = await insert_generic(database, ranking, rankings, Ranking)
-    # Insert a default MATCH_POINTS subtype row
-    default_body = RankingMatchPointsBody(position=ranking.position)
-    await _insert_subtype_row(last_record_id, default_body)
+    # Insert the correct subtype row based on scoring_type
+    subtype_body: RankingBody
+    if ranking.scoring_type == ScoringType.MATCH_POINTS:
+        subtype_body = RankingMatchPointsBody(position=ranking.position)
+    elif ranking.scoring_type == ScoringType.SET_POINTS:
+        subtype_body = RankingSetPointsBody(position=ranking.position)
+    else:
+        subtype_body = RankingSetPointsWithMatchBonusBody(position=ranking.position)
+    await _insert_subtype_row(last_record_id, subtype_body)
 
     from bracket.sql.rankings import get_all_rankings_in_tournament
 

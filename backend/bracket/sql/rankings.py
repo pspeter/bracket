@@ -23,7 +23,6 @@ _RANKING_SELECT = """
         rspwmb.match_bonus_points AS mp_match_bonus_points
     FROM rankings r
     LEFT JOIN ranking_match_points rmp ON rmp.ranking_id = r.id
-    LEFT JOIN ranking_set_points rsp ON rsp.ranking_id = r.id
     LEFT JOIN ranking_set_points_with_match_bonus rspwmb ON rspwmb.ranking_id = r.id
 """
 
@@ -60,17 +59,12 @@ def _row_to_ranking(row: object) -> Ranking:
 
 
 async def get_all_rankings_in_tournament(tournament_id: TournamentId) -> list[Ranking]:
-    query = (
-        _RANKING_SELECT
-        + " WHERE r.tournament_id = :tournament_id ORDER BY r.position"
-    )
+    query = _RANKING_SELECT + " WHERE r.tournament_id = :tournament_id ORDER BY r.position"
     rows = await database.fetch_all(query=query, values={"tournament_id": tournament_id})
     return [_row_to_ranking(row) for row in rows]
 
 
-async def get_default_ranking_for_stage(
-    tournament_id: TournamentId, stage_id: StageId
-) -> Ranking:
+async def get_default_ranking_for_stage(tournament_id: TournamentId, stage_id: StageId) -> Ranking:
     query = (
         _RANKING_SELECT
         + """
@@ -153,16 +147,19 @@ async def _delete_subtype_row(ranking_id: RankingId, scoring_type: ScoringType) 
 
 async def sql_update_ranking(
     tournament_id: TournamentId, ranking_id: RankingId, ranking_body: RankingBody
-) -> list[Ranking]:
+) -> None:
     # Fetch current scoring_type to detect type change
     current_row = await database.fetch_one(
-        query="SELECT scoring_type FROM rankings WHERE id = :ranking_id AND tournament_id = :tournament_id",
+        query=(
+            "SELECT scoring_type FROM rankings"
+            " WHERE id = :ranking_id AND tournament_id = :tournament_id"
+        ),
         values={"ranking_id": ranking_id, "tournament_id": tournament_id},
     )
     assert current_row is not None, "Ranking not found"
     current_type = ScoringType(current_row._mapping["scoring_type"])
 
-    await database.fetch_all(
+    await database.execute(
         query="""
             UPDATE rankings
             SET position = :position,
@@ -188,7 +185,7 @@ async def sql_update_ranking(
         },
     )
 
-    if current_type.value != ranking_body.scoring_type:
+    if current_type != ScoringType(ranking_body.scoring_type):
         await _delete_subtype_row(ranking_id, current_type)
         await _insert_subtype_row(ranking_id, ranking_body)
     elif isinstance(ranking_body, RankingMatchPointsBody):
@@ -219,8 +216,6 @@ async def sql_update_ranking(
                 "match_bonus_points": ranking_body.match_bonus_points,
             },
         )
-
-    return await get_all_rankings_in_tournament(tournament_id)
 
 
 async def sql_delete_ranking(tournament_id: TournamentId, ranking_id: RankingId) -> None:
