@@ -44,6 +44,7 @@ from bracket.utils.id_types import (
     TeamId,
     TournamentId,
 )
+from tests.unit_tests.mocks import match_sets_for_state
 
 T0 = DUMMY_MOCK_TIME
 DURATION = DUMMY_TOURNAMENT.duration_minutes  # 10
@@ -58,8 +59,6 @@ def _match(id_: int) -> MatchWithDetails:
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(id_),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
     )
 
 
@@ -689,8 +688,6 @@ def test_already_scheduled_matches_are_skipped() -> None:
         round_id=RoundId(99),
         start_time=T0,
         court_id=CourtId(1),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
     )
     unscheduled = _match(1)
     stages = [_stage(1, [[scheduled, unscheduled]])]
@@ -735,7 +732,11 @@ def test_conflicting_pinned_matches_stay_pinned_while_new_match_avoids_them() ->
 def test_reoptimize_reflows_not_started_but_not_in_progress() -> None:
     """Reoptimize re-flows a scheduled not-started match but leaves an in-progress one pinned."""
     in_progress = _match(1).model_copy(
-        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.IN_PROGRESS}
+        update={
+            "start_time": T0,
+            "court_id": CourtId(1),
+            "match_sets": match_sets_for_state(MatchId(1), MatchState.IN_PROGRESS),
+        }
     )
     not_started = _match(2).model_copy(
         update={"start_time": T0 + timedelta(minutes=SLOT), "court_id": CourtId(1)}
@@ -753,7 +754,11 @@ def test_reoptimize_reflows_not_started_but_not_in_progress() -> None:
 def test_reoptimize_pins_completed_match() -> None:
     """A completed match is held fixed too; only not-started matches are re-flowed."""
     completed = _match(1).model_copy(
-        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.COMPLETED}
+        update={
+            "start_time": T0,
+            "court_id": CourtId(1),
+            "match_sets": match_sets_for_state(MatchId(1), MatchState.COMPLETED),
+        }
     )
     not_started = _match(2)
     stages = [_stage(1, [[completed, not_started]])]
@@ -766,7 +771,11 @@ def test_reoptimize_pins_completed_match() -> None:
 def test_reoptimize_flows_movable_matches_around_pinned_slot() -> None:
     """Re-flowed not-started matches never overlap a pinned in-progress match's court slot."""
     in_progress = _match(1).model_copy(
-        update={"start_time": T0, "court_id": CourtId(1), "state": MatchState.IN_PROGRESS}
+        update={
+            "start_time": T0,
+            "court_id": CourtId(1),
+            "match_sets": match_sets_for_state(MatchId(1), MatchState.IN_PROGRESS),
+        }
     )
     # Two not-started matches sitting on top of the in-progress slot; reoptimize must move them.
     movable_a = _match(2).model_copy(update={"start_time": T0, "court_id": CourtId(1)})
@@ -938,8 +947,6 @@ def _match_with_teams(
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(id_),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=inp_a.id,
         stage_item_input2_id=inp_b.id,
         stage_item_input1=inp_a,
@@ -1205,8 +1212,6 @@ def test_preserved_referee_not_overlapped_with_pinned_playing_match() -> None:
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(1),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=inp31.id,
         stage_item_input2_id=inp32.id,
         stage_item_input1=inp31,
@@ -1428,8 +1433,6 @@ def test_referee_assigned_to_placeholder_match() -> None:
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(2),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=tentative_a.id,
         stage_item_input2_id=tentative_b.id,
         stage_item_input1=tentative_a,
@@ -1485,8 +1488,6 @@ def _scheduled_match_with_teams(
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(id_),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=inp_a.id,
         stage_item_input2_id=inp_b.id,
         stage_item_input1=inp_a,
@@ -1787,8 +1788,6 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(1),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=_final_input(1, level).id,
         stage_item_input2_id=_final_input(2, level).id,
         stage_item_input1=_final_input(1, level),
@@ -1802,8 +1801,6 @@ def test_schedule_movable_playing_not_overlapping_pinned_referee() -> None:
         created=T0,
         duration_minutes=DURATION,
         round_id=RoundId(2),
-        stage_item_input1_score=0,
-        stage_item_input2_score=0,
         stage_item_input1_id=inp3_a.id,
         stage_item_input2_id=inp3_b.id,
         stage_item_input1=inp3_a,

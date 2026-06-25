@@ -4,6 +4,7 @@ from heliclockter import timedelta
 from bracket.models.db.match import (
     MatchRescheduleBody,
     MatchResizeBreakBody,
+    MatchSetState,
     MatchState,
     MatchSwapBody,
 )
@@ -343,12 +344,12 @@ async def test_unschedule_started_match_fails(
                     "stage_item_input1_id": stage_item_input1_inserted.id,
                     "stage_item_input2_id": stage_item_input2_inserted.id,
                     "court_id": court1_inserted.id,
-                    "state": state,
                     "completed_at": DUMMY_MATCH1.completed_at
                     if state is MatchState.COMPLETED
                     else None,
                 }
-            )
+            ),
+            set_state=MatchSetState(state.value),
         ) as match_inserted,
     ):
         response = await send_tournament_request(
@@ -1212,13 +1213,13 @@ async def test_swap_started_match_with_unscheduled_fails(
                     "stage_item_input1_id": input1.id,
                     "stage_item_input2_id": input2.id,
                     "court_id": court1_inserted.id,
-                    "state": state,
                     "start_time": tournament.start_time,
                     "completed_at": DUMMY_MATCH1.completed_at
                     if state is MatchState.COMPLETED
                     else None,
                 }
-            )
+            ),
+            set_state=MatchSetState(state.value),
         ) as scheduled_match,
         inserted_match(
             DUMMY_MATCH1.model_copy(

@@ -11,7 +11,7 @@ from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
     _resolve_round_1_for_swiss_stage_item,
 )
-from bracket.models.db.match import MatchState
+from bracket.models.db.match import MatchSetState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage import Stage
 from bracket.models.db.stage_item import StageItem, StageItemWithInputsCreate, StageType
@@ -71,26 +71,30 @@ async def _build_resolved_swiss_stage(
     round1, _ = sorted(stage_item.rounds, key=lambda r: r.id)
 
     for match in round1.matches:
-        # Two-step: first set IN_PROGRESS with a non-zero score, then COMPLETE.
+        set_id = match.match_sets[0].id
+        # Two-step on the set: first set IN_PROGRESS with a non-zero score, then COMPLETE.
         resp = await send_tournament_request(
             HTTPMethod.PUT,
-            f"matches/{match.id}",
+            f"matches/{match.id}/sets/{set_id}",
             auth_context,
             json={
-                "round_id": round1.id,
-                "state": MatchState.IN_PROGRESS.value,
+                "state": MatchSetState.IN_PROGRESS.value,
                 "stage_item_input1_score": 1,
                 "stage_item_input2_score": 0,
             },
         )
-        assert resp == SUCCESS_RESPONSE
+        assert resp["data"]["id"] == match.id
         resp = await send_tournament_request(
             HTTPMethod.PUT,
-            f"matches/{match.id}",
+            f"matches/{match.id}/sets/{set_id}",
             auth_context,
-            json={"round_id": round1.id, "state": MatchState.COMPLETED.value},
+            json={
+                "state": MatchSetState.COMPLETED.value,
+                "stage_item_input1_score": 1,
+                "stage_item_input2_score": 0,
+            },
         )
-        assert resp == SUCCESS_RESPONSE
+        assert resp["data"]["id"] == match.id
 
     stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
     round1, round2 = sorted(stage_item.rounds, key=lambda r: r.id)
@@ -196,18 +200,18 @@ async def test_pinned_round_survives_upstream_correction(
 
             # Upstream correction: flip a round-1 score to shift ELO (triggers orchestrator).
             first_r1_match = sorted(round1.matches, key=lambda m: m.id)[0]
+            first_r1_set_id = first_r1_match.match_sets[0].id
             resp = await send_tournament_request(
                 HTTPMethod.PUT,
-                f"matches/{first_r1_match.id}",
+                f"matches/{first_r1_match.id}/sets/{first_r1_set_id}",
                 auth_context,
                 json={
-                    "round_id": round1.id,
-                    "state": MatchState.IN_PROGRESS.value,
+                    "state": MatchSetState.IN_PROGRESS.value,
                     "stage_item_input1_score": 0,
                     "stage_item_input2_score": 1,
                 },
             )
-            assert resp == SUCCESS_RESPONSE
+            assert resp["data"]["id"] == first_r1_match.id
 
             stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
             round2_after = sorted(stage_item.rounds, key=lambda r: r.id)[1]

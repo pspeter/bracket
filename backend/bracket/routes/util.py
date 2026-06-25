@@ -88,7 +88,12 @@ async def match_dependency(tournament_id: TournamentId, match_id: MatchId) -> Ma
             detail=f"Could not find match with id {match_id}",
         )
 
-    return match
+    # The match's overall state is derived from its sets, so load them here: callers rely on
+    # ``match.state`` (e.g. to guard unschedule/swap of a started match).
+    from bracket.sql.match_sets import get_sets_for_match
+
+    sets = await get_sets_for_match(match_id)
+    return match.model_copy(update={"match_sets": sets})
 
 
 async def team_dependency(tournament_id: TournamentId, team_id: TeamId) -> Team:

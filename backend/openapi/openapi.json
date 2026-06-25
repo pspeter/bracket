@@ -480,6 +480,14 @@
             ],
             "title": "Input2 Slot"
           },
+          "match_sets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MatchSet"
+            },
+            "title": "Match Sets",
+            "type": "array"
+          },
           "referee_name": {
             "anyOf": [
               {
@@ -545,10 +553,6 @@
             ],
             "title": "Stage Item Input1 Id"
           },
-          "stage_item_input1_score": {
-            "title": "Stage Item Input1 Score",
-            "type": "integer"
-          },
           "stage_item_input1_winner_from_match_id": {
             "anyOf": [
               {
@@ -588,10 +592,6 @@
             ],
             "title": "Stage Item Input2 Id"
           },
-          "stage_item_input2_score": {
-            "title": "Stage Item Input2 Score",
-            "type": "integer"
-          },
           "stage_item_input2_winner_from_match_id": {
             "anyOf": [
               {
@@ -617,7 +617,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/MatchState",
-            "default": "NOT_STARTED"
+            "readOnly": true
           }
         },
         "required": [
@@ -626,12 +626,9 @@
           "duration_minutes",
           "custom_duration_minutes",
           "round_id",
-          "stage_item_input1_score",
-          "stage_item_input2_score",
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "state",
           "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
@@ -642,25 +639,15 @@
           "referee_slot",
           "id",
           "stage_item_input1",
-          "stage_item_input2"
+          "stage_item_input2",
+          "match_sets",
+          "state"
         ],
         "title": "Match",
         "type": "object"
       },
       "MatchBody": {
         "properties": {
-          "completed_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
-          },
           "court_id": {
             "anyOf": [
               {
@@ -708,32 +695,14 @@
           "round_id": {
             "title": "Round Id",
             "type": "integer"
-          },
-          "stage_item_input1_score": {
-            "default": 0,
-            "title": "Stage Item Input1 Score",
-            "type": "integer"
-          },
-          "stage_item_input2_score": {
-            "default": 0,
-            "title": "Stage Item Input2 Score",
-            "type": "integer"
-          },
-          "state": {
-            "$ref": "#/components/schemas/MatchState",
-            "default": "NOT_STARTED"
           }
         },
         "required": [
           "round_id",
-          "stage_item_input1_score",
-          "stage_item_input2_score",
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "custom_duration_minutes",
-          "state",
-          "completed_at"
+          "custom_duration_minutes"
         ],
         "title": "MatchBody",
         "type": "object"
@@ -867,7 +836,44 @@
         "title": "MatchResizeBreakBody",
         "type": "object"
       },
-      "MatchScoreTrackingBody": {
+      "MatchSet": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "match_id": {
+            "title": "Match Id",
+            "type": "integer"
+          },
+          "set_number": {
+            "title": "Set Number",
+            "type": "integer"
+          },
+          "stage_item_input1_score": {
+            "title": "Stage Item Input1 Score",
+            "type": "integer"
+          },
+          "stage_item_input2_score": {
+            "title": "Stage Item Input2 Score",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchSetState"
+          }
+        },
+        "required": [
+          "id",
+          "match_id",
+          "set_number",
+          "stage_item_input1_score",
+          "stage_item_input2_score",
+          "state"
+        ],
+        "title": "MatchSet",
+        "type": "object"
+      },
+      "MatchSetBody": {
         "properties": {
           "stage_item_input1_score": {
             "default": 0,
@@ -880,7 +886,7 @@
             "type": "integer"
           },
           "state": {
-            "$ref": "#/components/schemas/MatchState",
+            "$ref": "#/components/schemas/MatchSetState",
             "default": "NOT_STARTED"
           }
         },
@@ -889,8 +895,17 @@
           "stage_item_input2_score",
           "state"
         ],
-        "title": "MatchScoreTrackingBody",
+        "title": "MatchSetBody",
         "type": "object"
+      },
+      "MatchSetState": {
+        "enum": [
+          "NOT_STARTED",
+          "IN_PROGRESS",
+          "COMPLETED"
+        ],
+        "title": "MatchSetState",
+        "type": "string"
       },
       "MatchState": {
         "enum": [
@@ -1001,6 +1016,17 @@
             ],
             "title": "Input2 Slot"
           },
+          "last_set_max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Set Max Points"
+          },
           "level_id": {
             "anyOf": [
               {
@@ -1011,6 +1037,24 @@
               }
             ],
             "title": "Level Id"
+          },
+          "match_sets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MatchSet"
+            },
+            "title": "Match Sets",
+            "type": "array"
+          },
+          "max_points": {
+            "default": 21,
+            "title": "Max Points",
+            "type": "integer"
+          },
+          "num_sets": {
+            "default": 1,
+            "title": "Num Sets",
+            "type": "integer"
           },
           "referee": {
             "anyOf": [
@@ -1105,10 +1149,6 @@
             ],
             "title": "Stage Item Input1 Id"
           },
-          "stage_item_input1_score": {
-            "title": "Stage Item Input1 Score",
-            "type": "integer"
-          },
           "stage_item_input1_winner_from_match_id": {
             "anyOf": [
               {
@@ -1148,10 +1188,6 @@
             ],
             "title": "Stage Item Input2 Id"
           },
-          "stage_item_input2_score": {
-            "title": "Stage Item Input2 Score",
-            "type": "integer"
-          },
           "stage_item_input2_winner_from_match_id": {
             "anyOf": [
               {
@@ -1177,7 +1213,12 @@
           },
           "state": {
             "$ref": "#/components/schemas/MatchState",
-            "default": "NOT_STARTED"
+            "readOnly": true
+          },
+          "two_point_advantage": {
+            "default": true,
+            "title": "Two Point Advantage",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1186,12 +1227,9 @@
           "duration_minutes",
           "custom_duration_minutes",
           "round_id",
-          "stage_item_input1_score",
-          "stage_item_input2_score",
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "state",
           "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
@@ -1203,10 +1241,16 @@
           "id",
           "stage_item_input1",
           "stage_item_input2",
+          "match_sets",
           "court",
           "referee",
           "level_id",
-          "side_switch_every_n_points"
+          "side_switch_every_n_points",
+          "num_sets",
+          "max_points",
+          "last_set_max_points",
+          "two_point_advantage",
+          "state"
         ],
         "title": "MatchWithDetails",
         "type": "object"
@@ -1303,6 +1347,14 @@
             ],
             "title": "Level Id"
           },
+          "match_sets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MatchSet"
+            },
+            "title": "Match Sets",
+            "type": "array"
+          },
           "referee": {
             "anyOf": [
               {
@@ -1393,10 +1445,6 @@
             ],
             "title": "Stage Item Input1 Id"
           },
-          "stage_item_input1_score": {
-            "title": "Stage Item Input1 Score",
-            "type": "integer"
-          },
           "stage_item_input1_winner_from_match_id": {
             "anyOf": [
               {
@@ -1433,10 +1481,6 @@
             ],
             "title": "Stage Item Input2 Id"
           },
-          "stage_item_input2_score": {
-            "title": "Stage Item Input2 Score",
-            "type": "integer"
-          },
           "stage_item_input2_winner_from_match_id": {
             "anyOf": [
               {
@@ -1462,7 +1506,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/MatchState",
-            "default": "NOT_STARTED"
+            "readOnly": true
           }
         },
         "required": [
@@ -1471,12 +1515,9 @@
           "duration_minutes",
           "custom_duration_minutes",
           "round_id",
-          "stage_item_input1_score",
-          "stage_item_input2_score",
           "court_id",
           "referee_stage_item_input_id",
           "referee_name",
-          "state",
           "completed_at",
           "stage_item_input1_id",
           "stage_item_input2_id",
@@ -1488,10 +1529,12 @@
           "id",
           "stage_item_input1",
           "stage_item_input2",
+          "match_sets",
           "level_id",
           "court",
           "referee",
-          "side_switch_every_n_points"
+          "side_switch_every_n_points",
+          "state"
         ],
         "title": "MatchWithDetailsDefinitive",
         "type": "object"
@@ -4371,7 +4414,7 @@
     }
   },
   "info": {
-    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Levels](#tag/Levels)\n\n- [Matches](#tag/Matches)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Referees](#tag/Referees)\n\n- [Rounds](#tag/Rounds)\n\n- [Score Tracking](#tag/Score-Tracking)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
+    "description": "\n### Description\nThis API allows you to do everything the frontend of [Bracket](https://github.com/evroon/bracket)\nallows you to do (the frontend uses this API as well).\n\nFore more information, see the [documentation](https://docs.bracketapp.nl).\n\n### Table of Contents\n*(links only work for [ReDoc](https://api.bracketapp.nl/redoc), not for Swagger UI)*\n\n- [Auth](#tag/Auth)\n\n- [Clubs](#tag/Clubs)\n\n- [Courts](#tag/Courts)\n\n- [Internals](#tag/Internals)\n\n- [Levels](#tag/Levels)\n\n- [Matches](#tag/Matches)\n\n- [Match sets](#tag/Match-sets)\n\n- [Players](#tag/Players)\n\n- [Rankings](#tag/Rankings)\n\n- [Referees](#tag/Referees)\n\n- [Rounds](#tag/Rounds)\n\n- [Score Tracking](#tag/Score-Tracking)\n\n- [Signup](#tag/Signup)\n\n- [Stage Items](#tag/Stage-Items)\n\n- [Stage Item Inputs](#tag/Stage-Item-Inputs)\n\n- [Stages](#tag/Stages)\n\n- [Teams](#tag/Teams)\n\n- [Tournaments](#tag/Tournaments)\n\n- [Users](#tag/Users)\n\n### Links\nGitHub: <https://github.com/evroon/bracket>\n\nDocs: <https://docs.bracketapp.nl>\n\nDemo: <https://www.bracketapp.nl/demo>\n\nAPI docs (Redoc): <https://api.bracketapp.nl/redoc>\n\nAPI docs (Swagger UI): <https://api.bracketapp.nl/docs>\n",
     "license": {
       "name": "AGPL-3.0",
       "url": "https://www.gnu.org/licenses/agpl-3.0.en.html"
@@ -4704,9 +4747,11 @@
         "tags": [
           "Score Tracking"
         ]
-      },
+      }
+    },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}": {
       "put": {
-        "operationId": "update_score_tracking_match_score_tracking__score_tracking_token__matches__match_id__put",
+        "operationId": "update_match_set_by_token_score_tracking__score_tracking_token__matches__match_id__sets__set_id__put",
         "parameters": [
           {
             "in": "path",
@@ -4714,6 +4759,15 @@
             "required": true,
             "schema": {
               "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
               "type": "integer"
             }
           },
@@ -4731,7 +4785,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MatchScoreTrackingBody"
+                "$ref": "#/components/schemas/MatchSetBody"
               }
             }
           },
@@ -4759,9 +4813,9 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Score Tracking Match",
+        "summary": "Update Match Set By Token",
         "tags": [
-          "Score Tracking"
+          "Match sets"
         ]
       }
     },
@@ -6027,6 +6081,81 @@
         ]
       }
     },
+    "/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}": {
+      "put": {
+        "operationId": "update_match_set_authenticated_tournaments__tournament_id__matches__match_id__sets__set_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchSetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Update Match Set Authenticated",
+        "tags": [
+          "Match sets"
+        ]
+      }
+    },
     "/tournaments/{tournament_id}/matches/{match_id}/unschedule": {
       "post": {
         "operationId": "unschedule_match_tournaments__tournament_id__matches__match_id__unschedule_post",
@@ -6688,6 +6817,16 @@
               "title": "Ranking Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force",
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -7285,70 +7424,6 @@
           }
         ],
         "summary": "Get Authenticated Score Tracking Match",
-        "tags": [
-          "Score Tracking"
-        ]
-      },
-      "put": {
-        "operationId": "update_authenticated_score_tracking_match_tournaments__tournament_id__score_tracking_matches__match_id__put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "tournament_id",
-            "required": true,
-            "schema": {
-              "title": "Tournament Id",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "path",
-            "name": "match_id",
-            "required": true,
-            "schema": {
-              "title": "Match Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MatchScoreTrackingBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "summary": "Update Authenticated Score Tracking Match",
         "tags": [
           "Score Tracking"
         ]

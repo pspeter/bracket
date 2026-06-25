@@ -193,20 +193,6 @@ matches = Table(
         nullable=True,
     ),
     Column("referee_name", String, nullable=True),
-    Column("stage_item_input1_score", Integer, nullable=False),
-    Column("stage_item_input2_score", Integer, nullable=False),
-    Column(
-        "state",
-        Enum(
-            "NOT_STARTED",
-            "IN_PROGRESS",
-            "COMPLETED",
-            name="match_state",
-        ),
-        nullable=False,
-        server_default="NOT_STARTED",
-        index=True,
-    ),
     Column("completed_at", DateTimeTZ, nullable=True),
     Column("input1_slot", Integer, nullable=True),
     Column("input2_slot", Integer, nullable=True),
@@ -215,6 +201,34 @@ matches = Table(
         "referee_stage_item_input_id IS NULL OR referee_name IS NULL",
         name="matches_at_most_one_referee",
     ),
+)
+
+match_sets = Table(
+    "match_sets",
+    metadata,
+    Column("id", BigInteger, primary_key=True, index=True),
+    Column(
+        "match_id",
+        BigInteger,
+        ForeignKey("matches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("set_number", Integer, nullable=False),
+    Column("stage_item_input1_score", Integer, nullable=False, server_default="0"),
+    Column("stage_item_input2_score", Integer, nullable=False, server_default="0"),
+    Column(
+        "state",
+        Enum(
+            "NOT_STARTED",
+            "IN_PROGRESS",
+            "COMPLETED",
+            name="match_set_state",
+        ),
+        nullable=False,
+        server_default="NOT_STARTED",
+    ),
+    UniqueConstraint("match_id", "set_number"),
 )
 
 teams = Table(

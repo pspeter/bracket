@@ -1,10 +1,8 @@
 import pytest
 
 from bracket.database import database
-from bracket.models.db.match import Match
 from bracket.models.db.stage_item_inputs import StageItemInputInsertable
-from bracket.schema import matches, tournaments
-from bracket.utils.db import fetch_one_parsed_certain
+from bracket.schema import tournaments
 from bracket.utils.dummy_records import (
     DUMMY_COURT1,
     DUMMY_COURT2,
@@ -376,9 +374,10 @@ async def test_authenticated_score_tracking_update_works_when_public_link_disabl
             )
         ) as match_inserted,
     ):
+        set_id = match_inserted.match_sets[0].id
         response = await send_tournament_request(
             HTTPMethod.PUT,
-            f"score-tracking/matches/{match_inserted.id}",
+            f"matches/{match_inserted.id}/sets/{set_id}",
             auth_context,
             json={
                 "stage_item_input1_score": 7,
@@ -388,18 +387,10 @@ async def test_authenticated_score_tracking_update_works_when_public_link_disabl
         )
 
         assert response["data"]["id"] == match_inserted.id
-        assert response["data"]["stage_item_input1_score"] == 7
-        assert response["data"]["stage_item_input2_score"] == 5
         assert response["data"]["state"] == "IN_PROGRESS"
-
-        updated_match = await fetch_one_parsed_certain(
-            database,
-            Match,
-            query=matches.select().where(matches.c.id == match_inserted.id),
-        )
-        assert updated_match.stage_item_input1_score == 7
-        assert updated_match.stage_item_input2_score == 5
-        assert updated_match.state.name == "IN_PROGRESS"
+        assert response["data"]["match_sets"][0]["stage_item_input1_score"] == 7
+        assert response["data"]["match_sets"][0]["stage_item_input2_score"] == 5
+        assert response["data"]["match_sets"][0]["state"] == "IN_PROGRESS"
 
 
 @pytest.mark.asyncio(loop_scope="session")

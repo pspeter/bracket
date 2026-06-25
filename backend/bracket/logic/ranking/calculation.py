@@ -24,11 +24,13 @@ def set_statistics_for_stage_item_input(
     stage_item: StageItemWithRounds,
 ) -> None:
     is_team1 = team_index == 0
-    team_score = match.stage_item_input1_score if is_team1 else match.stage_item_input2_score
-    was_draw = match.stage_item_input1_score == match.stage_item_input2_score
-    has_won = not was_draw and team_score == max(
-        match.stage_item_input1_score, match.stage_item_input2_score
-    )
+    # Win/draw/loss is decided by sets won. For a single-set match this is identical to comparing
+    # the two flat scores, so num_sets=1 behaves exactly as before.
+    sets1 = match.sets_won_by_input1
+    sets2 = match.sets_won_by_input2
+    team_sets = sets1 if is_team1 else sets2
+    was_draw = sets1 == sets2
+    has_won = not was_draw and team_sets == max(sets1, sets2)
 
     if has_won:
         stats[stage_item_input_id].wins += 1

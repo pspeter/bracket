@@ -6,7 +6,7 @@ from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
     _resolve_round_1_for_swiss_stage_item,
 )
-from bracket.models.db.match import MatchState
+from bracket.models.db.match import MatchSetState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import StageItemInputCreateBodyFinal
@@ -14,7 +14,7 @@ from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stag
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.utils.dummy_records import DUMMY_STAGE1, DUMMY_TEAM1
 from bracket.utils.http import HTTPMethod
-from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
+from tests.integration_tests.api.shared import send_tournament_request
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     assert_row_count_and_clear,
@@ -70,20 +70,20 @@ async def test_completing_round1_auto_resolves_round2(
         assert round2.lifecycle_state == RoundLifecycleState.PLACEHOLDER
 
         try:
-            # Complete all round 1 matches via the HTTP API — this triggers the orchestrator
+            # Complete all round 1 matches via the per-set HTTP API — this triggers the orchestrator
             for match in round1.matches:
+                set_id = match.match_sets[0].id
                 resp = await send_tournament_request(
                     HTTPMethod.PUT,
-                    f"matches/{match.id}",
+                    f"matches/{match.id}/sets/{set_id}",
                     auth_context,
                     json={
-                        "round_id": round1.id,
-                        "state": MatchState.COMPLETED.value,
+                        "state": MatchSetState.COMPLETED.value,
                         "stage_item_input1_score": 0,
                         "stage_item_input2_score": 0,
                     },
                 )
-                assert resp == SUCCESS_RESPONSE
+                assert resp["data"]["id"] == match.id
 
             # Round 2 must now be RESOLVED with concrete teams
             stage_item = await get_stage_item(tournament_id, stage_item_raw.id)

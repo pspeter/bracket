@@ -3,6 +3,7 @@ from typing import Literal, cast
 from bracket.database import database
 from bracket.models.db.stage import Stage
 from bracket.models.db.util import StageWithStageItems
+from bracket.sql.match_sets import MATCH_SETS_SUBQUERY
 from bracket.utils.id_types import LevelId, RoundId, StageId, StageItemId, TournamentId
 from bracket.utils.types import dict_without_none
 
@@ -23,6 +24,7 @@ async def get_full_tournament_details(
         if stage_item_ids is not None
         else ""
     )
+    match_sets = MATCH_SETS_SUBQUERY
 
     query = f"""
         WITH inputs_with_teams AS (
@@ -42,7 +44,8 @@ async def get_full_tournament_details(
                 to_json(sii1) as stage_item_input1,
                 to_json(sii2) as stage_item_input2,
                 to_json(c) as court,
-                to_json(ref_sii) AS referee
+                to_json(ref_sii) AS referee,
+                {match_sets}
             FROM matches
             LEFT JOIN inputs_with_teams sii1 on sii1.id = matches.stage_item_input1_id
             LEFT JOIN inputs_with_teams sii2 on sii2.id = matches.stage_item_input2_id

@@ -112,8 +112,6 @@ async def test_rounds_and_matches_returned_in_id_order_after_heap_reuse(
                             created=datetime_utc.now(),
                             round_id=round_id,
                             duration_minutes=10,
-                            stage_item_input1_score=0,
-                            stage_item_input2_score=0,
                         ),
                         matches,
                         Match,

@@ -8,7 +8,7 @@ from bracket.database import database
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.models.db.match import (
     MatchCreateBody,
-    MatchState,
+    MatchSetState,
     MatchWithDetails,
     MatchWithDetailsDefinitive,
 )
@@ -620,14 +620,16 @@ async def test_reoptimize_keeps_started_matches_fixed_and_reflows_the_rest(
             key=lambda m: (m.start_time, m.court_id),
         )
         in_progress, completed = scheduled_before[0], scheduled_before[1]
-        await database.execute(
-            "UPDATE matches SET state = :state WHERE id = :match_id",
-            {"state": MatchState.IN_PROGRESS.value, "match_id": in_progress.id},
-        )
-        await database.execute(
-            "UPDATE matches SET state = :state WHERE id = :match_id",
-            {"state": MatchState.COMPLETED.value, "match_id": completed.id},
-        )
+        for match_set in in_progress.match_sets:
+            await database.execute(
+                "UPDATE match_sets SET state = :state WHERE id = :id",
+                {"state": MatchSetState.IN_PROGRESS.value, "id": match_set.id},
+            )
+        for match_set in completed.match_sets:
+            await database.execute(
+                "UPDATE match_sets SET state = :state WHERE id = :id",
+                {"state": MatchSetState.COMPLETED.value, "id": match_set.id},
+            )
         frozen = {
             in_progress.id: (in_progress.court_id, in_progress.start_time),
             completed.id: (completed.court_id, completed.start_time),

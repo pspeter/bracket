@@ -9,7 +9,7 @@ from bracket.database import database
 from bracket.models.db.club import Club, ClubInsertable
 from bracket.models.db.court import Court, CourtInsertable
 from bracket.models.db.level import Level, LevelInsertable
-from bracket.models.db.match import Match, MatchInsertable
+from bracket.models.db.match import Match, MatchInsertable, MatchSetState
 from bracket.models.db.player import Player, PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import (
@@ -197,9 +197,40 @@ async def inserted_round(round_: RoundInsertable) -> AsyncIterator[Round]:
 
 
 @asynccontextmanager
-async def inserted_match(match: MatchInsertable) -> AsyncIterator[Match]:
+async def inserted_match(
+    match: MatchInsertable,
+    *,
+    set_score1: int = 0,
+    set_score2: int = 0,
+    set_state: MatchSetState = MatchSetState.NOT_STARTED,
+) -> AsyncIterator[Match]:
+    """Insert a match plus a single set (set_number=1).
+
+    Scores and match state now live on ``match_sets`` rather than on the match row, so this
+    mirrors what ``sql_create_match`` does in production (one set per match for num_sets=1) and
+    lets tests seed a starting score/state directly.
+    """
+    from bracket.sql.match_sets import get_sets_for_match
+
     async with inserted_generic(match, matches, Match) as row_inserted:
-        yield cast("Match", row_inserted)
+        match_row = cast("Match", row_inserted)
+        await database.execute(
+            query="""
+                INSERT INTO match_sets (
+                    match_id, set_number, stage_item_input1_score, stage_item_input2_score, state
+                )
+                VALUES (:match_id, 1, :score1, :score2, :state)
+            """,
+            values={
+                "match_id": match_row.id,
+                "score1": set_score1,
+                "score2": set_score2,
+                "state": set_state.value,
+            },
+        )
+        sets = await get_sets_for_match(match_row.id)
+        # match_sets cascade-delete with the match, so no extra cleanup is needed here.
+        yield match_row.model_copy(update={"match_sets": sets})
 
 
 @asynccontextmanager

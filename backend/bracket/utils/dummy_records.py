@@ -6,7 +6,7 @@ from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubInsertable
 from bracket.models.db.court import CourtInsertable
 from bracket.models.db.level import LevelInsertable
-from bracket.models.db.match import MatchInsertable, MatchState
+from bracket.models.db.match import MatchInsertable
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import RankingBase
@@ -137,14 +137,11 @@ DUMMY_MATCH1 = MatchInsertable(
     round_id=RoundId(DB_PLACEHOLDER_ID),
     stage_item_input1_id=StageItemInputId(DB_PLACEHOLDER_ID),
     stage_item_input2_id=StageItemInputId(DB_PLACEHOLDER_ID),
-    stage_item_input1_score=11,
-    stage_item_input2_score=22,
     court_id=CourtId(DB_PLACEHOLDER_ID),
     stage_item_input1_winner_from_match_id=None,
     stage_item_input2_winner_from_match_id=None,
     duration_minutes=10,
     custom_duration_minutes=None,
-    state=MatchState.COMPLETED,
     completed_at=DUMMY_MOCK_TIME,
 )
 

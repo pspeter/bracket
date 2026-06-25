@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from starlette import status
 
 from bracket.config import config
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
@@ -19,6 +20,10 @@ from bracket.routes.models import (
     SuccessResponse,
 )
 from bracket.routes.util import disallow_archived_tournament
+from bracket.sql.match_sets import (
+    sql_ranking_has_active_sets,
+    sql_resize_sets_for_ranking,
+)
 from bracket.sql.rankings import (
     get_all_rankings_in_tournament,
     sql_create_ranking,
@@ -45,14 +50,36 @@ async def update_ranking_by_id(
     tournament_id: TournamentId,
     ranking_id: RankingId,
     ranking_body: RankingBody,
+    force: bool = False,
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    # Detect a change in the configured number of sets so existing matches' set rows can be
+    # resized. When matches already have in-progress or completed sets this is destructive, so
+    # it is refused with a 409 unless explicitly forced.
+    existing_rankings = await get_all_rankings_in_tournament(tournament_id)
+    old_num_sets = next(
+        (r.num_sets for r in existing_rankings if r.id == ranking_id), ranking_body.num_sets
+    )
+
+    if ranking_body.num_sets != old_num_sets and not force:
+        if await sql_ranking_has_active_sets(ranking_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Matches with in-progress or completed sets exist. Pass force=true to proceed."
+                ),
+            )
+
     await sql_update_ranking(
         tournament_id=tournament_id,
         ranking_id=ranking_id,
         ranking_body=ranking_body,
     )
+
+    if ranking_body.num_sets != old_num_sets:
+        await sql_resize_sets_for_ranking(ranking_id, old_num_sets, ranking_body.num_sets)
+
     stage_item_ids = await get_stage_item_input_ids_by_ranking_id(ranking_id)
     for stage_item_id in stage_item_ids:
         stage_item = await get_stage_item(tournament_id, stage_item_id)
