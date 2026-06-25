@@ -392,7 +392,11 @@ export function ScoreTrackingMatchView({
               >
                 {t('switch_sides_button')}
               </Button>
-              <Text fz="sm" c="red" style={{ visibility: showSideSwitchReminder ? 'visible' : 'hidden' }}>
+              <Text
+                fz="sm"
+                c="red"
+                style={{ visibility: showSideSwitchReminder ? 'visible' : 'hidden' }}
+              >
                 {t('side_switch_reminder_description')}
               </Text>
             </Stack>
