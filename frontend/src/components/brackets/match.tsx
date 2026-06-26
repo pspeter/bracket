@@ -91,7 +91,7 @@ export default function Match({
     const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
     const fz = match.num_sets > 3 ? '0.6rem' : '0.75rem';
     const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
-    const minWidth = maxScore >= 100 ? '2rem' : maxScore >= 10 ? '1.8rem' : '1.2rem';
+    const minWidth = maxScore >= 100 ? '2rem' : maxScore >= 10 ? '1.6rem' : '1.2rem';
     return (
       <div
         key={set.id}

@@ -308,7 +308,7 @@ function MatchCard({
           set.stage_item_input1_score,
           set.stage_item_input2_score
         );
-        const minWidth = maxScore >= 100 ? '2.4rem' : maxScore >= 10 ? '1.8rem' : '1.2rem';
+        const minWidth = maxScore >= 100 ? '2.4rem' : maxScore >= 10 ? '1.6rem' : '1.2rem';
         return (
           <Text
             key={set.id}
