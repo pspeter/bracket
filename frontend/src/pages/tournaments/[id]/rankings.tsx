@@ -7,6 +7,7 @@ import {
   Container,
   NumberInput,
   Select,
+  Text,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +19,15 @@ import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonSingleColumn } from '@components/utils/skeletons';
 import { Translator } from '@components/utils/types';
 import { getTournamentIdFromRouter } from '@components/utils/util';
-import { Ranking, RankingsResponse, ScoringType, TournamentWithLevels } from '@openapi';
+import {
+  Ranking,
+  RankingsResponse,
+  ScoringType,
+  StageItemWithRounds,
+  TournamentWithLevels,
+} from '@openapi';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
-import { getRankings, getTournamentById } from '@services/adapter';
+import { getRankings, getStages, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
 
 function RankingDeleteButton({
@@ -64,13 +71,16 @@ function EditRankingForm({
   t,
   tournament,
   ranking,
+  stageItems,
   swrRankingsResponse,
 }: {
   t: Translator;
   tournament: TournamentWithLevels;
   ranking: Ranking;
+  stageItems: StageItemWithRounds[];
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
+  const stageItemsForRanking = stageItems.filter((si) => si.ranking_id === ranking.id);
   const form = useForm({
     initialValues: {
       scoring_type: ranking.scoring_type as ScoringType,
@@ -88,6 +98,9 @@ function EditRankingForm({
     },
     validate: {},
   });
+  const hasEvenSetsError =
+    form.values.num_sets % 2 === 0 &&
+    stageItemsForRanking.some((si) => si.type === 'SINGLE_ELIMINATION');
   const rankingTitle = `${t('ranking_title')} ${ranking.position + 1}`;
 
   return (
@@ -173,6 +186,11 @@ function EditRankingForm({
             label={t('num_sets_label')}
             {...form.getInputProps('num_sets')}
           />
+          {hasEvenSetsError && (
+            <Text c="red" size="sm" mt="xs">
+              {t('even_sets_single_elim_error')}
+            </Text>
+          )}
           <NumberInput
             mt="1rem"
             withAsterisk
@@ -208,7 +226,13 @@ function EditRankingForm({
               {...form.getInputProps('side_switch_every_n_points')}
             />
           )}
-          <Button fullWidth style={{ marginTop: 16 }} color="green" type="submit">
+          <Button
+            fullWidth
+            style={{ marginTop: 16 }}
+            color="green"
+            type="submit"
+            disabled={hasEvenSetsError}
+          >
             {`${t('save_button')} ${rankingTitle}`}
           </Button>
         </Accordion.Panel>
@@ -220,10 +244,12 @@ function EditRankingForm({
 function RankingForm({
   t,
   tournament,
+  stageItems,
   swrRankingsResponse,
 }: {
   t: Translator;
   tournament: TournamentWithLevels;
+  stageItems: StageItemWithRounds[];
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
   const rankings: Ranking[] = swrRankingsResponse.data != null ? swrRankingsResponse.data.data : [];
@@ -235,6 +261,7 @@ function RankingForm({
         t={t}
         tournament={tournament}
         ranking={ranking}
+        stageItems={stageItems}
         swrRankingsResponse={swrRankingsResponse}
       />
     ));
@@ -257,9 +284,11 @@ function RankingForm({
 export default function RankingsPage() {
   const { tournamentData } = getTournamentIdFromRouter();
   const swrRankingsResponse = getRankings(tournamentData.id);
+  const swrStagesResponse = getStages(tournamentData.id);
 
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const tournamentDataFull = swrTournamentResponse.data?.data;
+  const stageItems = (swrStagesResponse.data?.data ?? []).flatMap((s) => s.stage_items);
   const { t } = useTranslation();
 
   // TODO: show loading icon.
@@ -273,6 +302,7 @@ export default function RankingsPage() {
         <RankingForm
           t={t}
           tournament={tournamentDataFull}
+          stageItems={stageItems}
           swrRankingsResponse={swrRankingsResponse}
         />
         <Button

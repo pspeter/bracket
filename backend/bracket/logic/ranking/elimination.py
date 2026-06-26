@@ -1,3 +1,5 @@
+import logging
+
 from bracket.models.db.match import Match, MatchState
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
@@ -8,6 +10,8 @@ from bracket.utils.id_types import (
     MatchId,
     RoundId,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_inputs_to_update_in_subsequent_elimination_rounds(
@@ -44,14 +48,28 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
                 subsequent_match.stage_item_input1_winner_from_match_id
             )
         ):
-            updated_inputs[0] = affected_match1.get_winner()
+            winner1 = affected_match1.get_winner()
+            if winner1 is None:
+                logger.warning(
+                    "Match %s has no winner yet or is a draw — skipping elimination propagation",
+                    affected_match1.id,
+                )
+            else:
+                updated_inputs[0] = winner1
 
         if subsequent_match.stage_item_input2_winner_from_match_id is not None and (
             affected_match2 := affected_matches.get(
                 subsequent_match.stage_item_input2_winner_from_match_id
             )
         ):
-            updated_inputs[1] = affected_match2.get_winner()
+            winner2 = affected_match2.get_winner()
+            if winner2 is None:
+                logger.warning(
+                    "Match %s has no winner yet or is a draw — skipping elimination propagation",
+                    affected_match2.id,
+                )
+            else:
+                updated_inputs[1] = winner2
 
         if original_inputs != updated_inputs:
             input_ids = [input_.id if input_ else None for input_ in updated_inputs]

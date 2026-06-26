@@ -4,15 +4,16 @@ from unittest.mock import ANY
 import pytest
 
 from bracket.models.db.ranking import ScoringType
+from bracket.models.db.stage_item import StageType
 from bracket.sql.rankings import (
     get_all_rankings_in_tournament,
     sql_delete_ranking,
 )
-from bracket.utils.dummy_records import DUMMY_RANKING1, DUMMY_TEAM1
+from bracket.utils.dummy_records import DUMMY_RANKING1, DUMMY_STAGE1, DUMMY_STAGE_ITEM1, DUMMY_STAGE_ITEM3, DUMMY_TEAM1
 from bracket.utils.http import HTTPMethod
 from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
 from tests.integration_tests.models import AuthContext
-from tests.integration_tests.sql import inserted_ranking, inserted_team
+from tests.integration_tests.sql import inserted_ranking, inserted_stage, inserted_stage_item, inserted_team
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -235,3 +236,85 @@ async def test_update_ranking_side_switch(
             updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
             updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
             assert updated.side_switch_every_n_points == 7
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_even_sets_single_elimination_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT with even num_sets returns 422 when the ranking is used by a SINGLE_ELIMINATION stage item."""
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2}
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})
+    ) as test_ranking:
+        async with inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            async with inserted_stage_item(
+                DUMMY_STAGE_ITEM3.model_copy(
+                    update={"stage_id": stage.id, "ranking_id": test_ranking.id}
+                )
+            ):
+                response = await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"rankings/{test_ranking.id}",
+                    auth_context,
+                    json=body,
+                )
+                assert "detail" in response
+                assert "Even number of sets" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_odd_sets_single_elimination_succeeds(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT with odd num_sets succeeds even when the ranking is used by a SINGLE_ELIMINATION stage item."""
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 3}
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})
+    ) as test_ranking:
+        async with inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            async with inserted_stage_item(
+                DUMMY_STAGE_ITEM3.model_copy(
+                    update={"stage_id": stage.id, "ranking_id": test_ranking.id}
+                )
+            ):
+                response = await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"rankings/{test_ranking.id}",
+                    auth_context,
+                    json=body,
+                )
+                assert response.get("success") is True, response
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_even_sets_round_robin_succeeds(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT with even num_sets is allowed when all associated stage items are ROUND_ROBIN."""
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2}
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})
+    ) as test_ranking:
+        async with inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            async with inserted_stage_item(
+                DUMMY_STAGE_ITEM1.model_copy(
+                    update={"stage_id": stage.id, "ranking_id": test_ranking.id}
+                )
+            ):
+                response = await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"rankings/{test_ranking.id}",
+                    auth_context,
+                    json=body,
+                )
+                assert response.get("success") is True, response

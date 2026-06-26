@@ -141,6 +141,7 @@
     "empty_password_validation": "Password cannot be empty",
     "empty_slot": "Empty slot",
     "end_set_label": "End Set",
+    "even_sets_single_elim_error": "Even number of sets is not supported for single elimination brackets.",
     "example_label": "Example:",
     "filter_stage_item_label": "Filter on stage item",
     "filter_stage_item_placeholder": "No filter",

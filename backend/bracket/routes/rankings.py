@@ -32,7 +32,7 @@ from bracket.sql.rankings import (
     sql_update_ranking,
 )
 from bracket.sql.stage_item_inputs import get_stage_item_input_ids_by_ranking_id
-from bracket.sql.stage_items import get_stage_item
+from bracket.sql.stage_items import get_stage_item, get_stage_items_for_ranking
 from bracket.utils.id_types import RankingId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
@@ -55,6 +55,14 @@ async def update_ranking_by_id(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    if ranking_body.num_sets % 2 == 0:
+        stage_items_for_ranking = await get_stage_items_for_ranking(tournament_id, ranking_id)
+        if any(si.type == StageType.SINGLE_ELIMINATION for si in stage_items_for_ranking):
+            raise HTTPException(
+                status_code=422,
+                detail="Even number of sets is not supported for single elimination brackets.",
+            )
+
     # Detect a change in the configured number of sets so existing matches' set rows can be
     # resized. When matches already have in-progress or completed sets this is destructive, so
     # it is refused with a 409 unless explicitly forced.
