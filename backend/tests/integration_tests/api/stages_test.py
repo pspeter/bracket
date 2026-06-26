@@ -502,6 +502,61 @@ async def test_set_ranking_for_all_stage_items_overwrites_every_item(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_set_ranking_for_all_stage_items_even_sets_single_elimination_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(
+                update={"tournament_id": tournament_id, "position": 1, "num_sets": 2}
+            )
+        ) as even_sets_ranking,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM3.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ),
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"stages/{stage_inserted.id}/ranking",
+            auth_context,
+            json={"ranking_id": even_sets_ranking.id},
+        )
+        assert "detail" in response
+        assert "Even number of sets" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_set_ranking_for_all_stage_items_unknown_ranking_returns_404(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ),
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"stages/{stage_inserted.id}/ranking",
+            auth_context,
+            json={"ranking_id": 9999999},
+        )
+        assert "detail" in response
+        assert "Could not find ranking" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_activate_stage(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
