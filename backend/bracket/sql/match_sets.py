@@ -30,15 +30,19 @@ async def sql_get_match_set(match_set_id: MatchSetId) -> MatchSet | None:
 
 
 async def sql_create_match_sets(match_id: MatchId, num_sets: int) -> None:
-    """Insert ``num_sets`` NOT_STARTED sets (set_number 1..num_sets) for a match."""
-    for set_number in range(1, max(num_sets, 1) + 1):
-        await database.execute(
-            query="""
-                INSERT INTO match_sets (match_id, set_number, state)
-                VALUES (:match_id, :set_number, 'NOT_STARTED')
-            """,
-            values={"match_id": match_id, "set_number": set_number},
-        )
+    """Insert ``num_sets`` NOT_STARTED sets (set_number 1..num_sets) for a match.
+
+    Uses a single multi-row INSERT (via ``generate_series``) rather than one statement per
+    set, so match creation stays a single round-trip regardless of ``num_sets``.
+    """
+    await database.execute(
+        query="""
+            INSERT INTO match_sets (match_id, set_number, state)
+            SELECT :match_id, set_number, 'NOT_STARTED'
+            FROM generate_series(1, :num_sets) AS set_number
+        """,
+        values={"match_id": match_id, "num_sets": max(num_sets, 1)},
+    )
 
 
 async def sql_update_match_set(match_set_id: MatchSetId, body: MatchSetBody) -> None:

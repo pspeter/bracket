@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
 from bracket.config import config
+from bracket.database import database
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import (
     update_inputs_in_complete_elimination_stage_item,
@@ -71,22 +72,26 @@ async def update_ranking_by_id(
                 ),
             )
 
-    await sql_update_ranking(
-        tournament_id=tournament_id,
-        ranking_id=ranking_id,
-        ranking_body=ranking_body,
-    )
+    # The ranking update, the set resize it triggers, and the dependent ranking
+    # recalculations must be atomic, so set rows can't be left inconsistent with the ranking's
+    # num_sets if a later step fails.
+    async with database.transaction():
+        await sql_update_ranking(
+            tournament_id=tournament_id,
+            ranking_id=ranking_id,
+            ranking_body=ranking_body,
+        )
 
-    if ranking_body.num_sets != old_num_sets:
-        await sql_resize_sets_for_ranking(ranking_id, old_num_sets, ranking_body.num_sets)
+        if ranking_body.num_sets != old_num_sets:
+            await sql_resize_sets_for_ranking(ranking_id, old_num_sets, ranking_body.num_sets)
 
-    stage_item_ids = await get_stage_item_input_ids_by_ranking_id(ranking_id)
-    for stage_item_id in stage_item_ids:
-        stage_item = await get_stage_item(tournament_id, stage_item_id)
-        await recalculate_ranking_for_stage_item(tournament_id, stage_item)
+        stage_item_ids = await get_stage_item_input_ids_by_ranking_id(ranking_id)
+        for stage_item_id in stage_item_ids:
+            stage_item = await get_stage_item(tournament_id, stage_item_id)
+            await recalculate_ranking_for_stage_item(tournament_id, stage_item)
 
-        if stage_item.type == StageType.SINGLE_ELIMINATION:
-            await update_inputs_in_complete_elimination_stage_item(stage_item)
+            if stage_item.type == StageType.SINGLE_ELIMINATION:
+                await update_inputs_in_complete_elimination_stage_item(stage_item)
     return SuccessResponse()
 
 

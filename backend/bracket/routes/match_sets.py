@@ -3,6 +3,7 @@ from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.config import config
+from bracket.database import database
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
 from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
@@ -64,21 +65,26 @@ async def update_match_set_and_recalculate(
     )
     await validate_match_can_be_started(tournament_id, match_with_sets, new_state)
 
-    await sql_update_match_set(match_set_id, body)
-
-    # completed_at side effect: set when the match becomes completed, clear when it reverts.
-    if new_state is MatchState.COMPLETED and match.completed_at is None:
-        await sql_set_match_completed_at(match.id, datetime_utc.now())
-    elif new_state is not MatchState.COMPLETED and match.completed_at is not None:
-        await sql_set_match_completed_at(match.id, None)
-
     round_ = await get_round_by_id(tournament_id, match.round_id)
     stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    await auto_resolve_next_swiss_round(tournament_id, stage_item)
 
-    if stage_item.type == StageType.SINGLE_ELIMINATION:
-        await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match.id})
+    # The set update, its completed_at side effect, and the dependent ranking/follow-up
+    # recalculations must be atomic, so a failure can't leave the score and the derived
+    # state out of sync.
+    async with database.transaction():
+        await sql_update_match_set(match_set_id, body)
+
+        # completed_at side effect: set when the match becomes completed, clear when it reverts.
+        if new_state is MatchState.COMPLETED and match.completed_at is None:
+            await sql_set_match_completed_at(match.id, datetime_utc.now())
+        elif new_state is not MatchState.COMPLETED and match.completed_at is not None:
+            await sql_set_match_completed_at(match.id, None)
+
+        await recalculate_ranking_for_stage_item(tournament_id, stage_item)
+        await auto_resolve_next_swiss_round(tournament_id, stage_item)
+
+        if stage_item.type == StageType.SINGLE_ELIMINATION:
+            await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match.id})
 
     updated = await sql_get_match_with_details(tournament_id, match.id)
     if updated is None:

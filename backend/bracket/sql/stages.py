@@ -45,6 +45,12 @@ async def get_full_tournament_details(
                 to_json(sii2) as stage_item_input2,
                 to_json(c) as court,
                 to_json(ref_sii) AS referee,
+                s2.level_id AS level_id,
+                rnk.side_switch_every_n_points AS side_switch_every_n_points,
+                rnk.num_sets AS num_sets,
+                rnk.max_points AS max_points,
+                rnk.last_set_max_points AS last_set_max_points,
+                rnk.two_point_advantage AS two_point_advantage,
                 {match_sets}
             FROM matches
             LEFT JOIN inputs_with_teams sii1 on sii1.id = matches.stage_item_input1_id
@@ -52,6 +58,7 @@ async def get_full_tournament_details(
             LEFT JOIN rounds r on matches.round_id = r.id
             LEFT JOIN stage_items si on r.stage_item_id = si.id
             LEFT JOIN stages s2 on s2.id = si.stage_id
+            LEFT JOIN rankings rnk on rnk.id = si.ranking_id
             LEFT JOIN courts c on matches.court_id = c.id
             LEFT JOIN inputs_with_teams ref_sii on ref_sii.id = matches.referee_stage_item_input_id
             WHERE s2.tournament_id = :tournament_id

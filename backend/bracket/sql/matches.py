@@ -92,16 +92,19 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
         )
         RETURNING *
     """
-    result = await database.fetch_one(query=query, values=match.model_dump())
+    # The match insert and its set pre-population must be atomic: a match with zero sets
+    # derives as NOT_STARTED forever and renders no editable rows, so never leave one behind.
+    async with database.transaction():
+        result = await database.fetch_one(query=query, values=match.model_dump())
 
-    if result is None:
-        raise ValueError("Could not create stage")
+        if result is None:
+            raise ValueError("Could not create stage")
 
-    created_match = Match.model_validate(dict(result._mapping))
+        created_match = Match.model_validate(dict(result._mapping))
 
-    # Pre-populate one row in match_sets per configured set, all NOT_STARTED at 0–0.
-    num_sets = await sql_get_num_sets_for_round(created_match.round_id)
-    await sql_create_match_sets(created_match.id, num_sets)
+        # Pre-populate one row in match_sets per configured set, all NOT_STARTED at 0–0.
+        num_sets = await sql_get_num_sets_for_round(created_match.round_id)
+        await sql_create_match_sets(created_match.id, num_sets)
 
     return created_match
 
@@ -365,26 +368,29 @@ async def clear_scores_for_matches_in_stage_item(
             AND stages.tournament_id = :tournament_id
             AND stage_items.id = :stage_item_id
         """
-    await database.execute(
-        query=query,
-        values={
-            "stage_item_id": stage_item_id,
-            "tournament_id": tournament_id,
-        },
-    )
-    await database.execute(
-        query="""
-        UPDATE matches
-        SET completed_at = NULL
-        FROM rounds
-        JOIN stage_items ON rounds.stage_item_id = stage_items.id
-        JOIN stages ON stages.id = stage_items.stage_id
-        WHERE   rounds.id = matches.round_id
-            AND stages.tournament_id = :tournament_id
-            AND stage_items.id = :stage_item_id
-        """,
-        values={
-            "stage_item_id": stage_item_id,
-            "tournament_id": tournament_id,
-        },
-    )
+    # Clearing the set scores and clearing completed_at must be atomic, so matches never end
+    # up with reset sets but a stale completed_at (or vice versa).
+    async with database.transaction():
+        await database.execute(
+            query=query,
+            values={
+                "stage_item_id": stage_item_id,
+                "tournament_id": tournament_id,
+            },
+        )
+        await database.execute(
+            query="""
+            UPDATE matches
+            SET completed_at = NULL
+            FROM rounds
+            JOIN stage_items ON rounds.stage_item_id = stage_items.id
+            JOIN stages ON stages.id = stage_items.stage_id
+            WHERE   rounds.id = matches.round_id
+                AND stages.tournament_id = :tournament_id
+                AND stage_items.id = :stage_item_id
+            """,
+            values={
+                "stage_item_id": stage_item_id,
+                "tournament_id": tournament_id,
+            },
+        )
