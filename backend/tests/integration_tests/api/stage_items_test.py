@@ -12,9 +12,11 @@ from bracket.schema import match_sets, matches, rounds, stage_item_inputs, stage
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
+    DUMMY_RANKING1,
     DUMMY_STAGE1,
     DUMMY_STAGE2,
     DUMMY_STAGE_ITEM1,
+    DUMMY_STAGE_ITEM3,
     DUMMY_TEAM1,
     DUMMY_TEAM2,
     DUMMY_TEAM3,
@@ -28,6 +30,7 @@ from tests.integration_tests.api.shared import (
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     assert_row_count_and_clear,
+    inserted_ranking,
     inserted_stage,
     inserted_stage_item,
     inserted_team,
@@ -464,3 +467,61 @@ async def test_update_single_elimination_stage_item_fails_after_games_started(
         await assert_row_count_and_clear(stage_item_inputs, 4)
         await assert_row_count_and_clear(stage_items, 1)
         await assert_row_count_and_clear(stages, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_create_single_elimination_stage_item_with_even_set_ranking_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """POST stage_items with SINGLE_ELIMINATION type and a ranking with even num_sets returns 422."""
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "num_sets": 2})
+    ) as ranking_even:
+        async with inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            response = await send_tournament_request(
+                HTTPMethod.POST,
+                "stage_items",
+                auth_context,
+                json={
+                    "type": StageType.SINGLE_ELIMINATION.value,
+                    "team_count": 2,
+                    "stage_id": stage.id,
+                    "ranking_id": ranking_even.id,
+                },
+            )
+            assert "detail" in response
+            assert "Even number of sets" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_stage_item_ranking_to_even_sets_single_elimination_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT stage_items changing ranking_id to a ranking with even num_sets returns 422 for SINGLE_ELIMINATION."""
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "num_sets": 2})
+    ) as ranking_even:
+        async with inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            async with inserted_stage_item(
+                DUMMY_STAGE_ITEM3.model_copy(
+                    update={"stage_id": stage.id, "ranking_id": auth_context.ranking.id}
+                )
+            ) as stage_item:
+                response = await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"stage_items/{stage_item.id}",
+                    auth_context,
+                    json={
+                        "name": "Bracket A",
+                        "ranking_id": ranking_even.id,
+                        "team_count": stage_item.team_count,
+                    },
+                )
+                assert "detail" in response
+                assert "Even number of sets" in response["detail"]

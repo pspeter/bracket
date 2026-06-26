@@ -55,6 +55,7 @@ from bracket.sql.stage_items import (
     get_stage_item,
     sql_create_stage_item_with_empty_inputs,
 )
+from bracket.sql.rankings import get_default_ranking_for_stage, get_ranking_by_id
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
@@ -483,6 +484,17 @@ async def create_stage_item(
     existing_stage_items = [stage_item for stage in stages for stage_item in stage.stage_items]
     check_requirement(existing_stage_items, user, "max_stage_items")
 
+    if stage_body.type is StageType.SINGLE_ELIMINATION:
+        if stage_body.ranking_id is not None:
+            ranking = await get_ranking_by_id(tournament_id, stage_body.ranking_id)
+        else:
+            ranking = await get_default_ranking_for_stage(tournament_id, stage_body.stage_id)
+        if ranking is not None and ranking.num_sets % 2 == 0:
+            raise HTTPException(
+                status_code=422,
+                detail="Even number of sets is not supported for single elimination brackets.",
+            )
+
     stage_item = await sql_create_stage_item_with_empty_inputs(tournament_id, stage_body)
     await build_matches_for_stage_item(stage_item, tournament_id)
     return SuccessResponse()
@@ -507,6 +519,14 @@ async def update_stage_item(
 
     await check_foreign_keys_belong_to_tournament(stage_item_body, tournament_id)
     team_count_changed = stage_item_body.team_count != stage_item.team_count
+
+    if stage_item.type is StageType.SINGLE_ELIMINATION and stage_item_body.ranking_id != stage_item.ranking_id:
+        ranking = await get_ranking_by_id(tournament_id, stage_item_body.ranking_id)
+        if ranking is not None and ranking.num_sets % 2 == 0:
+            raise HTTPException(
+                status_code=422,
+                detail="Even number of sets is not supported for single elimination brackets.",
+            )
 
     async with database.transaction():
         if stage_item_body.games_per_player is not None and stage_item.type is StageType.SWISS:

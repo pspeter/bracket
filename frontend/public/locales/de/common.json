@@ -141,6 +141,7 @@
     "empty_password_validation": "Passwort darf nicht leer sein",
     "empty_slot": "Leerer Slot",
     "end_set_label": "Satz beenden",
+    "even_sets_single_elim_error": "Eine gerade Anzahl von Sätzen wird für Single-Elimination-Brackets nicht unterstützt.",
     "example_label": "Beispiel:",
     "filter_stage_item_label": "Nach Stufenelement filtern",
     "filter_stage_item_placeholder": "Kein Filter",

@@ -84,6 +84,14 @@ async def get_default_ranking_for_stage(tournament_id: TournamentId, stage_id: S
     return _row_to_ranking(result)
 
 
+async def get_ranking_by_id(tournament_id: TournamentId, ranking_id: RankingId) -> Ranking | None:
+    query = _RANKING_SELECT + " WHERE r.tournament_id = :tournament_id AND r.id = :ranking_id"
+    result = await database.fetch_one(
+        query=query, values={"tournament_id": tournament_id, "ranking_id": ranking_id}
+    )
+    return _row_to_ranking(result) if result else None
+
+
 async def get_ranking_for_stage_item(
     tournament_id: TournamentId, stage_item_id: StageItemId
 ) -> Ranking | None:
