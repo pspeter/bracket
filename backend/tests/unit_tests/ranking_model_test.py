@@ -174,6 +174,31 @@ def test_migration_redesign_exists_and_chains_from_side_switch() -> None:
     assert callable(migration.downgrade)
 
 
+def test_ranking_has_name_field() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        name="Main ranking",
+        scoring_type=ScoringType.MATCH_POINTS,
+    )
+    assert ranking.name == "Main ranking"
+
+
+def test_ranking_name_defaults_to_empty_string() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        scoring_type=ScoringType.MATCH_POINTS,
+    )
+    assert ranking.name == ""
+
+
 def test_ranking_new_base_fields() -> None:
     now = datetime_utc.now()
     ranking = Ranking(

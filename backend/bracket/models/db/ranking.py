@@ -29,6 +29,7 @@ class RankingSetPointsWithMatchBonusData(BaseModel):
 class RankingBase(BaseModel):
     tournament_id: TournamentId
     position: int
+    name: str = ""
     level_id: LevelId | None = None
     scoring_type: ScoringType = ScoringType.MATCH_POINTS
     num_sets: int = 1
