@@ -42,11 +42,75 @@ import {
   ScoreTrackingMatchResponse,
 } from '@openapi';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
+import { getSetScoreColors } from '../../utils/match_sets';
 
 function getMatchStateColor(state: string) {
   if (state === 'IN_PROGRESS') return 'blue';
   if (state === 'COMPLETED') return 'green';
   return 'gray';
+}
+
+// Per-set score chips, mirroring the schedule rows and bracket cards. Multi-set matches show each
+// set's score separately; single-set matches keep the single aggregate box.
+function SetScoreChip({ set, side }: { set: MatchSet; side: 's1' | 's2' }) {
+  const { s1, s2 } = getSetScoreColors(set);
+  const bg = side === 's1' ? s1 : s2;
+  const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+  const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
+  const minWidth = maxScore >= 100 ? '2.8rem' : maxScore >= 10 ? '1.8rem' : '1.5rem';
+  return (
+    <div
+      style={{
+        backgroundColor: bg,
+        borderRadius: '0.4rem',
+        minWidth,
+        color: 'white',
+        fontWeight: 800,
+        textAlign: 'center',
+        padding: '0 4px',
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
+function MatchSetScores({
+  match,
+  side,
+  aggregateColor,
+  aggregateScore,
+  aggregateTextColor,
+}: {
+  match: MatchWithDetails;
+  side: 's1' | 's2';
+  aggregateColor: string;
+  aggregateScore: number;
+  aggregateTextColor: string;
+}) {
+  const isMultiSet = match.num_sets > 1 && match.match_sets.length > 0;
+  if (isMultiSet) {
+    return (
+      <div style={{ display: 'flex', gap: '3px', justifyContent: 'flex-end' }}>
+        {match.match_sets.map((set) => (
+          <SetScoreChip key={set.id} set={set} side={side} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        backgroundColor: aggregateColor,
+        borderRadius: '0.5rem',
+        width: '2.5rem',
+        color: aggregateTextColor,
+        fontWeight: 800,
+      }}
+    >
+      <Center>{aggregateScore}</Center>
+    </div>
+  );
 }
 
 function getPseudoStagesResponse(matches: MatchWithDetails[]) {
@@ -192,17 +256,13 @@ export function ScoreTrackingListView({
                   </Text>
                 </Grid.Col>
                 <Grid.Col span="content" pb="0rem">
-                  <div
-                    style={{
-                      backgroundColor: getScoreColors(match).stage_item_input1_score,
-                      borderRadius: '0.5rem',
-                      width: '2.5rem',
-                      color: getScoreColors(match).textColor,
-                      fontWeight: 800,
-                    }}
-                  >
-                    <Center>{getMatchScore1(match)}</Center>
-                  </div>
+                  <MatchSetScores
+                    match={match}
+                    side="s1"
+                    aggregateColor={getScoreColors(match).stage_item_input1_score}
+                    aggregateScore={getMatchScore1(match)}
+                    aggregateTextColor={getScoreColors(match).textColor}
+                  />
                 </Grid.Col>
               </Grid>
               <Grid>
@@ -212,17 +272,13 @@ export function ScoreTrackingListView({
                   </Text>
                 </Grid.Col>
                 <Grid.Col span="content" pb="0rem">
-                  <div
-                    style={{
-                      backgroundColor: getScoreColors(match).stage_item_input2_score,
-                      borderRadius: '0.5rem',
-                      width: '2.5rem',
-                      color: getScoreColors(match).textColor,
-                      fontWeight: 800,
-                    }}
-                  >
-                    <Center>{getMatchScore2(match)}</Center>
-                  </div>
+                  <MatchSetScores
+                    match={match}
+                    side="s2"
+                    aggregateColor={getScoreColors(match).stage_item_input2_score}
+                    aggregateScore={getMatchScore2(match)}
+                    aggregateTextColor={getScoreColors(match).textColor}
+                  />
                 </Grid.Col>
               </Grid>
               <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
