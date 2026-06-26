@@ -20,13 +20,9 @@ export default function ScoreTrackingMatchPage() {
       backHref={`/score-tracking/${score_tracking_token}`}
       storageKey={`score-tracking:${score_tracking_token}:${matchId}:swapped`}
       refereesEnabled={refereesEnabled}
-      saveMatch={async (next) => {
+      updateSet={async (setId, body) => {
         if (score_tracking_token == null || matchId == null) return;
-        // Until the score-tracking screen is migrated to per-set entry, drive the match's
-        // first set (single-set matches behave exactly as before).
-        const setId = swrResponse.data?.data.match_sets[0]?.id;
-        if (setId == null) return;
-        await updateScoreTrackingMatchSet(score_tracking_token, matchId, setId, next);
+        await updateScoreTrackingMatchSet(score_tracking_token, matchId, setId, body);
       }}
     />
   );

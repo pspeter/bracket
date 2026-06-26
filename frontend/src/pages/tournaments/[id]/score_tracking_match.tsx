@@ -22,12 +22,9 @@ export default function TournamentScoreTrackingMatchPage() {
           storageKey={`tournament-score-tracking:${tournamentData.id}:${matchId}:swapped`}
           levels={swrTournamentResponse.data?.data.levels ?? []}
           refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}
-          saveMatch={async (next) => {
+          updateSet={async (setId, body) => {
             if (matchId == null) return;
-            // Drive the match's first set; single-set matches behave exactly as before.
-            const setId = swrResponse.data?.data.match_sets[0]?.id;
-            if (setId == null) return;
-            await updateMatchSet(tournamentData.id, matchId, setId, next);
+            await updateMatchSet(tournamentData.id, matchId, setId, body);
           }}
         />
       ) : null}
