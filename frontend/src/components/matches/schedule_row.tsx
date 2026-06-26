@@ -11,8 +11,9 @@ import {
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
-import { LevelResponse } from '@openapi';
+import { LevelResponse, MatchSet, MatchWithDetails } from '@openapi';
 import { stringToColour } from '@services/lookups';
+import { getSetScoreColors } from '../../utils/match_sets';
 
 export function ScheduleRow({
   data,
@@ -30,7 +31,43 @@ export function ScheduleRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
-  const colors = getScoreColors(data.match);
+  const match: MatchWithDetails = data.match;
+  const isMultiSet = match.num_sets > 1 && match.match_sets.length > 0;
+  // Single-set surfaces only: match-level colour and aggregate score. Multi-set
+  // matches render per-set chips below, which carry their own per-set colours.
+  const colors = getScoreColors(match);
+  const displayScore1 = getMatchScore1(match);
+  const displayScore2 = getMatchScore2(match);
+
+  const setScoreChip = (set: MatchSet, side: 's1' | 's2') => {
+    const { s1, s2 } = getSetScoreColors(set);
+    const bg = side === 's1' ? s1 : s2;
+    const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+    const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
+    const minWidth = maxScore >= 100 ? '2.8rem' : maxScore >= 10 ? '1.8rem' : '1.5rem';
+    return (
+      <div
+        key={set.id}
+        style={{
+          backgroundColor: bg,
+          borderRadius: '0.4rem',
+          minWidth,
+          color: 'white',
+          fontWeight: 800,
+          textAlign: 'center',
+          padding: '0 4px',
+        }}
+      >
+        {value}
+      </div>
+    );
+  };
+
+  const multiSetScoreCell = (side: 's1' | 's2') => (
+    <div style={{ display: 'flex', gap: '3px', justifyContent: 'flex-end' }}>
+      {match.match_sets.map((set) => setScoreChip(set, side))}
+    </div>
+  );
 
   const card = (
     <Card
@@ -74,17 +111,21 @@ export function ScheduleRow({
             </Text>
           </Grid.Col>
           <Grid.Col span="content" pb="0rem">
-            <div
-              style={{
-                backgroundColor: colors.stage_item_input1_score,
-                borderRadius: '0.5rem',
-                width: '2.5rem',
-                color: colors.textColor,
-                fontWeight: 800,
-              }}
-            >
-              <Center>{getMatchScore1(data.match)}</Center>
-            </div>
+            {isMultiSet ? (
+              multiSetScoreCell('s1')
+            ) : (
+              <div
+                style={{
+                  backgroundColor: colors.stage_item_input1_score,
+                  borderRadius: '0.5rem',
+                  width: '2.5rem',
+                  color: colors.textColor,
+                  fontWeight: 800,
+                }}
+              >
+                <Center>{displayScore1}</Center>
+              </div>
+            )}
           </Grid.Col>
         </Grid>
         <Grid mb="0rem">
@@ -94,17 +135,21 @@ export function ScheduleRow({
             </Text>
           </Grid.Col>
           <Grid.Col span="content" pb="0rem">
-            <div
-              style={{
-                backgroundColor: colors.stage_item_input2_score,
-                borderRadius: '0.5rem',
-                width: '2.5rem',
-                color: colors.textColor,
-                fontWeight: 800,
-              }}
-            >
-              <Center>{getMatchScore2(data.match)}</Center>
-            </div>
+            {isMultiSet ? (
+              multiSetScoreCell('s2')
+            ) : (
+              <div
+                style={{
+                  backgroundColor: colors.stage_item_input2_score,
+                  borderRadius: '0.5rem',
+                  width: '2.5rem',
+                  color: colors.textColor,
+                  fontWeight: 800,
+                }}
+              >
+                <Center>{displayScore2}</Center>
+              </div>
+            )}
           </Grid.Col>
         </Grid>
         <RefereeDisplay match={data.match} refereesEnabled={refereesEnabled} />

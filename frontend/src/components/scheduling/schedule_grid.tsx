@@ -45,8 +45,9 @@ import {
 } from '@logic/planning/layout';
 import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
 import { ZOOM_PX_PER_MINUTE, ZoomLevel } from '@logic/planning/zoom';
-import { Court, MatchWithDetails } from '@openapi';
+import { Court, MatchSet, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
+import { getSetScoreColors, getSetsWon } from '../../utils/match_sets';
 
 import { COURT_CONTENT_ATTRIBUTE, PLANNER_GRID_ATTRIBUTE } from './planner_anchor';
 import classes from './schedule_grid.module.css';
@@ -252,8 +253,12 @@ function MatchCard({
   // stay readable on any tint and at every card height — including short matches'
   // one-line layout, where both scores sit side by side next to the names.
   const showScore = match.state !== 'NOT_STARTED';
-  const matchScore1 = getMatchScore1(match);
-  const matchScore2 = getMatchScore2(match);
+  const isMultiSet = match.num_sets > 1;
+  const rawScore1 = getMatchScore1(match);
+  const rawScore2 = getMatchScore2(match);
+  const setsWon = isMultiSet ? getSetsWon(match.match_sets) : null;
+  const matchScore1 = isMultiSet ? (setsWon?.input1 ?? 0) : rawScore1;
+  const matchScore2 = isMultiSet ? (setsWon?.input2 ?? 0) : rawScore2;
   const score1Colour = scoreColour(matchScore1, matchScore2);
   const score2Colour = scoreColour(matchScore2, matchScore1);
   const scoreChip = (value: number, chipColour: string) => (
@@ -281,6 +286,42 @@ function MatchCard({
       {chips}
     </Box>
   );
+  // Per-set chips for agenda cards where the two teams occupy separate lines.
+  const perSetChips = (side: 's1' | 's2') => (
+    <Box
+      style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', gap: 3, alignItems: 'center' }}
+    >
+      {match.match_sets.map((set: MatchSet) => {
+        const colours = getSetScoreColors(set);
+        const bg = side === 's1' ? colours.s1 : colours.s2;
+        const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+        const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
+        const minWidth = maxScore >= 100 ? '2.4rem' : maxScore >= 10 ? '1.6rem' : '1.2rem';
+        return (
+          <Text
+            key={set.id}
+            component="span"
+            fz={fontSize}
+            fw={800}
+            lh={1}
+            style={{
+              flexShrink: 0,
+              color: '#fff',
+              backgroundColor: bg,
+              borderRadius: 4,
+              padding: '1px 5px',
+              whiteSpace: 'nowrap',
+              minWidth,
+              textAlign: 'center',
+            }}
+          >
+            {value}
+          </Text>
+        );
+      })}
+    </Box>
+  );
+  const showAgendaPerSet = zoom === 'agenda' && isMultiSet && showScore && !combineTeams;
   // A match can sit on either (or both) sides of a precedence dependency, plus the earlier-stage
   // ordering violation or a round-order conflict — collect every applicable description so the
   // tooltip explains them all.
@@ -518,7 +559,9 @@ function MatchCard({
                   scoreChip(matchScore1, score1Colour),
                   scoreChip(matchScore2, score2Colour)
                 )
-              : pinnedScores(scoreChip(matchScore1, score1Colour)))}
+              : showAgendaPerSet
+                ? perSetChips('s1')
+                : pinnedScores(scoreChip(matchScore1, score1Colour)))}
           {!metaLine && !mergeConflictIcons && violationIcon}
           {!metaLine && !mergeConflictIcons && refereeConflictIcon}
         </Flex>
@@ -537,7 +580,10 @@ function MatchCard({
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>
-            {showScore && pinnedScores(scoreChip(matchScore2, score2Colour))}
+            {showScore &&
+              (showAgendaPerSet
+                ? perSetChips('s2')
+                : pinnedScores(scoreChip(matchScore2, score2Colour)))}
           </Flex>
         )}
         {showReferee && (
