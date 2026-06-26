@@ -10,3 +10,5 @@ class TeamStatistics(BaseModel):
     draws: int = 0
     losses: int = 0
     points: Decimal = Decimal("0.00")
+    set_difference: int = 0
+    point_difference: int = 0
