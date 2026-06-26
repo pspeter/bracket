@@ -304,6 +304,11 @@ function MatchCard({
         const bg = side === 's1' ? colours.s1 : colours.s2;
         const value =
           side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+        const maxScore = Math.max(
+          set.stage_item_input1_score,
+          set.stage_item_input2_score
+        );
+        const minWidth = maxScore >= 100 ? '2.4rem' : maxScore >= 10 ? '1.8rem' : '1.2rem';
         return (
           <Text
             key={set.id}
@@ -318,7 +323,7 @@ function MatchCard({
               borderRadius: 4,
               padding: '1px 5px',
               whiteSpace: 'nowrap',
-              minWidth: '1.8rem',
+              minWidth,
               textAlign: 'center',
             }}
           >

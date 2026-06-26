@@ -46,13 +46,15 @@ export function ScheduleRow({
     const { s1, s2 } = getSetScoreColors(set);
     const bg = side === 's1' ? s1 : s2;
     const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+    const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
+    const minWidth = maxScore >= 100 ? '2.8rem' : maxScore >= 10 ? '2rem' : '1.5rem';
     return (
       <div
         key={set.id}
         style={{
           backgroundColor: bg,
           borderRadius: '0.4rem',
-          minWidth: '2rem',
+          minWidth,
           color: 'white',
           fontWeight: 800,
           textAlign: 'center',
