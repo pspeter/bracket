@@ -318,8 +318,8 @@ export const SCORE_WIN_COLOUR = '#009e73';
 export const SCORE_DRAW_COLOUR = '#656565';
 export const SCORE_LOSE_COLOUR = '#d55e00';
 /** Live (in-progress) and pending (not-started) score chip backgrounds. */
-const SCORE_LIVE_COLOUR = '#74c0fc';
-const SCORE_PENDING_COLOUR = '#868e96';
+export const SCORE_LIVE_COLOUR = '#74c0fc';
+export const SCORE_PENDING_COLOUR = '#868e96';
 
 /** Score colour from one side's perspective: own score vs the other side's. */
 export function scoreColour(own: number, other: number): string {

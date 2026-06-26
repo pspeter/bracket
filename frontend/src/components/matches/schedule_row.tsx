@@ -11,8 +11,9 @@ import {
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
-import { LevelResponse } from '@openapi';
+import { LevelResponse, MatchWithDetails } from '@openapi';
 import { stringToColour } from '@services/lookups';
+import { getSetsWon } from '../../utils/match_sets';
 
 export function ScheduleRow({
   data,
@@ -30,7 +31,16 @@ export function ScheduleRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
-  const colors = getScoreColors(data.match);
+  const match: MatchWithDetails = data.match;
+  const isMultiSet = match.num_sets > 1;
+  const { input1: setsWon1, input2: setsWon2 } = getSetsWon(match.match_sets);
+  const displayScore1 = isMultiSet ? setsWon1 : getMatchScore1(match);
+  const displayScore2 = isMultiSet ? setsWon2 : getMatchScore2(match);
+
+  const scoreSource = isMultiSet
+    ? { ...match, stage_item_input1_score: setsWon1, stage_item_input2_score: setsWon2 }
+    : match;
+  const colors = getScoreColors(scoreSource as MatchWithDetails);
 
   const card = (
     <Card
@@ -83,7 +93,7 @@ export function ScheduleRow({
                 fontWeight: 800,
               }}
             >
-              <Center>{getMatchScore1(data.match)}</Center>
+              <Center>{displayScore1}</Center>
             </div>
           </Grid.Col>
         </Grid>
@@ -103,7 +113,7 @@ export function ScheduleRow({
                 fontWeight: 800,
               }}
             >
-              <Center>{getMatchScore2(data.match)}</Center>
+              <Center>{displayScore2}</Center>
             </div>
           </Grid.Col>
         </Grid>

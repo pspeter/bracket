@@ -252,8 +252,20 @@ function MatchCard({
   // stay readable on any tint and at every card height — including short matches'
   // one-line layout, where both scores sit side by side next to the names.
   const showScore = match.state !== 'NOT_STARTED';
-  const matchScore1 = getMatchScore1(match);
-  const matchScore2 = getMatchScore2(match);
+  const isMultiSet = match.num_sets > 1;
+  const rawScore1 = getMatchScore1(match);
+  const rawScore2 = getMatchScore2(match);
+  const setsWon = isMultiSet ? (() => {
+    const s1 = match.match_sets.filter(
+      (s) => s.state === 'COMPLETED' && s.stage_item_input1_score > s.stage_item_input2_score
+    ).length;
+    const s2 = match.match_sets.filter(
+      (s) => s.state === 'COMPLETED' && s.stage_item_input2_score > s.stage_item_input1_score
+    ).length;
+    return { s1, s2 };
+  })() : null;
+  const matchScore1 = isMultiSet ? (setsWon?.s1 ?? 0) : rawScore1;
+  const matchScore2 = isMultiSet ? (setsWon?.s2 ?? 0) : rawScore2;
   const score1Colour = scoreColour(matchScore1, matchScore2);
   const score2Colour = scoreColour(matchScore2, matchScore1);
   const scoreChip = (value: number, chipColour: string) => (
