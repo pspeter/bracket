@@ -15,10 +15,13 @@ from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
     DUMMY_MOCK_TIME,
+    DUMMY_RANKING1,
     DUMMY_ROUND1,
     DUMMY_STAGE1,
     DUMMY_STAGE2,
     DUMMY_STAGE_ITEM1,
+    DUMMY_STAGE_ITEM2,
+    DUMMY_STAGE_ITEM3,
     DUMMY_TEAM1,
 )
 from bracket.utils.http import HTTPMethod
@@ -30,6 +33,7 @@ from tests.integration_tests.api.shared import (
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     assert_row_count_and_clear,
+    inserted_ranking,
     inserted_round,
     inserted_stage,
     inserted_stage_item,
@@ -456,6 +460,45 @@ async def test_update_stage(
 
         await assert_row_count_and_clear(stage_items, 1)
         await assert_row_count_and_clear(stages, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_set_ranking_for_all_stage_items_overwrites_every_item(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "position": 1})
+        ) as other_ranking,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_1,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM2.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": other_ranking.id}
+            )
+        ) as stage_item_2,
+    ):
+        assert (
+            await send_tournament_request(
+                HTTPMethod.PUT,
+                f"stages/{stage_inserted.id}/ranking",
+                auth_context,
+                json={"ranking_id": other_ranking.id},
+            )
+            == SUCCESS_RESPONSE
+        )
+
+        [stage] = await get_full_tournament_details(tournament_id)
+        ranking_by_item = {item.id: item.ranking_id for item in stage.stage_items}
+        assert ranking_by_item[stage_item_1.id] == other_ranking.id
+        assert ranking_by_item[stage_item_2.id] == other_ranking.id
 
 
 @pytest.mark.asyncio(loop_scope="session")
