@@ -5,6 +5,7 @@ from heliclockter import datetime_utc
 from bracket.database import database
 from bracket.models.db.match import Match, MatchBody, MatchCreateBody, MatchWithDetails
 from bracket.models.db.tournament import Tournament
+from bracket.sql.match_sets import MATCH_SETS_SUBQUERY, sql_create_match_sets
 from bracket.utils.id_types import (
     CourtId,
     MatchId,
@@ -41,6 +42,24 @@ async def sql_delete_matches_for_stage_item_id(stage_item_id: StageItemId) -> No
     await database.execute(query=query, values={"stage_item_id": stage_item_id})
 
 
+async def sql_get_num_sets_for_round(round_id: RoundId) -> int:
+    """Return the number of sets configured by the ranking applicable to a round's stage item.
+
+    Falls back to 1 when no ranking is found (mirrors the historical single-score behaviour).
+    """
+    query = """
+        SELECT rankings.num_sets
+        FROM rounds
+        JOIN stage_items ON stage_items.id = rounds.stage_item_id
+        JOIN rankings ON rankings.id = stage_items.ranking_id
+        WHERE rounds.id = :round_id
+        """
+    result = await database.fetch_one(query=query, values={"round_id": round_id})
+    if result is None:
+        return 1
+    return int(result._mapping["num_sets"])
+
+
 async def sql_create_match(match: MatchCreateBody) -> Match:
     query = """
         INSERT INTO matches (
@@ -52,10 +71,7 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             stage_item_input2_winner_from_match_id,
             duration_minutes,
             custom_duration_minutes,
-            stage_item_input1_score,
-            stage_item_input2_score,
             created,
-            state,
             input1_slot,
             input2_slot,
             referee_slot
@@ -69,35 +85,37 @@ async def sql_create_match(match: MatchCreateBody) -> Match:
             :stage_item_input2_winner_from_match_id,
             :duration_minutes,
             :custom_duration_minutes,
-            0,
-            0,
             NOW(),
-            'NOT_STARTED',
             :input1_slot,
             :input2_slot,
             :referee_slot
         )
         RETURNING *
     """
-    result = await database.fetch_one(query=query, values=match.model_dump())
+    # The match insert and its set pre-population must be atomic: a match with zero sets
+    # derives as NOT_STARTED forever and renders no editable rows, so never leave one behind.
+    async with database.transaction():
+        result = await database.fetch_one(query=query, values=match.model_dump())
 
-    if result is None:
-        raise ValueError("Could not create stage")
+        if result is None:
+            raise ValueError("Could not create stage")
 
-    return Match.model_validate(dict(result._mapping))
+        created_match = Match.model_validate(dict(result._mapping))
+
+        # Pre-populate one row in match_sets per configured set, all NOT_STARTED at 0–0.
+        num_sets = await sql_get_num_sets_for_round(created_match.round_id)
+        await sql_create_match_sets(created_match.id, num_sets)
+
+    return created_match
 
 
 async def sql_update_match(match_id: MatchId, match: MatchBody, tournament: Tournament) -> None:
     query = """
         UPDATE matches
         SET round_id = :round_id,
-            stage_item_input1_score = :stage_item_input1_score,
-            stage_item_input2_score = :stage_item_input2_score,
             court_id = :court_id,
             custom_duration_minutes = :custom_duration_minutes,
-            duration_minutes = :duration_minutes,
-            state = :state,
-            completed_at = :completed_at
+            duration_minutes = :duration_minutes
         WHERE matches.id = :match_id
         RETURNING *
         """
@@ -111,14 +129,22 @@ async def sql_update_match(match_id: MatchId, match: MatchBody, tournament: Tour
         query=query,
         values={
             "match_id": match_id,
-            # The referee columns are set by dedicated setters in the route (preserving the
-            # "only touch when provided" semantics), not by this generic UPDATE.
-            **match.model_dump(exclude={"referee_stage_item_input_id", "referee_name"}),
+            "round_id": match.round_id,
+            "court_id": match.court_id,
+            "custom_duration_minutes": match.custom_duration_minutes,
             "duration_minutes": duration_minutes,
-            "state": match.state.value,
+        },
+    )
+
+
+async def sql_set_match_completed_at(match_id: MatchId, completed_at: datetime_utc | None) -> None:
+    await database.execute(
+        query="UPDATE matches SET completed_at = :completed_at WHERE id = :match_id",
+        values={
+            "match_id": match_id,
             "completed_at": (
-                datetime.fromisoformat(match.completed_at.isoformat())
-                if match.completed_at is not None
+                datetime.fromisoformat(completed_at.isoformat())
+                if completed_at is not None
                 else None
             ),
         },
@@ -204,8 +230,10 @@ async def sql_unschedule_match(match_id: MatchId) -> None:
 
 
 async def sql_get_match(match_id: MatchId) -> Match:
-    query = """
-        SELECT *
+    query = f"""
+        SELECT
+            matches.*,
+            {MATCH_SETS_SUBQUERY}
         FROM matches
         WHERE matches.id = :match_id
         """
@@ -220,7 +248,7 @@ async def sql_get_match(match_id: MatchId) -> Match:
 async def sql_get_match_with_details(
     tournament_id: TournamentId, match_id: MatchId
 ) -> MatchWithDetails | None:
-    query = """
+    query = f"""
         WITH inputs_with_teams AS (
             SELECT DISTINCT ON (stage_item_inputs.id)
                 stage_item_inputs.*,
@@ -239,7 +267,12 @@ async def sql_get_match_with_details(
             to_json(c) AS court,
             to_json(ref_sii) AS referee,
             stages.level_id AS level_id,
-            rankings.side_switch_every_n_points AS side_switch_every_n_points
+            rankings.side_switch_every_n_points AS side_switch_every_n_points,
+            rankings.num_sets AS num_sets,
+            rankings.max_points AS max_points,
+            rankings.last_set_max_points AS last_set_max_points,
+            rankings.two_point_advantage AS two_point_advantage,
+            {MATCH_SETS_SUBQUERY}
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id
@@ -263,6 +296,7 @@ async def sql_get_scheduled_matches_with_details(
     court_id: CourtId | None = None,
 ) -> list[MatchWithDetails]:
     court_filter = "AND matches.court_id = :court_id" if court_id is not None else ""
+    match_sets = MATCH_SETS_SUBQUERY
     query = f"""
         WITH inputs_with_teams AS (
             SELECT DISTINCT ON (stage_item_inputs.id)
@@ -282,7 +316,12 @@ async def sql_get_scheduled_matches_with_details(
             to_json(c) AS court,
             to_json(ref_sii) AS referee,
             stages.level_id AS level_id,
-            rankings.side_switch_every_n_points AS side_switch_every_n_points
+            rankings.side_switch_every_n_points AS side_switch_every_n_points,
+            rankings.num_sets AS num_sets,
+            rankings.max_points AS max_points,
+            rankings.last_set_max_points AS last_set_max_points,
+            rankings.two_point_advantage AS two_point_advantage,
+            {match_sets}
         FROM matches
         JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON stage_items.id = rounds.stage_item_id
@@ -317,20 +356,41 @@ async def clear_scores_for_matches_in_stage_item(
     tournament_id: TournamentId, stage_item_id: StageItemId
 ) -> None:
     query = """
-        UPDATE matches
+        UPDATE match_sets
         SET stage_item_input1_score = 0,
-            stage_item_input2_score = 0
-        FROM rounds
+            stage_item_input2_score = 0,
+            state = 'NOT_STARTED'
+        FROM matches
+        JOIN rounds ON rounds.id = matches.round_id
         JOIN stage_items ON rounds.stage_item_id = stage_items.id
         JOIN stages ON stages.id = stage_items.stage_id
-        WHERE   rounds.id = matches.round_id
+        WHERE   match_sets.match_id = matches.id
             AND stages.tournament_id = :tournament_id
             AND stage_items.id = :stage_item_id
         """
-    await database.execute(
-        query=query,
-        values={
-            "stage_item_id": stage_item_id,
-            "tournament_id": tournament_id,
-        },
-    )
+    # Clearing the set scores and clearing completed_at must be atomic, so matches never end
+    # up with reset sets but a stale completed_at (or vice versa).
+    async with database.transaction():
+        await database.execute(
+            query=query,
+            values={
+                "stage_item_id": stage_item_id,
+                "tournament_id": tournament_id,
+            },
+        )
+        await database.execute(
+            query="""
+            UPDATE matches
+            SET completed_at = NULL
+            FROM rounds
+            JOIN stage_items ON rounds.stage_item_id = stage_items.id
+            JOIN stages ON stages.id = stage_items.stage_id
+            WHERE   rounds.id = matches.round_id
+                AND stages.tournament_id = :tournament_id
+                AND stage_items.id = :stage_item_id
+            """,
+            values={
+                "stage_item_id": stage_item_id,
+                "tournament_id": tournament_id,
+            },
+        )

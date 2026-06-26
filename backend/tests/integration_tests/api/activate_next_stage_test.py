@@ -1,14 +1,14 @@
 import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchBody, MatchState, MatchWithDetailsDefinitive
+from bracket.models.db.match import MatchSetBody, MatchSetState, MatchWithDetailsDefinitive
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
 from bracket.models.db.util import StageWithStageItems
-from bracket.sql.matches import sql_update_match
+from bracket.sql.match_sets import sql_update_match_set
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
@@ -114,15 +114,15 @@ async def test_activate_next_stage(
         for round_ in prev_stage.stage_items[0].rounds:
             for match in round_.matches:
                 assert isinstance(match, MatchWithDetailsDefinitive)
-                await sql_update_match(
-                    match.id,
-                    MatchBody(
-                        **match.model_copy(
-                            update={"stage_item_input1_score": 21, "state": MatchState.COMPLETED}
-                        ).model_dump()
-                    ),
-                    auth_context.tournament,
-                )
+                for match_set in match.match_sets:
+                    await sql_update_match_set(
+                        match_set.id,
+                        MatchSetBody(
+                            stage_item_input1_score=21,
+                            stage_item_input2_score=0,
+                            state=MatchSetState.COMPLETED,
+                        ),
+                    )
 
         response = await send_tournament_request(
             HTTPMethod.POST, "stages/activate?direction=next", auth_context, json={}

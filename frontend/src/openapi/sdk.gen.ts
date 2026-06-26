@@ -179,9 +179,6 @@ import type {
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostErrors,
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses,
-  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutData,
-  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors,
-  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses,
   UpdateClubClubsClubIdPutData,
   UpdateClubClubsClubIdPutErrors,
   UpdateClubClubsClubIdPutResponses,
@@ -194,6 +191,12 @@ import type {
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutData,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutErrors,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses,
+  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData,
+  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors,
+  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses,
+  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData,
+  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors,
+  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutData,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutErrors,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutResponses,
@@ -203,9 +206,6 @@ import type {
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutData,
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutErrors,
   UpdateRoundByIdTournamentsTournamentIdRoundsRoundIdPutResponses,
-  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData,
-  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors,
-  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutData,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutErrors,
   UpdateStageItemInputTournamentsTournamentIdStageItemsStageItemIdInputsStageItemInputIdPutResponses,
@@ -386,23 +386,23 @@ export const getScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdG
   });
 
 /**
- * Update Score Tracking Match
+ * Update Match Set By Token
  */
-export const updateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPut = <
+export const updateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPut = <
   ThrowOnError extends boolean = false,
 >(
   options: Options<
-    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData,
+    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData,
     ThrowOnError
   >
 ) =>
   (options.client ?? client).put<
-    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses,
-    UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors,
+    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses,
+    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors,
     ThrowOnError
   >({
     responseType: 'json',
-    url: '/score-tracking/{score_tracking_token}/matches/{match_id}',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}',
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -894,6 +894,32 @@ export const resizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPos
   });
 
 /**
+ * Update Match Set Authenticated
+ */
+export const updateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPut = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).put<
+    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses,
+    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
  * Unschedule Match
  */
 export const unscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePost = <
@@ -1323,31 +1349,6 @@ export const getAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrack
       security: [{ scheme: 'bearer', type: 'http' }],
       url: '/tournaments/{tournament_id}/score-tracking/matches/{match_id}',
       ...options,
-    });
-
-/**
- * Update Authenticated Score Tracking Match
- */
-export const updateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPut =
-  <ThrowOnError extends boolean = false>(
-    options: Options<
-      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutData,
-      ThrowOnError
-    >
-  ) =>
-    (options.client ?? client).put<
-      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses,
-      UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors,
-      ThrowOnError
-    >({
-      responseType: 'json',
-      security: [{ scheme: 'bearer', type: 'http' }],
-      url: '/tournaments/{tournament_id}/score-tracking/matches/{match_id}',
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
     });
 
 /**

@@ -2,7 +2,7 @@ import { ScoreTrackingMatchView } from '@components/score_tracking/views';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getTournamentById } from '@services/adapter';
-import { updateTournamentScoreTrackingMatch } from '@services/match';
+import { updateMatchSet } from '@services/match';
 import { getTournamentScoreTrackingMatch } from '@services/score_tracking';
 import { useParams } from 'react-router';
 
@@ -24,7 +24,10 @@ export default function TournamentScoreTrackingMatchPage() {
           refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}
           saveMatch={async (next) => {
             if (matchId == null) return;
-            await updateTournamentScoreTrackingMatch(tournamentData.id, matchId, next);
+            // Drive the match's first set; single-set matches behave exactly as before.
+            const setId = swrResponse.data?.data.match_sets[0]?.id;
+            if (setId == null) return;
+            await updateMatchSet(tournamentData.id, matchId, setId, next);
           }}
         />
       ) : null}

@@ -145,8 +145,12 @@ async def test_db_init() -> None:
         assert all(input_.draws == 0 for input_ in all_inputs)
         assert all(input_.losses == 0 for input_ in all_inputs)
         assert all(match.state is MatchState.NOT_STARTED for match in all_matches)
-        assert all(match.stage_item_input1_score == 0 for match in all_matches)
-        assert all(match.stage_item_input2_score == 0 for match in all_matches)
+        assert all(
+            match_set.stage_item_input1_score == 0 and match_set.stage_item_input2_score == 0
+            for match in all_matches
+            for match_set in match.match_sets
+        )
+        assert all(len(match.match_sets) == 1 for match in all_matches)
         assert all(match.start_time is None for match in all_matches)
         assert all(match.court_id is None for match in all_matches)
     finally:

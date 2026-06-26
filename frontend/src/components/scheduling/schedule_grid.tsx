@@ -18,7 +18,12 @@ import { format } from 'date-fns';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import {
+  formatMatchInput1,
+  formatMatchInput2,
+  getMatchScore1,
+  getMatchScore2,
+} from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import {
   CONFLICT_COLOURS,
@@ -247,8 +252,10 @@ function MatchCard({
   // stay readable on any tint and at every card height — including short matches'
   // one-line layout, where both scores sit side by side next to the names.
   const showScore = match.state !== 'NOT_STARTED';
-  const score1Colour = scoreColour(match.stage_item_input1_score, match.stage_item_input2_score);
-  const score2Colour = scoreColour(match.stage_item_input2_score, match.stage_item_input1_score);
+  const matchScore1 = getMatchScore1(match);
+  const matchScore2 = getMatchScore2(match);
+  const score1Colour = scoreColour(matchScore1, matchScore2);
+  const score2Colour = scoreColour(matchScore2, matchScore1);
   const scoreChip = (value: number, chipColour: string) => (
     <Text
       component="span"
@@ -508,10 +515,10 @@ function MatchCard({
           {showScore &&
             (lines === 1 || combineTeams
               ? pinnedScores(
-                  scoreChip(match.stage_item_input1_score, score1Colour),
-                  scoreChip(match.stage_item_input2_score, score2Colour)
+                  scoreChip(matchScore1, score1Colour),
+                  scoreChip(matchScore2, score2Colour)
                 )
-              : pinnedScores(scoreChip(match.stage_item_input1_score, score1Colour)))}
+              : pinnedScores(scoreChip(matchScore1, score1Colour)))}
           {!metaLine && !mergeConflictIcons && violationIcon}
           {!metaLine && !mergeConflictIcons && refereeConflictIcon}
         </Flex>
@@ -530,7 +537,7 @@ function MatchCard({
             <Text size="xs" fz={fontSize} fw={600} lh={1.3} truncate>
               {input2}
             </Text>
-            {showScore && pinnedScores(scoreChip(match.stage_item_input2_score, score2Colour))}
+            {showScore && pinnedScores(scoreChip(matchScore2, score2Colour))}
           </Flex>
         )}
         {showReferee && (

@@ -26,6 +26,7 @@ from bracket.utils.id_types import (
     TeamId,
     TournamentId,
 )
+from tests.unit_tests.mocks import match_sets_for_state
 
 
 def test_scoring_type_values() -> None:
@@ -93,9 +94,7 @@ def test_set_statistics_reads_from_match_points() -> None:
         created=now,
         duration_minutes=90,
         round_id=RoundId(-1),
-        stage_item_input1_score=2,
-        stage_item_input2_score=0,
-        state=MatchState.COMPLETED,
+        match_sets=match_sets_for_state(MatchId(0), MatchState.COMPLETED, 2, 0),
     )
     stage_item = StageItemWithRounds(
         rounds=[

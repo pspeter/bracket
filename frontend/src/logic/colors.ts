@@ -349,15 +349,12 @@ export function getScoreColors(match: MatchWithDetails) {
     };
   }
 
+  // Scores live on sets now; aggregate them for the single colour pair this surface shows.
+  const score1 = match.match_sets.reduce((sum, set) => sum + set.stage_item_input1_score, 0);
+  const score2 = match.match_sets.reduce((sum, set) => sum + set.stage_item_input2_score, 0);
   return {
-    stage_item_input1_score: scoreColour(
-      match.stage_item_input1_score,
-      match.stage_item_input2_score
-    ),
-    stage_item_input2_score: scoreColour(
-      match.stage_item_input2_score,
-      match.stage_item_input1_score
-    ),
+    stage_item_input1_score: scoreColour(score1, score2),
+    stage_item_input2_score: scoreColour(score2, score1),
     textColor: 'white',
   };
 }

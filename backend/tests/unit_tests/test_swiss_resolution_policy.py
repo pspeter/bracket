@@ -5,6 +5,7 @@ from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.util import RoundWithMatches
 from bracket.utils.dummy_records import DUMMY_MATCH1, DUMMY_MOCK_TIME
 from bracket.utils.id_types import MatchId, RoundId, StageItemId
+from tests.unit_tests.mocks import match_sets_for_state
 
 
 def _make_match(match_id: int, state: MatchState) -> MatchWithDetails:
@@ -12,7 +13,7 @@ def _make_match(match_id: int, state: MatchState) -> MatchWithDetails:
         **DUMMY_MATCH1.model_dump()
         | {
             "id": MatchId(match_id),
-            "state": state,
+            "match_sets": match_sets_for_state(MatchId(match_id), state),
             "stage_item_input1_id": None,
             "stage_item_input2_id": None,
             "court_id": None,

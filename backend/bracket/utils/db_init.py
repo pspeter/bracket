@@ -23,7 +23,7 @@ from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubInsertable
 from bracket.models.db.court import CourtInsertable
 from bracket.models.db.level import LevelInsertable
-from bracket.models.db.match import Match, MatchBody, MatchState
+from bracket.models.db.match import Match, MatchSetBody, MatchSetState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import RankingInsertable
@@ -40,7 +40,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyTentative,
 )
 from bracket.models.db.team import TeamInsertable
-from bracket.models.db.tournament import Tournament, TournamentInsertable
+from bracket.models.db.tournament import TournamentInsertable
 from bracket.models.db.user import UserInsertable
 from bracket.models.db.user_x_club import UserXClubInsertable, UserXClubRelation
 from bracket.schema import (
@@ -60,10 +60,10 @@ from bracket.schema import (
     users,
     users_x_clubs,
 )
-from bracket.sql.matches import sql_update_match
+from bracket.sql.match_sets import get_sets_for_match, sql_update_match_set
+from bracket.sql.matches import sql_set_match_completed_at
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
-from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.users import create_user, get_user
 from bracket.utils.alembic import alembic_stamp_head
 from bracket.utils.db import insert_generic
@@ -453,7 +453,7 @@ async def init_db_when_empty() -> UserId | None:
     return None
 
 
-async def apply_match_states(tournament_id: TournamentId, tournament_details: Tournament) -> None:
+async def apply_match_states(tournament_id: TournamentId) -> None:
     all_matches: list[Any] = []
     for stage in await get_full_tournament_details(tournament_id):
         for stage_item in stage.stage_items:
@@ -466,31 +466,29 @@ async def apply_match_states(tournament_id: TournamentId, tournament_details: To
 
     for i, match in enumerate(all_matches):
         if i < completed_count:
-            state = MatchState.COMPLETED
+            set_state = MatchSetState.COMPLETED
             score1, score2 = random.randint(1, 10), random.randint(0, 9)
             completed_at: datetime_utc | None = DUMMY_MOCK_TIME
         elif i < completed_count + in_progress_count:
-            state = MatchState.IN_PROGRESS
+            set_state = MatchSetState.IN_PROGRESS
             score1, score2 = random.randint(0, 7), random.randint(0, 7)
             completed_at = None
         else:
-            state = MatchState.NOT_STARTED
+            set_state = MatchSetState.NOT_STARTED
             score1, score2 = 0, 0
             completed_at = None
 
-        await sql_update_match(
-            match_id=assert_some(match.id),
-            match=MatchBody.model_validate(
-                {
-                    **match.model_dump(),
-                    "stage_item_input1_score": score1,
-                    "stage_item_input2_score": score2,
-                    "state": state,
-                    "completed_at": completed_at,
-                }
-            ),
-            tournament=tournament_details,
-        )
+        match_id = assert_some(match.id)
+        for match_set in await get_sets_for_match(match_id):
+            await sql_update_match_set(
+                match_set.id,
+                MatchSetBody(
+                    stage_item_input1_score=score1,
+                    stage_item_input2_score=score2,
+                    state=set_state,
+                ),
+            )
+        await sql_set_match_completed_at(match_id, completed_at)
 
 
 async def sql_create_dev_db() -> UserId:
@@ -691,8 +689,7 @@ async def sql_create_dev_db() -> UserId:
     await build_matches_for_stage_item(stage_item_2, tournament_id_1)
     await build_matches_for_stage_item(stage_item_3, tournament_id_1)
 
-    tournament_details_1 = await sql_get_tournament(tournament_id_1)
-    await apply_match_states(tournament_id_1, tournament_details_1)
+    await apply_match_states(tournament_id_1)
 
     for _stage_item in (stage_item_1, stage_item_2, stage_item_3):
         stage_item_with_rounds = await get_stage_item(tournament_id_1, _stage_item.id)
@@ -860,8 +857,7 @@ async def sql_create_dev_db() -> UserId:
     await build_matches_for_stage_item(b_stage_item, tournament_id_2)
     await build_matches_for_stage_item(a_stage_item, tournament_id_2)
 
-    tournament_details_2 = await sql_get_tournament(tournament_id_2)
-    await apply_match_states(tournament_id_2, tournament_details_2)
+    await apply_match_states(tournament_id_2)
 
     for _stage_item in (b_stage_item, a_stage_item):
         stage_item_with_rounds = await get_stage_item(tournament_id_2, _stage_item.id)

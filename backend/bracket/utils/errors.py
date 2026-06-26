@@ -10,6 +10,7 @@ from bracket.utils.types import EnumAutoStr
 
 
 class UniqueIndex(EnumAutoStr):
+    match_sets_match_id_set_number_key = auto()
     ix_stages_one_active_no_level = auto()
     ix_stages_one_active_per_level = auto()
     ix_tournaments_dashboard_endpoint = auto()
@@ -35,6 +36,9 @@ class ForeignKey(EnumAutoStr):
 
 
 unique_index_violation_error_lookup = {
+    UniqueIndex.match_sets_match_id_set_number_key: (
+        "A match can only have one set with a given set number"
+    ),
     UniqueIndex.ix_stages_one_active_no_level: ("Only one stage can be active per tournament"),
     UniqueIndex.ix_stages_one_active_per_level: ("Only one stage can be active per level"),
     UniqueIndex.ix_tournaments_dashboard_endpoint: "This dashboard link is already taken",

@@ -333,6 +333,7 @@
     "scoring_type_set_points_with_match_bonus": "Satzpunkte mit Spielbonus",
     "search_placeholder": "Suche ...",
     "set_default_duration_button": "Standard setzen",
+    "set_label": "Satz {{number}}",
     "set_to_new_button": "Jetzt setzen",
     "sign_in_title": "Anmelden",
     "single_elimination_label": "Einzel Eliminierung",

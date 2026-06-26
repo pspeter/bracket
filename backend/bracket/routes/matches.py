@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.config import config
@@ -16,23 +15,16 @@ from bracket.logic.planning.matches import (
     schedule_all_unscheduled_matches,
     validate_match_can_be_unscheduled,
 )
-from bracket.logic.ranking.calculation import (
-    recalculate_ranking_for_stage_item,
-)
-from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
-from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
 from bracket.models.db.match import (
     Match,
     MatchBody,
     MatchCreateBodyFrontend,
     MatchRescheduleBody,
     MatchResizeBreakBody,
-    MatchScoreTrackingBody,
     MatchState,
     MatchSwapBody,
     SchedulerWeights,
 )
-from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import user_authenticated_for_tournament
@@ -52,8 +44,6 @@ from bracket.sql.referees import (
     sql_set_match_referee_name,
     sql_set_match_referee_slot,
 )
-from bracket.sql.rounds import get_round_by_id
-from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
@@ -104,71 +94,6 @@ async def validate_match_can_be_started(
         raise ValueError(
             f"Could not find stage for match {existing_match.id} in tournament {tournament_id}"
         )
-
-
-def get_match_body_with_state_updates(existing_match: Match, match_body: MatchBody) -> MatchBody:
-    missing_fields = {
-        "round_id": existing_match.round_id,
-        "stage_item_input1_score": existing_match.stage_item_input1_score,
-        "stage_item_input2_score": existing_match.stage_item_input2_score,
-        "court_id": existing_match.court_id,
-        "custom_duration_minutes": existing_match.custom_duration_minutes,
-        "state": existing_match.state,
-    }
-    match_body = match_body.model_copy(
-        update={
-            key: value
-            for key, value in missing_fields.items()
-            if key not in match_body.model_fields_set
-        }
-    )
-
-    scores_changed = (
-        existing_match.stage_item_input1_score != match_body.stage_item_input1_score
-        or existing_match.stage_item_input2_score != match_body.stage_item_input2_score
-    )
-    scores_are_zero = (
-        match_body.stage_item_input1_score == 0 and match_body.stage_item_input2_score == 0
-    )
-    # A score only carries meaning while a match is in progress or completed. Outside those
-    # states the only valid score is 0–0, so resetting the score (e.g. moving a match back to
-    # "not started") is allowed, but recording a real score there is not.
-    if (
-        scores_changed
-        and match_body.state not in {MatchState.IN_PROGRESS, MatchState.COMPLETED}
-        and not scores_are_zero
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Scores can only be set while the match is in progress or being completed; "
-                "moving a match to another state requires resetting its score to 0–0"
-            ),
-        )
-
-    completed_at = None
-    if match_body.state is MatchState.COMPLETED:
-        completed_at = (
-            existing_match.completed_at
-            if existing_match.state is MatchState.COMPLETED
-            and existing_match.completed_at is not None
-            else datetime_utc.now()
-        )
-
-    return match_body.model_copy(update={"completed_at": completed_at})
-
-
-def get_full_match_body_from_score_tracking(
-    existing_match: Match, body: MatchScoreTrackingBody
-) -> MatchBody:
-    return MatchBody(
-        round_id=existing_match.round_id,
-        court_id=existing_match.court_id,
-        custom_duration_minutes=existing_match.custom_duration_minutes,
-        stage_item_input1_score=body.stage_item_input1_score,
-        stage_item_input2_score=body.stage_item_input2_score,
-        state=body.state,
-    )
 
 
 @router.delete("/tournaments/{tournament_id}/matches/{match_id}", response_model=SuccessResponse)
@@ -314,7 +239,21 @@ async def update_match_by_id(
 ) -> SuccessResponse:
     await check_foreign_keys_belong_to_tournament(match_body, tournament_id)
     tournament = await sql_get_tournament(tournament_id)
-    await validate_match_can_be_started(tournament_id, match, match_body.state)
+
+    # Fields the client didn't send keep their existing values (a partial update must not null
+    # out, e.g., the court just because only the duration was changed).
+    fill_defaults = {
+        "round_id": match.round_id,
+        "court_id": match.court_id,
+        "custom_duration_minutes": match.custom_duration_minutes,
+    }
+    match_body = match_body.model_copy(
+        update={
+            key: value
+            for key, value in fill_defaults.items()
+            if key not in match_body.model_fields_set
+        }
+    )
 
     # Only touch the referee when the client explicitly sent at least one referee field, so
     # other match edits (scores, duration, ...) never clear an existing assignment.
@@ -334,8 +273,6 @@ async def update_match_by_id(
     if referee_stage_item_input_id is not None:
         await validate_referee_slot_for_match(tournament_id, match, referee_stage_item_input_id)
 
-    match_body = get_match_body_with_state_updates(match, match_body)
-
     await sql_update_match(match_id, match_body, tournament)
 
     if referee_provided:
@@ -345,11 +282,6 @@ async def update_match_by_id(
             await sql_set_match_referee_name(match_id, referee_name)
         else:
             await sql_clear_match_referee(match_id)
-
-    round_ = await get_round_by_id(tournament_id, match.round_id)
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    await auto_resolve_next_swiss_round(tournament_id, stage_item)
 
     if (
         match_body.custom_duration_minutes != match.custom_duration_minutes
@@ -364,9 +296,6 @@ async def update_match_by_id(
             if match_pos.match.court_id == match.court_id
         ]
         await reorder_all_matches(tournament, court_matches)
-
-    if stage_item.type == StageType.SINGLE_ELIMINATION:
-        await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match_id})
 
     return SuccessResponse()
 

@@ -294,6 +294,10 @@ export type Match = {
    */
   input2_slot: number | null;
   /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
    * Referee Name
    */
   referee_name: string | null;
@@ -318,10 +322,6 @@ export type Match = {
    */
   stage_item_input1_id: number | null;
   /**
-   * Stage Item Input1 Score
-   */
-  stage_item_input1_score: number;
-  /**
    * Stage Item Input1 Winner From Match Id
    */
   stage_item_input1_winner_from_match_id: number | null;
@@ -334,10 +334,6 @@ export type Match = {
    */
   stage_item_input2_id: number | null;
   /**
-   * Stage Item Input2 Score
-   */
-  stage_item_input2_score: number;
-  /**
    * Stage Item Input2 Winner From Match Id
    */
   stage_item_input2_winner_from_match_id: number | null;
@@ -345,17 +341,13 @@ export type Match = {
    * Start Time
    */
   start_time: string | null;
-  state: MatchState;
+  readonly state: MatchState;
 };
 
 /**
  * MatchBody
  */
 export type MatchBody = {
-  /**
-   * Completed At
-   */
-  completed_at: string | null;
   /**
    * Court Id
    */
@@ -376,15 +368,6 @@ export type MatchBody = {
    * Round Id
    */
   round_id: number;
-  /**
-   * Stage Item Input1 Score
-   */
-  stage_item_input1_score: number;
-  /**
-   * Stage Item Input2 Score
-   */
-  stage_item_input2_score: number;
-  state: MatchState;
 };
 
 /**
@@ -450,9 +433,21 @@ export type MatchResizeBreakBody = {
 };
 
 /**
- * MatchScoreTrackingBody
+ * MatchSet
  */
-export type MatchScoreTrackingBody = {
+export type MatchSet = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Match Id
+   */
+  match_id: number;
+  /**
+   * Set Number
+   */
+  set_number: number;
   /**
    * Stage Item Input1 Score
    */
@@ -461,8 +456,28 @@ export type MatchScoreTrackingBody = {
    * Stage Item Input2 Score
    */
   stage_item_input2_score: number;
-  state: MatchState;
+  state: MatchSetState;
 };
+
+/**
+ * MatchSetBody
+ */
+export type MatchSetBody = {
+  /**
+   * Stage Item Input1 Score
+   */
+  stage_item_input1_score: number;
+  /**
+   * Stage Item Input2 Score
+   */
+  stage_item_input2_score: number;
+  state: MatchSetState;
+};
+
+/**
+ * MatchSetState
+ */
+export type MatchSetState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 
 /**
  * MatchState
@@ -523,9 +538,25 @@ export type MatchWithDetails = {
    */
   input2_slot: number | null;
   /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
    * Level Id
    */
   level_id: number | null;
+  /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
+   * Max Points
+   */
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
   /**
    * Referee
    */
@@ -559,10 +590,6 @@ export type MatchWithDetails = {
    */
   stage_item_input1_id: number | null;
   /**
-   * Stage Item Input1 Score
-   */
-  stage_item_input1_score: number;
-  /**
    * Stage Item Input1 Winner From Match Id
    */
   stage_item_input1_winner_from_match_id: number | null;
@@ -575,10 +602,6 @@ export type MatchWithDetails = {
    */
   stage_item_input2_id: number | null;
   /**
-   * Stage Item Input2 Score
-   */
-  stage_item_input2_score: number;
-  /**
    * Stage Item Input2 Winner From Match Id
    */
   stage_item_input2_winner_from_match_id: number | null;
@@ -586,7 +609,11 @@ export type MatchWithDetails = {
    * Start Time
    */
   start_time: string | null;
-  state: MatchState;
+  readonly state: MatchState;
+  /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
 };
 
 /**
@@ -627,9 +654,25 @@ export type MatchWithDetailsDefinitive = {
    */
   input2_slot: number | null;
   /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
    * Level Id
    */
   level_id: number | null;
+  /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
+   * Max Points
+   */
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
   /**
    * Referee
    */
@@ -663,10 +706,6 @@ export type MatchWithDetailsDefinitive = {
    */
   stage_item_input1_id: number | null;
   /**
-   * Stage Item Input1 Score
-   */
-  stage_item_input1_score: number;
-  /**
    * Stage Item Input1 Winner From Match Id
    */
   stage_item_input1_winner_from_match_id: number | null;
@@ -679,10 +718,6 @@ export type MatchWithDetailsDefinitive = {
    */
   stage_item_input2_id: number | null;
   /**
-   * Stage Item Input2 Score
-   */
-  stage_item_input2_score: number;
-  /**
    * Stage Item Input2 Winner From Match Id
    */
   stage_item_input2_winner_from_match_id: number | null;
@@ -690,7 +725,11 @@ export type MatchWithDetailsDefinitive = {
    * Start Time
    */
   start_time: string | null;
-  state: MatchState;
+  readonly state: MatchState;
+  /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
 };
 
 /**
@@ -2360,6 +2399,501 @@ export type ValidationError = {
   type: string;
 };
 
+/**
+ * Match
+ */
+export type MatchWritable = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
+  /**
+   * Court Id
+   */
+  court_id: number | null;
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Custom Duration Minutes
+   */
+  custom_duration_minutes: number | null;
+  /**
+   * Duration Minutes
+   */
+  duration_minutes: number;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
+   * Referee Name
+   */
+  referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
+  /**
+   * Round Id
+   */
+  round_id: number;
+  /**
+   * Stage Item Input1
+   */
+  stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Stage Item Input1 Id
+   */
+  stage_item_input1_id: number | null;
+  /**
+   * Stage Item Input1 Winner From Match Id
+   */
+  stage_item_input1_winner_from_match_id: number | null;
+  /**
+   * Stage Item Input2
+   */
+  stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Stage Item Input2 Id
+   */
+  stage_item_input2_id: number | null;
+  /**
+   * Stage Item Input2 Winner From Match Id
+   */
+  stage_item_input2_winner_from_match_id: number | null;
+  /**
+   * Start Time
+   */
+  start_time: string | null;
+};
+
+/**
+ * MatchWithDetails
+ *
+ * MatchWithDetails has zero or one defined stage item inputs, but not both.
+ */
+export type MatchWithDetailsWritable = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
+  court: Court | null;
+  /**
+   * Court Id
+   */
+  court_id: number | null;
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Custom Duration Minutes
+   */
+  custom_duration_minutes: number | null;
+  /**
+   * Duration Minutes
+   */
+  duration_minutes: number;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
+   * Max Points
+   */
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
+  /**
+   * Referee
+   */
+  referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Referee Name
+   */
+  referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
+  /**
+   * Round Id
+   */
+  round_id: number;
+  /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
+   * Stage Item Input1
+   */
+  stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Stage Item Input1 Id
+   */
+  stage_item_input1_id: number | null;
+  /**
+   * Stage Item Input1 Winner From Match Id
+   */
+  stage_item_input1_winner_from_match_id: number | null;
+  /**
+   * Stage Item Input2
+   */
+  stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Stage Item Input2 Id
+   */
+  stage_item_input2_id: number | null;
+  /**
+   * Stage Item Input2 Winner From Match Id
+   */
+  stage_item_input2_winner_from_match_id: number | null;
+  /**
+   * Start Time
+   */
+  start_time: string | null;
+  /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
+};
+
+/**
+ * MatchWithDetailsDefinitive
+ */
+export type MatchWithDetailsDefinitiveWritable = {
+  /**
+   * Completed At
+   */
+  completed_at: string | null;
+  court: Court | null;
+  /**
+   * Court Id
+   */
+  court_id: number | null;
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Custom Duration Minutes
+   */
+  custom_duration_minutes: number | null;
+  /**
+   * Duration Minutes
+   */
+  duration_minutes: number;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Input1 Slot
+   */
+  input1_slot: number | null;
+  /**
+   * Input2 Slot
+   */
+  input2_slot: number | null;
+  /**
+   * Last Set Max Points
+   */
+  last_set_max_points: number | null;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
+   * Match Sets
+   */
+  match_sets: Array<MatchSet>;
+  /**
+   * Max Points
+   */
+  max_points: number;
+  /**
+   * Num Sets
+   */
+  num_sets: number;
+  /**
+   * Referee
+   */
+  referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
+  /**
+   * Referee Name
+   */
+  referee_name: string | null;
+  /**
+   * Referee Slot
+   */
+  referee_slot: number | null;
+  /**
+   * Referee Stage Item Input Id
+   */
+  referee_stage_item_input_id: number | null;
+  /**
+   * Round Id
+   */
+  round_id: number;
+  /**
+   * Side Switch Every N Points
+   */
+  side_switch_every_n_points: number | null;
+  /**
+   * Stage Item Input1
+   */
+  stage_item_input1: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
+  /**
+   * Stage Item Input1 Id
+   */
+  stage_item_input1_id: number | null;
+  /**
+   * Stage Item Input1 Winner From Match Id
+   */
+  stage_item_input1_winner_from_match_id: number | null;
+  /**
+   * Stage Item Input2
+   */
+  stage_item_input2: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty;
+  /**
+   * Stage Item Input2 Id
+   */
+  stage_item_input2_id: number | null;
+  /**
+   * Stage Item Input2 Winner From Match Id
+   */
+  stage_item_input2_winner_from_match_id: number | null;
+  /**
+   * Start Time
+   */
+  start_time: string | null;
+  /**
+   * Two Point Advantage
+   */
+  two_point_advantage: boolean;
+};
+
+/**
+ * RoundWithMatches
+ */
+export type RoundWithMatchesWritable = {
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Is Pinned
+   */
+  is_pinned: boolean | null;
+  lifecycle_state: RoundLifecycleState;
+  /**
+   * Matches
+   */
+  matches: Array<MatchWithDetailsDefinitiveWritable | MatchWithDetailsWritable>;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Stage Item Id
+   */
+  stage_item_id: number;
+};
+
+/**
+ * ScoreTrackingInfo
+ */
+export type ScoreTrackingInfoWritable = {
+  /**
+   * Courts
+   */
+  courts: Array<Court>;
+  /**
+   * Has Active Stage
+   */
+  has_active_stage: boolean;
+  /**
+   * Levels
+   */
+  levels: Array<LevelResponse>;
+  /**
+   * Matches
+   */
+  matches: Array<MatchWithDetailsWritable>;
+  /**
+   * Referees Enabled
+   */
+  referees_enabled: boolean;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
+  /**
+   * Tournament Name
+   */
+  tournament_name: string;
+};
+
+/**
+ * ScoreTrackingInfoResponse
+ */
+export type ScoreTrackingInfoResponseWritable = {
+  data: ScoreTrackingInfoWritable;
+};
+
+/**
+ * ScoreTrackingMatchResponse
+ */
+export type ScoreTrackingMatchResponseWritable = {
+  data: MatchWithDetailsWritable;
+};
+
+/**
+ * SingleMatchResponse
+ */
+export type SingleMatchResponseWritable = {
+  data: MatchWritable;
+};
+
+/**
+ * StageItemWithRounds
+ */
+export type StageItemWithRoundsWritable = {
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Games Per Player
+   */
+  games_per_player: number | null;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Inputs
+   */
+  inputs: Array<StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty>;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Ranking Id
+   */
+  ranking_id: number | null;
+  /**
+   * Rounds
+   */
+  rounds: Array<RoundWithMatchesWritable>;
+  /**
+   * Stage Id
+   */
+  stage_id: number;
+  /**
+   * Team Count
+   */
+  team_count: number;
+  type: StageType;
+  /**
+   * Type Name
+   */
+  type_name: string;
+};
+
+/**
+ * StageWithStageItems
+ */
+export type StageWithStageItemsWritable = {
+  /**
+   * Created
+   */
+  created: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Is Active
+   */
+  is_active: boolean;
+  /**
+   * Level Id
+   */
+  level_id: number | null;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Stage Items
+   */
+  stage_items: Array<StageItemWithRoundsWritable>;
+  /**
+   * Tournament Id
+   */
+  tournament_id: number;
+};
+
+/**
+ * StagesWithStageItemsResponse
+ */
+export type StagesWithStageItemsResponseWritable = {
+  /**
+   * Data
+   */
+  data: Array<StageWithStageItemsWritable>;
+};
+
 export type GetClubsClubsGetData = {
   body?: never;
   path?: never;
@@ -2575,41 +3109,46 @@ export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGe
 export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponse =
   GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses[keyof GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses];
 
-export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutData = {
-  body: MatchScoreTrackingBody;
+export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData = {
+  body: MatchSetBody;
   path: {
     /**
      * Match Id
      */
     match_id: number;
     /**
+     * Set Id
+     */
+    set_id: number;
+    /**
      * Score Tracking Token
      */
     score_tracking_token: string;
   };
   query?: never;
-  url: '/score-tracking/{score_tracking_token}/matches/{match_id}';
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}';
 };
 
-export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors = {
+export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors = {
   /**
    * Validation Error
    */
   422: HttpValidationError;
 };
 
-export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutError =
-  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors[keyof UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutErrors];
+export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutError =
+  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors[keyof UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors];
 
-export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses = {
-  /**
-   * Successful Response
-   */
-  200: ScoreTrackingMatchResponse;
-};
+export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: ScoreTrackingMatchResponse;
+  };
 
-export type UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponse =
-  UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses[keyof UpdateScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdPutResponses];
+export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponse =
+  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses];
 
 export type GetSignupInfoSignupSignupTokenGetData = {
   body?: never;
@@ -3369,6 +3908,47 @@ export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPost
 export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponse =
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses[keyof ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses];
 
+export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData = {
+  body: MatchSetBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Set Id
+     */
+    set_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}';
+};
+
+export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutError =
+  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors[keyof UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors];
+
+export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: ScoreTrackingMatchResponse;
+  };
+
+export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponse =
+  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses];
+
 export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData = {
   body?: never;
   path: {
@@ -3779,7 +4359,12 @@ export type UpdateRankingByIdTournamentsTournamentIdRankingsRankingIdPutData = {
      */
     ranking_id: number;
   };
-  query?: never;
+  query?: {
+    /**
+     * Force
+     */
+    force?: boolean;
+  };
   url: '/tournaments/{tournament_id}/rankings/{ranking_id}';
 };
 
@@ -4114,45 +4699,6 @@ export type GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTracki
 
 export type GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetResponse =
   GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetResponses[keyof GetAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdGetResponses];
-
-export type UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutData =
-  {
-    body: MatchScoreTrackingBody;
-    path: {
-      /**
-       * Tournament Id
-       */
-      tournament_id: number;
-      /**
-       * Match Id
-       */
-      match_id: number;
-    };
-    query?: never;
-    url: '/tournaments/{tournament_id}/score-tracking/matches/{match_id}';
-  };
-
-export type UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors =
-  {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-  };
-
-export type UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutError =
-  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors[keyof UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutErrors];
-
-export type UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: ScoreTrackingMatchResponse;
-  };
-
-export type UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponse =
-  UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses[keyof UpdateAuthenticatedScoreTrackingMatchTournamentsTournamentIdScoreTrackingMatchesMatchIdPutResponses];
 
 export type CreateStageItemTournamentsTournamentIdStageItemsPostData = {
   body: StageItemCreateBody;

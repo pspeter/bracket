@@ -3,6 +3,17 @@ import dayjs from 'dayjs';
 import { formatStageItemInput } from './stage_item_input';
 import { Translator } from './types';
 
+// Scores now live on the match's sets. These helpers aggregate them back into a single pair of
+// numbers so display surfaces that haven't been migrated to per-set rendering keep behaving
+// exactly as before for single-set matches (and show a sensible total for multi-set ones).
+export function getMatchScore1(match: { match_sets: Array<{ stage_item_input1_score: number }> }) {
+  return match.match_sets.reduce((sum, set) => sum + set.stage_item_input1_score, 0);
+}
+
+export function getMatchScore2(match: { match_sets: Array<{ stage_item_input2_score: number }> }) {
+  return match.match_sets.reduce((sum, set) => sum + set.stage_item_input2_score, 0);
+}
+
 export function getMatchStartTime(match: MatchWithDetails) {
   return dayjs(match.start_time || '');
 }

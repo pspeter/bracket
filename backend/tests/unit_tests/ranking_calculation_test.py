@@ -22,6 +22,7 @@ from bracket.utils.id_types import (
     TeamId,
     TournamentId,
 )
+from tests.unit_tests.mocks import match_sets_for_state
 
 
 def _ranking(tournament_id: TournamentId, now: datetime_utc, win: str, draw: str) -> Ranking:
@@ -70,9 +71,7 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=2,
-                            stage_item_input2_score=0,
-                            state=MatchState.COMPLETED,
+                            match_sets=match_sets_for_state(MatchId(0), MatchState.COMPLETED, 2, 0),
                         ),
                         MatchWithDetailsDefinitive(
                             id=MatchId(-2),
@@ -81,18 +80,16 @@ def test_determine_ranking_for_stage_item_elimination() -> None:
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=2,
-                            stage_item_input2_score=2,
-                            state=MatchState.COMPLETED,
+                            match_sets=match_sets_for_state(MatchId(0), MatchState.COMPLETED, 2, 2),
                         ),
                         MatchWithDetails(  # This gets ignored in ranking calculation
                             id=MatchId(-3),
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=3,
-                            stage_item_input2_score=2,
-                            state=MatchState.IN_PROGRESS,
+                            match_sets=match_sets_for_state(
+                                MatchId(0), MatchState.IN_PROGRESS, 3, 2
+                            ),
                         ),
                     ],
                     stage_item_id=StageItemId(-1),
@@ -151,9 +148,7 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=2,
-                            stage_item_input2_score=0,
-                            state=MatchState.COMPLETED,
+                            match_sets=match_sets_for_state(MatchId(0), MatchState.COMPLETED, 2, 0),
                         ),
                         MatchWithDetailsDefinitive(
                             id=MatchId(-2),
@@ -162,18 +157,16 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=2,
-                            stage_item_input2_score=2,
-                            state=MatchState.COMPLETED,
+                            match_sets=match_sets_for_state(MatchId(0), MatchState.COMPLETED, 2, 2),
                         ),
                         MatchWithDetails(  # This gets ignored in ranking calculation
                             id=MatchId(-3),
                             created=now,
                             duration_minutes=90,
                             round_id=RoundId(-1),
-                            stage_item_input1_score=3,
-                            stage_item_input2_score=2,
-                            state=MatchState.IN_PROGRESS,
+                            match_sets=match_sets_for_state(
+                                MatchId(0), MatchState.IN_PROGRESS, 3, 2
+                            ),
                         ),
                     ],
                     stage_item_id=StageItemId(-1),

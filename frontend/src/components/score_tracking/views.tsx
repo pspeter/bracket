@@ -22,7 +22,12 @@ import { SWRResponse } from 'swr';
 import { LevelBadge, LevelFilterSelect } from '@components/levels/levels';
 import { Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
-import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
+import {
+  formatMatchInput1,
+  formatMatchInput2,
+  getMatchScore1,
+  getMatchScore2,
+} from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { responseIsValid } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
@@ -193,7 +198,7 @@ export function ScoreTrackingListView({
                       fontWeight: 800,
                     }}
                   >
-                    <Center>{match.stage_item_input1_score}</Center>
+                    <Center>{getMatchScore1(match)}</Center>
                   </div>
                 </Grid.Col>
               </Grid>
@@ -213,7 +218,7 @@ export function ScoreTrackingListView({
                       fontWeight: 800,
                     }}
                   >
-                    <Center>{match.stage_item_input2_score}</Center>
+                    <Center>{getMatchScore2(match)}</Center>
                   </div>
                 </Grid.Col>
               </Grid>
@@ -265,9 +270,7 @@ export function ScoreTrackingMatchView({
 
   const matchData = responseIsValid(swrResponse) ? swrResponse.data!.data : null;
   const n = matchData?.side_switch_every_n_points ?? null;
-  const combinedScore = matchData
-    ? matchData.stage_item_input1_score + matchData.stage_item_input2_score
-    : 0;
+  const combinedScore = matchData ? getMatchScore1(matchData) + getMatchScore2(matchData) : 0;
 
   useEffect(() => {
     if (matchData === null) return;
@@ -309,12 +312,12 @@ export function ScoreTrackingMatchView({
     {
       slot: 1 as const,
       name: formatMatchInput1(t, stageItemsLookup, matchesLookup, match),
-      score: match.stage_item_input1_score,
+      score: getMatchScore1(match),
     },
     {
       slot: 2 as const,
       name: formatMatchInput2(t, stageItemsLookup, matchesLookup, match),
-      score: match.stage_item_input2_score,
+      score: getMatchScore2(match),
     },
   ];
   const displayedTeams = isSwapped ? [teams[1], teams[0]] : teams;
@@ -331,8 +334,8 @@ export function ScoreTrackingMatchView({
   }
 
   async function adjustScore(slot: 1 | 2, delta: number) {
-    const next1 = Math.max(0, match.stage_item_input1_score + (slot === 1 ? delta : 0));
-    const next2 = Math.max(0, match.stage_item_input2_score + (slot === 2 ? delta : 0));
+    const next1 = Math.max(0, getMatchScore1(match) + (slot === 1 ? delta : 0));
+    const next2 = Math.max(0, getMatchScore2(match) + (slot === 2 ? delta : 0));
     await persistMatch({
       stage_item_input1_score: next1,
       stage_item_input2_score: next2,
@@ -372,8 +375,8 @@ export function ScoreTrackingMatchView({
               loading={isSaving}
               onClick={() =>
                 persistMatch({
-                  stage_item_input1_score: match.stage_item_input1_score,
-                  stage_item_input2_score: match.stage_item_input2_score,
+                  stage_item_input1_score: getMatchScore1(match),
+                  stage_item_input2_score: getMatchScore2(match),
                   state: 'IN_PROGRESS',
                 })
               }
@@ -441,8 +444,8 @@ export function ScoreTrackingMatchView({
                   loading={isSaving}
                   onClick={() =>
                     persistMatch({
-                      stage_item_input1_score: match.stage_item_input1_score,
-                      stage_item_input2_score: match.stage_item_input2_score,
+                      stage_item_input1_score: getMatchScore1(match),
+                      stage_item_input2_score: getMatchScore2(match),
                       state: 'IN_PROGRESS',
                     })
                   }
@@ -456,8 +459,8 @@ export function ScoreTrackingMatchView({
                   loading={isSaving}
                   onClick={() =>
                     persistMatch({
-                      stage_item_input1_score: match.stage_item_input1_score,
-                      stage_item_input2_score: match.stage_item_input2_score,
+                      stage_item_input1_score: getMatchScore1(match),
+                      stage_item_input2_score: getMatchScore2(match),
                       state: 'COMPLETED',
                     })
                   }

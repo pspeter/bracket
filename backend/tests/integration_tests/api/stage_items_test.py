@@ -2,13 +2,13 @@ import pytest
 
 from bracket.database import database
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchState
+from bracket.models.db.match import MatchSetState, MatchState
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
-from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stages
+from bracket.schema import match_sets, matches, rounds, stage_item_inputs, stage_items, stages
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
@@ -392,11 +392,16 @@ async def test_update_stage_item_fails_when_removed_empty_slot_is_in_started_mat
             if input_slot_4.id in {match.stage_item_input1_id, match.stage_item_input2_id}
         )
 
+        for match_set in blocking_match.match_sets:
+            await database.execute(
+                query=match_sets.update()
+                .where(match_sets.c.id == match_set.id)
+                .values(state=MatchSetState(state.value).value)
+            )
         await database.execute(
             query=matches.update()
             .where(matches.c.id == blocking_match.id)
             .values(
-                state=state.value,
                 completed_at=blocking_match.completed_at if state is MatchState.COMPLETED else None,
             )
         )
@@ -434,11 +439,12 @@ async def test_update_single_elimination_stage_item_fails_after_games_started(
         stage_item = await get_stage_item(auth_context.tournament.id, stage_item_id)
         blocking_match = stage_item.rounds[0].matches[0]
 
-        await database.execute(
-            query=matches.update()
-            .where(matches.c.id == blocking_match.id)
-            .values(state=MatchState.IN_PROGRESS.value)
-        )
+        for match_set in blocking_match.match_sets:
+            await database.execute(
+                query=match_sets.update()
+                .where(match_sets.c.id == match_set.id)
+                .values(state=MatchSetState.IN_PROGRESS.value)
+            )
 
         response = await send_tournament_request(
             HTTPMethod.PUT,

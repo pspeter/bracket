@@ -7,7 +7,13 @@ import { SWRResponse } from 'swr';
 import MatchModal from '@components/modals/match_modal';
 import { assert_not_none } from '@components/utils/assert';
 import { Time } from '@components/utils/datetime';
-import { formatMatchInput1, formatMatchInput2, isMatchHappening } from '@components/utils/match';
+import {
+  formatMatchInput1,
+  formatMatchInput2,
+  getMatchScore1,
+  getMatchScore2,
+  isMatchHappening,
+} from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { MatchWithDetails, RoundWithMatches, StagesWithStageItemsResponse } from '@openapi';
@@ -63,10 +69,10 @@ export default function Match({
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
   const matchesLookup = getMatchLookup(swrStagesResponse);
 
-  const team1_style =
-    match.stage_item_input1_score > match.stage_item_input2_score ? winner_style : {};
-  const team2_style =
-    match.stage_item_input1_score < match.stage_item_input2_score ? winner_style : {};
+  const score1 = getMatchScore1(match);
+  const score2 = getMatchScore2(match);
+  const team1_style = score1 > score2 ? winner_style : {};
+  const team2_style = score1 < score2 ? winner_style : {};
 
   // Placeholder rounds have no resolved teams yet, so show "TBD" for their unresolved
   // slots instead of the generic "Empty slot" fallback (PRD US 21).
@@ -82,14 +88,14 @@ export default function Match({
       <div className={classes.top} style={team1_style}>
         <Grid grow>
           <Grid.Col span={10}>{team1_label}</Grid.Col>
-          <Grid.Col span={2}>{match.stage_item_input1_score}</Grid.Col>
+          <Grid.Col span={2}>{score1}</Grid.Col>
         </Grid>
       </div>
       <div className={classes.divider} />
       <div className={classes.bottom} style={team2_style}>
         <Grid grow>
           <Grid.Col span={10}>{team2_label}</Grid.Col>
-          <Grid.Col span={2}>{match.stage_item_input2_score}</Grid.Col>
+          <Grid.Col span={2}>{score2}</Grid.Col>
         </Grid>
       </div>
       {refereesEnabled && (

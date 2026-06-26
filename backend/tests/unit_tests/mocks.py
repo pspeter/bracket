@@ -1,6 +1,12 @@
 from heliclockter import datetime_utc
 
-from bracket.models.db.match import MatchState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import (
+    MatchSet,
+    MatchSetState,
+    MatchState,
+    MatchWithDetails,
+    MatchWithDetailsDefinitive,
+)
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
@@ -16,6 +22,7 @@ from bracket.utils.dummy_records import (
 from bracket.utils.id_types import (
     CourtId,
     MatchId,
+    MatchSetId,
     RoundId,
     StageId,
     StageItemId,
@@ -23,6 +30,24 @@ from bracket.utils.id_types import (
     TeamId,
     TournamentId,
 )
+
+
+def _single_set(match_id: MatchId, score1: int, score2: int, state: MatchSetState) -> MatchSet:
+    return MatchSet(
+        id=MatchSetId(int(match_id) * 10),
+        match_id=match_id,
+        set_number=1,
+        stage_item_input1_score=score1,
+        stage_item_input2_score=score2,
+        state=state,
+    )
+
+
+def match_sets_for_state(
+    match_id: MatchId, state: MatchState, score1: int = 0, score2: int = 0
+) -> list[MatchSet]:
+    """Build a single-set list whose derived match state equals ``state`` (num_sets=1)."""
+    return [_single_set(match_id, score1, score2, MatchSetState(state.value))]
 
 
 def get_stage_item_inputs_mock(tournament_id: TournamentId) -> list[StageItemInputFinal]:
@@ -76,9 +101,7 @@ def get_2_definitive_matches_mock(
         duration_minutes=duration_minutes,
         round_id=RoundId(-3),
         court_id=CourtId(-1),
-        stage_item_input1_score=2,
-        stage_item_input2_score=0,
-        state=MatchState.COMPLETED,
+        match_sets=[_single_set(MatchId(-1), 2, 0, MatchSetState.COMPLETED)],
         completed_at=DUMMY_MOCK_TIME,
     )
     match2 = MatchWithDetailsDefinitive(
@@ -92,9 +115,7 @@ def get_2_definitive_matches_mock(
         duration_minutes=duration_minutes,
         round_id=RoundId(-3),
         court_id=CourtId(-2),
-        stage_item_input1_score=2,
-        stage_item_input2_score=3,
-        state=MatchState.COMPLETED,
+        match_sets=[_single_set(MatchId(-2), 2, 3, MatchSetState.COMPLETED)],
         completed_at=DUMMY_MOCK_TIME,
     )
     return match1, match2
@@ -111,8 +132,7 @@ def get_2_definitive_and_2_tentative_matches_mock(
         created=DUMMY_MOCK_TIME,
         duration_minutes=90,
         round_id=RoundId(-2),
-        stage_item_input1_score=4,
-        stage_item_input2_score=0,
+        match_sets=[_single_set(MatchId(-3), 4, 0, MatchSetState.NOT_STARTED)],
         stage_item_input1_winner_from_match_id=match1.id,
         stage_item_input2_winner_from_match_id=match2.id,
     )
@@ -121,8 +141,7 @@ def get_2_definitive_and_2_tentative_matches_mock(
         created=DUMMY_MOCK_TIME,
         duration_minutes=90,
         round_id=RoundId(-1),
-        stage_item_input1_score=3,
-        stage_item_input2_score=2,
+        match_sets=[_single_set(MatchId(-4), 3, 2, MatchSetState.NOT_STARTED)],
         stage_item_input1_winner_from_match_id=match2.id,
         stage_item_input2_winner_from_match_id=match3.id,
     )

@@ -4,7 +4,7 @@ from enum import auto
 from typing import cast
 
 from heliclockter import datetime_utc, timedelta
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from bracket.models.db.court import Court
 from bracket.models.db.shared import BaseModelORM
@@ -13,6 +13,7 @@ from bracket.utils.id_types import (
     CourtId,
     LevelId,
     MatchId,
+    MatchSetId,
     RoundId,
     StageItemInputId,
 )
@@ -25,20 +26,47 @@ class MatchState(EnumAutoStr):
     COMPLETED = auto()
 
 
+class MatchSetState(EnumAutoStr):
+    NOT_STARTED = auto()
+    IN_PROGRESS = auto()
+    COMPLETED = auto()
+
+
+class MatchSet(BaseModelORM):
+    id: MatchSetId
+    match_id: MatchId
+    set_number: int
+    stage_item_input1_score: int
+    stage_item_input2_score: int
+    state: MatchSetState
+
+
+def derive_match_state(sets: list["MatchSet"]) -> MatchState:
+    """Derive a match's overall state from the states of its sets.
+
+    - all sets NOT_STARTED (or no sets) -> NOT_STARTED
+    - all sets COMPLETED -> COMPLETED
+    - anything else (any IN_PROGRESS, or a mix of COMPLETED and NOT_STARTED) -> IN_PROGRESS
+    """
+    states = {match_set.state for match_set in sets}
+    if not states or states == {MatchSetState.NOT_STARTED}:
+        return MatchState.NOT_STARTED
+    if states == {MatchSetState.COMPLETED}:
+        return MatchState.COMPLETED
+    return MatchState.IN_PROGRESS
+
+
 class MatchBaseInsertable(BaseModelORM):
     created: datetime_utc
     start_time: datetime_utc | None = None
     duration_minutes: int
     custom_duration_minutes: int | None = None
     round_id: RoundId
-    stage_item_input1_score: int
-    stage_item_input2_score: int
     court_id: CourtId | None = None
     # Referee as a third match slot: a reference to a stage_item_input that resolves to a team
     # like the playing slots, or a free-text external referee name. At most one is set.
     referee_stage_item_input_id: StageItemInputId | None = None
     referee_name: str | None = None
-    state: MatchState = MatchState.NOT_STARTED
     completed_at: datetime_utc | None = None
 
     @property
@@ -61,13 +89,43 @@ class Match(MatchInsertable):
     id: MatchId
     stage_item_input1: StageItemInput | None = None
     stage_item_input2: StageItemInput | None = None
+    match_sets: list[MatchSet] = []
+
+    @field_validator("match_sets", mode="before")
+    @staticmethod
+    def parse_match_sets(value: object) -> object:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def state(self) -> MatchState:
+        return derive_match_state(self.match_sets)
+
+    @property
+    def sets_won_by_input1(self) -> int:
+        return sum(
+            1 for s in self.match_sets if s.stage_item_input1_score > s.stage_item_input2_score
+        )
+
+    @property
+    def sets_won_by_input2(self) -> int:
+        return sum(
+            1 for s in self.match_sets if s.stage_item_input2_score > s.stage_item_input1_score
+        )
 
     def get_winner(self) -> StageItemInput | None:
-        if self.state is not MatchState.COMPLETED:
+        if derive_match_state(self.match_sets) is not MatchState.COMPLETED:
             return None
-        if self.stage_item_input1_score > self.stage_item_input2_score:
+
+        sets1 = self.sets_won_by_input1
+        sets2 = self.sets_won_by_input2
+        if sets1 > sets2:
             return self.stage_item_input1
-        if self.stage_item_input1_score < self.stage_item_input2_score:
+        if sets2 > sets1:
             return self.stage_item_input2
 
         return None
@@ -83,6 +141,11 @@ class MatchWithDetails(Match):
     referee: StageItemInput | None = None
     level_id: LevelId | None = None
     side_switch_every_n_points: int | None = None
+    # Set configuration copied from the ranking applicable to this match's stage item.
+    num_sets: int = 1
+    max_points: int = 21
+    last_set_max_points: int | None = None
+    two_point_advantage: bool = True
 
     @field_validator("stage_item_input1", "stage_item_input2", "court", "referee", mode="before")
     @staticmethod
@@ -105,6 +168,11 @@ class MatchWithDetailsDefinitive(Match):
     court: Court | None = None
     referee: StageItemInput | None = None
     side_switch_every_n_points: int | None = None
+    # Set configuration copied from the ranking applicable to this match's stage item.
+    num_sets: int = 1
+    max_points: int = 21
+    last_set_max_points: int | None = None
+    two_point_advantage: bool = True
 
     @property
     def stage_item_inputs(self) -> list[StageItemInput]:
@@ -123,20 +191,16 @@ class MatchWithDetailsDefinitive(Match):
 
 class MatchBody(BaseModelORM):
     round_id: RoundId
-    stage_item_input1_score: int = 0
-    stage_item_input2_score: int = 0
     court_id: CourtId | None = None
     referee_stage_item_input_id: StageItemInputId | None = None
     referee_name: str | None = None
     custom_duration_minutes: int | None = None
-    state: MatchState = MatchState.NOT_STARTED
-    completed_at: datetime_utc | None = None
 
 
-class MatchScoreTrackingBody(BaseModelORM):
+class MatchSetBody(BaseModelORM):
     stage_item_input1_score: int = 0
     stage_item_input2_score: int = 0
-    state: MatchState = MatchState.NOT_STARTED
+    state: MatchSetState = MatchSetState.NOT_STARTED
 
 
 class MatchCreateBodyFrontend(BaseModelORM):
