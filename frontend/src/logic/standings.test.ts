@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ScoringType } from '@openapi';
-
 import { formatDifference, getWinsColumnKey } from './standings';
 
 describe('formatDifference', () => {

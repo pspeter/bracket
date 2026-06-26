@@ -10,8 +10,9 @@ import {
 import RequestErrorAlert from '@components/utils/error_alert';
 import { TableSkeletonTwoColumns } from '@components/utils/skeletons';
 import { setTitle } from '@components/utils/util';
+import { Ranking } from '@openapi';
 import { StandingsContent } from '@pages/tournaments/[id]/dashboard/standings';
-import { getStagesLive, getTeamsLive } from '@services/adapter';
+import { getRankings, getStagesLive, getTeamsLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';
 
 export default function StandingsPresentPage() {
@@ -20,6 +21,7 @@ export default function StandingsPresentPage() {
 
   const swrTeamsResponse = getTeamsLive(tournamentValid ? tournamentDataFull.id : null);
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
+  const swrRankingsResponse = getRankings(tournamentValid ? tournamentDataFull.id : null);
 
   if (!tournamentValid) {
     return tournamentDataFull;
@@ -32,6 +34,10 @@ export default function StandingsPresentPage() {
   setTitle(getTournamentHeadTitle(tournamentDataFull));
 
   if (swrTeamsResponse.error) return <RequestErrorAlert error={swrTeamsResponse.error} />;
+
+  const rankingsById: Record<number, Ranking> = Object.fromEntries(
+    (swrRankingsResponse.data?.data ?? []).map((r) => [r.id, r])
+  );
 
   const fontSizeInPixels = 28;
   return (
@@ -47,6 +53,7 @@ export default function StandingsPresentPage() {
             swrStagesResponse={swrStagesResponse}
             fontSizeInPixels={fontSizeInPixels}
             maxTeamsToDisplay={14}
+            rankingsById={rankingsById}
           />
         </Grid.Col>
       </Grid>
