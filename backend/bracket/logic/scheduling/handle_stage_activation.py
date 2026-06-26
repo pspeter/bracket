@@ -281,6 +281,68 @@ async def update_matches_in_activated_stage(tournament_id: TournamentId, stage_i
             await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
 
 
+async def resolve_dependent_inputs_for_completed_stage_item(
+    tournament_id: TournamentId,
+    source_stage_item_id: StageItemId,
+) -> None:
+    """Resolve placeholder inputs that depend on a source stage item once it is complete.
+
+    This is the auto-advance that replaces manual stage activation: as soon as every match in the
+    source stage item is COMPLETED, any input elsewhere in the tournament of the form "winner
+    (position N) of <source>" is resolved to the concrete team in that ranking position. It is
+    safe to call on every score update — if the source is not complete yet it is a no-op, and once
+    complete it always re-resolves (so a later score correction in the source flows downstream).
+    """
+    stages = await get_full_tournament_details(tournament_id)
+    source_stage_item = next(
+        (
+            stage_item
+            for stage in stages
+            for stage_item in stage.stage_items
+            if stage_item.id == source_stage_item_id
+        ),
+        None,
+    )
+    if source_stage_item is None:
+        return
+
+    source_matches = [
+        match for round_ in source_stage_item.rounds for match in round_.matches
+    ]
+    if not source_matches or not all(
+        match.state is MatchState.COMPLETED for match in source_matches
+    ):
+        return
+
+    team_rankings = await get_team_rankings_lookup_for_tournament(tournament_id, stages)
+
+    affected_stage_item_ids: set[StageItemId] = set()
+    for stage in stages:
+        for stage_item in stage.stage_items:
+            for stage_item_input in stage_item.inputs:
+                if stage_item_input.winner_from_stage_item_id != source_stage_item_id:
+                    continue
+
+                target_input_id = determine_team_id(
+                    source_stage_item_id,
+                    assert_some(stage_item_input.winner_position),
+                    team_rankings,
+                )
+                target_input = await get_stage_item_input_by_id(tournament_id, target_input_id)
+                if not isinstance(target_input, StageItemInputFinal):
+                    continue
+
+                await sql_set_team_id_for_stage_item_input(
+                    tournament_id, stage_item_input.id, target_input.team.id
+                )
+                affected_stage_item_ids.add(stage_item.id)
+
+    for stage_item_id in affected_stage_item_ids:
+        affected_stage_item = await get_stage_item(tournament_id, stage_item_id)
+        if affected_stage_item.type == StageType.SWISS:
+            await _resolve_round_1_for_swiss_stage_item(tournament_id, affected_stage_item)
+
+
 async def update_matches_in_deactivated_stage(
     tournament_id: TournamentId, deactivated_stage: StageWithStageItems
 ) -> None:
