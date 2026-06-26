@@ -67,15 +67,21 @@ async def sql_update_match_set(match_set_id: MatchSetId, body: MatchSetBody) -> 
 async def sql_add_trailing_sets(
     match_id: MatchId, from_set_number: int, to_set_number: int
 ) -> None:
-    for set_number in range(from_set_number, to_set_number + 1):
-        await database.execute(
-            query="""
-                INSERT INTO match_sets (match_id, set_number, state)
-                VALUES (:match_id, :set_number, 'NOT_STARTED')
-                ON CONFLICT (match_id, set_number) DO NOTHING
-            """,
-            values={"match_id": match_id, "set_number": set_number},
-        )
+    # Single multi-row insert (via generate_series) so a resize stays one round-trip per match,
+    # matching how sql_create_match_sets pre-populates sets at match creation.
+    await database.execute(
+        query="""
+            INSERT INTO match_sets (match_id, set_number, state)
+            SELECT :match_id, set_number, 'NOT_STARTED'
+            FROM generate_series(:from_set_number, :to_set_number) AS set_number
+            ON CONFLICT (match_id, set_number) DO NOTHING
+        """,
+        values={
+            "match_id": match_id,
+            "from_set_number": from_set_number,
+            "to_set_number": to_set_number,
+        },
+    )
 
 
 async def sql_delete_trailing_sets(match_id: MatchId, keep_up_to_set_number: int) -> None:

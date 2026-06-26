@@ -37,7 +37,7 @@ async def get_stage_item_input_by_id(
     return TypeAdapter(StageItemInput).validate_python(result)
 
 
-async def get_stage_item_input_ids_by_ranking_id(ranking_id: RankingId) -> list[StageItemId]:
+async def get_stage_item_ids_by_ranking_id(ranking_id: RankingId) -> list[StageItemId]:
     query = """
         SELECT id
         FROM stage_items

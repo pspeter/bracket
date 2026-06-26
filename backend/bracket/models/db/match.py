@@ -106,15 +106,19 @@ class Match(MatchInsertable):
         return derive_match_state(self.match_sets)
 
     @property
+    def completed_sets(self) -> list["MatchSet"]:
+        return [s for s in self.match_sets if s.state is MatchSetState.COMPLETED]
+
+    @property
     def sets_won_by_input1(self) -> int:
         return sum(
-            1 for s in self.match_sets if s.stage_item_input1_score > s.stage_item_input2_score
+            1 for s in self.completed_sets if s.stage_item_input1_score > s.stage_item_input2_score
         )
 
     @property
     def sets_won_by_input2(self) -> int:
         return sum(
-            1 for s in self.match_sets if s.stage_item_input2_score > s.stage_item_input1_score
+            1 for s in self.completed_sets if s.stage_item_input2_score > s.stage_item_input1_score
         )
 
     def get_winner(self) -> StageItemInput | None:
