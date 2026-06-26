@@ -6,6 +6,10 @@ from bracket.database import database
 from bracket.logic.levels import validate_level_id_for_tournament
 from bracket.logic.planning.template import build_template_blueprint, max_until_rank_for_template
 from bracket.logic.planning.template_service import replace_stages_from_template
+from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
+from bracket.logic.ranking.elimination import (
+    update_inputs_in_complete_elimination_stage_item,
+)
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.scheduling.handle_stage_activation import (
     get_pending_match_count_in_stage,
@@ -13,10 +17,6 @@ from bracket.logic.scheduling.handle_stage_activation import (
     get_updates_to_inputs_in_activated_stage,
     update_matches_in_activated_stage,
     update_matches_in_deactivated_stage,
-)
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import (
-    update_inputs_in_complete_elimination_stage_item,
 )
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.stage import (

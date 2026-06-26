@@ -3501,6 +3501,19 @@
         "title": "StageRankingResponse",
         "type": "object"
       },
+      "StageRankingUpdateBody": {
+        "properties": {
+          "ranking_id": {
+            "title": "Ranking Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ranking_id"
+        ],
+        "title": "StageRankingUpdateBody",
+        "type": "object"
+      },
       "StageTemplateCreateBody": {
         "properties": {
           "groups": {
@@ -8084,6 +8097,72 @@
           }
         ],
         "summary": "Update Stage",
+        "tags": [
+          "Stages"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/stages/{stage_id}/ranking": {
+      "put": {
+        "operationId": "set_ranking_for_stage_items_tournaments__tournament_id__stages__stage_id__ranking_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage_id",
+            "required": true,
+            "schema": {
+              "title": "Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageRankingUpdateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Set Ranking For Stage Items",
         "tags": [
           "Stages"
         ]
