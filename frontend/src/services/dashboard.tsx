@@ -13,7 +13,7 @@ export function getTournamentResponseByEndpointName(): TournamentWithLevels | Re
 
   if (swrTournamentsResponse.isLoading) return <TableSkeletonTwoColumns />;
   if (swrTournamentsResponse.error) {
-    if (swrTournamentsResponse.error.response.status == 404) return <DashboardNotFoundTitle />;
+    if (swrTournamentsResponse.error.response?.status == 404) return <DashboardNotFoundTitle />;
     return <GenericErrorPage />;
   }
 

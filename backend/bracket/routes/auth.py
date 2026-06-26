@@ -187,7 +187,12 @@ async def user_authenticated_or_public_dashboard_by_endpoint_name(
 ) -> UserPublic | None:
     if endpoint_name is not None:
         tournament = await sql_get_tournament_by_endpoint_name(endpoint_name)
-        if tournament is None or tournament.status != TournamentStatus.OPEN:
+        if tournament is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Can't find this tournament",
+            )
+        if tournament.status != TournamentStatus.OPEN:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
