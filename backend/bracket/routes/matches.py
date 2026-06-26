@@ -25,6 +25,7 @@ from bracket.models.db.match import (
     MatchSwapBody,
     SchedulerWeights,
 )
+from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import user_authenticated_for_tournament
@@ -81,13 +82,18 @@ async def validate_match_can_be_started(
             for stage_item in stage.stage_items:
                 for round_ in stage_item.rounds:
                     if round_.id == existing_match.round_id:
-                        if stage.is_active:
+                        match = next(
+                            (m for m in round_.matches if m.id == existing_match.id), None
+                        )
+                        if match is not None and isinstance(
+                            match.stage_item_input1, StageItemInputFinal
+                        ) and isinstance(match.stage_item_input2, StageItemInputFinal):
                             return
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail=(
-                                f'Cannot start this match because stage "{stage.name}" '
-                                "has not started yet. Start that stage first."
+                                "Cannot start this match because its opponents are not "
+                                "determined yet."
                             ),
                         )
 
