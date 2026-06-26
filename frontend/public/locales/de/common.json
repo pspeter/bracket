@@ -93,7 +93,6 @@
     "default_label": "Standard",
     "default_pause_duration_button": "Standard-Pausendauer",
     "default_ranking_badge": "Standard Rangliste",
-    "default_ranking_badge_with_level": "Level {{name}} Standard",
     "details_button": "Details",
     "delete_button": "Löschen",
     "delete_club_button": "Verein löschen",

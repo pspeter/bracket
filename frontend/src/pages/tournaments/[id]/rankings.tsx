@@ -42,14 +42,9 @@ function RankingDeleteButton({
   swrRankingsResponse: SWRResponse<RankingsResponse>;
 }) {
   if (ranking.position === 0) {
-    const level = tournament.levels.find((l) => l.id === ranking.level_id);
     return (
       <Center ml="1rem" miw="10rem">
-        <Badge color="indigo">
-          {level != null
-            ? t('default_ranking_badge_with_level', { name: level.name })
-            : t('default_ranking_badge')}
-        </Badge>
+        <Badge color="indigo">{t('default_ranking_badge')}</Badge>
       </Center>
     );
   }
