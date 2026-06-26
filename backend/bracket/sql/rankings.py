@@ -13,7 +13,7 @@ from bracket.models.db.ranking import (
     RankingSetPointsWithMatchBonusData,
     ScoringType,
 )
-from bracket.utils.id_types import LevelId, RankingId, StageId, StageItemId, TournamentId
+from bracket.utils.id_types import LevelId, RankingId, StageItemId, TournamentId
 
 # Common SELECT fragment that LEFT JOINs all three subtype tables
 _RANKING_SELECT = """
@@ -66,21 +66,17 @@ async def get_all_rankings_in_tournament(tournament_id: TournamentId) -> list[Ra
     return [_row_to_ranking(row) for row in rows]
 
 
-async def get_default_ranking_for_stage(tournament_id: TournamentId, stage_id: StageId) -> Ranking:
+async def get_default_ranking(tournament_id: TournamentId) -> Ranking:
     query = (
         _RANKING_SELECT
         + """
-        JOIN stages ON stages.id = :stage_id
         WHERE r.tournament_id = :tournament_id
-          AND r.level_id IS NOT DISTINCT FROM stages.level_id
         ORDER BY r.position
         LIMIT 1
         """
     )
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "stage_id": stage_id}
-    )
-    assert result is not None, "No default ranking found for stage"
+    result = await database.fetch_one(query=query, values={"tournament_id": tournament_id})
+    assert result is not None, "No default ranking found for tournament"
     return _row_to_ranking(result)
 
 

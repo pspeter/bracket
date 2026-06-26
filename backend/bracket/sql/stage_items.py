@@ -5,7 +5,7 @@ from bracket.database import database
 from bracket.models.db.stage_item import StageItem, StageItemCreateBody, StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import StageItemInputCreateBodyEmpty
 from bracket.models.db.util import StageItemWithRounds
-from bracket.sql.rankings import get_default_ranking_for_stage
+from bracket.sql.rankings import get_default_ranking
 from bracket.sql.stage_item_inputs import sql_create_stage_item_input
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.id_types import RankingId, StageItemId, TournamentId
@@ -28,7 +28,7 @@ async def sql_create_stage_item(
             "team_count": stage_item.team_count,
             "ranking_id": stage_item.ranking_id
             if stage_item.ranking_id
-            else (await get_default_ranking_for_stage(tournament_id, stage_item.stage_id)).id,
+            else (await get_default_ranking(tournament_id)).id,
             "games_per_player": stage_item.games_per_player,
         },
     )
