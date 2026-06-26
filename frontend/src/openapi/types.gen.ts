@@ -1482,9 +1482,17 @@ export type StageItemInputEmpty = {
    */
   losses: number;
   /**
+   * Point Difference
+   */
+  point_difference: number;
+  /**
    * Points
    */
   points: string;
+  /**
+   * Set Difference
+   */
+  set_difference: number;
   /**
    * Slot
    */
@@ -1532,9 +1540,17 @@ export type StageItemInputFinal = {
    */
   losses: number;
   /**
+   * Point Difference
+   */
+  point_difference: number;
+  /**
    * Points
    */
   points: string;
+  /**
+   * Set Difference
+   */
+  set_difference: number;
   /**
    * Slot
    */
@@ -1627,9 +1643,17 @@ export type StageItemInputTentative = {
    */
   losses: number;
   /**
+   * Point Difference
+   */
+  point_difference: number;
+  /**
    * Points
    */
   points: string;
+  /**
+   * Set Difference
+   */
+  set_difference: number;
   /**
    * Slot
    */

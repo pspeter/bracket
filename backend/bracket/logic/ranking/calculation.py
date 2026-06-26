@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from bracket.logic.ranking.statistics import START_ELO, TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
-from bracket.models.db.ranking import Ranking
+from bracket.models.db.ranking import Ranking, ScoringType
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.rankings import get_ranking_for_stage_item
@@ -29,41 +29,69 @@ def set_statistics_for_stage_item_input(
     sets1 = match.sets_won_by_input1
     sets2 = match.sets_won_by_input2
     team_sets = sets1 if is_team1 else sets2
+    opp_sets = sets2 if is_team1 else sets1
     was_draw = sets1 == sets2
     has_won = not was_draw and team_sets == max(sets1, sets2)
 
+    completed_sets = [s for s in match.match_sets if s.state.value == "COMPLETED"]
+    if is_team1:
+        total_points_for = sum(s.stage_item_input1_score for s in completed_sets)
+        total_points_against = sum(s.stage_item_input2_score for s in completed_sets)
+    else:
+        total_points_for = sum(s.stage_item_input2_score for s in completed_sets)
+        total_points_against = sum(s.stage_item_input1_score for s in completed_sets)
+
+    stats[stage_item_input_id].set_difference += team_sets - opp_sets
+    stats[stage_item_input_id].point_difference += total_points_for - total_points_against
+
     if has_won:
         stats[stage_item_input_id].wins += 1
-        if ranking.match_points is not None:
-            swiss_score_diff = ranking.match_points.win_points
-        else:
-            # TODO: Issue 5 — implement set-points win logic
-            swiss_score_diff = Decimal("1.0")
     elif was_draw:
         stats[stage_item_input_id].draws += 1
-        if ranking.match_points is not None:
-            swiss_score_diff = ranking.match_points.draw_points
-        else:
-            # TODO: Issue 5 — implement set-points draw logic
-            swiss_score_diff = Decimal("0.5")
     else:
         stats[stage_item_input_id].losses += 1
-        if ranking.match_points is not None:
-            swiss_score_diff = ranking.match_points.loss_points
-        else:
-            # TODO: Issue 5 — implement set-points loss logic
-            swiss_score_diff = Decimal("0.0")
 
     match stage_item.type:
         case StageType.ROUND_ROBIN | StageType.SINGLE_ELIMINATION:
-            stats[stage_item_input_id].points += swiss_score_diff
+            match ranking.scoring_type:
+                case ScoringType.MATCH_POINTS:
+                    mp = ranking.match_points
+                    if has_won:
+                        stats[stage_item_input_id].points += mp.win_points if mp else Decimal("1.0")
+                    elif was_draw:
+                        stats[stage_item_input_id].points += mp.draw_points if mp else Decimal("0.5")
+                    else:
+                        stats[stage_item_input_id].points += mp.loss_points if mp else Decimal("0.0")
+
+                case ScoringType.SET_POINTS:
+                    stats[stage_item_input_id].points += Decimal(team_sets)
+
+                case ScoringType.SET_POINTS_WITH_MATCH_BONUS:
+                    stats[stage_item_input_id].points += Decimal(team_sets)
+                    if has_won:
+                        assert ranking.set_points_with_bonus is not None
+                        stats[
+                            stage_item_input_id
+                        ].points += ranking.set_points_with_bonus.match_bonus_points
 
         case StageType.SWISS:
+            # Swiss ELO uses match_points.win/draw/loss or standard 1.0/0.5/0.0 for set-based types
+            if ranking.match_points is not None:
+                if has_won:
+                    elo_score = ranking.match_points.win_points
+                elif was_draw:
+                    elo_score = ranking.match_points.draw_points
+                else:
+                    elo_score = ranking.match_points.loss_points
+            else:
+                elo_score = (
+                    Decimal("1.0") if has_won else Decimal("0.5") if was_draw else Decimal("0.0")
+                )
             rating_diff = (match.stage_item_input2.elo - match.stage_item_input1.elo) * (
                 1 if is_team1 else -1
             )
             expected_score = Decimal(1.0 / (1.0 + math.pow(10.0, rating_diff / D)))
-            stats[stage_item_input_id].points += int(K * (swiss_score_diff - expected_score))
+            stats[stage_item_input_id].points += int(K * (elo_score - expected_score))
 
         case _:
             raise ValueError(f"Unsupported stage type: {stage_item.type}")
@@ -105,7 +133,11 @@ def determine_team_ranking_for_stage_item(
     ranking: Ranking,
 ) -> list[tuple[StageItemInputId, TeamStatistics]]:
     team_ranking = determine_ranking_for_stage_item(stage_item, ranking)
-    return sorted(team_ranking.items(), key=lambda x: x[1].points, reverse=True)
+    return sorted(
+        team_ranking.items(),
+        key=lambda x: (x[1].points, x[1].set_difference, x[1].point_difference),
+        reverse=True,
+    )
 
 
 async def recalculate_ranking_for_stage_item(

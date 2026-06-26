@@ -2924,11 +2924,21 @@
             "title": "Losses",
             "type": "integer"
           },
+          "point_difference": {
+            "default": 0,
+            "title": "Point Difference",
+            "type": "integer"
+          },
           "points": {
             "default": "0.0",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Points",
             "type": "string"
+          },
+          "set_difference": {
+            "default": 0,
+            "title": "Set Difference",
+            "type": "integer"
           },
           "slot": {
             "title": "Slot",
@@ -2972,6 +2982,8 @@
           "wins",
           "draws",
           "losses",
+          "set_difference",
+          "point_difference",
           "id",
           "slot",
           "tournament_id",
@@ -2999,11 +3011,21 @@
             "title": "Losses",
             "type": "integer"
           },
+          "point_difference": {
+            "default": 0,
+            "title": "Point Difference",
+            "type": "integer"
+          },
           "points": {
             "default": "0.0",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Points",
             "type": "string"
+          },
+          "set_difference": {
+            "default": 0,
+            "title": "Set Difference",
+            "type": "integer"
           },
           "slot": {
             "title": "Slot",
@@ -3064,6 +3086,8 @@
           "wins",
           "draws",
           "losses",
+          "set_difference",
+          "point_difference",
           "id",
           "slot",
           "tournament_id",
@@ -3159,11 +3183,21 @@
             "title": "Losses",
             "type": "integer"
           },
+          "point_difference": {
+            "default": 0,
+            "title": "Point Difference",
+            "type": "integer"
+          },
           "points": {
             "default": "0.0",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Points",
             "type": "string"
+          },
+          "set_difference": {
+            "default": 0,
+            "title": "Set Difference",
+            "type": "integer"
           },
           "slot": {
             "title": "Slot",
@@ -3208,6 +3242,8 @@
           "wins",
           "draws",
           "losses",
+          "set_difference",
+          "point_difference",
           "id",
           "slot",
           "tournament_id",

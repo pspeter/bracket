@@ -138,6 +138,8 @@ stage_item_inputs = Table(
     Column("wins", Integer, nullable=False, server_default="0"),
     Column("draws", Integer, nullable=False, server_default="0"),
     Column("losses", Integer, nullable=False, server_default="0"),
+    Column("set_difference", Integer, nullable=False, server_default="0"),
+    Column("point_difference", Integer, nullable=False, server_default="0"),
     UniqueConstraint("stage_item_id", "team_id"),
     UniqueConstraint("stage_item_id", "winner_from_stage_item_id", "winner_position"),
 )
