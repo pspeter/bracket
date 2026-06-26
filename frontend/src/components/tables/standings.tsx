@@ -7,7 +7,7 @@ import { EmptyTableInfo } from '@components/no_content/empty_table_info';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { StageItemInputFinal, StageItemWithRounds } from '@openapi';
 import { WinDistributionTitle } from './players';
-import { ThNotSortable, ThSortable, getTableState, sortTableEntries } from './table';
+import { ThNotSortable, ThSortable, getTableState } from './table';
 import TableLayoutLarge from './table_large';
 
 export function StandingsTableForStageItem({
@@ -30,10 +30,17 @@ export function StandingsTableForStageItem({
   const maxPoints = Math.max(...teams_with_inputs.map((input) => parseFloat(input.points)));
 
   const rows = teams_with_inputs
-    .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) => (p1.points > p2.points ? 1 : -1))
-    .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) =>
-      sortTableEntries(p1, p2, tableState)
-    )
+    .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) => {
+      const pts1 = parseFloat(p1.points);
+      const pts2 = parseFloat(p2.points);
+      if (pts1 !== pts2) return pts2 - pts1;
+      const sd1 = p1.set_difference ?? 0;
+      const sd2 = p2.set_difference ?? 0;
+      if (sd1 !== sd2) return sd2 - sd1;
+      const pd1 = p1.point_difference ?? 0;
+      const pd2 = p2.point_difference ?? 0;
+      return pd2 - pd1;
+    })
     .slice(0, maxTeamsToDisplay)
     .map((team_with_input, index) => (
       <Table.Tr key={team_with_input.id}>

@@ -55,13 +55,13 @@ def set_statistics_for_stage_item_input(
         case StageType.ROUND_ROBIN | StageType.SINGLE_ELIMINATION:
             match ranking.scoring_type:
                 case ScoringType.MATCH_POINTS:
-                    assert ranking.match_points is not None
+                    mp = ranking.match_points
                     if has_won:
-                        stats[stage_item_input_id].points += ranking.match_points.win_points
+                        stats[stage_item_input_id].points += mp.win_points if mp else Decimal("1.0")
                     elif was_draw:
-                        stats[stage_item_input_id].points += ranking.match_points.draw_points
+                        stats[stage_item_input_id].points += mp.draw_points if mp else Decimal("0.5")
                     else:
-                        stats[stage_item_input_id].points += ranking.match_points.loss_points
+                        stats[stage_item_input_id].points += mp.loss_points if mp else Decimal("0.0")
 
                 case ScoringType.SET_POINTS:
                     stats[stage_item_input_id].points += Decimal(team_sets)
