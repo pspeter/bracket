@@ -33,7 +33,7 @@ def set_statistics_for_stage_item_input(
     was_draw = sets1 == sets2
     has_won = not was_draw and team_sets == max(sets1, sets2)
 
-    completed_sets = [s for s in match.match_sets if s.state.value == "COMPLETED"]
+    completed_sets = match.completed_sets
     if is_team1:
         total_points_for = sum(s.stage_item_input1_score for s in completed_sets)
         total_points_against = sum(s.stage_item_input2_score for s in completed_sets)
@@ -59,9 +59,13 @@ def set_statistics_for_stage_item_input(
                     if has_won:
                         stats[stage_item_input_id].points += mp.win_points if mp else Decimal("1.0")
                     elif was_draw:
-                        stats[stage_item_input_id].points += mp.draw_points if mp else Decimal("0.5")
+                        stats[stage_item_input_id].points += (
+                            mp.draw_points if mp else Decimal("0.5")
+                        )
                     else:
-                        stats[stage_item_input_id].points += mp.loss_points if mp else Decimal("0.0")
+                        stats[stage_item_input_id].points += (
+                            mp.loss_points if mp else Decimal("0.0")
+                        )
 
                 case ScoringType.SET_POINTS:
                     stats[stage_item_input_id].points += Decimal(team_sets)
@@ -69,10 +73,12 @@ def set_statistics_for_stage_item_input(
                 case ScoringType.SET_POINTS_WITH_MATCH_BONUS:
                     stats[stage_item_input_id].points += Decimal(team_sets)
                     if has_won:
-                        assert ranking.set_points_with_bonus is not None
-                        stats[
-                            stage_item_input_id
-                        ].points += ranking.set_points_with_bonus.match_bonus_points
+                        # Subtype row should always exist for this scoring type, but fall back to
+                        # the model default bonus rather than crashing if it is ever missing.
+                        bonus = ranking.set_points_with_bonus
+                        stats[stage_item_input_id].points += (
+                            bonus.match_bonus_points if bonus is not None else Decimal("1.0")
+                        )
 
         case StageType.SWISS:
             # Swiss ELO uses match_points.win/draw/loss or standard 1.0/0.5/0.0 for set-based types

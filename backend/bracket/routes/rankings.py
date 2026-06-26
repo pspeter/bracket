@@ -31,7 +31,7 @@ from bracket.sql.rankings import (
     sql_delete_ranking,
     sql_update_ranking,
 )
-from bracket.sql.stage_item_inputs import get_stage_item_input_ids_by_ranking_id
+from bracket.sql.stage_item_inputs import get_stage_item_ids_by_ranking_id
 from bracket.sql.stage_items import get_stage_item, get_stage_items_for_ranking
 from bracket.utils.id_types import RankingId, TournamentId
 
@@ -93,7 +93,7 @@ async def update_ranking_by_id(
         if ranking_body.num_sets != old_num_sets:
             await sql_resize_sets_for_ranking(ranking_id, old_num_sets, ranking_body.num_sets)
 
-        stage_item_ids = await get_stage_item_input_ids_by_ranking_id(ranking_id)
+        stage_item_ids = await get_stage_item_ids_by_ranking_id(ranking_id)
         for stage_item_id in stage_item_ids:
             stage_item = await get_stage_item(tournament_id, stage_item_id)
             await recalculate_ranking_for_stage_item(tournament_id, stage_item)

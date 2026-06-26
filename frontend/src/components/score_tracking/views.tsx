@@ -440,9 +440,6 @@ export function ScoreTrackingMatchView({
     const isLastSet = set.set_number === numSets;
     const endDisabled = isSaving || isEndSetDisabled(set, match, isSwapped);
 
-    const setScore1 = isSwapped ? set.stage_item_input2_score : set.stage_item_input1_score;
-    const setScore2 = isSwapped ? set.stage_item_input1_score : set.stage_item_input2_score;
-
     const teamDisplayScores = displayedTeams.map((team) =>
       team.slot === 1
         ? isSwapped
