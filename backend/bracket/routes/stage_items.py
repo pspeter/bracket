@@ -55,7 +55,7 @@ from bracket.sql.stage_items import (
     get_stage_item,
     sql_create_stage_item_with_empty_inputs,
 )
-from bracket.sql.rankings import get_ranking_by_id
+from bracket.sql.rankings import get_default_ranking_for_stage, get_ranking_by_id
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
@@ -484,8 +484,11 @@ async def create_stage_item(
     existing_stage_items = [stage_item for stage in stages for stage_item in stage.stage_items]
     check_requirement(existing_stage_items, user, "max_stage_items")
 
-    if stage_body.type is StageType.SINGLE_ELIMINATION and stage_body.ranking_id is not None:
-        ranking = await get_ranking_by_id(tournament_id, stage_body.ranking_id)
+    if stage_body.type is StageType.SINGLE_ELIMINATION:
+        if stage_body.ranking_id is not None:
+            ranking = await get_ranking_by_id(tournament_id, stage_body.ranking_id)
+        else:
+            ranking = await get_default_ranking_for_stage(tournament_id, stage_body.stage_id)
         if ranking is not None and ranking.num_sets % 2 == 0:
             raise HTTPException(
                 status_code=422,

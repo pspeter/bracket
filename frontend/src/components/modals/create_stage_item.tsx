@@ -16,8 +16,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
+import { RankingSelect } from '@components/select/ranking_select';
 import { Translator } from '@components/utils/types';
 import {
+  Ranking,
   StageItemInputOptionsResponse,
   StageWithStageItems,
   StagesWithStageItemsResponse,
@@ -190,20 +192,25 @@ interface FormValues {
   team_count_round_robin: number;
   team_count_elimination: number;
   games_per_player: number;
+  ranking_id: string;
 }
 export function CreateStageItemModal({
   tournament,
   stage,
+  rankings,
   swrStagesResponse,
   swrAvailableInputsResponse,
 }: {
   tournament: TournamentWithLevels;
   stage: StageWithStageItems;
+  rankings: Ranking[];
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
+
+  const defaultRanking = rankings.find((r) => r.level_id === stage.level_id) ?? rankings[0];
 
   const form = useForm<FormValues>({
     initialValues: {
@@ -211,6 +218,7 @@ export function CreateStageItemModal({
       team_count_round_robin: 4,
       team_count_elimination: 2,
       games_per_player: 3,
+      ranking_id: defaultRanking?.id.toString() ?? '',
     },
     validate: {
       team_count_round_robin: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
@@ -243,6 +251,7 @@ export function CreateStageItemModal({
               stage.id,
               values.type,
               getTeamCount(values),
+              Number(values.ranking_id),
               values.type === 'SWISS' ? values.games_per_player : null
             );
             await swrStagesResponse.mutate();
@@ -260,6 +269,7 @@ export function CreateStageItemModal({
           <Divider mt="1rem" />
           <TeamCountInput form={form} />
           <GamesPerPlayerInput form={form} />
+          <RankingSelect form={form} rankings={rankings} />
 
           <Button fullWidth mt="1.5rem" color="green" type="submit">
             {t('create_stage_item_button')}

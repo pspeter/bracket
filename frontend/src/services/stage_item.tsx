@@ -5,6 +5,7 @@ export async function createStageItem(
   stage_id: number,
   type: string,
   team_count: number,
+  ranking_id: number,
   games_per_player: number | null = null
 ) {
   return createAxios()
@@ -12,6 +13,7 @@ export async function createStageItem(
       stage_id,
       type,
       team_count,
+      ranking_id,
       games_per_player,
     })
     .catch((response: any) => handleRequestError(response));

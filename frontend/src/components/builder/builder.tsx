@@ -538,6 +538,7 @@ function StageColumn({
         key={-1}
         tournament={tournament}
         stage={stage}
+        rankings={rankings}
         swrStagesResponse={swrStagesResponse}
         swrAvailableInputsResponse={swrAvailableInputsResponse}
       />
