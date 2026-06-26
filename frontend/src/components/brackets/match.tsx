@@ -99,7 +99,7 @@ export default function Match({
           color: 'white',
           fontWeight: 800,
           fontSize: fz,
-          minWidth: '1.5rem',
+          minWidth: '1.8rem',
           textAlign: 'center',
           padding: '0 3px',
         }}

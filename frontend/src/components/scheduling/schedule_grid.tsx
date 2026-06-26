@@ -318,6 +318,8 @@ function MatchCard({
               borderRadius: 4,
               padding: '1px 5px',
               whiteSpace: 'nowrap',
+              minWidth: '1.8rem',
+              textAlign: 'center',
             }}
           >
             {value}
