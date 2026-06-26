@@ -30,6 +30,7 @@ async def test_rankings_endpoint(
                     "created": ANY,
                     "id": auth_context.ranking.id,
                     "position": 0,
+                    "name": "",
                     "scoring_type": "MATCH_POINTS",
                     "num_sets": 1,
                     "max_points": 21,
@@ -209,6 +210,78 @@ async def test_update_ranking_preserves_position_when_omitted(
         updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
         updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
         assert updated.position == 7
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_name(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "win_points": "1.0",
+        "draw_points": "0.5",
+        "loss_points": "0.0",
+        "position": 0,
+        "name": "Fair play ranking",
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+        )
+        assert response["success"] is True
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.name == "Fair play ranking"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_preserves_name_when_omitted(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A PUT without `name` keeps the existing name instead of clearing it."""
+    base_body = {
+        "scoring_type": "MATCH_POINTS",
+        "win_points": "1.0",
+        "draw_points": "0.5",
+        "loss_points": "0.0",
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        await send_tournament_request(
+            HTTPMethod.PUT,
+            f"rankings/{ranking_inserted.id}",
+            auth_context,
+            json={**base_body, "name": "Keep me"},
+        )
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=base_body
+        )
+        assert response["success"] is True
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.name == "Keep me"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_create_ranking_with_name(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    response = await send_tournament_request(
+        HTTPMethod.POST,
+        "rankings",
+        auth_context,
+        json={"scoring_type": "MATCH_POINTS", "name": "Secondary ranking"},
+    )
+    assert response.get("success") is True, response
+
+    tournament_id = auth_context.tournament.id
+    rankings_list = await get_all_rankings_in_tournament(tournament_id)
+    named_ranking = next((r for r in rankings_list if r.name == "Secondary ranking"), None)
+    assert named_ranking is not None
+    await sql_delete_ranking(tournament_id, named_ranking.id)
 
 
 @pytest.mark.asyncio(loop_scope="session")
