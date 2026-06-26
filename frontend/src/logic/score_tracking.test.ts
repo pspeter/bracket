@@ -1,0 +1,170 @@
+import { describe, expect, it } from 'vitest';
+
+import { MatchSet } from '@openapi';
+
+import { getScoreTrackingViewState, isEndSetDisabled } from './score_tracking';
+
+function makeSet(overrides: Partial<MatchSet> & Pick<MatchSet, 'set_number' | 'state'>): MatchSet {
+  return {
+    id: overrides.set_number,
+    match_id: 1,
+    stage_item_input1_score: overrides.stage_item_input1_score ?? 0,
+    stage_item_input2_score: overrides.stage_item_input2_score ?? 0,
+    ...overrides,
+  };
+}
+
+describe('getScoreTrackingViewState', () => {
+  it('returns not_started when all sets are NOT_STARTED', () => {
+    const sets = [makeSet({ set_number: 1, state: 'NOT_STARTED' })];
+    expect(getScoreTrackingViewState(sets)).toEqual({ kind: 'not_started' });
+  });
+
+  it('returns playing with the IN_PROGRESS set', () => {
+    const set = makeSet({ set_number: 1, state: 'IN_PROGRESS' });
+    const result = getScoreTrackingViewState([set]);
+    expect(result).toEqual({ kind: 'playing', set });
+  });
+
+  it('returns playing with the second set when first is COMPLETED and second is IN_PROGRESS', () => {
+    const set1 = makeSet({ set_number: 1, state: 'COMPLETED' });
+    const set2 = makeSet({ set_number: 2, state: 'IN_PROGRESS' });
+    const result = getScoreTrackingViewState([set1, set2]);
+    expect(result).toEqual({ kind: 'playing', set: set2 });
+  });
+
+  it('returns between_sets when there is a completed set and a next not-started set', () => {
+    const set1 = makeSet({ set_number: 1, state: 'COMPLETED' });
+    const set2 = makeSet({ set_number: 2, state: 'NOT_STARTED' });
+    const result = getScoreTrackingViewState([set1, set2]);
+    expect(result).toEqual({
+      kind: 'between_sets',
+      completed: set1,
+      next: set2,
+      allSets: [set1, set2],
+    });
+  });
+
+  it('returns between_sets with last completed set when multiple are done', () => {
+    const set1 = makeSet({ set_number: 1, state: 'COMPLETED' });
+    const set2 = makeSet({ set_number: 2, state: 'COMPLETED' });
+    const set3 = makeSet({ set_number: 3, state: 'NOT_STARTED' });
+    const result = getScoreTrackingViewState([set1, set2, set3]);
+    expect(result).toEqual({
+      kind: 'between_sets',
+      completed: set2,
+      next: set3,
+      allSets: [set1, set2, set3],
+    });
+  });
+
+  it('returns completed when all sets are COMPLETED', () => {
+    const sets = [
+      makeSet({ set_number: 1, state: 'COMPLETED' }),
+      makeSet({ set_number: 2, state: 'COMPLETED' }),
+      makeSet({ set_number: 3, state: 'COMPLETED' }),
+    ];
+    expect(getScoreTrackingViewState(sets)).toEqual({ kind: 'completed' });
+  });
+
+  it('returns completed for single set COMPLETED', () => {
+    const sets = [makeSet({ set_number: 1, state: 'COMPLETED' })];
+    expect(getScoreTrackingViewState(sets)).toEqual({ kind: 'completed' });
+  });
+});
+
+describe('isEndSetDisabled', () => {
+  const baseMatch = {
+    two_point_advantage: false,
+    max_points: 21,
+    last_set_max_points: null as number | null,
+    num_sets: 3,
+  };
+
+  it('is disabled when no score has reached the limit', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 20,
+      stage_item_input2_score: 15,
+    });
+    expect(isEndSetDisabled(set, baseMatch, false)).toBe(true);
+  });
+
+  it('is enabled when one score reaches limit with no two_point_advantage', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 15,
+    });
+    expect(isEndSetDisabled(set, baseMatch, false)).toBe(false);
+  });
+
+  it('is disabled when two_point_advantage=true and margin < 2', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 20,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, two_point_advantage: true }, false)).toBe(true);
+  });
+
+  it('is enabled when two_point_advantage=true and margin >= 2', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 22,
+      stage_item_input2_score: 20,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, two_point_advantage: true }, false)).toBe(false);
+  });
+
+  it('uses last_set_max_points for the last set', () => {
+    const matchWithLastSet = { ...baseMatch, last_set_max_points: 15, num_sets: 3 };
+    // score 15-10: reaches last_set limit (15), no two_point_advantage
+    const set = makeSet({
+      set_number: 3,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 15,
+      stage_item_input2_score: 10,
+    });
+    expect(isEndSetDisabled(set, matchWithLastSet, false)).toBe(false);
+  });
+
+  it('uses max_points for non-last sets even when last_set_max_points is set', () => {
+    const matchWithLastSet = { ...baseMatch, last_set_max_points: 15, num_sets: 3 };
+    // score 15-10 for set 1: does NOT reach max_points (21)
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 15,
+      stage_item_input2_score: 10,
+    });
+    expect(isEndSetDisabled(set, matchWithLastSet, false)).toBe(true);
+  });
+
+  it('respects isSwapped by swapping score slots', () => {
+    // With swapped=false: s1=21, s2=15 → enabled (21 >= 21)
+    // With swapped=true: s1=15, s2=21 → enabled (21 >= 21, treating input2 as s1)
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 15,
+    });
+    expect(isEndSetDisabled(set, baseMatch, false)).toBe(false);
+    expect(isEndSetDisabled(set, baseMatch, true)).toBe(false);
+  });
+
+  it('is disabled at exact limit with two_point_advantage when tied', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 21,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, two_point_advantage: true }, false)).toBe(true);
+  });
+});
