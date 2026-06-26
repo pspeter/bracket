@@ -259,8 +259,8 @@ export function getStagesLive(
   );
 }
 
-export function getRankings(tournament_id: number): SWRResponse<RankingsResponse> {
-  return useSWR(`tournaments/${tournament_id}/rankings`, fetcher);
+export function getRankings(tournament_id: number | null): SWRResponse<RankingsResponse> {
+  return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/rankings`, fetcher);
 }
 
 export function getRankingsPerStageItem(

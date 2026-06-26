@@ -11,8 +11,8 @@ import { NoContent } from '@components/no_content/empty_table_info';
 import { StandingsTableForStageItem } from '@components/tables/standings';
 import { TableSkeletonTwoColumns } from '@components/utils/skeletons';
 import { responseIsValid, setTitle } from '@components/utils/util';
-import { StagesWithStageItemsResponse } from '@openapi';
-import { getStagesLive } from '@services/adapter';
+import { Ranking, StagesWithStageItemsResponse } from '@openapi';
+import { getRankings, getStagesLive } from '@services/adapter';
 import { getTournamentResponseByEndpointName } from '@services/dashboard';
 import {
   getStageItemLevelLookup,
@@ -24,12 +24,14 @@ export function StandingsContent({
   swrStagesResponse,
   fontSizeInPixels,
   maxTeamsToDisplay,
+  rankingsById = {},
   levelId = null,
   teamId = null,
 }: {
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   fontSizeInPixels: number;
   maxTeamsToDisplay: number;
+  rankingsById?: Record<number, Ranking>;
   levelId?: number | null;
   teamId?: number | null;
 }) {
@@ -56,20 +58,26 @@ export function StandingsContent({
     .sort((si1: any, si2: any) =>
       stageItemsLookup[si1].name > stageItemsLookup[si2].name ? 1 : -1
     )
-    .map((stageItemId) => (
-      <div key={stageItemId}>
-        <Text size="xl" mt="md" mb="xs" inherit>
-          {stageItemsLookup[stageItemId].name}
-        </Text>
-        <StandingsTableForStageItem
-          teams_with_inputs={stageItemTeamLookup[stageItemId]}
-          stageItem={stageItemsLookup[stageItemId]}
-          stageItemsLookup={stageItemsLookup}
-          fontSizeInPixels={fontSizeInPixels}
-          maxTeamsToDisplay={maxTeamsToDisplay}
-        />
-      </div>
-    ));
+    .map((stageItemId) => {
+      const stageItem = stageItemsLookup[stageItemId];
+      const ranking =
+        stageItem.ranking_id != null ? (rankingsById[stageItem.ranking_id] ?? null) : null;
+      return (
+        <div key={stageItemId}>
+          <Text size="xl" mt="md" mb="xs" inherit>
+            {stageItem.name}
+          </Text>
+          <StandingsTableForStageItem
+            teams_with_inputs={stageItemTeamLookup[stageItemId]}
+            stageItem={stageItem}
+            stageItemsLookup={stageItemsLookup}
+            fontSizeInPixels={fontSizeInPixels}
+            maxTeamsToDisplay={maxTeamsToDisplay}
+            ranking={ranking}
+          />
+        </div>
+      );
+    });
 
   if (rows.length < 1) {
     return (
@@ -90,6 +98,7 @@ export default function DashboardStandingsPage() {
   const [teamId] = useQueryState('team', parseAsInteger);
 
   const swrStagesResponse = getStagesLive(tournamentValid ? tournamentDataFull.id : null);
+  const swrRankingsResponse = getRankings(tournamentValid ? tournamentDataFull.id : null);
 
   if (!tournamentValid) {
     return tournamentDataFull;
@@ -101,6 +110,10 @@ export default function DashboardStandingsPage() {
     return <TableSkeletonTwoColumns />;
   }
 
+  const rankingsById: Record<number, Ranking> = Object.fromEntries(
+    (swrRankingsResponse.data?.data ?? []).map((r) => [r.id, r])
+  );
+
   return (
     <>
       <DoubleHeader tournamentData={tournamentDataFull} />
@@ -110,6 +123,7 @@ export default function DashboardStandingsPage() {
             swrStagesResponse={swrStagesResponse}
             fontSizeInPixels={16}
             maxTeamsToDisplay={100}
+            rankingsById={rankingsById}
             levelId={levelId}
             teamId={teamId}
           />

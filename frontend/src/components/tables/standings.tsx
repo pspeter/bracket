@@ -2,11 +2,10 @@ import { Table, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 import { PlayerScore } from '@components/info/player_score';
-import { WinDistribution } from '@components/info/player_statistics';
 import { EmptyTableInfo } from '@components/no_content/empty_table_info';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
-import { StageItemInputFinal, StageItemWithRounds } from '@openapi';
-import { WinDistributionTitle } from './players';
+import { formatDifference, getWinsColumnKey } from '@logic/standings';
+import { Ranking, StageItemInputFinal, StageItemWithRounds } from '@openapi';
 import { ThNotSortable, ThSortable, getTableState } from './table';
 import TableLayoutLarge from './table_large';
 
@@ -16,18 +15,22 @@ export function StandingsTableForStageItem({
   fontSizeInPixels,
   stageItemsLookup,
   maxTeamsToDisplay,
+  ranking,
 }: {
   teams_with_inputs: StageItemInputFinal[];
   stageItem: StageItemWithRounds;
   fontSizeInPixels: number;
   stageItemsLookup: any;
   maxTeamsToDisplay: number;
+  ranking?: Ranking | null;
 }) {
   const { t } = useTranslation();
   const tableState = getTableState('points', false);
 
   const minPoints = Math.min(...teams_with_inputs.map((input) => parseFloat(input.points)));
   const maxPoints = Math.max(...teams_with_inputs.map((input) => parseFloat(input.points)));
+
+  const winsColumnKey = getWinsColumnKey(ranking?.scoring_type ?? null);
 
   const rows = teams_with_inputs
     .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) => {
@@ -50,7 +53,7 @@ export function StandingsTableForStageItem({
             {formatStageItemInput(team_with_input, stageItemsLookup)}
           </Text>
         </Table.Td>
-        <Table.Td visibleFrom="sm" style={{ minWidth: '8rem' }}>
+        <Table.Td style={{ minWidth: '8rem' }}>
           <Text truncate="end" lineClamp={1} inherit>
             {team_with_input.points}
           </Text>
@@ -66,14 +69,15 @@ export function StandingsTableForStageItem({
             />
           </Table.Td>
         ) : (
-          <Table.Td style={{ minWidth: '10rem' }}>
-            <WinDistribution
-              wins={team_with_input.wins}
-              draws={team_with_input.draws}
-              losses={team_with_input.losses}
-              fontSizeInPixels={fontSizeInPixels}
-            />
-          </Table.Td>
+          <>
+            <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.wins}</Table.Td>
+            <Table.Td visibleFrom="sm" style={{ minWidth: '6rem' }}>
+              {formatDifference(team_with_input.set_difference ?? 0)}
+            </Table.Td>
+            <Table.Td visibleFrom="sm" style={{ minWidth: '6rem' }}>
+              {formatDifference(team_with_input.point_difference ?? 0)}
+            </Table.Td>
+          </>
         )}
       </Table.Tr>
     ));
@@ -99,12 +103,12 @@ export function StandingsTableForStageItem({
             </>
           ) : (
             <>
-              <ThSortable visibleFrom="sm" state={tableState} field="points">
+              <ThSortable state={tableState} field="points">
                 {t('points_table_header')}
               </ThSortable>
-              <ThNotSortable>
-                <WinDistributionTitle />
-              </ThNotSortable>
+              <ThNotSortable>{t(winsColumnKey)}</ThNotSortable>
+              <ThNotSortable visibleFrom="sm">{t('set_difference_label')}</ThNotSortable>
+              <ThNotSortable visibleFrom="sm">{t('point_difference_label')}</ThNotSortable>
             </>
           )}
         </Table.Tr>
