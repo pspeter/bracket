@@ -13,7 +13,7 @@ import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
 import { LevelResponse, MatchSet, MatchWithDetails } from '@openapi';
 import { stringToColour } from '@services/lookups';
-import { getSetScoreColors, getSetsWon } from '../../utils/match_sets';
+import { getSetScoreColors } from '../../utils/match_sets';
 
 export function ScheduleRow({
   data,
@@ -33,14 +33,11 @@ export function ScheduleRow({
   const { t } = useTranslation();
   const match: MatchWithDetails = data.match;
   const isMultiSet = match.num_sets > 1 && match.match_sets.length > 0;
-  const { input1: setsWon1, input2: setsWon2 } = getSetsWon(match.match_sets);
-  const displayScore1 = isMultiSet ? setsWon1 : getMatchScore1(match);
-  const displayScore2 = isMultiSet ? setsWon2 : getMatchScore2(match);
-
-  const scoreSource = isMultiSet
-    ? { ...match, stage_item_input1_score: setsWon1, stage_item_input2_score: setsWon2 }
-    : match;
-  const colors = getScoreColors(scoreSource as MatchWithDetails);
+  // Single-set surfaces only: match-level colour and aggregate score. Multi-set
+  // matches render per-set chips below, which carry their own per-set colours.
+  const colors = getScoreColors(match);
+  const displayScore1 = getMatchScore1(match);
+  const displayScore2 = getMatchScore2(match);
 
   const setScoreChip = (set: MatchSet, side: 's1' | 's2') => {
     const { s1, s2 } = getSetScoreColors(set);

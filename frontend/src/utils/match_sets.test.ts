@@ -7,12 +7,15 @@ import { getSetScoreColors, getSetsWon } from './match_sets';
 const SCORE_LIVE_COLOUR = '#74c0fc';
 const SCORE_PENDING_COLOUR = '#868e96';
 
-function set(
-  state: MatchSet['state'],
-  score1: number,
-  score2: number
-): MatchSet {
-  return { id: 1, match_id: 1, set_number: 1, stage_item_input1_score: score1, stage_item_input2_score: score2, state };
+function set(state: MatchSet['state'], score1: number, score2: number): MatchSet {
+  return {
+    id: 1,
+    match_id: 1,
+    set_number: 1,
+    stage_item_input1_score: score1,
+    stage_item_input2_score: score2,
+    state,
+  };
 }
 
 describe('getSetsWon', () => {
@@ -41,11 +44,7 @@ describe('getSetsWon', () => {
   });
 
   it('counts all three completed sets in a 2–1 scenario', () => {
-    const sets = [
-      set('COMPLETED', 21, 18),
-      set('COMPLETED', 18, 21),
-      set('COMPLETED', 21, 15),
-    ];
+    const sets = [set('COMPLETED', 21, 18), set('COMPLETED', 18, 21), set('COMPLETED', 21, 15)];
     expect(getSetsWon(sets)).toEqual({ input1: 2, input2: 1 });
   });
 });

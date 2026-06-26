@@ -47,7 +47,7 @@ import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/
 import { ZOOM_PX_PER_MINUTE, ZoomLevel } from '@logic/planning/zoom';
 import { Court, MatchSet, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
-import { getSetScoreColors } from '../../utils/match_sets';
+import { getSetScoreColors, getSetsWon } from '../../utils/match_sets';
 
 import { COURT_CONTENT_ATTRIBUTE, PLANNER_GRID_ATTRIBUTE } from './planner_anchor';
 import classes from './schedule_grid.module.css';
@@ -256,17 +256,9 @@ function MatchCard({
   const isMultiSet = match.num_sets > 1;
   const rawScore1 = getMatchScore1(match);
   const rawScore2 = getMatchScore2(match);
-  const setsWon = isMultiSet ? (() => {
-    const s1 = match.match_sets.filter(
-      (s) => s.state === 'COMPLETED' && s.stage_item_input1_score > s.stage_item_input2_score
-    ).length;
-    const s2 = match.match_sets.filter(
-      (s) => s.state === 'COMPLETED' && s.stage_item_input2_score > s.stage_item_input1_score
-    ).length;
-    return { s1, s2 };
-  })() : null;
-  const matchScore1 = isMultiSet ? (setsWon?.s1 ?? 0) : rawScore1;
-  const matchScore2 = isMultiSet ? (setsWon?.s2 ?? 0) : rawScore2;
+  const setsWon = isMultiSet ? getSetsWon(match.match_sets) : null;
+  const matchScore1 = isMultiSet ? (setsWon?.input1 ?? 0) : rawScore1;
+  const matchScore2 = isMultiSet ? (setsWon?.input2 ?? 0) : rawScore2;
   const score1Colour = scoreColour(matchScore1, matchScore2);
   const score2Colour = scoreColour(matchScore2, matchScore1);
   const scoreChip = (value: number, chipColour: string) => (
@@ -302,12 +294,8 @@ function MatchCard({
       {match.match_sets.map((set: MatchSet) => {
         const colours = getSetScoreColors(set);
         const bg = side === 's1' ? colours.s1 : colours.s2;
-        const value =
-          side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
-        const maxScore = Math.max(
-          set.stage_item_input1_score,
-          set.stage_item_input2_score
-        );
+        const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;
+        const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
         const minWidth = maxScore >= 100 ? '2.4rem' : maxScore >= 10 ? '1.6rem' : '1.2rem';
         return (
           <Text

@@ -16,7 +16,12 @@ import {
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { TournamentMinimal } from '@components/utils/tournament';
-import { MatchSet, MatchWithDetails, RoundWithMatches, StagesWithStageItemsResponse } from '@openapi';
+import {
+  MatchSet,
+  MatchWithDetails,
+  RoundWithMatches,
+  StagesWithStageItemsResponse,
+} from '@openapi';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
 import { getSetScoreColors, getSetsWon } from '../../utils/match_sets';
 import classes from './match.module.css';
@@ -127,18 +132,14 @@ export default function Match({
       <div className={classes.top} style={isMultiSet ? multiSetTeam1Style : team1_style}>
         <Grid grow>
           <Grid.Col span={10}>{team1_label}</Grid.Col>
-          <Grid.Col span={2}>
-            {isMultiSet ? multiSetScores('s1') : score1}
-          </Grid.Col>
+          <Grid.Col span={2}>{isMultiSet ? multiSetScores('s1') : score1}</Grid.Col>
         </Grid>
       </div>
       <div className={classes.divider} />
       <div className={classes.bottom} style={isMultiSet ? multiSetTeam2Style : team2_style}>
         <Grid grow>
           <Grid.Col span={10}>{team2_label}</Grid.Col>
-          <Grid.Col span={2}>
-            {isMultiSet ? multiSetScores('s2') : score2}
-          </Grid.Col>
+          <Grid.Col span={2}>{isMultiSet ? multiSetScores('s2') : score2}</Grid.Col>
         </Grid>
       </div>
       {refereesEnabled && (
