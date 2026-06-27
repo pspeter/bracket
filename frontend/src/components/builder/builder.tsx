@@ -16,7 +16,13 @@ import {
 import { useColorScheme } from '@mantine/hooks';
 import { AiFillWarning } from '@react-icons/all-files/ai/AiFillWarning';
 import { BiCheck } from '@react-icons/all-files/bi/BiCheck';
-import { IconArrowsShuffle, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
+import {
+  IconArrowsShuffle,
+  IconDots,
+  IconListNumbers,
+  IconPencil,
+  IconTrash,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BiSolidWrench } from 'react-icons/bi';
@@ -27,6 +33,7 @@ import { LevelBadge } from '@components/levels/levels';
 import { ConfirmModal } from '@components/modals/confirm_modal';
 import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import { CreateStageItemModal } from '@components/modals/create_stage_item';
+import { SetStageRankingModal } from '@components/modals/set_stage_ranking';
 import { UpdateStageModal } from '@components/modals/update_stage';
 import { UpdateStageItemModal } from '@components/modals/update_stage_item';
 import { assert_not_none } from '@components/utils/assert';
@@ -407,6 +414,7 @@ function StageColumn({
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
   const [confirmDeleteOpened, setConfirmDeleteOpened] = useState(false);
+  const [rankingModalOpened, setRankingModalOpened] = useState(false);
   const teamsMap = getTeamsLookup(tournament != null ? tournament.id : -1);
   const stageItemsLookup = getStageItemLookup(swrStagesResponse);
 
@@ -482,6 +490,14 @@ function StageColumn({
         opened={opened}
         setOpened={setOpened}
       />
+      <SetStageRankingModal
+        swrStagesResponse={swrStagesResponse}
+        stage={stage}
+        tournament={tournament}
+        rankings={rankings}
+        opened={rankingModalOpened}
+        setOpened={setRankingModalOpened}
+      />
       <ConfirmModal
         opened={confirmDeleteOpened}
         setOpened={setConfirmDeleteOpened}
@@ -522,6 +538,12 @@ function StageColumn({
             </Menu.Item>
             <Menu.Item leftSection={<IconArrowsShuffle size="1.5rem" />} onClick={autoAssignTeams}>
               {t('auto_assign_teams_label')}
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<IconListNumbers size="1.5rem" />}
+              onClick={() => setRankingModalOpened(true)}
+            >
+              {t('set_ranking_for_stage_items_label')}
             </Menu.Item>
             <Menu.Item
               leftSection={<IconTrash size="1.5rem" />}
