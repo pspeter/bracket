@@ -1,6 +1,6 @@
 from bracket.database import database
 from bracket.models.db.match import MatchSet, MatchSetBody
-from bracket.utils.id_types import MatchId, MatchSetId, RankingId
+from bracket.utils.id_types import MatchId, MatchSetId, RankingId, StageItemId
 
 # SQL fragment that aggregates a match's sets into a JSON array, ordered by set number.
 # Correlates on the outer ``matches`` row, so callers must alias the matches table as ``matches``.
@@ -73,7 +73,9 @@ async def sql_add_trailing_sets(
         query="""
             INSERT INTO match_sets (match_id, set_number, state)
             SELECT :match_id, set_number, 'NOT_STARTED'
-            FROM generate_series(:from_set_number, :to_set_number) AS set_number
+            FROM generate_series(
+                CAST(:from_set_number AS integer), CAST(:to_set_number AS integer)
+            ) AS set_number
             ON CONFLICT (match_id, set_number) DO NOTHING
         """,
         values={
@@ -123,6 +125,28 @@ async def sql_ranking_has_active_sets(ranking_id: RankingId) -> bool:
     return bool(row._mapping["has_active"]) if row is not None else False
 
 
+async def sql_get_match_ids_for_stage_item(stage_item_id: StageItemId) -> list[MatchId]:
+    query = """
+        SELECT matches.id
+        FROM matches
+        JOIN rounds ON rounds.id = matches.round_id
+        WHERE rounds.stage_item_id = :stage_item_id
+        """
+    rows = await database.fetch_all(query=query, values={"stage_item_id": stage_item_id})
+    return [MatchId(row._mapping["id"]) for row in rows]
+
+
+async def _resize_sets_for_matches(
+    match_ids: list[MatchId], old_num_sets: int, new_num_sets: int
+) -> None:
+    """Add trailing NOT_STARTED sets or delete trailing sets for the given matches."""
+    for match_id in match_ids:
+        if new_num_sets > old_num_sets:
+            await sql_add_trailing_sets(match_id, old_num_sets + 1, new_num_sets)
+        else:
+            await sql_delete_trailing_sets(match_id, new_num_sets)
+
+
 async def sql_resize_sets_for_ranking(
     ranking_id: RankingId, old_num_sets: int, new_num_sets: int
 ) -> None:
@@ -131,8 +155,15 @@ async def sql_resize_sets_for_ranking(
         return
 
     match_ids = await sql_get_match_ids_for_ranking(ranking_id)
-    for match_id in match_ids:
-        if new_num_sets > old_num_sets:
-            await sql_add_trailing_sets(match_id, old_num_sets + 1, new_num_sets)
-        else:
-            await sql_delete_trailing_sets(match_id, new_num_sets)
+    await _resize_sets_for_matches(match_ids, old_num_sets, new_num_sets)
+
+
+async def sql_resize_sets_for_stage_item(
+    stage_item_id: StageItemId, old_num_sets: int, new_num_sets: int
+) -> None:
+    """Add trailing NOT_STARTED sets or delete trailing sets for every match of a stage item."""
+    if new_num_sets == old_num_sets:
+        return
+
+    match_ids = await sql_get_match_ids_for_stage_item(stage_item_id)
+    await _resize_sets_for_matches(match_ids, old_num_sets, new_num_sets)
