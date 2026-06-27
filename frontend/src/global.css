@@ -1,0 +1,16 @@
+/*
+ * Prevent mobile browsers (notably iOS Safari) from auto-zooming the page when
+ * a form control is focused. Safari zooms in whenever the focused field has a
+ * font-size below 16px, and because iOS ignores `user-scalable=no` the page can
+ * get stuck zoomed in. Mantine's default input size renders at 14px, so bumping
+ * form controls to 16px on small screens removes the trigger at the source while
+ * keeping normal pinch-to-zoom available. `!important` is needed to win over
+ * Mantine's class-based input styles.
+ */
+@media (max-width: 47.99em) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
