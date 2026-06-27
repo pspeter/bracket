@@ -38,7 +38,7 @@ async def test_match_with_concrete_teams_is_startable_in_inactive_stage(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,
@@ -85,10 +85,10 @@ async def test_match_with_unresolved_opponents_cannot_be_started(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": True})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted_1,
         inserted_stage(
-            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted_2,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,

@@ -1,5 +1,3 @@
-from typing import Literal, cast
-
 from bracket.database import database
 from bracket.models.db.stage import Stage
 from bracket.models.db.util import StageWithStageItems
@@ -147,12 +145,11 @@ async def sql_create_stage(
     tournament_id: TournamentId,
     name: str = "Stage",
     *,
-    is_active: bool = False,
     level_id: LevelId | None = None,
 ) -> Stage:
     query = """
-        INSERT INTO stages (created, is_active, name, tournament_id, level_id)
-        VALUES (NOW(), :is_active, :name, :tournament_id, :level_id)
+        INSERT INTO stages (created, name, tournament_id, level_id)
+        VALUES (NOW(), :name, :tournament_id, :level_id)
         RETURNING *
         """
     result = await database.fetch_one(
@@ -160,7 +157,6 @@ async def sql_create_stage(
         values={
             "tournament_id": tournament_id,
             "name": name,
-            "is_active": is_active,
             "level_id": level_id,
         },
     )
@@ -169,93 +165,3 @@ async def sql_create_stage(
         raise ValueError("Could not create stage")
 
     return Stage.model_validate(dict(result._mapping))
-
-
-async def sql_has_active_stage(tournament_id: TournamentId) -> bool:
-    query = """
-        SELECT EXISTS(
-            SELECT 1 FROM stages
-            WHERE tournament_id = :tournament_id
-            AND is_active IS TRUE
-        )
-    """
-    result = await database.fetch_val(query=query, values={"tournament_id": tournament_id})
-    return bool(result)
-
-
-async def get_next_stage_in_tournament(
-    tournament_id: TournamentId,
-    direction: Literal["next", "previous"],
-    level_id: LevelId | None = None,
-) -> StageId | None:
-    select_query = """
-        SELECT id
-        FROM stages
-        WHERE
-            CASE WHEN :direction='next'
-            THEN (
-                id > COALESCE(
-                    (
-                        SELECT id FROM stages
-                        WHERE is_active IS TRUE
-                        AND stages.tournament_id = :tournament_id
-                        AND stages.level_id IS NOT DISTINCT FROM :level_id
-                        ORDER BY id ASC
-                        LIMIT 1
-                    ),
-                    -1
-                )
-            )
-            ELSE (
-                id < COALESCE(
-                    (
-                        SELECT id FROM stages
-                        WHERE is_active IS TRUE
-                        AND stages.tournament_id = :tournament_id
-                        AND stages.level_id IS NOT DISTINCT FROM :level_id
-                        ORDER BY id DESC
-                        LIMIT 1
-                    ),
-                    10000000000
-                )
-            )
-            END
-        AND stages.tournament_id = :tournament_id
-        AND stages.level_id IS NOT DISTINCT FROM :level_id
-        AND is_active IS FALSE
-        ORDER BY
-            CASE WHEN :direction='next' THEN id END ASC,
-            CASE WHEN NOT :direction='next' THEN id END DESC
-    """
-    return cast(
-        "StageId | None",
-        await database.execute(
-            query=select_query,
-            values={
-                "tournament_id": tournament_id,
-                "direction": direction,
-                "level_id": level_id,
-            },
-        ),
-    )
-
-
-async def sql_activate_next_stage(
-    new_active_stage_id: StageId,
-    tournament_id: TournamentId,
-    level_id: LevelId | None = None,
-) -> None:
-    update_query = """
-        UPDATE stages
-        SET is_active = (stages.id = :new_active_stage_id)
-        WHERE stages.tournament_id = :tournament_id
-        AND stages.level_id IS NOT DISTINCT FROM :level_id
-    """
-    await database.execute(
-        query=update_query,
-        values={
-            "tournament_id": tournament_id,
-            "new_active_stage_id": new_active_stage_id,
-            "level_id": level_id,
-        },
-    )

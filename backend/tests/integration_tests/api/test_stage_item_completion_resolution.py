@@ -39,10 +39,10 @@ async def test_completing_source_stage_item_resolves_dependent_inputs(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": True})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted_1,
         inserted_stage(
-            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted_2,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,

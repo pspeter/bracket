@@ -53,7 +53,7 @@ async def test_rounds_and_matches_returned_in_id_order_after_heap_reuse(
     tournament_id = auth_context.tournament.id
 
     async with inserted_stage(
-        DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+        DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
     ) as stage_inserted:
         assert (
             await send_tournament_request(
@@ -147,7 +147,7 @@ async def test_inactive_stage_resolves_round_1_when_all_slots_filled(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,
@@ -231,7 +231,7 @@ async def test_resolve_round_1_targets_lowest_id_round_regardless_of_order(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": False})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,

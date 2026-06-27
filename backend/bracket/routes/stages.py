@@ -7,17 +7,9 @@ from bracket.logic.levels import validate_level_id_for_tournament
 from bracket.logic.planning.template import build_template_blueprint, max_until_rank_for_template
 from bracket.logic.planning.template_service import replace_stages_from_template
 from bracket.logic.scheduling.builder import determine_available_inputs
-from bracket.logic.scheduling.handle_stage_activation import (
-    get_pending_match_count_in_stage,
-    get_pending_matches_message,
-    get_updates_to_inputs_in_activated_stage,
-    update_matches_in_activated_stage,
-    update_matches_in_deactivated_stage,
-)
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.stage import (
     Stage,
-    StageActivateBody,
     StageCreateBody,
     StageTemplateCreateBody,
     StageUpdateBody,
@@ -31,20 +23,17 @@ from bracket.routes.auth import (
 )
 from bracket.routes.models import (
     StageItemInputOptionsResponse,
-    StageRankingResponse,
     StagesWithStageItemsResponse,
     SuccessResponse,
 )
 from bracket.routes.util import disallow_archived_tournament, stage_dependency
 from bracket.sql.stages import (
     get_full_tournament_details,
-    get_next_stage_in_tournament,
-    sql_activate_next_stage,
     sql_create_stage,
     sql_delete_stage,
 )
 from bracket.sql.teams import get_teams_with_members
-from bracket.utils.id_types import LevelId, StageId, TournamentId
+from bracket.utils.id_types import StageId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -169,47 +158,6 @@ async def update_stage(
     return SuccessResponse()
 
 
-@router.post("/tournaments/{tournament_id}/stages/activate", response_model=SuccessResponse)
-async def activate_next_stage(
-    tournament_id: TournamentId,
-    stage_body: StageActivateBody,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    __: Tournament = Depends(disallow_archived_tournament),
-) -> SuccessResponse:
-    await validate_level_id_for_tournament(tournament_id, stage_body.level_id)
-
-    new_active_stage_id = await get_next_stage_in_tournament(
-        tournament_id, stage_body.direction, stage_body.level_id
-    )
-    if new_active_stage_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"There is no {stage_body.direction} stage",
-        )
-
-    stages = await get_full_tournament_details(tournament_id)
-    deactivated_stage = next(
-        (stage for stage in stages if stage.is_active and stage.level_id == stage_body.level_id),
-        None,
-    )
-
-    if stage_body.direction == "next":
-        if deactivated_stage is not None:
-            pending_match_count = get_pending_match_count_in_stage(deactivated_stage)
-            if pending_match_count > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=get_pending_matches_message(pending_match_count),
-                )
-        await update_matches_in_activated_stage(tournament_id, new_active_stage_id)
-    else:
-        if deactivated_stage:
-            await update_matches_in_deactivated_stage(tournament_id, deactivated_stage)
-
-    await sql_activate_next_stage(new_active_stage_id, tournament_id, stage_body.level_id)
-    return SuccessResponse()
-
-
 @router.get(
     "/tournaments/{tournament_id}/available_inputs",
     response_model=StageItemInputOptionsResponse,
@@ -221,49 +169,3 @@ async def get_available_inputs(
     stages = await get_full_tournament_details(tournament_id)
     teams = await get_teams_with_members(tournament_id)
     return StageItemInputOptionsResponse(data=determine_available_inputs(teams, stages))
-
-
-@router.get("/tournaments/{tournament_id}/next_stage_rankings")
-async def get_next_stage_rankings(
-    tournament_id: TournamentId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    level_id: LevelId | None = None,
-) -> StageRankingResponse:
-    """
-    Get the rankings for the stage items in this stage.
-    """
-    await validate_level_id_for_tournament(tournament_id, level_id)
-    stages = await get_full_tournament_details(tournament_id)
-    level_stages = [stage for stage in stages if stage.level_id == level_id]
-    active_stage = next((stage for stage in level_stages if stage.is_active), None)
-    pending_match_count = (
-        get_pending_match_count_in_stage(active_stage) if active_stage is not None else 0
-    )
-    pending_matches_message = (
-        get_pending_matches_message(pending_match_count) if pending_match_count > 0 else None
-    )
-
-    if pending_match_count > 0:
-        return StageRankingResponse(
-            data={},
-            has_pending_matches=True,
-            pending_match_count=pending_match_count,
-            pending_matches_message=pending_matches_message,
-        )
-
-    next_stage_id = await get_next_stage_in_tournament(tournament_id, "next", level_id)
-
-    if next_stage_id is None:
-        return StageRankingResponse(
-            data={},
-            has_pending_matches=pending_match_count > 0,
-            pending_match_count=pending_match_count,
-            pending_matches_message=pending_matches_message,
-        )
-
-    return StageRankingResponse(
-        data=await get_updates_to_inputs_in_activated_stage(tournament_id, next_stage_id),
-        has_pending_matches=pending_match_count > 0,
-        pending_match_count=pending_match_count,
-        pending_matches_message=pending_matches_message,
-    )

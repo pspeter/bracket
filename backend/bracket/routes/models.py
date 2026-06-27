@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-from bracket.logic.scheduling.handle_stage_activation import StageItemInputUpdate
 from bracket.models.db.club import Club
 from bracket.models.db.court import Court
 from bracket.models.db.match import Match, MatchWithDetails
@@ -15,7 +14,7 @@ from bracket.models.db.tournament import LevelResponse, TournamentWithLevels
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
 from bracket.routes.auth import Token
-from bracket.utils.id_types import LevelId, StageId, StageItemId, TeamId, TournamentId
+from bracket.utils.id_types import LevelId, StageId, TeamId, TournamentId
 
 
 class SuccessResponse(BaseModel):
@@ -106,12 +105,6 @@ class StageItemInputOptionsResponse(
     pass
 
 
-class StageRankingResponse(DataResponse[dict[StageItemId, list[StageItemInputUpdate]]]):
-    has_pending_matches: bool = False
-    pending_match_count: int = 0
-    pending_matches_message: str | None = None
-
-
 class SignupTeamInfo(BaseModel):
     id: TeamId
     name: str
@@ -140,7 +133,6 @@ class ScoreTrackingInfo(BaseModel):
     tournament_id: TournamentId
     tournament_name: str
     matches: list[MatchWithDetails]
-    has_active_stage: bool
     referees_enabled: bool = False
     levels: list[LevelResponse] = []
     courts: list[Court] = []

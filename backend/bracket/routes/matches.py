@@ -82,12 +82,12 @@ async def validate_match_can_be_started(
             for stage_item in stage.stage_items:
                 for round_ in stage_item.rounds:
                     if round_.id == existing_match.round_id:
-                        match = next(
-                            (m for m in round_.matches if m.id == existing_match.id), None
-                        )
-                        if match is not None and isinstance(
-                            match.stage_item_input1, StageItemInputFinal
-                        ) and isinstance(match.stage_item_input2, StageItemInputFinal):
+                        match = next((m for m in round_.matches if m.id == existing_match.id), None)
+                        if (
+                            match is not None
+                            and isinstance(match.stage_item_input1, StageItemInputFinal)
+                            and isinstance(match.stage_item_input2, StageItemInputFinal)
+                        ):
                             return
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,

@@ -29,7 +29,7 @@ async def test_swiss_round1_resolves_when_assigned_in_active_stage(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": True})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,
@@ -130,7 +130,7 @@ async def test_swiss_round1_resolves_with_parallel_auto_assign(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": True})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,

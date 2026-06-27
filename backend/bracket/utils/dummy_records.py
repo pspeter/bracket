@@ -72,14 +72,12 @@ DUMMY_LEVEL2 = LevelInsertable(
 DUMMY_STAGE1 = StageInsertable(
     tournament_id=TournamentId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    is_active=True,
     name="Group Stage",
 )
 
 DUMMY_STAGE2 = StageInsertable(
     tournament_id=TournamentId(DB_PLACEHOLDER_ID),
     created=DUMMY_MOCK_TIME,
-    is_active=False,
     name="Knockout Stage",
 )
 

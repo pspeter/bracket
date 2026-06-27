@@ -4,16 +4,26 @@ from unittest.mock import ANY
 import pytest
 
 from bracket.models.db.ranking import ScoringType
-from bracket.models.db.stage_item import StageType
 from bracket.sql.rankings import (
     get_all_rankings_in_tournament,
     sql_delete_ranking,
 )
-from bracket.utils.dummy_records import DUMMY_RANKING1, DUMMY_STAGE1, DUMMY_STAGE_ITEM1, DUMMY_STAGE_ITEM3, DUMMY_TEAM1
+from bracket.utils.dummy_records import (
+    DUMMY_RANKING1,
+    DUMMY_STAGE1,
+    DUMMY_STAGE_ITEM1,
+    DUMMY_STAGE_ITEM3,
+    DUMMY_TEAM1,
+)
 from bracket.utils.http import HTTPMethod
 from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
 from tests.integration_tests.models import AuthContext
-from tests.integration_tests.sql import inserted_ranking, inserted_stage, inserted_stage_item, inserted_team
+from tests.integration_tests.sql import (
+    inserted_ranking,
+    inserted_stage,
+    inserted_stage_item,
+    inserted_team,
+)
 
 
 @pytest.mark.asyncio(loop_scope="session")

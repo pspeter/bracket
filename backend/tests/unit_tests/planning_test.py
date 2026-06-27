@@ -118,7 +118,6 @@ def _stage_with_rounds(
         tournament_id=TournamentId(-1),
         name="",
         created=T0,
-        is_active=False,
         level_id=level_id,
         stage_items=stage_items,
     )

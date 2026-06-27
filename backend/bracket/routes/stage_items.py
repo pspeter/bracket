@@ -41,6 +41,7 @@ from bracket.sql.matches import (
     sql_create_match,
     sql_delete_matches,
 )
+from bracket.sql.rankings import get_default_ranking_for_stage, get_ranking_by_id
 from bracket.sql.rounds import (
     get_next_round_name,
     sql_create_round,
@@ -55,7 +56,6 @@ from bracket.sql.stage_items import (
     get_stage_item,
     sql_create_stage_item_with_empty_inputs,
 )
-from bracket.sql.rankings import get_default_ranking_for_stage, get_ranking_by_id
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.sql.validation import check_foreign_keys_belong_to_tournament
@@ -520,7 +520,10 @@ async def update_stage_item(
     await check_foreign_keys_belong_to_tournament(stage_item_body, tournament_id)
     team_count_changed = stage_item_body.team_count != stage_item.team_count
 
-    if stage_item.type is StageType.SINGLE_ELIMINATION and stage_item_body.ranking_id != stage_item.ranking_id:
+    if (
+        stage_item.type is StageType.SINGLE_ELIMINATION
+        and stage_item_body.ranking_id != stage_item.ranking_id
+    ):
         ranking = await get_ranking_by_id(tournament_id, stage_item_body.ranking_id)
         if ranking is not None and ranking.num_sets % 2 == 0:
             raise HTTPException(
