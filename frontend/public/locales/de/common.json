@@ -333,6 +333,7 @@
     "set_label": "Satz {{number}}",
     "set_number_label": "Satz {{current}} von {{total}}",
     "set_ranking_for_stage_items_label": "Rangliste für alle Gruppen/Brackets festlegen",
+    "set_state_label": "Status von Satz {{number}}",
     "set_to_new_button": "Jetzt setzen",
     "sets_won_label": "Sätze gewonnen",
     "sign_in_title": "Anmelden",

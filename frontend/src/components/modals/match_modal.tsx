@@ -466,7 +466,11 @@ function MatchModalForm({
                 />
               </Group>
               <Select
-                label={t('match_state_label')}
+                label={
+                  form.values.sets.length > 1
+                    ? t('set_state_label', { number: set.set_number })
+                    : t('match_state_label')
+                }
                 data={[
                   { value: 'NOT_STARTED', label: t('match_state_not_started') },
                   { value: 'IN_PROGRESS', label: t('match_state_in_progress') },
@@ -476,6 +480,10 @@ function MatchModalForm({
                 onChange={(value) => {
                   if (value != null) {
                     form.setFieldValue(`sets.${index}.state`, value as SetFormValue['state']);
+                    if (value === 'NOT_STARTED') {
+                      form.setFieldValue(`sets.${index}.stage_item_input1_score`, 0);
+                      form.setFieldValue(`sets.${index}.stage_item_input2_score`, 0);
+                    }
                   }
                 }}
               />

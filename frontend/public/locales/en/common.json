@@ -333,6 +333,7 @@
     "set_label": "Set {{number}}",
     "set_number_label": "Set {{current}} of {{total}}",
     "set_ranking_for_stage_items_label": "Set ranking for all stage items",
+    "set_state_label": "Set {{number}} state",
     "set_to_new_button": "Set To Now",
     "sets_won_label": "Sets Won",
     "sign_in_title": "Sign in",
