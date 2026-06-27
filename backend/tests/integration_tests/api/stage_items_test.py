@@ -9,9 +9,9 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyTentative,
 )
 from bracket.schema import match_sets, matches, rounds, stage_item_inputs, stage_items, stages
+from bracket.sql.match_sets import get_sets_for_match
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
-from bracket.sql.match_sets import get_sets_for_match
 from bracket.utils.dummy_records import (
     DUMMY_COURT1,
     DUMMY_MATCH1,
@@ -544,9 +544,7 @@ async def test_update_stage_item_ranking_resizes_match_sets(
         inserted_ranking(
             DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "num_sets": 3})
         ) as ranking_three_sets,
-        inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
-        ) as stage,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})) as stage,
         inserted_stage_item(
             DUMMY_STAGE_ITEM1.model_copy(
                 update={"stage_id": stage.id, "ranking_id": auth_context.ranking.id}
