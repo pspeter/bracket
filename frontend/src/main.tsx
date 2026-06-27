@@ -1,4 +1,4 @@
-import { MantineProvider, createTheme } from '@mantine/core';
+import { Drawer, MantineProvider, Modal, createTheme } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import '@mantine/dropzone/styles.css';
@@ -61,6 +61,15 @@ const theme = createTheme({
       '#141517',
       '#101113',
     ],
+  },
+  components: {
+    // While a Modal or Drawer is open Mantine locks page scroll with
+    // react-remove-scroll, which by default also swallows pinch gestures
+    // (allowPinchZoom defaults to false). That left the page un-zoomable on
+    // mobile whenever e.g. the match details or edit-stage popup was open.
+    // Re-enable pinch zoom so accessibility zoom keeps working over modals.
+    Modal: Modal.extend({ defaultProps: { removeScrollProps: { allowPinchZoom: true } } }),
+    Drawer: Drawer.extend({ defaultProps: { removeScrollProps: { allowPinchZoom: true } } }),
   },
 });
 
