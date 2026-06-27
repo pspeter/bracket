@@ -41,10 +41,6 @@ class StageItemUpdateBody(BaseModelORM):
     games_per_player: int | None = None
 
 
-class StageItemActivateNextBody(BaseModelORM):
-    adjust_to_time: datetime_utc | None = None
-
-
 class StageItemCreateBody(BaseModelORM):
     stage_id: StageId
     name: str | None = None
