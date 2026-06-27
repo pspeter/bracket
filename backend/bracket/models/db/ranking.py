@@ -29,6 +29,7 @@ class RankingSetPointsWithMatchBonusData(BaseModel):
 class RankingBase(BaseModel):
     tournament_id: TournamentId
     position: int
+    name: str = ""
     level_id: LevelId | None = None
     scoring_type: ScoringType = ScoringType.MATCH_POINTS
     num_sets: int = 1
@@ -55,6 +56,7 @@ class Ranking(BaseModelORM, RankingBase):
 
 class RankingMatchPointsBody(BaseModel):
     scoring_type: Literal["MATCH_POINTS"] = "MATCH_POINTS"
+    name: str | None = None
     win_points: Decimal = Decimal("1.0")
     draw_points: Decimal = Decimal("0.5")
     loss_points: Decimal = Decimal("0.0")
@@ -68,6 +70,7 @@ class RankingMatchPointsBody(BaseModel):
 
 class RankingSetPointsBody(BaseModel):
     scoring_type: Literal["SET_POINTS"] = "SET_POINTS"
+    name: str | None = None
     num_sets: int = 1
     max_points: int = 21
     last_set_max_points: int | None = None
@@ -78,6 +81,7 @@ class RankingSetPointsBody(BaseModel):
 
 class RankingSetPointsWithMatchBonusBody(BaseModel):
     scoring_type: Literal["SET_POINTS_WITH_MATCH_BONUS"] = "SET_POINTS_WITH_MATCH_BONUS"
+    name: str | None = None
     match_bonus_points: Decimal = Decimal("1.0")
     num_sets: int = 1
     max_points: int = 21

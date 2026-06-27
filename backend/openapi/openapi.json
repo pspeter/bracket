@@ -1905,6 +1905,11 @@
             "title": "Max Points",
             "type": "integer"
           },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
           "num_sets": {
             "default": 1,
             "title": "Num Sets",
@@ -1952,6 +1957,7 @@
         "required": [
           "tournament_id",
           "position",
+          "name",
           "level_id",
           "scoring_type",
           "num_sets",
@@ -2011,6 +2017,17 @@
             "title": "Max Points",
             "type": "integer"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
           "num_sets": {
             "default": 1,
             "title": "Num Sets",
@@ -2065,6 +2082,7 @@
         },
         "required": [
           "scoring_type",
+          "name",
           "win_points",
           "draw_points",
           "loss_points",
@@ -2122,6 +2140,17 @@
             "title": "Max Points",
             "type": "integer"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
           "num_sets": {
             "default": 1,
             "title": "Num Sets",
@@ -2163,6 +2192,7 @@
         },
         "required": [
           "scoring_type",
+          "name",
           "num_sets",
           "max_points",
           "last_set_max_points",
@@ -2203,6 +2233,17 @@
             "default": 21,
             "title": "Max Points",
             "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           },
           "num_sets": {
             "default": 1,
@@ -2245,6 +2286,7 @@
         },
         "required": [
           "scoring_type",
+          "name",
           "match_bonus_points",
           "num_sets",
           "max_points",

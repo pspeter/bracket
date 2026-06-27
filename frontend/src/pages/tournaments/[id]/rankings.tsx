@@ -8,6 +8,7 @@ import {
   NumberInput,
   Select,
   Text,
+  TextInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,8 @@ import {
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getRankings, getStages, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
+
+import { getRankingTitle } from '@components/utils/rankings';
 
 function RankingDeleteButton({
   t,
@@ -78,6 +81,7 @@ function EditRankingForm({
   const stageItemsForRanking = stageItems.filter((si) => si.ranking_id === ranking.id);
   const form = useForm({
     initialValues: {
+      name: ranking.name ?? '',
       scoring_type: ranking.scoring_type as ScoringType,
       win_points: ranking.match_points?.win_points ?? '1.0',
       draw_points: ranking.match_points?.draw_points ?? '0.5',
@@ -96,7 +100,7 @@ function EditRankingForm({
   const hasEvenSetsError =
     form.values.num_sets % 2 === 0 &&
     stageItemsForRanking.some((si) => si.type === 'SINGLE_ELIMINATION');
-  const rankingTitle = `${t('ranking_title')} ${ranking.position + 1}`;
+  const rankingTitle = getRankingTitle(ranking, t);
 
   return (
     <form
@@ -111,6 +115,7 @@ function EditRankingForm({
           values.max_points,
           values.num_sets > 2 ? values.last_set_max_points : null,
           values.two_point_advantage,
+          values.name,
           values.win_points,
           values.draw_points,
           values.loss_points,
@@ -132,7 +137,13 @@ function EditRankingForm({
           </Center>
         </Center>
         <Accordion.Panel>
+          <TextInput
+            label={t('ranking_name_label')}
+            placeholder={`${t('ranking_title')} ${ranking.position + 1}`}
+            {...form.getInputProps('name')}
+          />
           <Select
+            mt="1rem"
             label={t('scoring_type_label')}
             data={[
               { value: 'MATCH_POINTS', label: t('scoring_type_match_points') },

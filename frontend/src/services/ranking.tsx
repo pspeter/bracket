@@ -18,6 +18,7 @@ export async function editRanking(
   max_points: number,
   last_set_max_points: number | null,
   two_point_advantage: boolean,
+  name: string,
   win_points?: string,
   draw_points?: string,
   loss_points?: string,
@@ -26,6 +27,7 @@ export async function editRanking(
   const body: Record<string, unknown> = {
     scoring_type,
     position,
+    name,
     side_switch_every_n_points,
     num_sets,
     max_points,

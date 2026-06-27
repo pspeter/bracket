@@ -48,6 +48,7 @@ def _row_to_ranking(row: Record) -> Ranking:
         created=m["created"],
         tournament_id=m["tournament_id"],
         position=m["position"],
+        name=m["name"],
         scoring_type=ScoringType(m["scoring_type"]),
         num_sets=m["num_sets"],
         max_points=m["max_points"],
@@ -169,6 +170,7 @@ async def sql_update_ranking(
         query="""
             UPDATE rankings
             SET position = COALESCE(:position, position),
+                name = COALESCE(:name, name),
                 scoring_type = :scoring_type,
                 num_sets = :num_sets,
                 max_points = :max_points,
@@ -182,6 +184,7 @@ async def sql_update_ranking(
             "ranking_id": ranking_id,
             "tournament_id": tournament_id,
             "position": ranking_body.position,
+            "name": ranking_body.name,
             "scoring_type": ranking_body.scoring_type,
             "num_sets": ranking_body.num_sets,
             "max_points": ranking_body.max_points,
@@ -240,10 +243,10 @@ async def sql_create_ranking(
     ranking_id = await database.execute(
         query="""
             INSERT INTO rankings
-            (tournament_id, position, scoring_type, num_sets, max_points,
+            (tournament_id, position, name, scoring_type, num_sets, max_points,
              last_set_max_points, two_point_advantage, level_id, side_switch_every_n_points)
             VALUES (
-                :tournament_id, :position, :scoring_type, :num_sets, :max_points,
+                :tournament_id, :position, :name, :scoring_type, :num_sets, :max_points,
                 :last_set_max_points, :two_point_advantage, :level_id, :side_switch_every_n_points
             )
             RETURNING id
@@ -251,6 +254,7 @@ async def sql_create_ranking(
         values={
             "tournament_id": tournament_id,
             "position": position,
+            "name": ranking_body.name if ranking_body.name is not None else "",
             "scoring_type": ranking_body.scoring_type,
             "num_sets": ranking_body.num_sets,
             "max_points": ranking_body.max_points,
