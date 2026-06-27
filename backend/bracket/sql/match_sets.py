@@ -39,7 +39,7 @@ async def sql_create_match_sets(match_id: MatchId, num_sets: int) -> None:
         query="""
             INSERT INTO match_sets (match_id, set_number, state)
             SELECT :match_id, set_number, 'NOT_STARTED'
-            FROM generate_series(1, :num_sets) AS set_number
+            FROM generate_series(1, CAST(:num_sets AS integer)) AS set_number
         """,
         values={"match_id": match_id, "num_sets": max(num_sets, 1)},
     )
