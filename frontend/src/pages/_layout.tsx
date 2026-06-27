@@ -110,7 +110,7 @@ export function HeaderAction({ links, navbarState, breadcrumbs }: HeaderActionPr
 
 function NavBar({ links }: any) {
   return (
-    <AppShell.Navbar p="md">
+    <AppShell.Navbar p="md" zIndex={200}>
       {links == null ? (
         <AppShell.Section grow>
           <div />
