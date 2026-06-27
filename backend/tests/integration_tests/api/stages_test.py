@@ -13,7 +13,10 @@ from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stag
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
+from bracket.sql.match_sets import get_sets_for_match
 from bracket.utils.dummy_records import (
+    DUMMY_COURT1,
+    DUMMY_MATCH1,
     DUMMY_MOCK_TIME,
     DUMMY_RANKING1,
     DUMMY_ROUND1,
@@ -33,6 +36,8 @@ from tests.integration_tests.api.shared import (
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     assert_row_count_and_clear,
+    inserted_court,
+    inserted_match,
     inserted_ranking,
     inserted_round,
     inserted_stage,
@@ -499,6 +504,59 @@ async def test_set_ranking_for_all_stage_items_overwrites_every_item(
         ranking_by_item = {item.id: item.ranking_id for item in stage.stage_items}
         assert ranking_by_item[stage_item_1.id] == other_ranking.id
         assert ranking_by_item[stage_item_2.id] == other_ranking.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_set_ranking_for_all_stage_items_resizes_match_sets(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Bulk-setting a stage's ranking to one with a different num_sets resizes its match sets."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(
+                update={"tournament_id": tournament_id, "position": 1, "num_sets": 3}
+            )
+        ) as ranking_three_sets,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})) as stage,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item.id})
+        ) as round_inserted,
+        inserted_court(
+            DUMMY_COURT1.model_copy(update={"tournament_id": tournament_id})
+        ) as court_inserted,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "court_id": court_inserted.id,
+                    "stage_item_input1_id": None,
+                    "stage_item_input2_id": None,
+                    "completed_at": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        # The match starts with a single set (matching the default ranking's num_sets=1).
+        assert len(await get_sets_for_match(match_inserted.id)) == 1
+
+        assert (
+            await send_tournament_request(
+                HTTPMethod.PUT,
+                f"stages/{stage.id}/ranking",
+                auth_context,
+                json={"ranking_id": ranking_three_sets.id},
+            )
+            == SUCCESS_RESPONSE
+        )
+
+        # The match should now carry three sets to match the newly assigned ranking.
+        assert len(await get_sets_for_match(match_inserted.id)) == 3
 
 
 @pytest.mark.asyncio(loop_scope="session")

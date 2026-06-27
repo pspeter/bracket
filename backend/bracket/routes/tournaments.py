@@ -213,12 +213,9 @@ async def create_tournament(
 
         if tournament_to_insert.levels:
             for position, level_name in enumerate(tournament_to_insert.levels):
-                level = await sql_create_level(tournament_id, level_name, position)
-                await sql_create_ranking(
-                    tournament_id, RankingMatchPointsBody(), position=0, level_id=level.id
-                )
-        else:
-            await sql_create_ranking(tournament_id, RankingMatchPointsBody(), position=0)
+                await sql_create_level(tournament_id, level_name, position)
+
+        await sql_create_ranking(tournament_id, RankingMatchPointsBody(), position=0)
 
     return SuccessResponse()
 

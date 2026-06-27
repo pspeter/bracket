@@ -13,7 +13,7 @@ from bracket.models.db.ranking import (
     RankingSetPointsWithMatchBonusData,
     ScoringType,
 )
-from bracket.utils.id_types import LevelId, RankingId, StageId, StageItemId, TournamentId
+from bracket.utils.id_types import LevelId, RankingId, StageItemId, TournamentId
 
 # Common SELECT fragment that LEFT JOINs all three subtype tables
 _RANKING_SELECT = """
@@ -48,6 +48,7 @@ def _row_to_ranking(row: Record) -> Ranking:
         created=m["created"],
         tournament_id=m["tournament_id"],
         position=m["position"],
+        name=m["name"],
         scoring_type=ScoringType(m["scoring_type"]),
         num_sets=m["num_sets"],
         max_points=m["max_points"],
@@ -66,21 +67,17 @@ async def get_all_rankings_in_tournament(tournament_id: TournamentId) -> list[Ra
     return [_row_to_ranking(row) for row in rows]
 
 
-async def get_default_ranking_for_stage(tournament_id: TournamentId, stage_id: StageId) -> Ranking:
+async def get_default_ranking(tournament_id: TournamentId) -> Ranking:
     query = (
         _RANKING_SELECT
         + """
-        JOIN stages ON stages.id = :stage_id
         WHERE r.tournament_id = :tournament_id
-          AND r.level_id IS NOT DISTINCT FROM stages.level_id
         ORDER BY r.position
         LIMIT 1
         """
     )
-    result = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "stage_id": stage_id}
-    )
-    assert result is not None, "No default ranking found for stage"
+    result = await database.fetch_one(query=query, values={"tournament_id": tournament_id})
+    assert result is not None, "No default ranking found for tournament"
     return _row_to_ranking(result)
 
 
@@ -173,6 +170,7 @@ async def sql_update_ranking(
         query="""
             UPDATE rankings
             SET position = COALESCE(:position, position),
+                name = COALESCE(:name, name),
                 scoring_type = :scoring_type,
                 num_sets = :num_sets,
                 max_points = :max_points,
@@ -186,6 +184,7 @@ async def sql_update_ranking(
             "ranking_id": ranking_id,
             "tournament_id": tournament_id,
             "position": ranking_body.position,
+            "name": ranking_body.name,
             "scoring_type": ranking_body.scoring_type,
             "num_sets": ranking_body.num_sets,
             "max_points": ranking_body.max_points,
@@ -244,10 +243,10 @@ async def sql_create_ranking(
     ranking_id = await database.execute(
         query="""
             INSERT INTO rankings
-            (tournament_id, position, scoring_type, num_sets, max_points,
+            (tournament_id, position, name, scoring_type, num_sets, max_points,
              last_set_max_points, two_point_advantage, level_id, side_switch_every_n_points)
             VALUES (
-                :tournament_id, :position, :scoring_type, :num_sets, :max_points,
+                :tournament_id, :position, :name, :scoring_type, :num_sets, :max_points,
                 :last_set_max_points, :two_point_advantage, :level_id, :side_switch_every_n_points
             )
             RETURNING id
@@ -255,6 +254,7 @@ async def sql_create_ranking(
         values={
             "tournament_id": tournament_id,
             "position": position,
+            "name": ranking_body.name if ranking_body.name is not None else "",
             "scoring_type": ranking_body.scoring_type,
             "num_sets": ranking_body.num_sets,
             "max_points": ranking_body.max_points,

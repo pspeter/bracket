@@ -42,6 +42,7 @@ from bracket.routes.models import (
     SuccessResponse,
 )
 from bracket.routes.util import disallow_archived_tournament, stage_dependency
+from bracket.sql.match_sets import sql_resize_sets_for_stage_item
 from bracket.sql.rankings import get_ranking_by_id
 from bracket.sql.stage_items import get_stage_item, sql_set_ranking_for_stage_items
 from bracket.sql.stages import (
@@ -205,6 +206,19 @@ async def set_ranking_for_stage_items(
         )
 
     async with database.transaction():
+        # Reassigning items to a ranking with a different set count must resize the set rows of
+        # their existing matches, mirroring the per-stage-item update path.
+        for stage_item in stage.stage_items:
+            if stage_item.ranking_id == ranking.id:
+                continue
+            old_ranking = (
+                await get_ranking_by_id(tournament_id, stage_item.ranking_id)
+                if stage_item.ranking_id is not None
+                else None
+            )
+            old_num_sets = old_ranking.num_sets if old_ranking is not None else 1
+            await sql_resize_sets_for_stage_item(stage_item.id, old_num_sets, ranking.num_sets)
+
         await sql_set_ranking_for_stage_items(stage_id, stage_body.ranking_id)
 
         for stage_item in stage.stage_items:

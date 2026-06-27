@@ -943,6 +943,10 @@ export type Ranking = {
    */
   max_points: number;
   /**
+   * Name
+   */
+  name: string;
+  /**
    * Num Sets
    */
   num_sets: number;
@@ -986,6 +990,10 @@ export type RankingMatchPointsBody = {
    * Max Points
    */
   max_points: number;
+  /**
+   * Name
+   */
+  name: string | null;
   /**
    * Num Sets
    */
@@ -1043,6 +1051,10 @@ export type RankingSetPointsBody = {
    */
   max_points: number;
   /**
+   * Name
+   */
+  name: string | null;
+  /**
    * Num Sets
    */
   num_sets: number;
@@ -1080,6 +1092,10 @@ export type RankingSetPointsWithMatchBonusBody = {
    * Max Points
    */
   max_points: number;
+  /**
+   * Name
+   */
+  name: string | null;
   /**
    * Num Sets
    */

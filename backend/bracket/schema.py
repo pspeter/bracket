@@ -327,6 +327,7 @@ rankings = Table(
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
     Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), nullable=False, index=True),
     Column("position", Integer, nullable=False),
+    Column("name", String, nullable=False, server_default=""),
     Column(
         "scoring_type",
         Enum("MATCH_POINTS", "SET_POINTS", "SET_POINTS_WITH_MATCH_BONUS", name="scoring_type"),
