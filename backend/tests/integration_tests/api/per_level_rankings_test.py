@@ -39,7 +39,7 @@ def _create_body(endpoint: str, club_id: int, levels: list[str] | None = None) -
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_tournament_with_levels_creates_one_default_ranking_per_level(
+async def test_tournament_with_levels_creates_a_single_default_ranking(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     endpoint = "per-level-rankings-create"
@@ -50,53 +50,18 @@ async def test_tournament_with_levels_creates_one_default_ranking_per_level(
     )
 
     tournament = assert_some(await sql_get_tournament_by_endpoint_name(endpoint))
-    tournament_response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
-    levels_by_name = {lvl["name"]: lvl for lvl in tournament_response["data"]["levels"]}
 
     rankings = await get_all_rankings_in_tournament(tournament.id)
-    assert len(rankings) == 2
-
-    rankings_by_level = {r.level_id: r for r in rankings}
-    assert rankings_by_level.keys() == {
-        levels_by_name["Beginners"]["id"],
-        levels_by_name["Advanced"]["id"],
-    }
-    for ranking in rankings:
-        assert ranking.position == 0
+    assert len(rankings) == 1
+    [ranking] = rankings
+    assert ranking.position == 0
+    assert ranking.level_id is None
 
     await sql_delete_tournament_completely(tournament.id)
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_rankings_api_response_includes_level_id(
-    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
-) -> None:
-    endpoint = "per-level-rankings-api"
-    body = _create_body(endpoint, auth_context.club.id, levels=["Beginners", "Advanced"])
-    assert (
-        await send_auth_request(HTTPMethod.POST, "tournaments", auth_context, json=body)
-        == SUCCESS_RESPONSE
-    )
-
-    tournament = assert_some(await sql_get_tournament_by_endpoint_name(endpoint))
-    tournament_response = await send_auth_request(
-        HTTPMethod.GET, f"tournaments/{tournament.id}", auth_context
-    )
-    level_ids = {lvl["id"] for lvl in tournament_response["data"]["levels"]}
-
-    temp_context = auth_context.model_copy(update={"tournament": tournament})
-    rankings_response = await send_tournament_request(HTTPMethod.GET, "rankings", temp_context)
-
-    response_level_ids = {r["level_id"] for r in rankings_response["data"]}
-    assert response_level_ids == level_ids
-
-    await sql_delete_tournament_completely(tournament.id)
-
-
-@pytest.mark.asyncio(loop_scope="session")
-async def test_stage_item_defaults_to_its_levels_ranking(
+async def test_stage_item_defaults_to_the_single_default_ranking(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     endpoint = "per-level-rankings-stageitem-default"
@@ -114,7 +79,7 @@ async def test_stage_item_defaults_to_its_levels_ranking(
     advanced_level_id = next(lvl["id"] for lvl in levels if lvl["name"] == "Advanced")
 
     rankings = await get_all_rankings_in_tournament(tournament.id)
-    advanced_ranking = next(r for r in rankings if r.level_id == advanced_level_id)
+    [default_ranking] = rankings
 
     temp_context = auth_context.model_copy(update={"tournament": tournament})
     assert (
@@ -144,7 +109,7 @@ async def test_stage_item_defaults_to_its_levels_ranking(
 
     [stage_after] = await get_full_tournament_details(tournament.id)
     [stage_item] = stage_after.stage_items
-    assert stage_item.ranking_id == advanced_ranking.id
+    assert stage_item.ranking_id == default_ranking.id
 
     await sql_delete_tournament_completely(tournament.id)
 

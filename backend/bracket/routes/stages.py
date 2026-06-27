@@ -6,14 +6,20 @@ from bracket.database import database
 from bracket.logic.levels import validate_level_id_for_tournament
 from bracket.logic.planning.template import build_template_blueprint, max_until_rank_for_template
 from bracket.logic.planning.template_service import replace_stages_from_template
+from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
+from bracket.logic.ranking.elimination import (
+    update_inputs_in_complete_elimination_stage_item,
+)
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.stage import (
     Stage,
     StageCreateBody,
+    StageRankingUpdateBody,
     StageTemplateCreateBody,
     StageUpdateBody,
 )
+from bracket.models.db.stage_item import StageType
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
@@ -27,6 +33,9 @@ from bracket.routes.models import (
     SuccessResponse,
 )
 from bracket.routes.util import disallow_archived_tournament, stage_dependency
+from bracket.sql.match_sets import sql_resize_sets_for_stage_item
+from bracket.sql.rankings import get_ranking_by_id
+from bracket.sql.stage_items import get_stage_item, sql_set_ranking_for_stage_items
 from bracket.sql.stages import (
     get_full_tournament_details,
     sql_create_stage,
@@ -155,6 +164,58 @@ async def update_stage(
         query=query,
         values={**values, "name": stage_body.name},
     )
+    return SuccessResponse()
+
+
+@router.put(
+    "/tournaments/{tournament_id}/stages/{stage_id}/ranking", response_model=SuccessResponse
+)
+async def set_ranking_for_stage_items(
+    tournament_id: TournamentId,
+    stage_id: StageId,
+    stage_body: StageRankingUpdateBody,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    __: Tournament = Depends(disallow_archived_tournament),
+    stage: StageWithStageItems = Depends(stage_dependency),
+) -> SuccessResponse:
+    ranking = await get_ranking_by_id(tournament_id, stage_body.ranking_id)
+    if ranking is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Could not find ranking with id {stage_body.ranking_id}",
+        )
+
+    has_single_elimination = any(
+        stage_item.type is StageType.SINGLE_ELIMINATION for stage_item in stage.stage_items
+    )
+    if ranking.num_sets % 2 == 0 and has_single_elimination:
+        raise HTTPException(
+            status_code=422,
+            detail="Even number of sets is not supported for single elimination brackets.",
+        )
+
+    async with database.transaction():
+        # Reassigning items to a ranking with a different set count must resize the set rows of
+        # their existing matches, mirroring the per-stage-item update path.
+        for stage_item in stage.stage_items:
+            if stage_item.ranking_id == ranking.id:
+                continue
+            old_ranking = (
+                await get_ranking_by_id(tournament_id, stage_item.ranking_id)
+                if stage_item.ranking_id is not None
+                else None
+            )
+            old_num_sets = old_ranking.num_sets if old_ranking is not None else 1
+            await sql_resize_sets_for_stage_item(stage_item.id, old_num_sets, ranking.num_sets)
+
+        await sql_set_ranking_for_stage_items(stage_id, stage_body.ranking_id)
+
+        for stage_item in stage.stage_items:
+            updated_stage_item = await get_stage_item(tournament_id, stage_item.id)
+            await recalculate_ranking_for_stage_item(tournament_id, updated_stage_item)
+            if updated_stage_item.type is StageType.SINGLE_ELIMINATION:
+                await update_inputs_in_complete_elimination_stage_item(updated_stage_item)
+
     return SuccessResponse()
 
 

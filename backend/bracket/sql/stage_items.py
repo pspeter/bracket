@@ -5,10 +5,10 @@ from bracket.database import database
 from bracket.models.db.stage_item import StageItem, StageItemCreateBody, StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import StageItemInputCreateBodyEmpty
 from bracket.models.db.util import StageItemWithRounds
-from bracket.sql.rankings import get_default_ranking_for_stage
+from bracket.sql.rankings import get_default_ranking
 from bracket.sql.stage_item_inputs import sql_create_stage_item_input
 from bracket.sql.stages import get_full_tournament_details
-from bracket.utils.id_types import RankingId, StageItemId, TournamentId
+from bracket.utils.id_types import RankingId, StageId, StageItemId, TournamentId
 
 
 async def sql_create_stage_item(
@@ -28,7 +28,7 @@ async def sql_create_stage_item(
             "team_count": stage_item.team_count,
             "ranking_id": stage_item.ranking_id
             if stage_item.ranking_id
-            else (await get_default_ranking_for_stage(tournament_id, stage_item.stage_id)).id,
+            else (await get_default_ranking(tournament_id)).id,
             "games_per_player": stage_item.games_per_player,
         },
     )
@@ -70,6 +70,17 @@ async def sql_delete_stage_item(stage_item_id: StageItemId) -> None:
         WHERE stage_items.id = :stage_item_id
         """
     await database.execute(query=query, values={"stage_item_id": stage_item_id})
+
+
+async def sql_set_ranking_for_stage_items(stage_id: StageId, ranking_id: RankingId) -> None:
+    await database.execute(
+        query="""
+            UPDATE stage_items
+            SET ranking_id = :ranking_id
+            WHERE stage_id = :stage_id
+        """,
+        values={"stage_id": stage_id, "ranking_id": ranking_id},
+    )
 
 
 async def get_stage_items_for_ranking(

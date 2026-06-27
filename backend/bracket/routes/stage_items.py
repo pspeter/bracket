@@ -37,11 +37,12 @@ from bracket.routes.auth import (
 )
 from bracket.routes.models import SuccessResponse
 from bracket.routes.util import disallow_archived_tournament, stage_item_dependency
+from bracket.sql.match_sets import sql_resize_sets_for_stage_item
 from bracket.sql.matches import (
     sql_create_match,
     sql_delete_matches,
 )
-from bracket.sql.rankings import get_default_ranking_for_stage, get_ranking_by_id
+from bracket.sql.rankings import get_default_ranking, get_ranking_by_id
 from bracket.sql.rounds import (
     get_next_round_name,
     sql_create_round,
@@ -488,7 +489,7 @@ async def create_stage_item(
         if stage_body.ranking_id is not None:
             ranking = await get_ranking_by_id(tournament_id, stage_body.ranking_id)
         else:
-            ranking = await get_default_ranking_for_stage(tournament_id, stage_body.stage_id)
+            ranking = await get_default_ranking(tournament_id)
         if ranking is not None and ranking.num_sets % 2 == 0:
             raise HTTPException(
                 status_code=422,
@@ -519,19 +520,33 @@ async def update_stage_item(
 
     await check_foreign_keys_belong_to_tournament(stage_item_body, tournament_id)
     team_count_changed = stage_item_body.team_count != stage_item.team_count
+    ranking_changed = stage_item_body.ranking_id != stage_item.ranking_id
 
-    if (
-        stage_item.type is StageType.SINGLE_ELIMINATION
-        and stage_item_body.ranking_id != stage_item.ranking_id
-    ):
-        ranking = await get_ranking_by_id(tournament_id, stage_item_body.ranking_id)
-        if ranking is not None and ranking.num_sets % 2 == 0:
+    new_ranking = (
+        await get_ranking_by_id(tournament_id, stage_item_body.ranking_id)
+        if stage_item_body.ranking_id is not None
+        else None
+    )
+
+    if stage_item.type is StageType.SINGLE_ELIMINATION and ranking_changed:
+        if new_ranking is not None and new_ranking.num_sets % 2 == 0:
             raise HTTPException(
                 status_code=422,
                 detail="Even number of sets is not supported for single elimination brackets.",
             )
 
     async with database.transaction():
+        # Reassigning a stage item to a ranking with a different set count must resize the set
+        # rows of its existing matches, mirroring how editing a ranking's num_sets resizes them.
+        if ranking_changed and new_ranking is not None:
+            old_ranking = (
+                await get_ranking_by_id(tournament_id, stage_item.ranking_id)
+                if stage_item.ranking_id is not None
+                else None
+            )
+            old_num_sets = old_ranking.num_sets if old_ranking is not None else 1
+            await sql_resize_sets_for_stage_item(stage_item_id, old_num_sets, new_ranking.num_sets)
+
         if stage_item_body.games_per_player is not None and stage_item.type is StageType.SWISS:
             await adjust_swiss_games_per_player(
                 tournament_id, stage_item_id, stage_item, stage_item_body.games_per_player

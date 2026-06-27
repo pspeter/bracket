@@ -4,7 +4,7 @@ Removes the stage activation feature: stages no longer have an "active" flag. Pl
 now auto-resolve as soon as their source stage item completes.
 
 Revision ID: c5f8a1d2e4b7
-Revises: b9d3e7f1a2c4
+Revises: e8c1a4d7f3b2
 Create Date: 2026-06-26 00:00:00.000000
 
 """
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str | None = "c5f8a1d2e4b7"
-down_revision: str | None = "b9d3e7f1a2c4"
+down_revision: str | None = "e8c1a4d7f3b2"
 branch_labels: str | None = None
 depends_on: str | None = None
 

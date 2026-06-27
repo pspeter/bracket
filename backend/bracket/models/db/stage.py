@@ -5,7 +5,7 @@ from heliclockter import datetime_utc
 from bracket.logic.planning.template import TemplateConfig
 from bracket.models.db.shared import BaseModelORM
 from bracket.models.db.stage_item import StageType
-from bracket.utils.id_types import LevelId, StageId, TournamentId
+from bracket.utils.id_types import LevelId, RankingId, StageId, TournamentId
 
 
 class StageInsertable(BaseModelORM):
@@ -25,6 +25,10 @@ class StageCreateBody(BaseModelORM):
 
 class StageUpdateBody(BaseModelORM):
     name: str
+
+
+class StageRankingUpdateBody(BaseModelORM):
+    ranking_id: RankingId
 
 
 class StageTemplateCreateBody(BaseModelORM):

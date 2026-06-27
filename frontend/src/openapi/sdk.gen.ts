@@ -164,6 +164,9 @@ import type {
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostErrors,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponses,
+  SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutData,
+  SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors,
+  SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostData,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses,
@@ -1512,6 +1515,32 @@ export const updateStageTournamentsTournamentIdStagesStageIdPut = <
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/stages/{stage_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Set Ranking For Stage Items
+ */
+export const setRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPut = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).put<
+    SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses,
+    SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/stages/{stage_id}/ranking',
     ...options,
     headers: {
       'Content-Type': 'application/json',

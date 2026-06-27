@@ -139,6 +139,29 @@ def test_schema_rankings_has_new_columns() -> None:
     assert "add_score_points" not in cols
 
 
+def test_schema_rankings_has_name_column() -> None:
+    from bracket.schema import rankings
+
+    assert "name" in rankings.c.keys()
+
+
+def test_migration_add_ranking_name_exists_and_chains_from_head() -> None:
+    import importlib.util
+    from pathlib import Path
+
+    versions_dir = Path(__file__).parent.parent.parent / "alembic" / "versions"
+    files = list(versions_dir.glob("*add_name_to_rankings*.py"))
+    assert files, "No add_name_to_rankings migration file found"
+    path = files[0]
+    spec = importlib.util.spec_from_file_location("migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.down_revision == "b9d3e7f1a2c4"
+    assert callable(migration.upgrade)
+    assert callable(migration.downgrade)
+
+
 def test_schema_subtype_tables_exist() -> None:
     from bracket.schema import (
         ranking_match_points,
@@ -172,6 +195,31 @@ def test_migration_redesign_exists_and_chains_from_side_switch() -> None:
     assert migration.down_revision == "d3b8f1c4e2a9"
     assert callable(migration.upgrade)
     assert callable(migration.downgrade)
+
+
+def test_ranking_has_name_field() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        name="Main ranking",
+        scoring_type=ScoringType.MATCH_POINTS,
+    )
+    assert ranking.name == "Main ranking"
+
+
+def test_ranking_name_defaults_to_empty_string() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        scoring_type=ScoringType.MATCH_POINTS,
+    )
+    assert ranking.name == ""
 
 
 def test_ranking_new_base_fields() -> None:

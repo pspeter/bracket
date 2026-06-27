@@ -943,6 +943,10 @@ export type Ranking = {
    */
   max_points: number;
   /**
+   * Name
+   */
+  name: string;
+  /**
    * Num Sets
    */
   num_sets: number;
@@ -986,6 +990,10 @@ export type RankingMatchPointsBody = {
    * Max Points
    */
   max_points: number;
+  /**
+   * Name
+   */
+  name: string | null;
   /**
    * Num Sets
    */
@@ -1043,6 +1051,10 @@ export type RankingSetPointsBody = {
    */
   max_points: number;
   /**
+   * Name
+   */
+  name: string | null;
+  /**
    * Num Sets
    */
   num_sets: number;
@@ -1080,6 +1092,10 @@ export type RankingSetPointsWithMatchBonusBody = {
    * Max Points
    */
   max_points: number;
+  /**
+   * Name
+   */
+  name: string | null;
   /**
    * Num Sets
    */
@@ -1775,6 +1791,16 @@ export type StageItemWithRounds = {
    * Type Name
    */
   type_name: string;
+};
+
+/**
+ * StageRankingUpdateBody
+ */
+export type StageRankingUpdateBody = {
+  /**
+   * Ranking Id
+   */
+  ranking_id: number;
 };
 
 /**
@@ -4945,6 +4971,42 @@ export type UpdateStageTournamentsTournamentIdStagesStageIdPutResponses = {
 
 export type UpdateStageTournamentsTournamentIdStagesStageIdPutResponse =
   UpdateStageTournamentsTournamentIdStagesStageIdPutResponses[keyof UpdateStageTournamentsTournamentIdStagesStageIdPutResponses];
+
+export type SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutData = {
+  body: StageRankingUpdateBody;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Stage Id
+     */
+    stage_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/stages/{stage_id}/ranking';
+};
+
+export type SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutError =
+  SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors[keyof SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors];
+
+export type SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses = {
+  /**
+   * Successful Response
+   */
+  200: SuccessResponse;
+};
+
+export type SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponse =
+  SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses[keyof SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses];
 
 export type GetTeamsTournamentsTournamentIdTeamsGetData = {
   body?: never;
