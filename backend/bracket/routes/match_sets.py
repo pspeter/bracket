@@ -6,6 +6,9 @@ from bracket.config import config
 from bracket.database import database
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
+from bracket.logic.scheduling.handle_stage_activation import (
+    resolve_dependent_inputs_for_completed_stage_item,
+)
 from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
 from bracket.models.db.match import (
     Match,
@@ -85,6 +88,10 @@ async def update_match_set_and_recalculate(
 
         if stage_item.type == StageType.SINGLE_ELIMINATION:
             await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match.id})
+
+        # Auto-advance: once this stage item is complete, resolve placeholder inputs in later
+        # stages that depend on its ranking (replaces manual stage activation).
+        await resolve_dependent_inputs_for_completed_stage_item(tournament_id, stage_item.id)
 
     updated = await sql_get_match_with_details(tournament_id, match.id)
     if updated is None:

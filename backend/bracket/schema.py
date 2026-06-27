@@ -2,14 +2,12 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
     Table,
     UniqueConstraint,
     func,
-    text,
 )
 from sqlalchemy.orm import declarative_base  # type: ignore[attr-defined]
 from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Enum, Float, Text
@@ -79,21 +77,7 @@ stages = Table(
     Column("name", String, nullable=False, index=True),
     Column("created", DateTimeTZ, nullable=False, server_default=func.now()),
     Column("tournament_id", BigInteger, ForeignKey("tournaments.id"), index=True, nullable=False),
-    Column("is_active", Boolean, nullable=False, server_default="false"),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
-    Index(
-        "ix_stages_one_active_per_level",
-        "tournament_id",
-        "level_id",
-        unique=True,
-        postgresql_where=text("is_active AND level_id IS NOT NULL"),
-    ),
-    Index(
-        "ix_stages_one_active_no_level",
-        "tournament_id",
-        unique=True,
-        postgresql_where=text("is_active AND level_id IS NULL"),
-    ),
 )
 
 stage_items = Table(

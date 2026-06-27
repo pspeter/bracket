@@ -1,5 +1,10 @@
 from bracket.logic.ranking.elimination import get_inputs_to_update_in_subsequent_elimination_rounds
-from bracket.models.db.match import MatchSet, MatchSetState, MatchWithDetails, MatchWithDetailsDefinitive
+from bracket.models.db.match import (
+    MatchSet,
+    MatchSetState,
+    MatchWithDetails,
+    MatchWithDetailsDefinitive,
+)
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.util import RoundWithMatches
 from bracket.utils.dummy_records import DUMMY_MOCK_TIME

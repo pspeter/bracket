@@ -199,7 +199,7 @@ async def test_authenticated_score_tracking_includes_levels_and_match_level(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_score_tracking_lists_only_matches_from_active_stage(
+async def test_score_tracking_lists_matches_from_all_stages(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
     async with (
@@ -308,12 +308,11 @@ async def test_score_tracking_lists_only_matches_from_active_stage(
             public_response = await send_request(HTTPMethod.GET, "score-tracking/score-token")
 
             assert authenticated_response["data"]["matches"] == public_response["data"]["matches"]
-            assert [match["id"] for match in authenticated_response["data"]["matches"]] == [
-                active_match_inserted.id
-            ]
-            assert inactive_match_inserted.id not in [
-                match["id"] for match in authenticated_response["data"]["matches"]
-            ]
+            # Without stage activation, the schedule lists scheduled matches from every stage.
+            assert {match["id"] for match in authenticated_response["data"]["matches"]} == {
+                active_match_inserted.id,
+                inactive_match_inserted.id,
+            }
         finally:
             await database.execute(
                 query=tournaments.update()

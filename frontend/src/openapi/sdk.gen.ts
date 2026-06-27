@@ -9,9 +9,6 @@ import {
 } from './client';
 import { client } from './client.gen';
 import type {
-  ActivateNextStageTournamentsTournamentIdStagesActivatePostData,
-  ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors,
-  ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses,
   AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostData,
   AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostErrors,
   AutoAssignRefereesTournamentsTournamentIdMatchesAutoAssignRefereesPostResponses,
@@ -106,9 +103,6 @@ import type {
   GetMeUsersUserIdGetData,
   GetMeUsersUserIdGetErrors,
   GetMeUsersUserIdGetResponses,
-  GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetData,
-  GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetErrors,
-  GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponses,
   GetPlayersTournamentsTournamentIdPlayersGetData,
   GetPlayersTournamentsTournamentIdPlayersGetErrors,
   GetPlayersTournamentsTournamentIdPlayersGetResponses,
@@ -945,30 +939,6 @@ export const unscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePost 
   });
 
 /**
- * Get Next Stage Rankings
- *
- * Get the rankings for the stage items in this stage.
- */
-export const getNextStageRankingsTournamentsTournamentIdNextStageRankingsGet = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetData,
-    ThrowOnError
-  >
-) =>
-  (options.client ?? client).get<
-    GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponses,
-    GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/next_stage_rankings',
-    ...options,
-  });
-
-/**
  * Get Players
  */
 export const getPlayersTournamentsTournamentIdPlayersGet = <ThrowOnError extends boolean = false>(
@@ -1477,29 +1447,6 @@ export const createStageTournamentsTournamentIdStagesPost = <ThrowOnError extend
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/stages',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * Activate Next Stage
- */
-export const activateNextStageTournamentsTournamentIdStagesActivatePost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<ActivateNextStageTournamentsTournamentIdStagesActivatePostData, ThrowOnError>
-) =>
-  (options.client ?? client).post<
-    ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses,
-    ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/stages/activate',
     ...options,
     headers: {
       'Content-Type': 'application/json',

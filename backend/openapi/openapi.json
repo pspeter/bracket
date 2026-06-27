@@ -2519,10 +2519,6 @@
             "title": "Courts",
             "type": "array"
           },
-          "has_active_stage": {
-            "title": "Has Active Stage",
-            "type": "boolean"
-          },
           "levels": {
             "default": [],
             "items": {
@@ -2556,7 +2552,6 @@
           "tournament_id",
           "tournament_name",
           "matches",
-          "has_active_stage",
           "referees_enabled",
           "levels",
           "courts"
@@ -2838,36 +2833,6 @@
           "data"
         ],
         "title": "SingleTeamResponse",
-        "type": "object"
-      },
-      "StageActivateBody": {
-        "properties": {
-          "direction": {
-            "default": "next",
-            "enum": [
-              "next",
-              "previous"
-            ],
-            "title": "Direction",
-            "type": "string"
-          },
-          "level_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Level Id"
-          }
-        },
-        "required": [
-          "direction",
-          "level_id"
-        ],
-        "title": "StageActivateBody",
         "type": "object"
       },
       "StageCreateBody": {
@@ -3297,22 +3262,6 @@
         "title": "StageItemInputTentative",
         "type": "object"
       },
-      "StageItemInputUpdate": {
-        "properties": {
-          "stage_item_input": {
-            "$ref": "#/components/schemas/StageItemInputTentative"
-          },
-          "team": {
-            "$ref": "#/components/schemas/Team"
-          }
-        },
-        "required": [
-          "stage_item_input",
-          "team"
-        ],
-        "title": "StageItemInputUpdate",
-        "type": "object"
-      },
       "StageItemInputUpdateBodyEmpty": {
         "properties": {
           "team_id": {
@@ -3500,49 +3449,6 @@
         "title": "StageItemWithRounds",
         "type": "object"
       },
-      "StageRankingResponse": {
-        "properties": {
-          "data": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/StageItemInputUpdate"
-              },
-              "type": "array"
-            },
-            "title": "Data",
-            "type": "object"
-          },
-          "has_pending_matches": {
-            "default": false,
-            "title": "Has Pending Matches",
-            "type": "boolean"
-          },
-          "pending_match_count": {
-            "default": 0,
-            "title": "Pending Match Count",
-            "type": "integer"
-          },
-          "pending_matches_message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pending Matches Message"
-          }
-        },
-        "required": [
-          "data",
-          "has_pending_matches",
-          "pending_match_count",
-          "pending_matches_message"
-        ],
-        "title": "StageRankingResponse",
-        "type": "object"
-      },
       "StageRankingUpdateBody": {
         "properties": {
           "ranking_id": {
@@ -3638,10 +3544,6 @@
             "title": "Id",
             "type": "integer"
           },
-          "is_active": {
-            "title": "Is Active",
-            "type": "boolean"
-          },
           "level_id": {
             "anyOf": [
               {
@@ -3673,7 +3575,6 @@
           "tournament_id",
           "name",
           "created",
-          "is_active",
           "level_id",
           "id",
           "stage_items"
@@ -6333,70 +6234,6 @@
         ]
       }
     },
-    "/tournaments/{tournament_id}/next_stage_rankings": {
-      "get": {
-        "description": "Get the rankings for the stage items in this stage.",
-        "operationId": "get_next_stage_rankings_tournaments__tournament_id__next_stage_rankings_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "tournament_id",
-            "required": true,
-            "schema": {
-              "title": "Tournament Id",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "level_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Level Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StageRankingResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "summary": "Get Next Stage Rankings",
-        "tags": [
-          "Stages"
-        ]
-      }
-    },
     "/tournaments/{tournament_id}/players": {
       "get": {
         "operationId": "get_players_tournaments__tournament_id__players_get",
@@ -7905,63 +7742,6 @@
           }
         ],
         "summary": "Create Stage",
-        "tags": [
-          "Stages"
-        ]
-      }
-    },
-    "/tournaments/{tournament_id}/stages/activate": {
-      "post": {
-        "operationId": "activate_next_stage_tournaments__tournament_id__stages_activate_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "tournament_id",
-            "required": true,
-            "schema": {
-              "title": "Tournament Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StageActivateBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "summary": "Activate Next Stage",
         "tags": [
           "Stages"
         ]

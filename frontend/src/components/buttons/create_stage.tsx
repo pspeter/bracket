@@ -5,7 +5,6 @@ import { SWRResponse } from 'swr';
 
 import {
   StageItemInputOptionsResponse,
-  StageRankingResponse,
   StagesWithStageItemsResponse,
   TournamentWithLevels,
 } from '@openapi';
@@ -15,25 +14,21 @@ async function createStageAndRefresh(
   tournament: TournamentWithLevels,
   levelId: number | null,
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>,
-  swrAvailableInputsResponse?: SWRResponse<StageItemInputOptionsResponse>,
-  swrRankingsPerStageItemResponse?: SWRResponse<StageRankingResponse>
+  swrAvailableInputsResponse?: SWRResponse<StageItemInputOptionsResponse>
 ) {
   await createStage(tournament.id, levelId);
   await swrStagesResponse.mutate();
   await swrAvailableInputsResponse?.mutate();
-  await swrRankingsPerStageItemResponse?.mutate();
 }
 
 export default function CreateStageButton({
   tournament,
   swrStagesResponse,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
 }: {
   tournament: TournamentWithLevels;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
 }) {
   const { t } = useTranslation();
 
@@ -60,8 +55,7 @@ export default function CreateStageButton({
                   tournament,
                   level.id,
                   swrStagesResponse,
-                  swrAvailableInputsResponse,
-                  swrRankingsPerStageItemResponse
+                  swrAvailableInputsResponse
                 )
               }
             >
@@ -80,13 +74,7 @@ export default function CreateStageButton({
       size="xs"
       style={{ marginRight: 10 }}
       onClick={() =>
-        createStageAndRefresh(
-          tournament,
-          null,
-          swrStagesResponse,
-          swrAvailableInputsResponse,
-          swrRankingsPerStageItemResponse
-        )
+        createStageAndRefresh(tournament, null, swrStagesResponse, swrAvailableInputsResponse)
       }
       leftSection={<GoPlus size={24} />}
     >

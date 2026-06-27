@@ -37,16 +37,6 @@ export async function setRankingForStageItems(
     .catch((response: any) => handleRequestError(response));
 }
 
-export async function activateNextStage(
-  tournament_id: number,
-  direction: string,
-  level_id: number | null = null
-) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/stages/activate`, { direction, level_id })
-    .catch((response: any) => handleRequestError(response));
-}
-
 export async function deleteStage(tournament_id: number, stage_id: number) {
   return createAxios()
     .delete(`tournaments/${tournament_id}/stages/${stage_id}`)

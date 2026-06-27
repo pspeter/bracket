@@ -22,7 +22,6 @@ from bracket.routes.util import match_dependency
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.levels import sql_get_levels_for_tournament
 from bracket.sql.matches import sql_get_scheduled_matches_with_details
-from bracket.sql.stages import sql_has_active_stage
 from bracket.sql.tournaments import sql_get_tournament
 from bracket.utils.id_types import CourtId, MatchId, TournamentId
 
@@ -37,9 +36,8 @@ async def get_score_tracking_info(
     tournament: Tournament = Depends(tournament_by_score_tracking_token),
     court_id: CourtId | None = None,
 ) -> ScoreTrackingInfoResponse:
-    matches, has_active_stage, levels, courts = await asyncio.gather(
+    matches, levels, courts = await asyncio.gather(
         sql_get_scheduled_matches_with_details(tournament.id, court_id),
-        sql_has_active_stage(tournament.id),
         sql_get_levels_for_tournament(tournament.id),
         get_all_courts_in_tournament(tournament.id),
     )
@@ -48,7 +46,6 @@ async def get_score_tracking_info(
             tournament_id=tournament.id,
             tournament_name=tournament.name,
             matches=matches,
-            has_active_stage=has_active_stage,
             referees_enabled=tournament.referees_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
             courts=courts,
@@ -85,10 +82,9 @@ async def get_authenticated_score_tracking_info(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     court_id: CourtId | None = None,
 ) -> ScoreTrackingInfoResponse:
-    tournament, matches, has_active_stage, levels, courts = await asyncio.gather(
+    tournament, matches, levels, courts = await asyncio.gather(
         sql_get_tournament(tournament_id),
         sql_get_scheduled_matches_with_details(tournament_id, court_id),
-        sql_has_active_stage(tournament_id),
         sql_get_levels_for_tournament(tournament_id),
         get_all_courts_in_tournament(tournament_id),
     )
@@ -97,7 +93,6 @@ async def get_authenticated_score_tracking_info(
             tournament_id=tournament.id,
             tournament_name=tournament.name,
             matches=matches,
-            has_active_stage=has_active_stage,
             referees_enabled=tournament.referees_enabled,
             levels=[LevelResponse.model_validate(level) for level in levels],
             courts=courts,

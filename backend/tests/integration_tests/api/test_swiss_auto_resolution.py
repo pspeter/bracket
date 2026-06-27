@@ -32,7 +32,7 @@ async def test_completing_round1_auto_resolves_round2(
 
     async with (
         inserted_stage(
-            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id, "is_active": True})
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
         ) as stage_inserted,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
         inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,

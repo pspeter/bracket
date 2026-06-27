@@ -174,26 +174,6 @@ export function ScoreTrackingListView({
 
   function renderEmptyState() {
     if (matches.length > 0) return null;
-    if (!info.has_active_stage) {
-      return (
-        <Alert color="yellow" title={t('no_active_stage_title')}>
-          <Stack gap="xs">
-            <Text>{t('no_active_stage_description')}</Text>
-            {stagesHref != null ? (
-              <Button
-                component={PreloadLink}
-                href={stagesHref}
-                variant="light"
-                color="yellow"
-                size="xs"
-              >
-                {t('no_active_stage_go_to_stages')}
-              </Button>
-            ) : null}
-          </Stack>
-        </Alert>
-      );
-    }
     return <Alert color="gray">{t('no_matches_title')}</Alert>;
   }
 

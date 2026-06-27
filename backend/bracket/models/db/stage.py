@@ -12,7 +12,6 @@ class StageInsertable(BaseModelORM):
     tournament_id: TournamentId
     name: str
     created: datetime_utc
-    is_active: bool
     level_id: LevelId | None = None
 
 
@@ -30,11 +29,6 @@ class StageUpdateBody(BaseModelORM):
 
 class StageRankingUpdateBody(BaseModelORM):
     ranking_id: RankingId
-
-
-class StageActivateBody(BaseModelORM):
-    direction: Literal["next", "previous"] = "next"
-    level_id: LevelId | None = None
 
 
 class StageTemplateCreateBody(BaseModelORM):

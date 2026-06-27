@@ -40,7 +40,6 @@ def _setup_tournament() -> tuple[
         tournament_id=tournament.id,
         name="",
         created=MOCK_NOW,
-        is_active=False,
         stage_items=[get_stage_item_mock(stage_item_inputs, rounds)],
     )
     return tournament, stage, matches

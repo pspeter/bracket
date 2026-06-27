@@ -287,7 +287,6 @@ async def _create_stage_items_from_blueprint(
                     "tournament_id": tournament_id,
                     "level_id": level_id,
                     "name": blueprint_stage.name,
-                    "is_active": stage_index == 0,
                 },
             )
         )
@@ -327,7 +326,6 @@ async def _create_big_round_robin_level(
                 "tournament_id": tournament_id,
                 "level_id": level_id,
                 "name": "Round Robin",
-                "is_active": True,
             },
         )
     )
