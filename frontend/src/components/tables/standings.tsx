@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PlayerScore } from '@components/info/player_score';
 import { EmptyTableInfo } from '@components/no_content/empty_table_info';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
-import { formatDifference, getWinsColumnKey } from '@logic/standings';
+import { formatDifference } from '@logic/standings';
 import { Ranking, StageItemInputFinal, StageItemWithRounds } from '@openapi';
 import { ThNotSortable, ThSortable, getTableState } from './table';
 import TableLayoutLarge from './table_large';
@@ -15,7 +15,6 @@ export function StandingsTableForStageItem({
   fontSizeInPixels,
   stageItemsLookup,
   maxTeamsToDisplay,
-  ranking,
 }: {
   teams_with_inputs: StageItemInputFinal[];
   stageItem: StageItemWithRounds;
@@ -29,8 +28,6 @@ export function StandingsTableForStageItem({
 
   const minPoints = Math.min(...teams_with_inputs.map((input) => parseFloat(input.points)));
   const maxPoints = Math.max(...teams_with_inputs.map((input) => parseFloat(input.points)));
-
-  const winsColumnKey = getWinsColumnKey(ranking?.scoring_type ?? null);
 
   const rows = teams_with_inputs
     .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) => {
@@ -70,11 +67,10 @@ export function StandingsTableForStageItem({
           </Table.Td>
         ) : (
           <>
-            <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.wins}</Table.Td>
-            <Table.Td visibleFrom="sm" style={{ minWidth: '6rem' }}>
+            <Table.Td style={{ minWidth: '6rem' }}>
               {formatDifference(team_with_input.set_difference ?? 0)}
             </Table.Td>
-            <Table.Td visibleFrom="sm" style={{ minWidth: '6rem' }}>
+            <Table.Td style={{ minWidth: '6rem' }}>
               {formatDifference(team_with_input.point_difference ?? 0)}
             </Table.Td>
           </>
@@ -106,9 +102,8 @@ export function StandingsTableForStageItem({
               <ThSortable state={tableState} field="points">
                 {t('points_table_header')}
               </ThSortable>
-              <ThNotSortable>{t(winsColumnKey)}</ThNotSortable>
-              <ThNotSortable visibleFrom="sm">{t('set_difference_label')}</ThNotSortable>
-              <ThNotSortable visibleFrom="sm">{t('point_difference_label')}</ThNotSortable>
+              <ThNotSortable>{t('set_difference_label')}</ThNotSortable>
+              <ThNotSortable>{t('point_difference_label')}</ThNotSortable>
             </>
           )}
         </Table.Tr>
