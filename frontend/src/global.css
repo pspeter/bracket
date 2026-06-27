@@ -3,11 +3,17 @@
  * a form control is focused. Safari zooms in whenever the focused field has a
  * font-size below 16px, and because iOS ignores `user-scalable=no` the page can
  * get stuck zoomed in. Mantine's default input size renders at 14px, so bumping
- * form controls to 16px on small screens removes the trigger at the source while
- * keeping normal pinch-to-zoom available. `!important` is needed to win over
- * Mantine's class-based input styles.
+ * form controls to 16px removes the trigger at the source while keeping normal
+ * pinch-to-zoom available. `!important` is needed to win over Mantine's
+ * class-based input styles.
+ *
+ * Targeted via `pointer: coarse` (touch as the primary input) rather than a
+ * width breakpoint: the auto-zoom is a property of touch devices at any size —
+ * larger phones, landscape orientation and tablets all trigger it even though
+ * their viewport can be wider than a phone-width breakpoint — while desktops
+ * with a narrow window neither auto-zoom nor want enlarged inputs.
  */
-@media (max-width: 47.99em) {
+@media (pointer: coarse) {
   input:not([type='checkbox']):not([type='radio']),
   select,
   textarea {
