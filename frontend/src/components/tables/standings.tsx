@@ -15,6 +15,7 @@ export function StandingsTableForStageItem({
   fontSizeInPixels,
   stageItemsLookup,
   maxTeamsToDisplay,
+  ranking,
 }: {
   teams_with_inputs: StageItemInputFinal[];
   stageItem: StageItemWithRounds;
@@ -28,6 +29,9 @@ export function StandingsTableForStageItem({
 
   const minPoints = Math.min(...teams_with_inputs.map((input) => parseFloat(input.points)));
   const maxPoints = Math.max(...teams_with_inputs.map((input) => parseFloat(input.points)));
+
+  // Tied matches only earn points (and are worth showing) when the ranking awards draw points.
+  const showTiedColumn = parseFloat(ranking?.match_points?.draw_points ?? '0') !== 0;
 
   const rows = teams_with_inputs
     .sort((p1: StageItemInputFinal, p2: StageItemInputFinal) => {
@@ -73,7 +77,9 @@ export function StandingsTableForStageItem({
                 (team_with_input.losses ?? 0)}
             </Table.Td>
             <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.wins}</Table.Td>
-            <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.draws}</Table.Td>
+            {showTiedColumn && (
+              <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.draws}</Table.Td>
+            )}
             <Table.Td style={{ minWidth: '6rem' }}>
               {formatDifference(team_with_input.set_difference ?? 0)}
             </Table.Td>
@@ -111,7 +117,7 @@ export function StandingsTableForStageItem({
               </ThSortable>
               <ThNotSortable>{t('matches_played_label')}</ThNotSortable>
               <ThNotSortable>{t('matches_won_label')}</ThNotSortable>
-              <ThNotSortable>{t('matches_tied_label')}</ThNotSortable>
+              {showTiedColumn && <ThNotSortable>{t('matches_tied_label')}</ThNotSortable>}
               <ThNotSortable>{t('set_difference_label')}</ThNotSortable>
               <ThNotSortable>{t('point_difference_label')}</ThNotSortable>
             </>
