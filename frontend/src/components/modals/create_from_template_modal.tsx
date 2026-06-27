@@ -19,7 +19,6 @@ import { SWRResponse } from 'swr';
 
 import {
   StageItemInputOptionsResponse,
-  StageRankingResponse,
   StagesWithStageItemsResponse,
   TournamentWithLevels,
 } from '@openapi';
@@ -63,14 +62,12 @@ export function CreateFromTemplateButton({
   registeredTeamCount,
   swrStagesResponse,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
   buttonSize = 'xs',
 }: {
   tournament: TournamentWithLevels;
   registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
   buttonSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }) {
   const { t } = useTranslation();
@@ -94,7 +91,6 @@ export function CreateFromTemplateButton({
         registeredTeamCount={registeredTeamCount}
         swrStagesResponse={swrStagesResponse}
         swrAvailableInputsResponse={swrAvailableInputsResponse}
-        swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
       />
     </>
   );
@@ -107,7 +103,6 @@ function CreateFromTemplateModal({
   registeredTeamCount,
   swrStagesResponse,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
 }: {
   tournament: TournamentWithLevels;
   opened: boolean;
@@ -115,7 +110,6 @@ function CreateFromTemplateModal({
   registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
 }) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
@@ -249,7 +243,6 @@ function CreateFromTemplateModal({
       });
       await swrStagesResponse.mutate();
       await swrAvailableInputsResponse.mutate();
-      await swrRankingsPerStageItemResponse.mutate();
       setReplaceConfirmOpen(false);
       setPendingSubmit(null);
       onClose();

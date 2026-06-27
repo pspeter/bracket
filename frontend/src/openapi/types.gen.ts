@@ -1241,10 +1241,6 @@ export type ScoreTrackingInfo = {
    */
   courts: Array<Court>;
   /**
-   * Has Active Stage
-   */
-  has_active_stage: boolean;
-  /**
    * Levels
    */
   levels: Array<LevelResponse>;
@@ -1412,20 +1408,6 @@ export type SinglePlayerResponse = {
  */
 export type SingleTeamResponse = {
   data: Team;
-};
-
-/**
- * StageActivateBody
- */
-export type StageActivateBody = {
-  /**
-   * Direction
-   */
-  direction: 'next' | 'previous';
-  /**
-   * Level Id
-   */
-  level_id: number | null;
 };
 
 /**
@@ -1685,14 +1667,6 @@ export type StageItemInputTentative = {
 };
 
 /**
- * StageItemInputUpdate
- */
-export type StageItemInputUpdate = {
-  stage_item_input: StageItemInputTentative;
-  team: Team;
-};
-
-/**
  * StageItemInputUpdateBodyEmpty
  */
 export type StageItemInputUpdateBodyEmpty = {
@@ -1804,30 +1778,6 @@ export type StageItemWithRounds = {
 };
 
 /**
- * StageRankingResponse
- */
-export type StageRankingResponse = {
-  /**
-   * Data
-   */
-  data: {
-    [key: string]: Array<StageItemInputUpdate>;
-  };
-  /**
-   * Has Pending Matches
-   */
-  has_pending_matches: boolean;
-  /**
-   * Pending Match Count
-   */
-  pending_match_count: number;
-  /**
-   * Pending Matches Message
-   */
-  pending_matches_message: string | null;
-};
-
-/**
  * StageTemplateCreateBody
  */
 export type StageTemplateCreateBody = {
@@ -1880,10 +1830,6 @@ export type StageWithStageItems = {
    * Id
    */
   id: number;
-  /**
-   * Is Active
-   */
-  is_active: boolean;
   /**
    * Level Id
    */
@@ -2781,10 +2727,6 @@ export type ScoreTrackingInfoWritable = {
    */
   courts: Array<Court>;
   /**
-   * Has Active Stage
-   */
-  has_active_stage: boolean;
-  /**
    * Levels
    */
   levels: Array<LevelResponse>;
@@ -2886,10 +2828,6 @@ export type StageWithStageItemsWritable = {
    * Id
    */
   id: number;
-  /**
-   * Is Active
-   */
-  is_active: boolean;
   /**
    * Level Id
    */
@@ -4009,43 +3947,6 @@ export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostRe
 export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponse =
   UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses[keyof UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostResponses];
 
-export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetData = {
-  body?: never;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-  };
-  query?: {
-    /**
-     * Level Id
-     */
-    level_id?: number | null;
-  };
-  url: '/tournaments/{tournament_id}/next_stage_rankings';
-};
-
-export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetError =
-  GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetErrors[keyof GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetErrors];
-
-export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponses = {
-  /**
-   * Successful Response
-   */
-  200: StageRankingResponse;
-};
-
-export type GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponse =
-  GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponses[keyof GetNextStageRankingsTournamentsTournamentIdNextStageRankingsGetResponses];
-
 export type GetPlayersTournamentsTournamentIdPlayersGetData = {
   body?: never;
   path: {
@@ -4940,38 +4841,6 @@ export type CreateStageTournamentsTournamentIdStagesPostResponses = {
 
 export type CreateStageTournamentsTournamentIdStagesPostResponse =
   CreateStageTournamentsTournamentIdStagesPostResponses[keyof CreateStageTournamentsTournamentIdStagesPostResponses];
-
-export type ActivateNextStageTournamentsTournamentIdStagesActivatePostData = {
-  body: StageActivateBody;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-  };
-  query?: never;
-  url: '/tournaments/{tournament_id}/stages/activate';
-};
-
-export type ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type ActivateNextStageTournamentsTournamentIdStagesActivatePostError =
-  ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors[keyof ActivateNextStageTournamentsTournamentIdStagesActivatePostErrors];
-
-export type ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses = {
-  /**
-   * Successful Response
-   */
-  200: SuccessResponse;
-};
-
-export type ActivateNextStageTournamentsTournamentIdStagesActivatePostResponse =
-  ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses[keyof ActivateNextStageTournamentsTournamentIdStagesActivatePostResponses];
 
 export type CreateStagesFromTemplateTournamentsTournamentIdStagesFromTemplatePostData = {
   body: StageTemplateCreateBody;

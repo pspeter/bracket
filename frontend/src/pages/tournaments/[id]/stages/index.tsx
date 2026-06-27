@@ -5,8 +5,6 @@ import { useTranslation } from 'react-i18next';
 import Builder from '@components/builder/builder';
 import { CreateStageButtonLarge } from '@components/buttons/create_stage';
 import { LevelFilterSelect } from '@components/levels/levels';
-import ActivateNextStageModal from '@components/modals/activate_next_stage_modal';
-import ActivatePreviousStageModal from '@components/modals/activate_previous_stage_modal';
 import { CreateFromTemplateButton } from '@components/modals/create_from_template_modal';
 import { NoContent } from '@components/no_content/empty_table_info';
 import { TableSkeletonTwoColumnsSmall } from '@components/utils/skeletons';
@@ -16,7 +14,6 @@ import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import {
   getAvailableStageItemInputs,
   getRankings,
-  getRankingsPerStageItem,
   getStages,
   getTeams,
   getTournamentById,
@@ -35,12 +32,6 @@ export default function StagesPage() {
   const tournamentDataFull =
     swrTournamentResponse.data != null ? swrTournamentResponse.data.data : null;
   const levels = tournamentDataFull?.levels ?? [];
-  const effectiveActivationLevelId =
-    levels.length > 0 ? (filteredLevelId === 'all' ? `${levels[0].id}` : filteredLevelId) : 'all';
-  const swrRankingsPerStageItemResponse = getRankingsPerStageItem(
-    tournamentData.id,
-    effectiveActivationLevelId
-  );
   const rankings = swrRankingsResponse.data != null ? swrRankingsResponse.data.data : [];
 
   const stages: StageWithStageItems[] =
@@ -80,7 +71,6 @@ export default function StagesPage() {
             registeredTeamCount={totalTeamCount}
             swrStagesResponse={swrStagesResponse}
             swrAvailableInputsResponse={swrAvailableInputsResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
             buttonSize="lg"
           />
         </Group>
@@ -90,24 +80,6 @@ export default function StagesPage() {
     content = (
       <>
         <Stack gap="xs" mt="1rem" maw="30rem">
-          <Group grow>
-            <ActivatePreviousStageModal
-              tournamentId={tournamentData.id}
-              swrStagesResponse={swrStagesResponse}
-              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-              levels={levels}
-              levelId={effectiveActivationLevelId}
-              onLevelChange={setFilteredLevelId}
-            />
-            <ActivateNextStageModal
-              tournamentId={tournamentData.id}
-              swrStagesResponse={swrStagesResponse}
-              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
-              levels={levels}
-              levelId={effectiveActivationLevelId}
-              onLevelChange={setFilteredLevelId}
-            />
-          </Group>
           <Text c="dimmed" size="sm">
             {t('stage_unassigned_teams_notice', { count: unassignedTeamCount })}
           </Text>
@@ -127,7 +99,6 @@ export default function StagesPage() {
               registeredTeamCount={totalTeamCount}
               swrStagesResponse={swrStagesResponse}
               swrAvailableInputsResponse={swrAvailableInputsResponse}
-              swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
               rankings={rankings}
               stages={filteredStages}
             />

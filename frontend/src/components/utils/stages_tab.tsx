@@ -1,6 +1,5 @@
 import { Tabs } from '@mantine/core';
 import { BiCircle } from '@react-icons/all-files/bi/BiCircle';
-import { MdPlayCircleFilled } from '@react-icons/all-files/md/MdPlayCircleFilled';
 
 import { StageWithStageItems } from '@openapi';
 import { responseIsValid } from './util';
@@ -13,7 +12,7 @@ export default function StagesTab({ swrStagesResponse, selectedStageId, setSelec
     <Tabs.Tab
       value={item.id.toString()}
       key={item.id.toString()}
-      leftSection={item.is_active ? <MdPlayCircleFilled size="1rem" /> : <BiCircle size="1rem" />}
+      leftSection={<BiCircle size="1rem" />}
     >
       {item.name}
     </Tabs.Tab>

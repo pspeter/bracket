@@ -13,7 +13,6 @@ import {
   RankingsResponse,
   RefereeNamesResponse,
   StageItemInputOptionsResponse,
-  StageRankingResponse,
   StagesWithStageItemsResponse,
   TeamsWithPlayersResponse,
   TournamentResponse,
@@ -261,14 +260,6 @@ export function getStagesLive(
 
 export function getRankings(tournament_id: number | null): SWRResponse<RankingsResponse> {
   return useSWR(tournament_id == null ? null : `tournaments/${tournament_id}/rankings`, fetcher);
-}
-
-export function getRankingsPerStageItem(
-  tournament_id: number,
-  level_id: string = 'all'
-): SWRResponse<StageRankingResponse> {
-  const levelParam = level_id === 'all' ? '' : `?level_id=${level_id}`;
-  return useSWR(`tournaments/${tournament_id}/next_stage_rankings${levelParam}`, fetcher);
 }
 
 export function getCourts(tournament_id: number): SWRResponse<CourtsResponse> {

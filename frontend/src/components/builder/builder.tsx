@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Badge,
   Card,
   CheckIcon,
   Combobox,
@@ -42,7 +41,6 @@ import {
   Ranking,
   StageItemInputOptionsResponse,
   StageItemWithRounds,
-  StageRankingResponse,
   StageWithStageItems,
   StagesWithStageItemsResponse,
   TournamentWithLevels,
@@ -58,7 +56,6 @@ function StageItemInputComboBox({
   current_key,
   availableInputs,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
   swrStagesResponse,
 }: {
   tournament: TournamentWithLevels;
@@ -66,7 +63,6 @@ function StageItemInputComboBox({
   current_key: string | null;
   availableInputs: StageItemInputChoice[];
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
 }) {
   const { t } = useTranslation();
@@ -128,7 +124,6 @@ function StageItemInputComboBox({
         ).then(() => {
           swrAvailableInputsResponse.mutate();
           swrStagesResponse.mutate();
-          swrRankingsPerStageItemResponse.mutate();
 
           setSuccessIcon(true);
 
@@ -230,7 +225,6 @@ function StageItemInputSection({
   availableInputs,
   swrAvailableInputsResponse,
   swrStagesResponse,
-  swrRankingsPerStageItemResponse,
 }: {
   tournament: TournamentWithLevels;
   stageItemInput: StageItemInput;
@@ -239,7 +233,6 @@ function StageItemInputSection({
   availableInputs: StageItemInputChoice[];
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
 }) {
   const opts = lastInList ? { pt: 'xs', mb: '-0.5rem' } : { py: 'xs', withBorder: true };
 
@@ -251,7 +244,6 @@ function StageItemInputSection({
         current_key={currentOptionValue}
         availableInputs={availableInputs}
         swrAvailableInputsResponse={swrAvailableInputsResponse}
-        swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
         swrStagesResponse={swrStagesResponse}
       />
     </Card.Section>
@@ -265,7 +257,6 @@ function StageItemRow({
   availableInputs,
   rankings,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
   levelId,
 }: {
   tournament: TournamentWithLevels;
@@ -275,7 +266,6 @@ function StageItemRow({
   availableInputs: StageItemInputChoice[];
   rankings: Ranking[];
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
 }) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
@@ -301,7 +291,6 @@ function StageItemRow({
           lastInList={i === stageItem.inputs.length - 1}
           swrAvailableInputsResponse={swrAvailableInputsResponse}
           swrStagesResponse={swrStagesResponse}
-          swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
         />
       );
     });
@@ -394,14 +383,12 @@ function StageColumn({
   stage,
   swrStagesResponse,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
   rankings,
 }: {
   tournament: TournamentWithLevels;
   stage: StageWithStageItems;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
   rankings: Ranking[];
 }) {
   const { t } = useTranslation();
@@ -467,7 +454,6 @@ function StageColumn({
         swrStagesResponse={swrStagesResponse}
         availableInputs={availableInputs}
         swrAvailableInputsResponse={swrAvailableInputsResponse}
-        swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
         rankings={rankings}
         levelId={stage.level_id}
       />
@@ -502,7 +488,6 @@ function StageColumn({
         <Group>
           {stage.name}
           <LevelBadge levels={tournament.levels} levelId={stage.level_id} />
-          {stage.is_active ? <Badge color="green">{t('active_badge_label')}</Badge> : null}
         </Group>
         <Menu withinPortal position="bottom-end" shadow="sm">
           <Menu.Target>
@@ -551,7 +536,6 @@ export default function Builder({
   registeredTeamCount,
   swrStagesResponse,
   swrAvailableInputsResponse,
-  swrRankingsPerStageItemResponse,
   rankings,
   stages: filteredStages,
 }: {
@@ -559,7 +543,6 @@ export default function Builder({
   registeredTeamCount: number;
   swrStagesResponse: SWRResponse<StagesWithStageItemsResponse>;
   swrAvailableInputsResponse: SWRResponse<StageItemInputOptionsResponse>;
-  swrRankingsPerStageItemResponse: SWRResponse<StageRankingResponse>;
   rankings: Ranking[];
   stages?: StageWithStageItems[];
 }) {
@@ -579,7 +562,6 @@ export default function Builder({
         tournament={tournament}
         swrStagesResponse={swrStagesResponse}
         swrAvailableInputsResponse={swrAvailableInputsResponse}
-        swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
         stage={stage}
         rankings={rankings}
       />
@@ -593,14 +575,12 @@ export default function Builder({
             tournament={tournament}
             swrStagesResponse={swrStagesResponse}
             swrAvailableInputsResponse={swrAvailableInputsResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
           />
           <CreateFromTemplateButton
             tournament={tournament}
             registeredTeamCount={registeredTeamCount}
             swrStagesResponse={swrStagesResponse}
             swrAvailableInputsResponse={swrAvailableInputsResponse}
-            swrRankingsPerStageItemResponse={swrRankingsPerStageItemResponse}
           />
         </Group>
       </h4>
