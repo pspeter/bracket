@@ -68,6 +68,13 @@ export function StandingsTableForStageItem({
         ) : (
           <>
             <Table.Td style={{ minWidth: '6rem' }}>
+              {(team_with_input.wins ?? 0) +
+                (team_with_input.draws ?? 0) +
+                (team_with_input.losses ?? 0)}
+            </Table.Td>
+            <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.wins}</Table.Td>
+            <Table.Td style={{ minWidth: '6rem' }}>{team_with_input.draws}</Table.Td>
+            <Table.Td style={{ minWidth: '6rem' }}>
               {formatDifference(team_with_input.set_difference ?? 0)}
             </Table.Td>
             <Table.Td style={{ minWidth: '6rem' }}>
@@ -102,6 +109,9 @@ export function StandingsTableForStageItem({
               <ThSortable state={tableState} field="points">
                 {t('points_table_header')}
               </ThSortable>
+              <ThNotSortable>{t('matches_played_label')}</ThNotSortable>
+              <ThNotSortable>{t('matches_won_label')}</ThNotSortable>
+              <ThNotSortable>{t('matches_tied_label')}</ThNotSortable>
               <ThNotSortable>{t('set_difference_label')}</ThNotSortable>
               <ThNotSortable>{t('point_difference_label')}</ThNotSortable>
             </>
