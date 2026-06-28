@@ -1,93 +1,108 @@
 ---
 name: tdd
-description: Implement a GitHub issue or feature using red/green TDD (one failing test at a time). Fetches the issue from GitHub if an issue number is given, then drives the implementation through the test cycle. Use when the user says "tdd", "implement with TDD", or "/tdd <issue>".
+description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
 ---
 
-Implement the following issue. If it references an issue number, fetch and read it from GitHub: $1
+# Test-Driven Development
 
-Implement using red/green TDD, one failing unit test at a time. If your changes touch the frontend, verify your changes using rodney and show relevant screenshots to the user.
+## Philosophy
+
+**Core principle**: Tests should verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't.
+
+**Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification - "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
+
+**Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
+
+See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
+
+## Anti-Pattern: Horizontal Slices
+
+**DO NOT write all tests first, then all implementation.** This is "horizontal slicing" - treating RED as "write all tests" and GREEN as "write all code."
+
+This produces **crap tests**:
+
+- Tests written in bulk test _imagined_ behavior, not _actual_ behavior
+- You end up testing the _shape_ of things (data structures, function signatures) rather than user-facing behavior
+- Tests become insensitive to real changes - they pass when behavior breaks, fail when behavior is fine
+- You outrun your headlights, committing to test structure before understanding the implementation
+
+**Correct approach**: Vertical slices via tracer bullets. One test → one implementation → repeat. Each test responds to what you learned from the previous cycle. Because you just wrote the code, you know exactly what behavior matters and how to verify it.
+
+```
+WRONG (horizontal):
+  RED:   test1, test2, test3, test4, test5
+  GREEN: impl1, impl2, impl3, impl4, impl5
+
+RIGHT (vertical):
+  RED→GREEN: test1→impl1
+  RED→GREEN: test2→impl2
+  RED→GREEN: test3→impl3
+  ...
+```
 
 ## Workflow
 
-1. Read and understand the issue (fetch from GitHub if a number was given — use `mcp__github__issue_read` with repo `pspeter/bracket`).
-2. Plan which layer(s) are affected: backend logic, backend API routes, frontend logic, frontend UI.
-3. For each increment of behaviour:
-   a. Write ONE failing test. Run it — confirm it fails for the right reason.
-   b. Write the minimum production code to make it pass.
-   c. Run the test again — confirm it passes.
-   d. Commit the green increment.
-4. Repeat step 3 until the issue is fully implemented.
-5. Run the full test suite for each affected layer to catch regressions.
-6. If the frontend was touched, launch the app with rodney and capture screenshots of the affected UI.
+### 1. Planning
 
-## Setting Up the Test Environment
+When exploring the codebase, read `CONTEXT.md` (if it exists) so that test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
-### PostgreSQL (required for backend integration tests)
+Before writing any code:
 
-The CI env file (`backend/ci.env`) targets port 5532, but in this remote environment PostgreSQL runs on port **5432**. Before running integration tests:
+- [ ] Confirm with user what interface changes are needed
+- [ ] Confirm with user which behaviors to test (prioritize)
+- [ ] Identify opportunities for deep modules (small interface, deep implementation) — run the `/codebase-design` skill for the vocabulary and the testability checks
+- [ ] List the behaviors to test (not implementation steps)
+- [ ] Get user approval on the plan
 
-```bash
-# 1. Start PostgreSQL if not already running
-pg_ctlcluster 16 main start
+Ask: "What should the public interface look like? Which behaviors are most important to test?"
 
-# 2. Create the CI role and database (safe to run multiple times)
-sudo -u postgres psql -c "CREATE USER bracket_ci WITH PASSWORD 'bracket_ci';" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE bracket_ci OWNER bracket_ci;" 2>/dev/null || true
+**You can't test everything.** Confirm with the user exactly which behaviors matter most. Focus testing effort on critical paths and complex logic, not every possible edge case.
+
+### 2. Tracer Bullet
+
+Write ONE test that confirms ONE thing about the system:
+
+```
+RED:   Write test for first behavior → test fails
+GREEN: Write minimal code to pass → test passes
 ```
 
-### Backend Tests
+This is your tracer bullet - proves the path works end-to-end.
 
-Run from `backend/`. Override `PG_DSN` to hit port 5432 instead of 5532:
+### 3. Incremental Loop
 
-```bash
-# All tests
-PG_DSN='postgresql://bracket_ci:bracket_ci@localhost:5432/bracket_ci' \
-  ENVIRONMENT=CI uv run pytest . -vvv
+For each remaining behavior:
 
-# Single test
-PG_DSN='postgresql://bracket_ci:bracket_ci@localhost:5432/bracket_ci' \
-  ENVIRONMENT=CI uv run pytest tests/path/to/test_file.py::test_function_name -vvv
+```
+RED:   Write next test → fails
+GREEN: Minimal code to pass → passes
 ```
 
-Unit tests (in `tests/unit_tests/`) do not require a database connection. Integration tests (in `tests/integration_tests/`) require Postgres to be running and the `bracket_ci` role/database to exist.
+Rules:
 
-### Frontend Tests
+- One test at a time
+- Only enough code to pass current test
+- Don't anticipate future tests
+- Keep tests focused on observable behavior
 
-Run from `frontend/`. Install dependencies first if `node_modules` is missing:
+### 4. Refactor
 
-```bash
-pnpm install       # only needed once per session
-pnpm run test:unit # vitest — fast, no browser required
+After all tests pass, look for [refactor candidates](refactoring.md):
+
+- [ ] Extract duplication
+- [ ] Deepen modules (move complexity behind simple interfaces)
+- [ ] Apply SOLID principles where natural
+- [ ] Consider what new code reveals about existing code
+- [ ] Run tests after each refactor step
+
+**Never refactor while RED.** Get to GREEN first.
+
+## Checklist Per Cycle
+
 ```
-
-`pnpm test` additionally runs `tsc` (type-check) and `prettier:write`. Use `test:unit` during TDD for a tight feedback loop.
-
-Frontend test files live at `src/**/*.test.{ts,tsx}` and use **vitest** with a Node environment — no DOM setup is needed for pure logic tests. Import from `vitest` directly: `import { describe, expect, it } from 'vitest'`.
-
-### Rodney (frontend verification)
-
-After any frontend change, verify behaviour in the browser:
-
-```bash
-# Start backend (in one terminal)
-CORS_ORIGINS=http://127.0.0.1:3000 ENVIRONMENT=DEVELOPMENT \
-  uv run gunicorn -k bracket.uvicorn.RestartableUvicornWorker \
-  bracket.app:app --bind 0.0.0.0:8400 --workers 1 --reload
-
-# Start frontend (in another terminal)
-VITE_API_BASE_URL=http://127.0.0.1:8400 \
-  pnpm run dev --port 3000 --host 0.0.0.0
-
-# First, discover available rodney commands
-nix develop -c uvx rodney --help
-
-# Then drive the browser and capture screenshots
-nix develop -c uvx rodney screenshot
-nix develop -c uvx rodney click "..."
+[ ] Test describes behavior, not implementation
+[ ] Test uses public interface only
+[ ] Test would survive internal refactor
+[ ] Code is minimal for this test
+[ ] No speculative features added
 ```
-
-Show the relevant screenshots to the user after each rodney verification step.
-
-## Commit Convention
-
-Commit each red→green cycle separately with a concise message. Prefix with `test:` for the failing test commit and no prefix (or `feat:`/`fix:`) for the implementation commit. Push to the current feature branch when done.
