@@ -3968,6 +3968,44 @@
         "title": "TournamentChangeStatusBody",
         "type": "object"
       },
+      "TournamentIssueEntry": {
+        "properties": {
+          "count": {
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "count"
+        ],
+        "title": "TournamentIssueEntry",
+        "type": "object"
+      },
+      "TournamentIssuesResponse": {
+        "properties": {
+          "data": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/TournamentIssueEntry"
+              },
+              "type": "array"
+            },
+            "title": "Data",
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "TournamentIssuesResponse",
+        "type": "object"
+      },
       "TournamentResponse": {
         "properties": {
           "data": {
@@ -5548,6 +5586,53 @@
         "summary": "Update Court By Id",
         "tags": [
           "Courts"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/issues": {
+      "get": {
+        "operationId": "get_issues_tournaments__tournament_id__issues_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentIssuesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Issues",
+        "tags": [
+          "Tournaments"
         ]
       }
     },

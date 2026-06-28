@@ -1,4 +1,4 @@
-import { Center, Divider, Group, Tooltip, UnstyledButton } from '@mantine/core';
+import { Center, Divider, Group, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import {
   Icon,
   IconBook,
@@ -20,17 +20,69 @@ import { useLocation } from 'react-router';
 
 import PreloadLink from '@components/utils/link';
 import { capitalize } from '@components/utils/util';
-import { getBaseApiUrl } from '@services/adapter';
+import { TournamentIssueEntry } from '@openapi';
+import { getBaseApiUrl, getTournamentIssues } from '@services/adapter';
 import classes from './_main_links.module.css';
+
+type IssueSection = 'planning' | 'players' | 'stages';
 
 interface MainLinkProps {
   icon: Icon;
   label: string;
   link: string;
   links?: MainLinkProps[] | null;
+  issueSection?: IssueSection;
+  issueEntries?: TournamentIssueEntry[];
+}
+
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  empty_slots: 'tournament_issue_empty_slots',
+  players_without_team: 'tournament_issue_players_without_team',
+  unassigned_teams: 'tournament_issue_unassigned_teams',
+  unplanned_matches: 'tournament_issue_unplanned_matches',
+};
+
+function issueCount(entries: TournamentIssueEntry[] = []) {
+  return entries.reduce((sum, entry) => sum + entry.count, 0);
+}
+
+function formatIssueCount(count: number) {
+  return count > 99 ? '99+' : `${count}`;
+}
+
+function IssueBadge({ count, mobile = false }: { count: number; mobile?: boolean }) {
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <span className={mobile ? classes.mobileIssueBadge : classes.issueBadge}>
+      {formatIssueCount(count)}
+    </span>
+  );
+}
+
+function formatIssueBreakdown(
+  entries: TournamentIssueEntry[] | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  if (entries == null || entries.length === 0) {
+    return '';
+  }
+
+  return entries
+    .map((entry) => {
+      const key = ISSUE_TYPE_LABELS[entry.type];
+      if (key == null) {
+        return `${entry.count} ${entry.type.replace(/_/g, ' ')}`;
+      }
+      return t(key, { count: entry.count });
+    })
+    .join(' · ');
 }
 
 function MainLinkMobile({ item, pathName }: { item: MainLinkProps; pathName: String }) {
+  const count = issueCount(item.issueEntries);
   return (
     <>
       <UnstyledButton
@@ -43,7 +95,8 @@ function MainLinkMobile({ item, pathName }: { item: MainLinkProps; pathName: Str
       >
         <Group className={classes.mobileLinkGroup}>
           <item.icon stroke={1.5} />
-          <p style={{ marginLeft: '0.5rem' }}>{item.label}</p>
+          <Text className={classes.mobileLinkLabel}>{item.label}</Text>
+          <IssueBadge count={count} mobile />
         </Group>
         <Divider />
       </UnstyledButton>
@@ -52,9 +105,24 @@ function MainLinkMobile({ item, pathName }: { item: MainLinkProps; pathName: Str
 }
 
 function MainLink({ item, pathName }: { item: MainLinkProps; pathName: String }) {
+  const { t } = useTranslation();
+  const count = issueCount(item.issueEntries);
+  const breakdown = formatIssueBreakdown(item.issueEntries, t);
+  const tooltipLabel =
+    breakdown.length > 0 ? (
+      <Stack gap={2}>
+        <Text size="sm">{item.label}</Text>
+        <Text size="xs" c="dimmed">
+          {breakdown}
+        </Text>
+      </Stack>
+    ) : (
+      item.label
+    );
+
   return (
     <>
-      <Tooltip position="right" label={item.label} transitionProps={{ duration: 0 }}>
+      <Tooltip position="right" label={tooltipLabel} transitionProps={{ duration: 0 }}>
         <UnstyledButton
           visibleFrom="sm"
           component={PreloadLink}
@@ -62,7 +130,10 @@ function MainLink({ item, pathName }: { item: MainLinkProps; pathName: String })
           className={classes.link}
           data-active={pathName.startsWith(item.link) || undefined}
         >
-          <item.icon stroke={1.5} />
+          <span className={classes.iconWrap}>
+            <item.icon stroke={1.5} />
+            <IssueBadge count={count} />
+          </span>
         </UnstyledButton>
       </Tooltip>
       <MainLinkMobile item={item} pathName={pathName} />
@@ -110,10 +181,12 @@ export function getBaseLinks() {
 export function TournamentLinks({ tournament_id }: any) {
   const location = useLocation();
   const { t } = useTranslation();
-  const tm_prefix = `/tournaments/${tournament_id}`;
+  const tournamentId = Number(tournament_id);
+  const issues = getTournamentIssues(tournamentId);
+  const tm_prefix = `/tournaments/${tournamentId}`;
   const pathName = location.pathname.replace('[id]', tournament_id).replace(/\/+$/, '');
 
-  const data = [
+  const data: MainLinkProps[] = [
     {
       icon: IconSettings,
       label: capitalize(t('tournament_setting_title')),
@@ -128,6 +201,7 @@ export function TournamentLinks({ tournament_id }: any) {
       icon: IconUser,
       label: capitalize(t('players_title')),
       link: `${tm_prefix}/players`,
+      issueSection: 'players',
     },
     {
       icon: IconUsers,
@@ -138,11 +212,13 @@ export function TournamentLinks({ tournament_id }: any) {
       icon: IconTrophy,
       label: capitalize(t('stage_title')),
       link: `${tm_prefix}/stages`,
+      issueSection: 'stages',
     },
     {
       icon: IconCalendar,
       label: capitalize(t('planning_title')),
       link: `${tm_prefix}/schedule`,
+      issueSection: 'planning',
     },
     {
       icon: IconDeviceGamepad2,
@@ -156,7 +232,17 @@ export function TournamentLinks({ tournament_id }: any) {
     },
   ];
 
-  const links = data.map((link) => <MainLink key={link.label} item={link} pathName={pathName} />);
+  const links = data.map((link) => (
+    <MainLink
+      key={link.label}
+      item={{
+        ...link,
+        issueEntries:
+          link.issueSection == null ? [] : (issues.data?.data[link.issueSection] ?? []),
+      }}
+      pathName={pathName}
+    />
+  ));
   return (
     <>
       <Center hiddenFrom="sm">

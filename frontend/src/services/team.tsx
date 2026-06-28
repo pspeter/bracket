@@ -1,4 +1,4 @@
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createTeam(
   tournament_id: number,
@@ -7,12 +7,14 @@ export async function createTeam(
   player_ids: string[],
   level_id: number | null
 ) {
-  return createAxios().post(`tournaments/${tournament_id}/teams`, {
+  const response = await createAxios().post(`tournaments/${tournament_id}/teams`, {
     name,
     active,
     player_ids,
     level_id,
   });
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function createTeams(
@@ -21,17 +23,20 @@ export async function createTeams(
   active: boolean,
   level_id: number | null
 ) {
-  return createAxios().post(`tournaments/${tournament_id}/teams_multi`, {
+  const response = await createAxios().post(`tournaments/${tournament_id}/teams_multi`, {
     names,
     active,
     level_id,
   });
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function deleteTeam(tournament_id: number, team_id: number) {
   await createAxios()
     .delete(`tournaments/${tournament_id}/teams/${team_id}`)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
 }
 
 export async function updateTeam(
@@ -42,10 +47,12 @@ export async function updateTeam(
   player_ids: string[],
   level_id: number | null
 ) {
-  return createAxios().put(`tournaments/${tournament_id}/teams/${team_id}`, {
+  const response = await createAxios().put(`tournaments/${tournament_id}/teams/${team_id}`, {
     name,
     active,
     player_ids,
     level_id,
   });
+  await mutateIssues(tournament_id);
+  return response;
 }

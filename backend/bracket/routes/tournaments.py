@@ -28,7 +28,12 @@ from bracket.routes.auth import (
     user_authenticated_or_public_dashboard,
     user_authenticated_or_public_dashboard_by_endpoint_name,
 )
-from bracket.routes.models import SuccessResponse, TournamentResponse, TournamentsResponse
+from bracket.routes.models import (
+    SuccessResponse,
+    TournamentIssuesResponse,
+    TournamentResponse,
+    TournamentsResponse,
+)
 from bracket.routes.util import disallow_archived_tournament
 from bracket.schema import tournaments
 from bracket.sql.levels import (
@@ -41,6 +46,7 @@ from bracket.sql.rankings import (
     sql_create_ranking,
     sql_delete_ranking,
 )
+from bracket.sql.tournament_issues import get_tournament_issues
 from bracket.sql.tournaments import (
     sql_create_tournament,
     sql_delete_tournament,
@@ -119,6 +125,14 @@ async def get_tournaments(
             )
 
     raise RuntimeError()
+
+
+@router.get("/tournaments/{tournament_id}/issues", response_model=TournamentIssuesResponse)
+async def get_issues(
+    tournament_id: TournamentId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+) -> TournamentIssuesResponse:
+    return TournamentIssuesResponse(data=await get_tournament_issues(tournament_id))
 
 
 @router.put("/tournaments/{tournament_id}", response_model=SuccessResponse)
