@@ -98,6 +98,9 @@ import type {
   GetCourtsTournamentsTournamentIdCourtsGetData,
   GetCourtsTournamentsTournamentIdCourtsGetErrors,
   GetCourtsTournamentsTournamentIdCourtsGetResponses,
+  GetIssuesTournamentsTournamentIdIssuesGetData,
+  GetIssuesTournamentsTournamentIdIssuesGetErrors,
+  GetIssuesTournamentsTournamentIdIssuesGetResponses,
   GetMetricsMetricsGetData,
   GetMetricsMetricsGetResponses,
   GetMeUsersUserIdGetData,
@@ -130,9 +133,6 @@ import type {
   GetTournamentsTournamentsGetData,
   GetTournamentsTournamentsGetErrors,
   GetTournamentsTournamentsGetResponses,
-  GetIssuesTournamentsTournamentIdIssuesGetData,
-  GetIssuesTournamentsTournamentIdIssuesGetErrors,
-  GetIssuesTournamentsTournamentIdIssuesGetResponses,
   GetTournamentTournamentsTournamentIdGetData,
   GetTournamentTournamentsTournamentIdGetErrors,
   GetTournamentTournamentsTournamentIdGetResponses,
@@ -539,25 +539,6 @@ export const getTournamentTournamentsTournamentIdGet = <ThrowOnError extends boo
   });
 
 /**
- * Get Issues
- */
-export const getIssuesTournamentsTournamentIdIssuesGet = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<GetIssuesTournamentsTournamentIdIssuesGetData, ThrowOnError>
-) =>
-  (options.client ?? client).get<
-    GetIssuesTournamentsTournamentIdIssuesGetResponses,
-    GetIssuesTournamentsTournamentIdIssuesGetErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/issues',
-    ...options,
-  });
-
-/**
  * Update Tournament By Id
  */
 export const updateTournamentByIdTournamentsTournamentIdPut = <
@@ -701,6 +682,23 @@ export const updateCourtByIdTournamentsTournamentIdCourtsCourtIdPut = <
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Get Issues
+ */
+export const getIssuesTournamentsTournamentIdIssuesGet = <ThrowOnError extends boolean = false>(
+  options: Options<GetIssuesTournamentsTournamentIdIssuesGetData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    GetIssuesTournamentsTournamentIdIssuesGetResponses,
+    GetIssuesTournamentsTournamentIdIssuesGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/issues',
+    ...options,
   });
 
 /**

@@ -53,6 +53,7 @@ DUMMY_TOURNAMENT = TournamentInsertable(
     duration_minutes=10,
     margin_minutes=5,
     max_team_size=4,
+    min_team_size=0,
 )
 
 DUMMY_LEVEL1 = LevelInsertable(

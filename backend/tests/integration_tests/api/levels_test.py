@@ -30,6 +30,7 @@ async def test_create_tournament_with_levels(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
         "levels": ["Beginners", "Advanced"],
     }
@@ -70,6 +71,7 @@ async def test_cannot_add_levels_after_creation(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
         "levels": ["Beginners"],
     }
@@ -91,6 +93,7 @@ async def test_cannot_add_levels_after_creation(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
         "levels": ["Beginners", "Advanced", "Expert"],
     }
@@ -120,6 +123,7 @@ async def test_rename_level(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
         "levels": ["Beginners", "Advanced"],
     }

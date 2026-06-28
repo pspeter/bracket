@@ -90,6 +90,7 @@ function GeneralTournamentForm({
           values.margin_minutes,
           false,
           4,
+          0,
           true,
           false,
           values.referees_enabled,

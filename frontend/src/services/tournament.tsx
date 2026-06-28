@@ -1,4 +1,4 @@
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createTournament(
   club_id: number,
@@ -12,6 +12,7 @@ export async function createTournament(
   margin_minutes: number,
   signup_enabled: boolean = false,
   max_team_size: number = 4,
+  min_team_size: number = 0,
   signup_team_choice_enabled: boolean = true,
   score_tracking_enabled: boolean = false,
   referees_enabled: boolean = false,
@@ -30,6 +31,7 @@ export async function createTournament(
       margin_minutes,
       signup_enabled,
       max_team_size,
+      min_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
       referees_enabled,
@@ -62,6 +64,7 @@ export async function updateTournament(
   margin_minutes: number,
   signup_enabled: boolean,
   max_team_size: number,
+  min_team_size: number,
   signup_team_choice_enabled: boolean,
   score_tracking_enabled: boolean,
   referees_enabled: boolean,
@@ -79,10 +82,15 @@ export async function updateTournament(
       margin_minutes,
       signup_enabled,
       max_team_size,
+      min_team_size,
       signup_team_choice_enabled,
       score_tracking_enabled,
       referees_enabled,
       rules,
+    })
+    .then(async (response) => {
+      await mutateIssues(tournament_id);
+      return response;
     })
     .catch((response: any) => handleRequestError(response));
 }

@@ -30,11 +30,18 @@ class TournamentInsertable(BaseModelORM):
     signup_enabled: bool = False
     signup_token: str | None = None
     max_team_size: int = Field(4, ge=1)
+    min_team_size: int = Field(0, ge=0)
     signup_team_choice_enabled: bool = True
     score_tracking_enabled: bool = False
     score_tracking_token: str | None = None
     rules: str | None = None
     referees_enabled: bool = False
+
+    @model_validator(mode="after")
+    def validate_team_size_bounds(self) -> "TournamentInsertable":
+        if self.min_team_size > self.max_team_size:
+            raise ValueError("min_team_size must be less than or equal to max_team_size")
+        return self
 
 
 class Tournament(TournamentInsertable):
@@ -63,6 +70,7 @@ class TournamentUpdateBody(BaseModelORM):
     # Required on PUT: omitted keys must not fall back to insert defaults (e.g. max_team_size=4).
     signup_enabled: bool
     max_team_size: int = Field(..., ge=1)
+    min_team_size: int = Field(..., ge=0)
     signup_team_choice_enabled: bool
     score_tracking_enabled: bool = False
     referees_enabled: bool = False
@@ -75,6 +83,12 @@ class TournamentUpdateBody(BaseModelORM):
             raise ValueError("Levels cannot be changed after tournament creation")
         return data
 
+    @model_validator(mode="after")
+    def validate_team_size_bounds(self) -> "TournamentUpdateBody":
+        if self.min_team_size > self.max_team_size:
+            raise ValueError("min_team_size must be less than or equal to max_team_size")
+        return self
+
 
 class TournamentChangeStatusBody(BaseModelORM):
     status: TournamentStatus
@@ -82,6 +96,7 @@ class TournamentChangeStatusBody(BaseModelORM):
 
 class TournamentBody(TournamentUpdateBody):
     club_id: ClubId
+    min_team_size: int = Field(0, ge=0)
     levels: list[str] | None = None
 
     @model_validator(mode="before")

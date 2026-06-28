@@ -10,6 +10,8 @@ from bracket.utils.dummy_records import (
     DUMMY_PLAYER1,
     DUMMY_PLAYER2,
     DUMMY_PLAYER3,
+    DUMMY_PLAYER4,
+    DUMMY_PLAYER5,
     DUMMY_RANKING1,
     DUMMY_ROUND1,
     DUMMY_STAGE1,
@@ -58,6 +60,7 @@ async def test_tournament_issues_endpoint_counts_open_nav_issues(
                 update={
                     "club_id": auth_context.club.id,
                     "dashboard_endpoint": "issues-test",
+                    "min_team_size": 2,
                 }
             )
         ) as tournament,
@@ -150,6 +153,7 @@ async def test_tournament_issues_endpoint_counts_open_nav_issues(
                     {"type": "empty_slots", "count": 2},
                     {"type": "unassigned_teams", "count": 2},
                 ],
+                "teams": [{"type": "teams_below_min_size", "count": 3}],
             }
         }
 
@@ -168,4 +172,45 @@ async def test_tournament_issues_endpoint_omits_zero_count_entries(
     ) as tournament:
         assert await send_auth_request(
             HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
-        ) == {"data": {"planning": [], "players": [], "stages": []}}
+        ) == {"data": {"planning": [], "players": [], "stages": [], "teams": []}}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_tournament_issues_endpoint_counts_teams_strictly_below_min_size(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_tournament(
+            DUMMY_TOURNAMENT.model_copy(
+                update={
+                    "club_id": auth_context.club.id,
+                    "dashboard_endpoint": "issues-teams-test",
+                    "min_team_size": 2,
+                }
+            )
+        ) as tournament,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament.id})) as team_1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament.id})) as team_2,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament.id})),
+        inserted_player_in_team(
+            DUMMY_PLAYER1.model_copy(update={"tournament_id": tournament.id}), team_1.id
+        ),
+        inserted_player_in_team(
+            DUMMY_PLAYER2.model_copy(update={"tournament_id": tournament.id}), team_2.id
+        ),
+        inserted_player_in_team(
+            DUMMY_PLAYER3.model_copy(update={"tournament_id": tournament.id}), team_2.id
+        ),
+        inserted_player(DUMMY_PLAYER4.model_copy(update={"tournament_id": tournament.id})),
+        inserted_player(DUMMY_PLAYER5.model_copy(update={"tournament_id": tournament.id})),
+    ):
+        assert await send_auth_request(
+            HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
+        ) == {
+            "data": {
+                "planning": [],
+                "players": [{"type": "players_without_team", "count": 2}],
+                "stages": [{"type": "unassigned_teams", "count": 3}],
+                "teams": [{"type": "teams_below_min_size", "count": 2}],
+            }
+        }

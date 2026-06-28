@@ -67,6 +67,21 @@ async def get_tournament_issues(
         """,
         tournament_id,
     )
+    teams_below_min_size = await _fetch_count(
+        """
+        SELECT count(*)
+        FROM (
+            SELECT teams.id
+            FROM teams
+            INNER JOIN tournaments ON tournaments.id = teams.tournament_id
+            LEFT JOIN players_x_teams ON players_x_teams.team_id = teams.id
+            WHERE teams.tournament_id = :tournament_id
+            GROUP BY teams.id, tournaments.min_team_size
+            HAVING count(players_x_teams.player_id) < tournaments.min_team_size
+        ) underfilled_teams
+        """,
+        tournament_id,
+    )
 
     return {
         "planning": _entry("unplanned_matches", unplanned_matches),
@@ -75,4 +90,5 @@ async def get_tournament_issues(
             *_entry("empty_slots", empty_slots),
             *_entry("unassigned_teams", unassigned_teams),
         ],
+        "teams": _entry("teams_below_min_size", teams_below_min_size),
     }

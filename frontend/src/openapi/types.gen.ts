@@ -2071,6 +2071,10 @@ export type TournamentBody = {
    */
   max_team_size: number;
   /**
+   * Min Team Size
+   */
+  min_team_size: number;
+  /**
    * Name
    */
   name: string;
@@ -2178,6 +2182,10 @@ export type TournamentUpdateBody = {
    */
   max_team_size: number;
   /**
+   * Min Team Size
+   */
+  min_team_size: number;
+  /**
    * Name
    */
   name: string;
@@ -2259,6 +2267,10 @@ export type TournamentWithLevels = {
    * Max Team Size
    */
   max_team_size: number;
+  /**
+   * Min Team Size
+   */
+  min_team_size: number;
   /**
    * Name
    */
@@ -3382,38 +3394,6 @@ export type GetTournamentTournamentsTournamentIdGetResponses = {
 export type GetTournamentTournamentsTournamentIdGetResponse =
   GetTournamentTournamentsTournamentIdGetResponses[keyof GetTournamentTournamentsTournamentIdGetResponses];
 
-export type GetIssuesTournamentsTournamentIdIssuesGetData = {
-  body?: never;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-  };
-  query?: never;
-  url: '/tournaments/{tournament_id}/issues';
-};
-
-export type GetIssuesTournamentsTournamentIdIssuesGetErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type GetIssuesTournamentsTournamentIdIssuesGetError =
-  GetIssuesTournamentsTournamentIdIssuesGetErrors[keyof GetIssuesTournamentsTournamentIdIssuesGetErrors];
-
-export type GetIssuesTournamentsTournamentIdIssuesGetResponses = {
-  /**
-   * Successful Response
-   */
-  200: TournamentIssuesResponse;
-};
-
-export type GetIssuesTournamentsTournamentIdIssuesGetResponse =
-  GetIssuesTournamentsTournamentIdIssuesGetResponses[keyof GetIssuesTournamentsTournamentIdIssuesGetResponses];
-
 export type UpdateTournamentByIdTournamentsTournamentIdPutData = {
   body: TournamentUpdateBody;
   path: {
@@ -3645,6 +3625,38 @@ export type UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses = {
 
 export type UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponse =
   UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses[keyof UpdateCourtByIdTournamentsTournamentIdCourtsCourtIdPutResponses];
+
+export type GetIssuesTournamentsTournamentIdIssuesGetData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/issues';
+};
+
+export type GetIssuesTournamentsTournamentIdIssuesGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetIssuesTournamentsTournamentIdIssuesGetError =
+  GetIssuesTournamentsTournamentIdIssuesGetErrors[keyof GetIssuesTournamentsTournamentIdIssuesGetErrors];
+
+export type GetIssuesTournamentsTournamentIdIssuesGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: TournamentIssuesResponse;
+};
+
+export type GetIssuesTournamentsTournamentIdIssuesGetResponse =
+  GetIssuesTournamentsTournamentIdIssuesGetResponses[keyof GetIssuesTournamentsTournamentIdIssuesGetResponses];
 
 export type UpdateLevelTournamentsTournamentIdLevelsLevelIdPutData = {
   body: LevelUpdateBody;
