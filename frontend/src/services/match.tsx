@@ -31,9 +31,11 @@ export async function updateMatch(
   match: Omit<MatchBody, 'referee_stage_item_input_id' | 'referee_name'> &
     Partial<Pick<MatchBody, 'referee_stage_item_input_id' | 'referee_name'>>
 ) {
-  return createAxios()
+  const response = await createAxios()
     .put(`tournaments/${tournament_id}/matches/${match_id}`, match)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 // Scores live on sets now. Updating a single set is the unit of change for both the
@@ -44,9 +46,11 @@ export async function updateMatchSet(
   set_id: number,
   body: MatchSetBody
 ) {
-  return createAxios()
+  const response = await createAxios()
     .put(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function updateScoreTrackingMatchSet(
@@ -87,7 +91,9 @@ export async function rescheduleMatch(
 }
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
-  return createAxios().post(`tournaments/${tournament_id}/matches/swap`, body);
+  const response = await createAxios().post(`tournaments/${tournament_id}/matches/swap`, body);
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function resizeMatchBreak(
@@ -95,7 +101,12 @@ export async function resizeMatchBreak(
   match_id: number,
   body: MatchResizeBreakBody
 ) {
-  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/resize_break`, body);
+  const response = await createAxios().post(
+    `tournaments/${tournament_id}/matches/${match_id}/resize_break`,
+    body
+  );
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function autoAssignReferees(tournament_id: number, weights?: SchedulerWeights) {

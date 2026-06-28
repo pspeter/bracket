@@ -24,7 +24,7 @@ import { TournamentIssueEntry } from '@openapi';
 import { getBaseApiUrl, getTournamentIssues } from '@services/adapter';
 import classes from './_main_links.module.css';
 
-type IssueSection = 'planning' | 'players' | 'stages' | 'teams';
+type IssueSection = 'planning' | 'players' | 'score_tracking' | 'stages' | 'teams';
 
 interface MainLinkProps {
   icon: Icon;
@@ -37,6 +37,8 @@ interface MainLinkProps {
 
 const ISSUE_TYPE_LABELS: Record<string, string> = {
   empty_slots: 'tournament_issue_empty_slots',
+  not_finished_overdue: 'tournament_issue_not_finished_overdue',
+  not_started_overdue: 'tournament_issue_not_started_overdue',
   players_without_team: 'tournament_issue_players_without_team',
   teams_below_min_size: 'tournament_issue_teams_below_min_size',
   unassigned_teams: 'tournament_issue_unassigned_teams',
@@ -226,6 +228,7 @@ export function TournamentLinks({ tournament_id }: any) {
       icon: IconDeviceGamepad2,
       label: capitalize(t('score_tracking_title')),
       link: `${tm_prefix}/score-tracking`,
+      issueSection: 'score_tracking',
     },
     {
       icon: IconBrackets,

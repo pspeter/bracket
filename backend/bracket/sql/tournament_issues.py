@@ -1,10 +1,17 @@
+from heliclockter import datetime_utc
+
 from bracket.database import database
 from bracket.models.db.tournament_issues import TournamentIssueEntry
 from bracket.utils.id_types import TournamentId
 
 
-async def _fetch_count(query: str, tournament_id: TournamentId) -> int:
-    return int(await database.fetch_val(query=query, values={"tournament_id": tournament_id}))
+async def _fetch_count(
+    query: str, tournament_id: TournamentId, extra_values: dict[str, object] | None = None
+) -> int:
+    values: dict[str, object] = {"tournament_id": tournament_id}
+    if extra_values is not None:
+        values.update(extra_values)
+    return int(await database.fetch_val(query=query, values=values))
 
 
 def _entry(type_: str, count: int) -> list[TournamentIssueEntry]:
@@ -16,6 +23,7 @@ def _entry(type_: str, count: int) -> list[TournamentIssueEntry]:
 async def get_tournament_issues(
     tournament_id: TournamentId,
 ) -> dict[str, list[TournamentIssueEntry]]:
+    current_time = datetime_utc.now()
     unplanned_matches = await _fetch_count(
         """
         SELECT count(*)
@@ -82,10 +90,62 @@ async def get_tournament_issues(
         """,
         tournament_id,
     )
+    not_finished_overdue = await _fetch_count(
+        """
+        SELECT count(*)
+        FROM matches
+        INNER JOIN rounds ON rounds.id = matches.round_id
+        INNER JOIN stage_items ON stage_items.id = rounds.stage_item_id
+        INNER JOIN stages ON stages.id = stage_items.stage_id
+        WHERE stages.tournament_id = :tournament_id
+        AND matches.start_time IS NOT NULL
+        AND matches.start_time + matches.duration_minutes * INTERVAL '1 minute' < :current_time
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM match_sets
+                WHERE match_sets.match_id = matches.id
+                AND match_sets.state <> 'COMPLETED'
+            )
+            OR NOT EXISTS (
+                SELECT 1
+                FROM match_sets
+                WHERE match_sets.match_id = matches.id
+            )
+        )
+        """,
+        tournament_id,
+        {"current_time": current_time},
+    )
+    not_started_overdue = await _fetch_count(
+        """
+        SELECT count(*)
+        FROM matches
+        INNER JOIN rounds ON rounds.id = matches.round_id
+        INNER JOIN stage_items ON stage_items.id = rounds.stage_item_id
+        INNER JOIN stages ON stages.id = stage_items.stage_id
+        WHERE stages.tournament_id = :tournament_id
+        AND matches.start_time IS NOT NULL
+        AND matches.start_time < :current_time
+        AND matches.start_time + matches.duration_minutes * INTERVAL '1 minute' >= :current_time
+        AND NOT EXISTS (
+            SELECT 1
+            FROM match_sets
+            WHERE match_sets.match_id = matches.id
+            AND match_sets.state <> 'NOT_STARTED'
+        )
+        """,
+        tournament_id,
+        {"current_time": current_time},
+    )
 
     return {
         "planning": _entry("unplanned_matches", unplanned_matches),
         "players": _entry("players_without_team", players_without_team),
+        "score_tracking": [
+            *_entry("not_finished_overdue", not_finished_overdue),
+            *_entry("not_started_overdue", not_started_overdue),
+        ],
         "stages": [
             *_entry("empty_slots", empty_slots),
             *_entry("unassigned_teams", unassigned_teams),
