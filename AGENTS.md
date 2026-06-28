@@ -187,3 +187,17 @@ Backend uses Pydantic settings with environment-specific `.env` files. Key env v
 - `JWT_SECRET` — required in production
 - `CORS_ORIGINS` — comma-separated origins
 - `SERVE_FRONTEND` / `API_PREFIX` — for combined deployment (Docker)
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues on `pspeter/bracket`; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `docs/CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
