@@ -1,7 +1,7 @@
 import { showNotification } from '@mantine/notifications';
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { useNavigate } from 'react-router';
-import useSWR, { SWRResponse } from 'swr';
+import useSWR, { mutate, SWRResponse } from 'swr';
 
 import { TournamentFilter } from '@components/utils/tournament';
 import { Pagination } from '@components/utils/util';
@@ -15,6 +15,7 @@ import {
   StageItemInputOptionsResponse,
   StagesWithStageItemsResponse,
   TeamsWithPlayersResponse,
+  TournamentIssuesResponse,
   TournamentResponse,
   TournamentsResponse,
   UserPublicResponse,
@@ -124,6 +125,23 @@ export function getTournamentByEndpointName(
 
 export function getTournamentById(tournament_id: number): SWRResponse<TournamentResponse> {
   return useSWR(`tournaments/${tournament_id}`, fetcher);
+}
+
+export function getIssuesKey(tournament_id: number): string {
+  return `tournaments/${tournament_id}/issues`;
+}
+
+export function getTournamentIssues(
+  tournament_id: number | null
+): SWRResponse<TournamentIssuesResponse> {
+  return useSWR(tournament_id == null ? null : getIssuesKey(tournament_id), fetcher, {
+    revalidateOnFocus: true,
+    revalidateOnMount: true,
+  });
+}
+
+export async function mutateIssues(tournament_id: number) {
+  await mutate(getIssuesKey(tournament_id));
 }
 
 export function getTournaments(filter: TournamentFilter): SWRResponse<TournamentsResponse> {

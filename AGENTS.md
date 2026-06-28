@@ -169,6 +169,10 @@ Alembic migrations live in `backend/alembic/versions/`. Migrations auto-run on s
 
 When you add a user-facing string, always add the new translation key to **both** the English (`public/locales/en/common.json`) and German (`public/locales/de/common.json`) locales. Keys are kept in alphabetical order within each file.
 
+#### Tournament Issue Badges
+
+When adding a new tournament issue source, wire every mutation that can change its count to invalidate the shared issues SWR key via `mutateIssues(tournament_id)`.
+
 ### Data Model Hierarchy
 
 Club → Tournament → Stage → StageItem (bracket/group) → Round → Match

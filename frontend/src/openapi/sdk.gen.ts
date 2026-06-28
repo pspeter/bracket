@@ -130,6 +130,9 @@ import type {
   GetTournamentsTournamentsGetData,
   GetTournamentsTournamentsGetErrors,
   GetTournamentsTournamentsGetResponses,
+  GetIssuesTournamentsTournamentIdIssuesGetData,
+  GetIssuesTournamentsTournamentIdIssuesGetErrors,
+  GetIssuesTournamentsTournamentIdIssuesGetResponses,
   GetTournamentTournamentsTournamentIdGetData,
   GetTournamentTournamentsTournamentIdGetErrors,
   GetTournamentTournamentsTournamentIdGetResponses,
@@ -532,6 +535,25 @@ export const getTournamentTournamentsTournamentIdGet = <ThrowOnError extends boo
   >({
     responseType: 'json',
     url: '/tournaments/{tournament_id}',
+    ...options,
+  });
+
+/**
+ * Get Issues
+ */
+export const getIssuesTournamentsTournamentIdIssuesGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetIssuesTournamentsTournamentIdIssuesGetData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    GetIssuesTournamentsTournamentIdIssuesGetResponses,
+    GetIssuesTournamentsTournamentIdIssuesGetErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/issues',
     ...options,
   });
 

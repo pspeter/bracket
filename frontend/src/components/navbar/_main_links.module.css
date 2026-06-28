@@ -34,6 +34,37 @@
   }
 }
 
+.iconWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: rem(24px);
+  height: rem(24px);
+}
+
+.issueBadge,
+.mobileIssueBadge {
+  min-width: rem(18px);
+  height: rem(18px);
+  padding: 0 rem(5px);
+  border-radius: rem(999px);
+  background: var(--mantine-color-red-6);
+  color: var(--mantine-color-white);
+  font-size: rem(11px);
+  font-weight: 700;
+  line-height: rem(18px);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.issueBadge {
+  position: absolute;
+  top: rem(-9px);
+  right: rem(-12px);
+  box-shadow: 0 0 0 rem(2px) light-dark(var(--mantine-color-white), var(--mantine-color-dark-7));
+}
+
 
 .mobileLink {
   &:hover {
@@ -54,4 +85,13 @@
 .mobileLinkGroup {
   padding-left: 1rem;
   padding-right: 1rem;
+  min-height: rem(46px);
+}
+
+.mobileLinkLabel {
+  margin-left: 0.5rem;
+}
+
+.mobileIssueBadge {
+  margin-left: auto;
 }

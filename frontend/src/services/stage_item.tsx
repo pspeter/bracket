@@ -1,4 +1,4 @@
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createStageItem(
   tournament_id: number,
@@ -8,7 +8,7 @@ export async function createStageItem(
   ranking_id: number,
   games_per_player: number | null = null
 ) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/stage_items`, {
       stage_id,
       type,
@@ -17,6 +17,8 @@ export async function createStageItem(
       games_per_player,
     })
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function updateStageItem(
@@ -27,7 +29,7 @@ export async function updateStageItem(
   team_count: number,
   games_per_player: number | null = null
 ) {
-  return createAxios()
+  const response = await createAxios()
     .put(`tournaments/${tournament_id}/stage_items/${stage_item_id}`, {
       name,
       ranking_id,
@@ -35,10 +37,14 @@ export async function updateStageItem(
       games_per_player,
     })
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function deleteStageItem(tournament_id: number, stage_item_id: number) {
-  return createAxios()
+  const response = await createAxios()
     .delete(`tournaments/${tournament_id}/stage_items/${stage_item_id}`)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }

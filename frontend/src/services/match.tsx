@@ -7,18 +7,22 @@ import {
   MatchSwapBody,
   SchedulerWeights,
 } from '@openapi';
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createMatch(tournament_id: number, match: MatchCreateBodyFrontend) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/matches`, match)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function deleteMatch(tournament_id: number, match_id: number) {
-  return createAxios()
+  const response = await createAxios()
     .delete(`tournaments/${tournament_id}/matches/${match_id}`)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function updateMatch(
@@ -62,7 +66,11 @@ export async function updateScoreTrackingMatchSet(
 // schedule and clear the selection.
 
 export async function unscheduleMatch(tournament_id: number, match_id: number) {
-  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/unschedule`);
+  const response = await createAxios().post(
+    `tournaments/${tournament_id}/matches/${match_id}/unschedule`
+  );
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function rescheduleMatch(
@@ -70,7 +78,12 @@ export async function rescheduleMatch(
   match_id: number,
   match: MatchRescheduleBody
 ) {
-  return createAxios().post(`tournaments/${tournament_id}/matches/${match_id}/reschedule`, match);
+  const response = await createAxios().post(
+    `tournaments/${tournament_id}/matches/${match_id}/reschedule`,
+    match
+  );
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
@@ -92,13 +105,17 @@ export async function autoAssignReferees(tournament_id: number, weights?: Schedu
 }
 
 export async function scheduleMatches(tournament_id: number, weights?: SchedulerWeights) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/schedule_matches`, weights)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function reoptimizeMatches(tournament_id: number, weights?: SchedulerWeights) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/reoptimize_matches`, weights)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }

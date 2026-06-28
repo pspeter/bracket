@@ -11,6 +11,7 @@ from bracket.models.db.stage_item_inputs import (
 )
 from bracket.models.db.team import FullTeamWithPlayers, Team
 from bracket.models.db.tournament import LevelResponse, TournamentWithLevels
+from bracket.models.db.tournament_issues import TournamentIssueEntry
 from bracket.models.db.user import UserPublic
 from bracket.models.db.util import StageWithStageItems
 from bracket.routes.auth import Token
@@ -38,6 +39,10 @@ class TournamentResponse(DataResponse[TournamentWithLevels]):
 
 
 class TournamentsResponse(DataResponse[list[TournamentWithLevels]]):
+    pass
+
+
+class TournamentIssuesResponse(DataResponse[dict[str, list[TournamentIssueEntry]]]):
     pass
 
 
