@@ -12,6 +12,7 @@ export default function ScoreTrackingMatchPage() {
   const matchId = match_id != null ? parseInt(match_id, 10) : null;
   const swrResponse = getScoreTrackingMatch(score_tracking_token ?? null, matchId);
   const swrInfoResponse = getScoreTrackingInfo(score_tracking_token ?? null, null);
+  const tournamentId = swrInfoResponse.data?.data.tournament_id ?? null;
   const refereesEnabled = swrInfoResponse.data?.data.referees_enabled ?? false;
 
   return (
@@ -22,7 +23,7 @@ export default function ScoreTrackingMatchPage() {
       refereesEnabled={refereesEnabled}
       updateSet={async (setId, body) => {
         if (score_tracking_token == null || matchId == null) return;
-        await updateScoreTrackingMatchSet(score_tracking_token, matchId, setId, body);
+        await updateScoreTrackingMatchSet(score_tracking_token, tournamentId, matchId, setId, body);
       }}
     />
   );

@@ -480,7 +480,7 @@ async def test_update_single_elimination_stage_item_fails_after_games_started(
 async def test_create_single_elimination_stage_item_with_even_set_ranking_returns_422(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """POST stage_items with SINGLE_ELIMINATION type and a ranking with even num_sets returns 422."""
+    """POST SINGLE_ELIMINATION stage_items with an even-set ranking returns 422."""
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
         DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "num_sets": 2})
@@ -507,7 +507,7 @@ async def test_create_single_elimination_stage_item_with_even_set_ranking_return
 async def test_update_stage_item_ranking_to_even_sets_single_elimination_returns_422(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """PUT stage_items changing ranking_id to a ranking with even num_sets returns 422 for SINGLE_ELIMINATION."""
+    """PUT SINGLE_ELIMINATION stage_items to an even-set ranking returns 422."""
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
         DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "num_sets": 2})

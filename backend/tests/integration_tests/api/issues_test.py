@@ -1,7 +1,10 @@
+from unittest.mock import Mock, patch
+
 import pytest
+from heliclockter import timedelta
 
 from bracket.database import database
-from bracket.models.db.match import MatchInsertable
+from bracket.models.db.match import MatchInsertable, MatchSetState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.schema import stage_item_inputs
 from bracket.utils.dummy_records import (
@@ -42,6 +45,22 @@ def unscheduled_match(round_id: int) -> MatchInsertable:
         update={
             "round_id": round_id,
             "start_time": None,
+            "court_id": None,
+            "stage_item_input1_id": None,
+            "stage_item_input2_id": None,
+            "completed_at": None,
+        }
+    )
+
+
+def scheduled_match(
+    round_id: int, *, start_offset_minutes: int, duration_minutes: int = 10
+) -> MatchInsertable:
+    return DUMMY_MATCH1.model_copy(
+        update={
+            "round_id": round_id,
+            "start_time": DUMMY_MOCK_TIME + timedelta(minutes=start_offset_minutes),
+            "duration_minutes": duration_minutes,
             "court_id": None,
             "stage_item_input1_id": None,
             "stage_item_input2_id": None,
@@ -102,7 +121,8 @@ async def test_tournament_issues_endpoint_counts_open_nav_issues(
                     "stage_item_input2_id": None,
                     "completed_at": DUMMY_MOCK_TIME,
                 }
-            )
+            ),
+            set_state=MatchSetState.COMPLETED,
         ),
     ):
         await database.execute_many(
@@ -149,6 +169,7 @@ async def test_tournament_issues_endpoint_counts_open_nav_issues(
             "data": {
                 "planning": [{"type": "unplanned_matches", "count": 2}],
                 "players": [{"type": "players_without_team", "count": 2}],
+                "score_tracking": [],
                 "stages": [
                     {"type": "empty_slots", "count": 2},
                     {"type": "unassigned_teams", "count": 2},
@@ -172,7 +193,144 @@ async def test_tournament_issues_endpoint_omits_zero_count_entries(
     ) as tournament:
         assert await send_auth_request(
             HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
-        ) == {"data": {"planning": [], "players": [], "stages": [], "teams": []}}
+        ) == {
+            "data": {"planning": [], "players": [], "score_tracking": [], "stages": [], "teams": []}
+        }
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_tournament_issues_endpoint_counts_score_tracking_match_past_start_not_end(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_tournament(
+            DUMMY_TOURNAMENT.model_copy(
+                update={
+                    "club_id": auth_context.club.id,
+                    "dashboard_endpoint": "issues-score-tracking-start-test",
+                    "score_tracking_enabled": False,
+                }
+            )
+        ) as tournament,
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": tournament.id})
+        ) as ranking,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})) as stage,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(update={"stage_id": stage.id, "ranking_id": ranking.id})
+        ) as stage_item,
+        inserted_round(DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item.id})) as round_,
+        inserted_match(
+            scheduled_match(round_.id, start_offset_minutes=-5, duration_minutes=10),
+            set_state=MatchSetState.NOT_STARTED,
+        ),
+    ):
+        with patch(
+            "bracket.sql.tournament_issues.datetime_utc.now",
+            Mock(return_value=DUMMY_MOCK_TIME),
+        ):
+            assert await send_auth_request(
+                HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
+            ) == {
+                "data": {
+                    "planning": [],
+                    "players": [],
+                    "score_tracking": [{"type": "not_started_overdue", "count": 1}],
+                    "stages": [],
+                    "teams": [],
+                }
+            }
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_tournament_issues_endpoint_counts_score_tracking_match_past_end_incomplete(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_tournament(
+            DUMMY_TOURNAMENT.model_copy(
+                update={
+                    "club_id": auth_context.club.id,
+                    "dashboard_endpoint": "issues-score-tracking-end-test",
+                }
+            )
+        ) as tournament,
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": tournament.id})
+        ) as ranking,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})) as stage,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(update={"stage_id": stage.id, "ranking_id": ranking.id})
+        ) as stage_item,
+        inserted_round(DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item.id})) as round_,
+        inserted_match(
+            scheduled_match(round_.id, start_offset_minutes=-15, duration_minutes=10),
+            set_state=MatchSetState.IN_PROGRESS,
+        ),
+        inserted_match(
+            scheduled_match(round_.id, start_offset_minutes=-15, duration_minutes=10),
+            set_state=MatchSetState.COMPLETED,
+        ),
+    ):
+        with patch(
+            "bracket.sql.tournament_issues.datetime_utc.now",
+            Mock(return_value=DUMMY_MOCK_TIME),
+        ):
+            assert await send_auth_request(
+                HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
+            ) == {
+                "data": {
+                    "planning": [],
+                    "players": [],
+                    "score_tracking": [{"type": "not_finished_overdue", "count": 1}],
+                    "stages": [],
+                    "teams": [],
+                }
+            }
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_tournament_issues_endpoint_counts_never_started_past_end_once(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        inserted_tournament(
+            DUMMY_TOURNAMENT.model_copy(
+                update={
+                    "club_id": auth_context.club.id,
+                    "dashboard_endpoint": "issues-score-tracking-precedence-test",
+                }
+            )
+        ) as tournament,
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": tournament.id})
+        ) as ranking,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament.id})) as stage,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(update={"stage_id": stage.id, "ranking_id": ranking.id})
+        ) as stage_item,
+        inserted_round(DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item.id})) as round_,
+        inserted_match(
+            scheduled_match(round_.id, start_offset_minutes=-15, duration_minutes=10),
+            set_state=MatchSetState.NOT_STARTED,
+        ),
+        inserted_match(unscheduled_match(round_.id), set_state=MatchSetState.NOT_STARTED),
+    ):
+        with patch(
+            "bracket.sql.tournament_issues.datetime_utc.now",
+            Mock(return_value=DUMMY_MOCK_TIME),
+        ):
+            assert await send_auth_request(
+                HTTPMethod.GET, f"tournaments/{tournament.id}/issues", auth_context
+            ) == {
+                "data": {
+                    "planning": [{"type": "unplanned_matches", "count": 1}],
+                    "players": [],
+                    "score_tracking": [{"type": "not_finished_overdue", "count": 1}],
+                    "stages": [],
+                    "teams": [],
+                }
+            }
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -210,6 +368,7 @@ async def test_tournament_issues_endpoint_counts_teams_strictly_below_min_size(
             "data": {
                 "planning": [],
                 "players": [{"type": "players_without_team", "count": 2}],
+                "score_tracking": [],
                 "stages": [{"type": "unassigned_teams", "count": 3}],
                 "teams": [{"type": "teams_below_min_size", "count": 2}],
             }

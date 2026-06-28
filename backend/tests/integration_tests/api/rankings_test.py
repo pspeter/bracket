@@ -325,7 +325,7 @@ async def test_update_ranking_side_switch(
 async def test_update_ranking_even_sets_single_elimination_returns_422(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """PUT with even num_sets returns 422 when the ranking is used by a SINGLE_ELIMINATION stage item."""
+    """PUT with even num_sets returns 422 for a SINGLE_ELIMINATION stage item."""
     body = {"scoring_type": "MATCH_POINTS", "num_sets": 2}
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
@@ -353,7 +353,7 @@ async def test_update_ranking_even_sets_single_elimination_returns_422(
 async def test_update_ranking_odd_sets_single_elimination_succeeds(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """PUT with odd num_sets succeeds even when the ranking is used by a SINGLE_ELIMINATION stage item."""
+    """PUT with odd num_sets succeeds for a SINGLE_ELIMINATION stage item."""
     body = {"scoring_type": "MATCH_POINTS", "num_sets": 3}
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
