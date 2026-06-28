@@ -1,17 +1,21 @@
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createRound(tournament_id: number, stage_item_id: number) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/rounds`, {
       stage_item_id,
     })
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function deleteRound(tournament_id: number, round_id: number) {
-  return createAxios()
+  const response = await createAxios()
     .delete(`tournaments/${tournament_id}/rounds/${round_id}`)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function updateRound(
