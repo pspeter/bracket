@@ -10,15 +10,19 @@ import {
 import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
 export async function createMatch(tournament_id: number, match: MatchCreateBodyFrontend) {
-  return createAxios()
+  const response = await createAxios()
     .post(`tournaments/${tournament_id}/matches`, match)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function deleteMatch(tournament_id: number, match_id: number) {
-  return createAxios()
+  const response = await createAxios()
     .delete(`tournaments/${tournament_id}/matches/${match_id}`)
     .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
 }
 
 export async function updateMatch(
