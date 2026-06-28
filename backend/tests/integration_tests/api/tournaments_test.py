@@ -45,6 +45,7 @@ async def test_tournaments_endpoint(
                 "signup_enabled": False,
                 "signup_token": None,
                 "max_team_size": 4,
+                "min_team_size": 0,
                 "signup_team_choice_enabled": True,
                 "score_tracking_enabled": False,
                 "score_tracking_token": None,
@@ -80,6 +81,7 @@ async def test_tournament_endpoint(
             "signup_enabled": False,
             "signup_token": None,
             "max_team_size": 4,
+            "min_team_size": 0,
             "signup_team_choice_enabled": True,
             "score_tracking_enabled": False,
             "score_tracking_token": None,
@@ -107,6 +109,7 @@ async def test_create_tournament(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
     assert (
@@ -135,6 +138,7 @@ async def test_create_tournament_duplicate_dashboard_endpoint(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
     assert await send_auth_request(HTTPMethod.POST, "tournaments", auth_context, json=body) == {
@@ -156,6 +160,7 @@ async def test_update_tournament(
         "margin_minutes": 3,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
     assert (
@@ -172,6 +177,30 @@ async def test_update_tournament(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_update_tournament_rejects_min_team_size_above_max_team_size(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    body = {
+        "name": "Some Cool Tournament",
+        "start_time": DUMMY_MOCK_TIME.isoformat().replace("+00:00", "Z"),
+        "dashboard_public": True,
+        "players_can_be_in_multiple_teams": True,
+        "auto_assign_courts": True,
+        "duration_minutes": 10,
+        "margin_minutes": 5,
+        "signup_enabled": False,
+        "max_team_size": 4,
+        "min_team_size": 5,
+        "signup_team_choice_enabled": True,
+    }
+    response = await send_tournament_request(HTTPMethod.PUT, "", auth_context, json=body)
+    assert "detail" in response
+    assert (
+        "min_team_size must be less than or equal to max_team_size" in response["detail"][0]["msg"]
+    )
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_tournament_referees_enabled_round_trip(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
@@ -185,6 +214,7 @@ async def test_tournament_referees_enabled_round_trip(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
 
@@ -231,6 +261,7 @@ async def test_tournament_rules_round_trip(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
 
@@ -280,6 +311,7 @@ async def test_tournament_rules_too_long_rejected(
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
         "rules": "x" * 50_001,
     }

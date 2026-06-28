@@ -53,6 +53,7 @@ tournaments = Table(
     Column("signup_enabled", Boolean, nullable=False, server_default="false"),
     Column("signup_token", String, nullable=True),
     Column("max_team_size", Integer, nullable=False, server_default="4"),
+    Column("min_team_size", Integer, nullable=False, server_default="0"),
     Column("signup_team_choice_enabled", Boolean, nullable=False, server_default="true"),
     Column("score_tracking_enabled", Boolean, nullable=False, server_default="false"),
     Column("score_tracking_token", String, nullable=True),

@@ -24,7 +24,7 @@ import { TournamentIssueEntry } from '@openapi';
 import { getBaseApiUrl, getTournamentIssues } from '@services/adapter';
 import classes from './_main_links.module.css';
 
-type IssueSection = 'planning' | 'players' | 'stages';
+type IssueSection = 'planning' | 'players' | 'stages' | 'teams';
 
 interface MainLinkProps {
   icon: Icon;
@@ -38,6 +38,7 @@ interface MainLinkProps {
 const ISSUE_TYPE_LABELS: Record<string, string> = {
   empty_slots: 'tournament_issue_empty_slots',
   players_without_team: 'tournament_issue_players_without_team',
+  teams_below_min_size: 'tournament_issue_teams_below_min_size',
   unassigned_teams: 'tournament_issue_unassigned_teams',
   unplanned_matches: 'tournament_issue_unplanned_matches',
 };
@@ -207,6 +208,7 @@ export function TournamentLinks({ tournament_id }: any) {
       icon: IconUsers,
       label: capitalize(t('teams_title')),
       link: `${tm_prefix}/teams`,
+      issueSection: 'teams',
     },
     {
       icon: IconTrophy,
@@ -237,8 +239,7 @@ export function TournamentLinks({ tournament_id }: any) {
       key={link.label}
       item={{
         ...link,
-        issueEntries:
-          link.issueSection == null ? [] : (issues.data?.data[link.issueSection] ?? []),
+        issueEntries: link.issueSection == null ? [] : (issues.data?.data[link.issueSection] ?? []),
       }}
       pathName={pathName}
     />

@@ -195,6 +195,7 @@ function GeneralTournamentForm({
       margin_minutes: tournament.margin_minutes,
       signup_enabled: tournament.signup_enabled,
       max_team_size: tournament.max_team_size,
+      min_team_size: tournament.min_team_size,
       signup_team_choice_enabled: tournament.signup_team_choice_enabled ?? true,
       score_tracking_enabled: tournament.score_tracking_enabled ?? false,
       referees_enabled: tournament.referees_enabled ?? false,
@@ -221,6 +222,10 @@ function GeneralTournamentForm({
           typeof values.max_team_size === 'number' && !Number.isNaN(values.max_team_size)
             ? values.max_team_size
             : tournament.max_team_size;
+        const minTeamSize =
+          typeof values.min_team_size === 'number' && !Number.isNaN(values.min_team_size)
+            ? values.min_team_size
+            : tournament.min_team_size;
 
         await updateTournament(
           tournament.id,
@@ -234,6 +239,7 @@ function GeneralTournamentForm({
           values.margin_minutes,
           values.signup_enabled ?? tournament.signup_enabled,
           maxTeamSize,
+          minTeamSize,
           values.signup_team_choice_enabled ?? tournament.signup_team_choice_enabled ?? true,
           values.score_tracking_enabled ?? tournament.score_tracking_enabled ?? false,
           values.referees_enabled ?? tournament.referees_enabled ?? false,
@@ -502,11 +508,24 @@ function GeneralTournamentForm({
         />
       </Fieldset>
       <Fieldset legend={t('miscellaneous_title')} mt="lg" radius="md">
-        <NumberInput
-          label={t('max_team_size_label')}
-          min={1}
-          {...form.getInputProps('max_team_size')}
-        />
+        <Grid>
+          <Grid.Col span={{ sm: 6 }}>
+            <NumberInput
+              label={t('min_team_size_label')}
+              description={t('min_team_size_help')}
+              min={0}
+              max={form.values.max_team_size}
+              {...form.getInputProps('min_team_size')}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ sm: 6 }}>
+            <NumberInput
+              label={t('max_team_size_label')}
+              min={Math.max(1, form.values.min_team_size)}
+              {...form.getInputProps('max_team_size')}
+            />
+          </Grid.Col>
+        </Grid>
         <Checkbox
           mt="md"
           label={t('miscellaneous_label')}

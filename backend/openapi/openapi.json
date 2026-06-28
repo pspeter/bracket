@@ -3891,6 +3891,12 @@
             "title": "Max Team Size",
             "type": "integer"
           },
+          "min_team_size": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Min Team Size",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -3946,6 +3952,7 @@
           "margin_minutes",
           "signup_enabled",
           "max_team_size",
+          "min_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
           "referees_enabled",
@@ -4060,6 +4067,11 @@
             "title": "Max Team Size",
             "type": "integer"
           },
+          "min_team_size": {
+            "minimum": 0.0,
+            "title": "Min Team Size",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -4115,6 +4127,7 @@
           "margin_minutes",
           "signup_enabled",
           "max_team_size",
+          "min_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
           "referees_enabled",
@@ -4190,6 +4203,12 @@
             "default": 4,
             "minimum": 1.0,
             "title": "Max Team Size",
+            "type": "integer"
+          },
+          "min_team_size": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Min Team Size",
             "type": "integer"
           },
           "name": {
@@ -4279,6 +4298,7 @@
           "signup_enabled",
           "signup_token",
           "max_team_size",
+          "min_team_size",
           "signup_team_choice_enabled",
           "score_tracking_enabled",
           "score_tracking_token",

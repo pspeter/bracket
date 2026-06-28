@@ -31,6 +31,7 @@ def _create_body(endpoint: str, club_id: int, levels: list[str] | None = None) -
         "margin_minutes": 5,
         "signup_enabled": False,
         "max_team_size": 4,
+        "min_team_size": 0,
         "signup_team_choice_enabled": True,
     }
     if levels is not None:
