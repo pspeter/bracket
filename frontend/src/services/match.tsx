@@ -6,6 +6,7 @@ import {
   MatchSetBody,
   MatchSwapBody,
   SchedulerWeights,
+  ScoreTrackingInfoResponse,
 } from '@openapi';
 import { createAxios, handleRequestError, mutateIssues } from './adapter';
 
@@ -55,13 +56,28 @@ export async function updateMatchSet(
 
 export async function updateScoreTrackingMatchSet(
   score_tracking_token: string,
+  tournament_id: number | null,
   match_id: number,
   set_id: number,
   body: MatchSetBody
 ) {
-  return createAxios()
+  const response = await createAxios()
     .put(`score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
+  const tournamentId =
+    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
+  if (tournamentId != null) {
+    await mutateIssues(tournamentId);
+  }
+  return response;
+}
+
+async function getTournamentIdForScoreTrackingToken(score_tracking_token: string) {
+  const response = await createAxios()
+    .get<ScoreTrackingInfoResponse>(`score-tracking/${score_tracking_token}`)
+    .catch((response: any) => handleRequestError(response));
+
+  return response?.data.data.tournament_id;
 }
 
 // The planner's scheduling mutations let errors propagate instead of handling
