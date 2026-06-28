@@ -4,6 +4,7 @@ import {
   ActiveSelectionState,
   GridMatchRef,
   IDLE_SELECTION,
+  PlannerMode,
   PlannerState,
   PlanningAction,
   SelectionState,
@@ -21,6 +22,10 @@ function lockedRef(matchId: number, courtId: number, position: number): GridMatc
   return { matchId, courtId, position, locked: true };
 }
 
+function startedRef(matchId: number, courtId: number, position: number): GridMatchRef {
+  return { matchId, courtId, position, played: true };
+}
+
 function playedRef(matchId: number, courtId: number, position: number): GridMatchRef {
   return { matchId, courtId, position, locked: true, played: true };
 }
@@ -33,8 +38,12 @@ function traySelected(matchId: number): ActiveSelectionState {
   return { kind: 'tray-match-selected', matchId };
 }
 
-function planner(zoom: ZoomLevel, selection: SelectionState = IDLE_SELECTION): PlannerState {
-  return { zoom, selection };
+function planner(
+  zoom: ZoomLevel,
+  selection: SelectionState = IDLE_SELECTION,
+  mode: PlannerMode = 'move'
+): PlannerState {
+  return { zoom, mode, selection };
 }
 
 function confirmMove(previous: ActiveSelectionState, action: PlanningAction): SelectionState {
@@ -415,6 +424,21 @@ describe('plannerReducer', () => {
     expect(initialPlannerState('compact')).toEqual(planner('compact'));
   });
 
+  it('switching mode resets any active selection', () => {
+    const transition = plannerReducer(planner('compact', selected(ref(10, 1, 2))), {
+      type: 'set-mode',
+      mode: 'unschedule',
+    });
+
+    expect(transition.state).toEqual({
+      zoom: 'compact',
+      mode: 'unschedule',
+      selection: IDLE_SELECTION,
+    });
+    expect(transition.actions).toEqual([]);
+    expect(transition.focus).toBeNull();
+  });
+
   describe('zoom events', () => {
     it('zoom-in and zoom-out snap between the three levels and clamp at the ends', () => {
       expect(plannerReducer(planner('overview'), { type: 'zoom-in' }).state.zoom).toBe('compact');
@@ -506,6 +530,46 @@ describe('plannerReducer', () => {
       });
 
       expect(state).toEqual(planner('compact', selected(lockedRef(10, 1, 0))));
+      expect(actions).toEqual([]);
+    });
+
+    it('unschedule mode sends a not-started planned match back to the tray on tap', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'unschedule'), {
+        type: 'tap-match',
+        match: ref(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('compact', IDLE_SELECTION, 'unschedule'));
+      expect(actions).toEqual([{ type: 'unschedule', matchId: 10 }]);
+    });
+
+    it('unschedule mode ignores locked planned matches', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'unschedule'), {
+        type: 'tap-match',
+        match: lockedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('compact', IDLE_SELECTION, 'unschedule'));
+      expect(actions).toEqual([]);
+    });
+
+    it('unschedule mode ignores started planned matches', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'unschedule'), {
+        type: 'tap-match',
+        match: startedRef(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('compact', IDLE_SELECTION, 'unschedule'));
+      expect(actions).toEqual([]);
+    });
+
+    it('unschedule mode still selects tray matches for placement', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'unschedule'), {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(planner('compact', traySelected(30), 'unschedule'));
       expect(actions).toEqual([]);
     });
 
