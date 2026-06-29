@@ -1,6 +1,4 @@
-import logging
-
-from bracket.models.db.match import Match, MatchState
+from bracket.models.db.match import Match, MatchState, derive_match_state
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.matches import (
@@ -11,7 +9,39 @@ from bracket.utils.id_types import (
     RoundId,
 )
 
-logger = logging.getLogger(__name__)
+_UNCHANGED = object()
+
+
+def _feeder_input_for_slot(
+    subsequent_match: Match,
+    slot: int,
+    *,
+    affected_matches: dict[MatchId, Match],
+    cleared_match_ids: set[MatchId],
+) -> StageItemInput | None | object:
+    """Return the input for a slot, or _UNCHANGED if the existing value should be kept."""
+    winner_from_id = (
+        subsequent_match.stage_item_input1_winner_from_match_id
+        if slot == 0
+        else subsequent_match.stage_item_input2_winner_from_match_id
+    )
+    if winner_from_id is None:
+        return _UNCHANGED
+
+    if winner_from_id in cleared_match_ids:
+        return None
+
+    feeder = affected_matches.get(winner_from_id)
+    if feeder is None:
+        return _UNCHANGED
+
+    if feeder.state is not MatchState.COMPLETED:
+        return None
+
+    winner = feeder.get_winner()
+    if winner is None:
+        return _UNCHANGED
+    return winner
 
 
 def get_inputs_to_update_in_subsequent_elimination_rounds(
@@ -26,68 +56,70 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
     rounds, because of the tree-like structure of elimination stage items.
     """
     current_round = next(round_ for round_ in stage_item.rounds if round_.id == current_round_id)
-    affected_matches: dict[MatchId, Match] = {
-        match.id: match
-        for match in current_round.matches
-        if match.state is MatchState.COMPLETED
-        if match_ids is None or match.id in match_ids
-    }
+    affected_matches: dict[MatchId, Match] = {}
+    cleared_match_ids: set[MatchId] = set()
+
+    for match in current_round.matches:
+        if match_ids is not None and match.id not in match_ids:
+            continue
+        if match.state is MatchState.COMPLETED:
+            affected_matches[match.id] = match
+        elif match_ids is not None:
+            cleared_match_ids.add(match.id)
+
     subsequent_rounds = [round_ for round_ in stage_item.rounds if round_.id > current_round.id]
     subsequent_rounds.sort(key=lambda round_: round_.id)
-    subsequent_matches = [match for round_ in subsequent_rounds for match in round_.matches]
 
-    for subsequent_match in subsequent_matches:
-        updated_inputs: list[StageItemInput | None] = [
-            subsequent_match.stage_item_input1,
-            subsequent_match.stage_item_input2,
-        ]
-        original_inputs = updated_inputs.copy()
+    for subsequent_round in subsequent_rounds:
+        for subsequent_match in subsequent_round.matches:
+            updated_inputs: list[StageItemInput | None] = [
+                subsequent_match.stage_item_input1,
+                subsequent_match.stage_item_input2,
+            ]
+            original_inputs = updated_inputs.copy()
 
-        if subsequent_match.stage_item_input1_winner_from_match_id is not None and (
-            affected_match1 := affected_matches.get(
-                subsequent_match.stage_item_input1_winner_from_match_id
-            )
-        ):
-            winner1 = affected_match1.get_winner()
-            if winner1 is None:
-                logger.warning(
-                    "Match %s has no winner yet or is a draw — skipping elimination propagation",
-                    affected_match1.id,
+            for slot in (0, 1):
+                resolved = _feeder_input_for_slot(
+                    subsequent_match,
+                    slot,
+                    affected_matches=affected_matches,
+                    cleared_match_ids=cleared_match_ids,
                 )
-            else:
-                updated_inputs[0] = winner1
+                if resolved is not _UNCHANGED:
+                    updated_inputs[slot] = resolved  # type: ignore[assignment]
 
-        if subsequent_match.stage_item_input2_winner_from_match_id is not None and (
-            affected_match2 := affected_matches.get(
-                subsequent_match.stage_item_input2_winner_from_match_id
-            )
-        ):
-            winner2 = affected_match2.get_winner()
-            if winner2 is None:
-                logger.warning(
-                    "Match %s has no winner yet or is a draw — skipping elimination propagation",
-                    affected_match2.id,
+            if original_inputs != updated_inputs:
+                input_ids = [input_.id if input_ else None for input_ in updated_inputs]
+
+                affected_matches[subsequent_match.id] = subsequent_match.model_copy(
+                    update={
+                        "stage_item_input1_id": input_ids[0],
+                        "stage_item_input2_id": input_ids[1],
+                        "stage_item_input1": updated_inputs[0],
+                        "stage_item_input2": updated_inputs[1],
+                    }
                 )
-            else:
-                updated_inputs[1] = winner2
+                updated = affected_matches[subsequent_match.id]
+                has_unresolved_inputs = (
+                    (
+                        updated.stage_item_input1_winner_from_match_id is not None
+                        and updated.stage_item_input1_id is None
+                    )
+                    or (
+                        updated.stage_item_input2_winner_from_match_id is not None
+                        and updated.stage_item_input2_id is None
+                    )
+                )
+                if (
+                    derive_match_state(updated.match_sets) is not MatchState.COMPLETED
+                    or has_unresolved_inputs
+                ):
+                    cleared_match_ids.add(subsequent_match.id)
 
-        if original_inputs != updated_inputs:
-            input_ids = [input_.id if input_ else None for input_ in updated_inputs]
-
-            affected_matches[subsequent_match.id] = subsequent_match.model_copy(
-                update={
-                    "stage_item_input1_id": input_ids[0],
-                    "stage_item_input2_id": input_ids[1],
-                    "stage_item_input1": updated_inputs[0],
-                    "stage_item_input2": updated_inputs[1],
-                }
-            )
-
-    # All affected matches need to be updated except for the inputs.
     return {
         match_id: match
         for match_id, match in affected_matches.items()
-        if match_ids is None or match.id not in match_ids
+        if match_ids is None or match_id not in match_ids
     }
 
 

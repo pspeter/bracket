@@ -3,7 +3,7 @@ from bracket.logic.match_sets.pointer import (
     IllegalSetTransitionError,
     apply_pointer_transition,
 )
-from bracket.models.db.match import MatchSet, MatchSetBody
+from bracket.models.db.match import MatchSet, MatchSetBody, MatchSetScoreEditBody
 from bracket.utils.id_types import MatchId, MatchSetId, RankingId, StageItemId
 
 _MATCH_SET_STATE_CASE_OUTER = """
@@ -161,6 +161,37 @@ async def sql_update_match_set(
                 "current_set_in_progress": new_in_progress,
             },
         )
+
+
+async def sql_score_edit_match_set(
+    match_id: MatchId, match_set_id: MatchSetId, body: MatchSetScoreEditBody
+) -> None:
+    lock_row = await database.fetch_one(
+        query="""
+            SELECT ms.id
+            FROM matches m
+            JOIN match_sets ms ON ms.match_id = m.id
+            WHERE m.id = :match_id AND ms.id = :match_set_id
+            FOR UPDATE OF m
+        """,
+        values={"match_id": match_id, "match_set_id": match_set_id},
+    )
+    if lock_row is None:
+        raise ValueError(f"Could not find set {match_set_id} for match {match_id}")
+
+    await database.execute(
+        query="""
+            UPDATE match_sets
+            SET stage_item_input1_score = :stage_item_input1_score,
+                stage_item_input2_score = :stage_item_input2_score
+            WHERE id = :match_set_id
+        """,
+        values={
+            "match_set_id": match_set_id,
+            "stage_item_input1_score": body.stage_item_input1_score,
+            "stage_item_input2_score": body.stage_item_input2_score,
+        },
+    )
 
 
 async def sql_add_trailing_sets(

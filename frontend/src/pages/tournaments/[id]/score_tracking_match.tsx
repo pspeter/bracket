@@ -2,7 +2,7 @@ import { ScoreTrackingMatchView } from '@components/score_tracking/views';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getTournamentById } from '@services/adapter';
-import { updateMatchSet } from '@services/match';
+import { endMatch, reopenMatch, scoreEditMatchSet, startMatch } from '@services/match';
 import { getTournamentScoreTrackingMatch } from '@services/score_tracking';
 import { useParams } from 'react-router';
 
@@ -22,9 +22,23 @@ export default function TournamentScoreTrackingMatchPage() {
           storageKey={`tournament-score-tracking:${tournamentData.id}:${matchId}:swapped`}
           levels={swrTournamentResponse.data?.data.levels ?? []}
           refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}
-          updateSet={async (setId, body) => {
-            if (matchId == null) return;
-            await updateMatchSet(tournamentData.id, matchId, setId, body);
+          actions={{
+            startMatch: async () => {
+              if (matchId == null) return;
+              await startMatch(tournamentData.id, matchId);
+            },
+            endMatch: async () => {
+              if (matchId == null) return;
+              await endMatch(tournamentData.id, matchId);
+            },
+            reopenMatch: async () => {
+              if (matchId == null) return;
+              await reopenMatch(tournamentData.id, matchId);
+            },
+            scoreEdit: async (setId, body) => {
+              if (matchId == null) return;
+              await scoreEditMatchSet(tournamentData.id, matchId, setId, body);
+            },
           }}
         />
       ) : null}

@@ -475,6 +475,20 @@ export type MatchSetBody = {
 };
 
 /**
+ * MatchSetScoreEditBody
+ */
+export type MatchSetScoreEditBody = {
+  /**
+   * Stage Item Input1 Score
+   */
+  stage_item_input1_score: number;
+  /**
+   * Stage Item Input2 Score
+   */
+  stage_item_input2_score: number;
+};
+
+/**
  * MatchSetState
  */
 export type MatchSetState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
@@ -3135,6 +3149,78 @@ export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGe
 export type GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponse =
   GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses[keyof GetScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdGetResponses];
 
+export type EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostData = {
+  body?: never;
+  path: {
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}/end';
+};
+
+export type EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostError =
+  EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostErrors[keyof EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostErrors];
+
+export type EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponse =
+  EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponses[keyof EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponses];
+
+export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostData = {
+  body?: never;
+  path: {
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}/reopen';
+};
+
+export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostError =
+  ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostErrors[keyof ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostErrors];
+
+export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponse =
+  ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses[keyof ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses];
+
 export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData = {
   body: MatchSetBody;
   path: {
@@ -3175,6 +3261,85 @@ export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSe
 
 export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponse =
   UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses];
+
+export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostData =
+  {
+    body: MatchSetScoreEditBody;
+    path: {
+      /**
+       * Match Id
+       */
+      match_id: number;
+      /**
+       * Set Id
+       */
+      set_id: number;
+      /**
+       * Score Tracking Token
+       */
+      score_tracking_token: string;
+    };
+    query?: never;
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}/score-edit';
+  };
+
+export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+  };
+
+export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostError =
+  ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostErrors[keyof ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostErrors];
+
+export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: ScoreTrackingMatchResponse;
+  };
+
+export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponse =
+  ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponses[keyof ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponses];
+
+export type StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostData = {
+  body?: never;
+  path: {
+    /**
+     * Match Id
+     */
+    match_id: number;
+    /**
+     * Score Tracking Token
+     */
+    score_tracking_token: string;
+  };
+  query?: never;
+  url: '/score-tracking/{score_tracking_token}/matches/{match_id}/start';
+};
+
+export type StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostError =
+  StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostErrors[keyof StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostErrors];
+
+export type StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponse =
+  StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponses[keyof StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponses];
 
 export type GetSignupInfoSignupSignupTokenGetData = {
   body?: never;
@@ -3894,6 +4059,78 @@ export type UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses = {
 export type UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponse =
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses[keyof UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses];
 
+export type EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/end';
+};
+
+export type EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostError =
+  EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostErrors[keyof EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostErrors];
+
+export type EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponse =
+  EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponses[keyof EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponses];
+
+export type ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/reopen';
+};
+
+export type ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostError =
+  ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostErrors[keyof ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostErrors];
+
+export type ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponse =
+  ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponses[keyof ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponses];
+
 export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostData = {
   body: MatchRescheduleBody;
   path: {
@@ -3929,6 +4166,42 @@ export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostRe
 
 export type RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponse =
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses[keyof RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses];
+
+export type ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/reset';
+};
+
+export type ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostError =
+  ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostErrors[keyof ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostErrors];
+
+export type ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponse =
+  ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponses[keyof ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponses];
 
 export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostData = {
   body: MatchResizeBreakBody;
@@ -4006,6 +4279,85 @@ export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSets
 
 export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponse =
   UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses];
+
+export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostData =
+  {
+    body: MatchSetScoreEditBody;
+    path: {
+      /**
+       * Tournament Id
+       */
+      tournament_id: number;
+      /**
+       * Match Id
+       */
+      match_id: number;
+      /**
+       * Set Id
+       */
+      set_id: number;
+    };
+    query?: never;
+    url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}/score-edit';
+  };
+
+export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+  };
+
+export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostError =
+  ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostErrors[keyof ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostErrors];
+
+export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: ScoreTrackingMatchResponse;
+  };
+
+export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponse =
+  ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponses[keyof ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponses];
+
+export type StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostData = {
+  body?: never;
+  path: {
+    /**
+     * Tournament Id
+     */
+    tournament_id: number;
+    /**
+     * Match Id
+     */
+    match_id: number;
+  };
+  query?: never;
+  url: '/tournaments/{tournament_id}/matches/{match_id}/start';
+};
+
+export type StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostError =
+  StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostErrors[keyof StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostErrors];
+
+export type StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponses = {
+  /**
+   * Successful Response
+   */
+  200: ScoreTrackingMatchResponse;
+};
+
+export type StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponse =
+  StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponses[keyof StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponses];
 
 export type UnscheduleMatchTournamentsTournamentIdMatchesMatchIdUnschedulePostData = {
   body?: never;

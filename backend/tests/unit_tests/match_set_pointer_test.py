@@ -1,8 +1,13 @@
 import pytest
 
 from bracket.logic.match_sets.pointer import (
+    IllegalMatchTransitionError,
     IllegalSetTransitionError,
+    apply_end,
     apply_pointer_transition,
+    apply_reopen,
+    apply_reset,
+    apply_start,
     derive_match_state_from_pointer,
     derive_set_state,
 )
@@ -59,3 +64,47 @@ def test_apply_pointer_transition_start_and_complete() -> None:
 def test_apply_pointer_transition_rejects_skipping_a_set() -> None:
     with pytest.raises(IllegalSetTransitionError):
         apply_pointer_transition(0, False, 2, MatchSetState.COMPLETED)
+
+
+def test_apply_start_from_not_started() -> None:
+    assert apply_start(0, False, 3) == (0, True)
+
+
+def test_apply_start_between_sets() -> None:
+    assert apply_start(1, False, 3) == (1, True)
+
+
+def test_apply_start_rejects_when_already_in_progress() -> None:
+    with pytest.raises(IllegalMatchTransitionError):
+        apply_start(0, True, 3)
+
+
+def test_apply_start_rejects_when_all_sets_completed() -> None:
+    with pytest.raises(IllegalMatchTransitionError):
+        apply_start(3, False, 3)
+
+
+def test_apply_end_completes_current_set() -> None:
+    assert apply_end(0, True) == (1, False)
+
+
+def test_apply_end_rejects_when_not_in_progress() -> None:
+    with pytest.raises(IllegalMatchTransitionError):
+        apply_end(1, False)
+
+
+def test_apply_reopen_last_completed_set() -> None:
+    assert apply_reopen(3, False) == (2, True)
+
+
+def test_apply_reopen_between_sets() -> None:
+    assert apply_reopen(1, False) == (0, True)
+
+
+def test_apply_reopen_rejects_when_nothing_completed() -> None:
+    with pytest.raises(IllegalMatchTransitionError):
+        apply_reopen(0, False)
+
+
+def test_apply_reset() -> None:
+    assert apply_reset() == (0, False)

@@ -3,6 +3,12 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
+from bracket.logic.match_sets.apply_update import (
+    end_match_and_recalculate,
+    reopen_match_and_recalculate,
+    reset_match_and_recalculate,
+    start_match_and_recalculate,
+)
 from bracket.logic.planning.matches import (
     assign_missing_referees_only,
     eligible_referee_slot_ids,
@@ -21,14 +27,15 @@ from bracket.models.db.match import (
     MatchCreateBodyFrontend,
     MatchRescheduleBody,
     MatchResizeBreakBody,
-    MatchState,
     MatchSwapBody,
     SchedulerWeights,
 )
-from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
-from bracket.routes.auth import user_authenticated_for_tournament
+from bracket.routes.auth import (
+    tournament_by_score_tracking_token,
+    user_authenticated_for_tournament,
+)
 from bracket.routes.models import (
     ScoreTrackingMatchResponse,
     SingleMatchResponse,
@@ -70,36 +77,122 @@ async def validate_referee_slot_for_match(
         )
 
 
-async def validate_match_can_be_started(
-    tournament_id: TournamentId, existing_match: Match, next_state: MatchState
-) -> None:
-    if existing_match.state is MatchState.NOT_STARTED and next_state in {
-        MatchState.IN_PROGRESS,
-        MatchState.COMPLETED,
-    }:
-        stages = await get_full_tournament_details(tournament_id, round_id=existing_match.round_id)
-        for stage in stages:
-            for stage_item in stage.stage_items:
-                for round_ in stage_item.rounds:
-                    if round_.id == existing_match.round_id:
-                        match = next((m for m in round_.matches if m.id == existing_match.id), None)
-                        if (
-                            match is not None
-                            and isinstance(match.stage_item_input1, StageItemInputFinal)
-                            and isinstance(match.stage_item_input2, StageItemInputFinal)
-                        ):
-                            return
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=(
-                                "Cannot start this match because its opponents are not "
-                                "determined yet."
-                            ),
-                        )
-
-        raise ValueError(
-            f"Could not find stage for match {existing_match.id} in tournament {tournament_id}"
+async def get_score_tracking_match_response(
+    tournament_id: TournamentId, match_id: MatchId
+) -> ScoreTrackingMatchResponse:
+    match = await sql_get_match_with_details(tournament_id, match_id)
+    if match is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Could not find match with id {match_id}",
         )
+    return ScoreTrackingMatchResponse(data=match)
+
+
+async def _scheduled_match_for_score_tracking(
+    tournament_id: TournamentId, match_id: MatchId
+) -> Match:
+    match = await match_dependency(tournament_id, match_id)
+    if match.start_time is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Could not find scheduled match"
+        )
+    return match
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/start",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def start_match_authenticated(
+    tournament_id: TournamentId,
+    match_id: MatchId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    match: Match = Depends(match_dependency),
+) -> ScoreTrackingMatchResponse:
+    updated = await start_match_and_recalculate(tournament_id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/start",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def start_match_by_token(
+    match_id: MatchId,
+    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+) -> ScoreTrackingMatchResponse:
+    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
+    updated = await start_match_and_recalculate(tournament.id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/end",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def end_match_authenticated(
+    tournament_id: TournamentId,
+    match_id: MatchId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    match: Match = Depends(match_dependency),
+) -> ScoreTrackingMatchResponse:
+    updated = await end_match_and_recalculate(tournament_id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/end",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def end_match_by_token(
+    match_id: MatchId,
+    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+) -> ScoreTrackingMatchResponse:
+    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
+    updated = await end_match_and_recalculate(tournament.id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/reopen",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def reopen_match_authenticated(
+    tournament_id: TournamentId,
+    match_id: MatchId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    match: Match = Depends(match_dependency),
+) -> ScoreTrackingMatchResponse:
+    updated = await reopen_match_and_recalculate(tournament_id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/reopen",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def reopen_match_by_token(
+    match_id: MatchId,
+    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+) -> ScoreTrackingMatchResponse:
+    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
+    updated = await reopen_match_and_recalculate(tournament.id, match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+@router.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/reset",
+    response_model=ScoreTrackingMatchResponse,
+)
+async def reset_match_authenticated(
+    tournament_id: TournamentId,
+    match_id: MatchId,
+    _: UserPublic = Depends(user_authenticated_for_tournament),
+    match: Match = Depends(match_dependency),
+) -> ScoreTrackingMatchResponse:
+    updated = await reset_match_and_recalculate(tournament_id, match)
+    return ScoreTrackingMatchResponse(data=updated)
 
 
 @router.delete("/tournaments/{tournament_id}/matches/{match_id}", response_model=SuccessResponse)
@@ -304,15 +397,3 @@ async def update_match_by_id(
         await reorder_all_matches(tournament, court_matches)
 
     return SuccessResponse()
-
-
-async def get_score_tracking_match_response(
-    tournament_id: TournamentId, match_id: MatchId
-) -> ScoreTrackingMatchResponse:
-    match = await sql_get_match_with_details(tournament_id, match_id)
-    if match is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Could not find match with id {match_id}",
-        )
-    return ScoreTrackingMatchResponse(data=match)

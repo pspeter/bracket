@@ -4,6 +4,7 @@ import {
   MatchRescheduleBody,
   MatchResizeBreakBody,
   MatchSetBody,
+  MatchSetScoreEditBody,
   MatchSwapBody,
   SchedulerWeights,
   ScoreTrackingInfoResponse,
@@ -51,6 +52,120 @@ export async function updateMatchSet(
     .put(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
   await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function scoreEditMatchSet(
+  tournament_id: number,
+  match_id: number,
+  set_id: number,
+  body: MatchSetScoreEditBody
+) {
+  const response = await createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}/score-edit`, body)
+    .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function startMatch(tournament_id: number, match_id: number) {
+  const response = await createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/start`)
+    .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function endMatch(tournament_id: number, match_id: number) {
+  const response = await createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/end`)
+    .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function reopenMatch(tournament_id: number, match_id: number) {
+  const response = await createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/reopen`)
+    .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function resetMatch(tournament_id: number, match_id: number) {
+  const response = await createAxios()
+    .post(`tournaments/${tournament_id}/matches/${match_id}/reset`)
+    .catch((response: any) => handleRequestError(response));
+  await mutateIssues(tournament_id);
+  return response;
+}
+
+export async function scoreEditScoreTrackingMatchSet(
+  score_tracking_token: string,
+  tournament_id: number | null,
+  match_id: number,
+  set_id: number,
+  body: MatchSetScoreEditBody
+) {
+  const response = await createAxios()
+    .post(
+      `score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}/score-edit`,
+      body
+    )
+    .catch((response: any) => handleRequestError(response));
+  const tournamentId =
+    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
+  if (tournamentId != null) {
+    await mutateIssues(tournamentId);
+  }
+  return response;
+}
+
+export async function startScoreTrackingMatch(
+  score_tracking_token: string,
+  tournament_id: number | null,
+  match_id: number
+) {
+  const response = await createAxios()
+    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/start`)
+    .catch((response: any) => handleRequestError(response));
+  const tournamentId =
+    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
+  if (tournamentId != null) {
+    await mutateIssues(tournamentId);
+  }
+  return response;
+}
+
+export async function endScoreTrackingMatch(
+  score_tracking_token: string,
+  tournament_id: number | null,
+  match_id: number
+) {
+  const response = await createAxios()
+    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/end`)
+    .catch((response: any) => handleRequestError(response));
+  const tournamentId =
+    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
+  if (tournamentId != null) {
+    await mutateIssues(tournamentId);
+  }
+  return response;
+}
+
+export async function reopenScoreTrackingMatch(
+  score_tracking_token: string,
+  tournament_id: number | null,
+  match_id: number
+) {
+  const response = await createAxios()
+    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/reopen`)
+    .catch((response: any) => handleRequestError(response));
+  const tournamentId =
+    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
+  if (tournamentId != null) {
+    await mutateIssues(tournamentId);
+  }
   return response;
 }
 
