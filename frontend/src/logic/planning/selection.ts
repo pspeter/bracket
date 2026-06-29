@@ -72,7 +72,8 @@ export type PlanningAction =
     }
   | { type: 'swap'; matchId1: number; matchId2: number }
   | { type: 'unschedule'; matchId: number }
-  | { type: 'resize-break'; matchId: number; newDurationMinutes: number };
+  | { type: 'resize-break'; matchId: number; newDurationMinutes: number }
+  | { type: 'open-details'; matchId: number };
 
 export interface SelectionTransition {
   state: SelectionState;
@@ -175,8 +176,20 @@ export function selectionReducer(
               actions: [{ type: 'unschedule', matchId: event.match.matchId }],
             };
           }
+          if (mode === 'edit') {
+            return {
+              state: IDLE_SELECTION,
+              actions: [{ type: 'open-details', matchId: event.match.matchId }],
+            };
+          }
           return stay({ kind: 'match-selected', match: event.match });
         case 'tap-tray-match':
+          if (mode === 'edit') {
+            return {
+              state: IDLE_SELECTION,
+              actions: [{ type: 'open-details', matchId: event.matchId }],
+            };
+          }
           return stay({ kind: 'tray-match-selected', matchId: event.matchId });
         default:
           return stay(state);
@@ -259,7 +272,7 @@ export interface PlannerState {
   selection: SelectionState;
 }
 
-const PLANNER_MODES = ['move', 'unschedule'] as const;
+const PLANNER_MODES = ['move', 'unschedule', 'edit'] as const;
 export type PlannerMode = (typeof PLANNER_MODES)[number];
 export function isPlannerMode(value: string): value is PlannerMode {
   return (PLANNER_MODES as readonly string[]).includes(value);

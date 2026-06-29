@@ -573,6 +573,38 @@ describe('plannerReducer', () => {
       expect(actions).toEqual([]);
     });
 
+    it('edit mode opens details for a planned match on tap', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'edit'), {
+        type: 'tap-match',
+        match: ref(10, 1, 0),
+      });
+
+      expect(state).toEqual(planner('compact', IDLE_SELECTION, 'edit'));
+      expect(actions).toEqual([{ type: 'open-details', matchId: 10 }]);
+    });
+
+    it('edit mode opens details for a tray match on tap', () => {
+      const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'edit'), {
+        type: 'tap-tray-match',
+        matchId: 30,
+      });
+
+      expect(state).toEqual(planner('compact', IDLE_SELECTION, 'edit'));
+      expect(actions).toEqual([{ type: 'open-details', matchId: 30 }]);
+    });
+
+    it('edit mode opens details for played and locked planned matches', () => {
+      for (const match of [startedRef(10, 1, 0), playedRef(11, 1, 1), lockedRef(12, 1, 2)]) {
+        const { state, actions } = plannerReducer(planner('compact', IDLE_SELECTION, 'edit'), {
+          type: 'tap-match',
+          match,
+        });
+
+        expect(state).toEqual(planner('compact', IDLE_SELECTION, 'edit'));
+        expect(actions).toEqual([{ type: 'open-details', matchId: match.matchId }]);
+      }
+    });
+
     it('deselects on a second tap of the selected match', () => {
       const { state, actions } = plannerReducer(planner('agenda', selected(ref(10, 1, 2))), {
         type: 'tap-match',
