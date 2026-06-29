@@ -184,10 +184,13 @@ matches = Table(
     Column("input1_slot", Integer, nullable=True),
     Column("input2_slot", Integer, nullable=True),
     Column("referee_slot", Integer, nullable=True),
+    Column("completed_set_count", Integer, nullable=False, server_default="0"),
+    Column("current_set_in_progress", Boolean, nullable=False, server_default="f"),
     CheckConstraint(
         "referee_stage_item_input_id IS NULL OR referee_name IS NULL",
         name="matches_at_most_one_referee",
     ),
+    CheckConstraint("completed_set_count >= 0", name="matches_completed_set_count_non_negative"),
 )
 
 match_sets = Table(
@@ -204,17 +207,6 @@ match_sets = Table(
     Column("set_number", Integer, nullable=False),
     Column("stage_item_input1_score", Integer, nullable=False, server_default="0"),
     Column("stage_item_input2_score", Integer, nullable=False, server_default="0"),
-    Column(
-        "state",
-        Enum(
-            "NOT_STARTED",
-            "IN_PROGRESS",
-            "COMPLETED",
-            name="match_set_state",
-        ),
-        nullable=False,
-        server_default="NOT_STARTED",
-    ),
     UniqueConstraint("match_id", "set_number"),
 )
 

@@ -479,6 +479,7 @@ async def apply_match_states(tournament_id: TournamentId) -> None:
         match_id = assert_some(match.id)
         for match_set in await get_sets_for_match(match_id):
             await sql_update_match_set(
+                match_id,
                 match_set.id,
                 MatchSetBody(
                     stage_item_input1_score=score1,

@@ -1,12 +1,56 @@
 from bracket.database import database
+from bracket.logic.match_sets.pointer import (
+    IllegalSetTransitionError,
+    apply_pointer_transition,
+)
 from bracket.models.db.match import MatchSet, MatchSetBody
 from bracket.utils.id_types import MatchId, MatchSetId, RankingId, StageItemId
 
+_MATCH_SET_STATE_CASE_OUTER = """
+    CASE
+        WHEN ms.set_number <= matches.completed_set_count THEN 'COMPLETED'
+        WHEN ms.set_number = matches.completed_set_count + 1
+             AND matches.current_set_in_progress THEN 'IN_PROGRESS'
+        ELSE 'NOT_STARTED'
+    END
+"""
+
+_MATCH_SET_STATE_CASE_JOINED = """
+    CASE
+        WHEN ms.set_number <= m.completed_set_count THEN 'COMPLETED'
+        WHEN ms.set_number = m.completed_set_count + 1
+             AND m.current_set_in_progress THEN 'IN_PROGRESS'
+        ELSE 'NOT_STARTED'
+    END
+"""
+
+_MATCH_SET_COLUMNS = f"""
+    ms.id,
+    ms.match_id,
+    ms.set_number,
+    ms.stage_item_input1_score,
+    ms.stage_item_input2_score,
+    {_MATCH_SET_STATE_CASE_JOINED} AS state
+"""
+
 # SQL fragment that aggregates a match's sets into a JSON array, ordered by set number.
 # Correlates on the outer ``matches`` row, so callers must alias the matches table as ``matches``.
-MATCH_SETS_SUBQUERY = """
+MATCH_SETS_SUBQUERY = f"""
     (
-        SELECT COALESCE(json_agg(ms.* ORDER BY ms.set_number), '[]'::json)
+        SELECT COALESCE(
+            json_agg(
+                json_build_object(
+                    'id', ms.id,
+                    'match_id', ms.match_id,
+                    'set_number', ms.set_number,
+                    'stage_item_input1_score', ms.stage_item_input1_score,
+                    'stage_item_input2_score', ms.stage_item_input2_score,
+                    'state', {_MATCH_SET_STATE_CASE_OUTER}
+                )
+                ORDER BY ms.set_number
+            ),
+            '[]'::json
+        )
         FROM match_sets ms
         WHERE ms.match_id = matches.id
     ) AS match_sets
@@ -14,17 +58,24 @@ MATCH_SETS_SUBQUERY = """
 
 
 async def get_sets_for_match(match_id: MatchId) -> list[MatchSet]:
-    query = """
-        SELECT * FROM match_sets
-        WHERE match_id = :match_id
-        ORDER BY set_number
+    query = f"""
+        SELECT {_MATCH_SET_COLUMNS}
+        FROM match_sets ms
+        JOIN matches m ON m.id = ms.match_id
+        WHERE ms.match_id = :match_id
+        ORDER BY ms.set_number
         """
     rows = await database.fetch_all(query=query, values={"match_id": match_id})
     return [MatchSet.model_validate(dict(row._mapping)) for row in rows]
 
 
 async def sql_get_match_set(match_set_id: MatchSetId) -> MatchSet | None:
-    query = "SELECT * FROM match_sets WHERE id = :match_set_id"
+    query = f"""
+        SELECT {_MATCH_SET_COLUMNS}
+        FROM match_sets ms
+        JOIN matches m ON m.id = ms.match_id
+        WHERE ms.id = :match_set_id
+    """
     row = await database.fetch_one(query=query, values={"match_set_id": match_set_id})
     return MatchSet.model_validate(dict(row._mapping)) if row is not None else None
 
@@ -37,31 +88,79 @@ async def sql_create_match_sets(match_id: MatchId, num_sets: int) -> None:
     """
     await database.execute(
         query="""
-            INSERT INTO match_sets (match_id, set_number, state)
-            SELECT :match_id, set_number, 'NOT_STARTED'
+            INSERT INTO match_sets (match_id, set_number)
+            SELECT :match_id, set_number
             FROM generate_series(1, CAST(:num_sets AS integer)) AS set_number
         """,
         values={"match_id": match_id, "num_sets": max(num_sets, 1)},
     )
 
 
-async def sql_update_match_set(match_set_id: MatchSetId, body: MatchSetBody) -> None:
-    query = """
-        UPDATE match_sets
-        SET stage_item_input1_score = :stage_item_input1_score,
-            stage_item_input2_score = :stage_item_input2_score,
-            state = :state
-        WHERE id = :match_set_id
-        """
+async def sql_update_match_set(
+    match_id: MatchId, match_set_id: MatchSetId, body: MatchSetBody
+) -> None:
+    """Atomically update set scores and advance the match progress pointer."""
+    lock_row = await database.fetch_one(
+        query="""
+            SELECT
+                m.completed_set_count,
+                m.current_set_in_progress,
+                ms.set_number
+            FROM matches m
+            JOIN match_sets ms ON ms.match_id = m.id
+            WHERE m.id = :match_id AND ms.id = :match_set_id
+            FOR UPDATE OF m
+        """,
+        values={"match_id": match_id, "match_set_id": match_set_id},
+    )
+    if lock_row is None:
+        raise ValueError(f"Could not find set {match_set_id} for match {match_id}")
+
+    completed_set_count = int(lock_row._mapping["completed_set_count"])
+    current_set_in_progress = bool(lock_row._mapping["current_set_in_progress"])
+    set_number = int(lock_row._mapping["set_number"])
+
+    try:
+        new_completed, new_in_progress = apply_pointer_transition(
+            completed_set_count,
+            current_set_in_progress,
+            set_number,
+            body.state,
+        )
+    except IllegalSetTransitionError:
+        raise
+
     await database.execute(
-        query=query,
+        query="""
+            UPDATE match_sets
+            SET stage_item_input1_score = :stage_item_input1_score,
+                stage_item_input2_score = :stage_item_input2_score
+            WHERE id = :match_set_id
+        """,
         values={
             "match_set_id": match_set_id,
             "stage_item_input1_score": body.stage_item_input1_score,
             "stage_item_input2_score": body.stage_item_input2_score,
-            "state": body.state.value,
         },
     )
+
+    if (
+        new_completed != completed_set_count
+        or new_in_progress != current_set_in_progress
+    ):
+        await database.execute(
+            query="""
+                UPDATE matches
+                SET completed_set_count = :completed_set_count,
+                    current_set_in_progress = :current_set_in_progress
+                WHERE id = :match_id
+            """,
+            values={
+                "match_id": match_id,
+                "completed_set_count": new_completed,
+                "current_set_in_progress": new_in_progress,
+            },
+        )
 
 
 async def sql_add_trailing_sets(
@@ -71,8 +170,8 @@ async def sql_add_trailing_sets(
     # matching how sql_create_match_sets pre-populates sets at match creation.
     await database.execute(
         query="""
-            INSERT INTO match_sets (match_id, set_number, state)
-            SELECT :match_id, set_number, 'NOT_STARTED'
+            INSERT INTO match_sets (match_id, set_number)
+            SELECT :match_id, set_number
             FROM generate_series(
                 CAST(:from_set_number AS integer), CAST(:to_set_number AS integer)
             ) AS set_number
@@ -94,6 +193,18 @@ async def sql_delete_trailing_sets(match_id: MatchId, keep_up_to_set_number: int
         """,
         values={"match_id": match_id, "keep_up_to": keep_up_to_set_number},
     )
+    await database.execute(
+        query="""
+            UPDATE matches
+            SET completed_set_count = LEAST(completed_set_count, :keep_up_to),
+                current_set_in_progress = CASE
+                    WHEN completed_set_count >= :keep_up_to THEN FALSE
+                    ELSE current_set_in_progress
+                END
+            WHERE id = :match_id
+        """,
+        values={"match_id": match_id, "keep_up_to": keep_up_to_set_number},
+    )
 
 
 async def sql_get_match_ids_for_ranking(ranking_id: RankingId) -> list[MatchId]:
@@ -109,16 +220,18 @@ async def sql_get_match_ids_for_ranking(ranking_id: RankingId) -> list[MatchId]:
 
 
 async def sql_ranking_has_active_sets(ranking_id: RankingId) -> bool:
-    """True if any match under this ranking has a set that is IN_PROGRESS or COMPLETED."""
+    """True if any match under this ranking has started or completed at least one set."""
     query = """
         SELECT EXISTS (
             SELECT 1
-            FROM match_sets ms
-            JOIN matches ON matches.id = ms.match_id
+            FROM matches
             JOIN rounds ON rounds.id = matches.round_id
             JOIN stage_items ON stage_items.id = rounds.stage_item_id
             WHERE stage_items.ranking_id = :ranking_id
-              AND ms.state IN ('IN_PROGRESS', 'COMPLETED')
+              AND (
+                  matches.completed_set_count > 0
+                  OR matches.current_set_in_progress
+              )
         ) AS has_active
         """
     row = await database.fetch_one(query=query, values={"ranking_id": ranking_id})

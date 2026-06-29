@@ -4,6 +4,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
+from bracket.logic.match_sets.pointer import IllegalSetTransitionError
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
 from bracket.logic.scheduling.handle_stage_activation import (
@@ -75,7 +76,13 @@ async def update_match_set_and_recalculate(
     # recalculations must be atomic, so a failure can't leave the score and the derived
     # state out of sync.
     async with database.transaction():
-        await sql_update_match_set(match_set_id, body)
+        try:
+            await sql_update_match_set(match.id, match_set_id, body)
+        except IllegalSetTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
         # completed_at side effect: set when the match becomes completed, clear when it reverts.
         if new_state is MatchState.COMPLETED and match.completed_at is None:

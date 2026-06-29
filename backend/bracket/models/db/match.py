@@ -44,6 +44,10 @@ class MatchSet(BaseModelORM):
 def derive_match_state(sets: list["MatchSet"]) -> MatchState:
     """Derive a match's overall state from the states of its sets.
 
+    Set states are derived positionally from the match progress pointer at read time,
+    so this reflects the pointer invariant: a contiguous COMPLETED prefix, at most one
+    IN_PROGRESS set, then NOT_STARTED.
+
     - all sets NOT_STARTED (or no sets) -> NOT_STARTED
     - all sets COMPLETED -> COMPLETED
     - anything else (any IN_PROGRESS, or a mix of COMPLETED and NOT_STARTED) -> IN_PROGRESS
