@@ -386,6 +386,14 @@ export default function SchedulePage() {
       setFocus((previous) => ({ ...focusTarget, nonce: (previous?.nonce ?? 0) + 1 }));
     }
 
+    for (const action of actions) {
+      if (action.type === 'open-details') {
+        setDetailsMatchId(action.matchId);
+      }
+    }
+
+    const backendActions = actions.filter((action) => action.type !== 'open-details');
+
     const updateTrayOpened = () =>
       setTrayOpened((opened) =>
         nextTrayOpenedAfterPlannerEvent({
@@ -397,13 +405,13 @@ export default function SchedulePage() {
         })
       );
 
-    if (actions.length > 0) {
+    if (backendActions.length > 0) {
       try {
         // Show the predicted outcome immediately; the revalidation that follows the
         // request replaces it with the backend's authoritative schedule.
         await swrStagesResponse.mutate(
           async (current) => {
-            for (const action of actions) {
+            for (const action of backendActions) {
               await performAction(action);
             }
             return current;
@@ -416,7 +424,7 @@ export default function SchedulePage() {
                     ...current,
                     data: applyPlanningActions(
                       current.data,
-                      actions,
+                      backendActions,
                       tournament.start_time,
                       tournament.margin_minutes
                     ),
@@ -540,6 +548,23 @@ export default function SchedulePage() {
                 ) : (
                   <Text span size="sm">
                     {t('planner_mode_unschedule')}
+                  </Text>
+                )}
+              </Group>
+            </Tooltip>
+          ),
+        },
+        {
+          value: 'edit',
+          label: (
+            <Tooltip label={t('planner_mode_edit')} disabled={!isMobile}>
+              <Group gap={4} wrap="nowrap" justify="center" miw={isMobile ? 26 : undefined}>
+                <IconListDetails size={16} aria-hidden />
+                {isMobile ? (
+                  <VisuallyHidden>{t('planner_mode_edit')}</VisuallyHidden>
+                ) : (
+                  <Text span size="sm">
+                    {t('planner_mode_edit')}
                   </Text>
                 )}
               </Group>
