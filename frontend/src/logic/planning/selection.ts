@@ -259,7 +259,11 @@ export interface PlannerState {
   selection: SelectionState;
 }
 
-export type PlannerMode = 'move' | 'unschedule' | 'edit';
+const PLANNER_MODES = ['move', 'unschedule'] as const;
+export type PlannerMode = (typeof PLANNER_MODES)[number];
+export function isPlannerMode(value: string): value is PlannerMode {
+  return (PLANNER_MODES as readonly string[]).includes(value);
+}
 
 export function initialPlannerState(zoom: ZoomLevel): PlannerState {
   return { zoom, mode: 'move', selection: IDLE_SELECTION };

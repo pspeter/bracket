@@ -54,10 +54,10 @@ import {
   FocusTarget,
   IDLE_SELECTION,
   PlannerEvent,
-  PlannerMode,
   PlannerState,
   PlanningAction,
   initialPlannerState,
+  isPlannerMode,
   plannerReducer,
 } from '@logic/planning/selection';
 import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tray';
@@ -508,7 +508,9 @@ export default function SchedulePage() {
       size={isMobile ? 'xs' : 'sm'}
       value={planner.mode}
       aria-label={t('planner_mode_aria_label')}
-      onChange={(value) => handlePlannerEvent({ type: 'set-mode', mode: value as PlannerMode })}
+      onChange={(value) => {
+        if (isPlannerMode(value)) handlePlannerEvent({ type: 'set-mode', mode: value });
+      }}
       data={[
         {
           value: 'move',
