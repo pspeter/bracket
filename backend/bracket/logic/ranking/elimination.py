@@ -2,7 +2,9 @@ from bracket.models.db.match import Match, MatchState, derive_match_state
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.matches import (
+    sql_reset_match,
     sql_set_input_ids_for_match,
+    sql_set_match_completed_at,
 )
 from bracket.utils.id_types import (
     MatchId,
@@ -44,20 +46,19 @@ def _feeder_input_for_slot(
     return winner
 
 
-def get_inputs_to_update_in_subsequent_elimination_rounds(
+def get_elimination_cascade(
     current_round_id: RoundId,
     stage_item: StageItemWithRounds,
     match_ids: set[MatchId] | None = None,
-) -> dict[MatchId, Match]:
+) -> tuple[dict[MatchId, Match], set[MatchId]]:
     """
-    Determine the updates of stage item input IDs in the elimination tree.
-
-    Crucial aspect is that entering a winner for a match will influence matches of subsequent
-    rounds, because of the tree-like structure of elimination stage items.
+    Determine downstream input updates and which matches must be reset when a feeder
+    is cleared or reset.
     """
     current_round = next(round_ for round_ in stage_item.rounds if round_.id == current_round_id)
     affected_matches: dict[MatchId, Match] = {}
     cleared_match_ids: set[MatchId] = set()
+    reset_match_ids: set[MatchId] = set()
 
     for match in current_round.matches:
         if match_ids is not None and match.id not in match_ids:
@@ -89,6 +90,9 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
                     updated_inputs[slot] = resolved  # type: ignore[assignment]
 
             if original_inputs != updated_inputs:
+                if derive_match_state(subsequent_match.match_sets) is not MatchState.NOT_STARTED:
+                    reset_match_ids.add(subsequent_match.id)
+
                 input_ids = [input_.id if input_ else None for input_ in updated_inputs]
 
                 affected_matches[subsequent_match.id] = subsequent_match.model_copy(
@@ -116,11 +120,52 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
                 ):
                     cleared_match_ids.add(subsequent_match.id)
 
-    return {
+    source_ids = match_ids or set()
+    reset_match_ids.update(cleared_match_ids - source_ids)
+
+    input_updates = {
         match_id: match
         for match_id, match in affected_matches.items()
         if match_ids is None or match_id not in match_ids
     }
+    return input_updates, reset_match_ids
+
+
+def get_inputs_to_update_in_subsequent_elimination_rounds(
+    current_round_id: RoundId,
+    stage_item: StageItemWithRounds,
+    match_ids: set[MatchId] | None = None,
+) -> dict[MatchId, Match]:
+    """
+    Determine the updates of stage item input IDs in the elimination tree.
+
+    Crucial aspect is that entering a winner for a match will influence matches of subsequent
+    rounds, because of the tree-like structure of elimination stage items.
+    """
+    input_updates, _ = get_elimination_cascade(current_round_id, stage_item, match_ids)
+    return input_updates
+
+
+async def cascade_elimination_after_feeder_reset(
+    current_round_id: RoundId,
+    stage_item: StageItemWithRounds,
+    feeder_match_ids: set[MatchId],
+) -> None:
+    input_updates, reset_match_ids = get_elimination_cascade(
+        current_round_id, stage_item, feeder_match_ids
+    )
+    match_to_round = {m.id: r.id for r in stage_item.rounds for m in r.matches}
+    for match_id in sorted(
+        reset_match_ids,
+        key=lambda mid: match_to_round.get(mid, 0),
+        reverse=True,
+    ):
+        await sql_reset_match(match_id)
+        await sql_set_match_completed_at(match_id, None)
+    for _, match in input_updates.items():
+        await sql_set_input_ids_for_match(
+            match.round_id, match.id, [match.stage_item_input1_id, match.stage_item_input2_id]
+        )
 
 
 async def update_inputs_in_subsequent_elimination_rounds(

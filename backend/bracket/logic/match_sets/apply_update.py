@@ -8,11 +8,17 @@ from bracket.database import database
 from bracket.logic.match_sets.pointer import IllegalMatchTransitionError, IllegalSetTransitionError
 from bracket.logic.match_sets.validation import validate_match_can_be_started
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import update_inputs_in_subsequent_elimination_rounds
+from bracket.logic.ranking.elimination import (
+    cascade_elimination_after_feeder_reset,
+    update_inputs_in_subsequent_elimination_rounds,
+)
 from bracket.logic.scheduling.handle_stage_activation import (
     resolve_dependent_inputs_for_completed_stage_item,
 )
-from bracket.logic.scheduling.swiss_resolution_orchestrator import auto_resolve_next_swiss_round
+from bracket.logic.scheduling.swiss_resolution_orchestrator import (
+    auto_resolve_next_swiss_round,
+    unwire_swiss_rounds_with_incomplete_predecessor,
+)
 from bracket.models.db.match import (
     Match,
     MatchSetBody,
@@ -162,6 +168,37 @@ async def reopen_match_and_recalculate(
 async def reset_match_and_recalculate(
     tournament_id: TournamentId, match: Match
 ) -> MatchWithDetails:
-    return await apply_match_change_and_recalculate(
-        tournament_id, match, lambda: sql_reset_match(match.id)
-    )
+    async with database.transaction():
+        try:
+            await sql_reset_match(match.id)
+        except (IllegalSetTransitionError, IllegalMatchTransitionError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
+        await sql_set_match_completed_at(match.id, None)
+
+        round_ = await get_round_by_id(tournament_id, match.round_id)
+        stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
+
+        if stage_item.type == StageType.SINGLE_ELIMINATION:
+            await cascade_elimination_after_feeder_reset(round_.id, stage_item, {match.id})
+
+        stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
+        if stage_item.type == StageType.SWISS:
+            await unwire_swiss_rounds_with_incomplete_predecessor(
+                tournament_id, stage_item, reset_matches=True
+            )
+
+        stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
+        await recalculate_ranking_for_stage_item(tournament_id, stage_item)
+        await resolve_dependent_inputs_for_completed_stage_item(tournament_id, stage_item.id)
+
+        updated = await sql_get_match_with_details(tournament_id, match.id)
+        if updated is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Could not find match with id {match.id}",
+            )
+        return updated

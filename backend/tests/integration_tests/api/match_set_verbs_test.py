@@ -10,6 +10,7 @@ from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
     _resolve_round_1_for_swiss_stage_item,
 )
+from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import (
@@ -287,6 +288,75 @@ async def test_reset_unwires_elimination_bracket(
             final_reset = bracket.rounds[1].matches[0]
             assert final_reset.stage_item_input1_id is None
             assert final_reset.id == final.id
+        finally:
+            await sql_delete_stage_item_with_foreign_keys(stage_item.id)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_reset_clears_completed_elimination_follower(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament_id})) as t2,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as t3,
+        inserted_team(DUMMY_TEAM4.model_copy(update={"tournament_id": tournament_id})) as t4,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})) as stage,
+    ):
+        stage_item = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Elimination",
+                team_count=4,
+                type=StageType.SINGLE_ELIMINATION,
+                ranking_id=auth_context.ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(stage_item, tournament_id)
+
+        try:
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(
+                si for s in details for si in s.stage_items if si.id == stage_item.id
+            )
+            semi1 = bracket.rounds[0].matches[0]
+            semi2 = bracket.rounds[0].matches[1]
+            final = bracket.rounds[1].matches[0]
+
+            await _complete_match(auth_context, semi1.id, semi1.match_sets[0].id)
+            await _complete_match(auth_context, semi2.id, semi2.match_sets[0].id)
+            await _complete_match(auth_context, final.id, final.match_sets[0].id)
+
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(
+                si for s in details for si in s.stage_items if si.id == stage_item.id
+            )
+            final = bracket.rounds[1].matches[0]
+            assert final.state == MatchState.COMPLETED
+            assert final.completed_at is not None
+
+            await send_tournament_request(
+                HTTPMethod.POST, f"matches/{semi1.id}/reset", auth_context
+            )
+
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(
+                si for s in details for si in s.stage_items if si.id == stage_item.id
+            )
+            final_reset = bracket.rounds[1].matches[0]
+            assert final_reset.state == MatchState.NOT_STARTED
+            assert final_reset.completed_at is None
+            assert final_reset.stage_item_input1_id is None
+            assert final_reset.match_sets[0].stage_item_input1_score == 0
+            assert final_reset.match_sets[0].stage_item_input2_score == 0
         finally:
             await sql_delete_stage_item_with_foreign_keys(stage_item.id)
 

@@ -12,16 +12,22 @@ from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
-from bracket.sql.matches import sql_set_input_ids_for_match
+from bracket.sql.matches import (
+    sql_reset_match,
+    sql_set_input_ids_for_match,
+    sql_set_match_completed_at,
+)
 from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.rounds import set_round_lifecycle_state
 from bracket.sql.stage_items import get_stage_item
 from bracket.utils.id_types import TournamentId
 
 
-async def _unwire_swiss_rounds_with_incomplete_predecessor(
+async def unwire_swiss_rounds_with_incomplete_predecessor(
     tournament_id: TournamentId,
     fresh: StageItemWithRounds,
+    *,
+    reset_matches: bool = False,
 ) -> bool:
     """Clear team assignments and revert RESOLVED rounds with incomplete predecessors."""
     changed = False
@@ -41,12 +47,24 @@ async def _unwire_swiss_rounds_with_incomplete_predecessor(
             continue
 
         for match in round_.matches:
+            if reset_matches and match.state is not MatchState.NOT_STARTED:
+                await sql_reset_match(match.id)
+                await sql_set_match_completed_at(match.id, None)
             if match.stage_item_input1_id is not None or match.stage_item_input2_id is not None:
                 await sql_set_input_ids_for_match(round_.id, match.id, [None, None])
                 changed = True
         await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.PLACEHOLDER)
         changed = True
     return changed
+
+
+async def _unwire_swiss_rounds_with_incomplete_predecessor(
+    tournament_id: TournamentId,
+    fresh: StageItemWithRounds,
+) -> bool:
+    return await unwire_swiss_rounds_with_incomplete_predecessor(
+        tournament_id, fresh, reset_matches=False
+    )
 
 
 async def _assign_teams_to_round(
