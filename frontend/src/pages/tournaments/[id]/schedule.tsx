@@ -10,10 +10,13 @@ import {
   Modal,
   Overlay,
   Paper,
+  SegmentedControl,
   Select,
   Stack,
   Text,
   Title,
+  Tooltip,
+  VisuallyHidden,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -54,6 +57,7 @@ import {
   PlannerState,
   PlanningAction,
   initialPlannerState,
+  isPlannerMode,
   plannerReducer,
 } from '@logic/planning/selection';
 import { nextTrayOpenedAfterPlannerEvent } from '@logic/planning/unscheduled_tray';
@@ -499,6 +503,52 @@ export default function SchedulePage() {
         {t('unschedule_button')}
       </Button>
     ) : null;
+  const plannerModeControl = (
+    <SegmentedControl
+      size={isMobile ? 'xs' : 'sm'}
+      value={planner.mode}
+      aria-label={t('planner_mode_aria_label')}
+      onChange={(value) => {
+        if (isPlannerMode(value)) handlePlannerEvent({ type: 'set-mode', mode: value });
+      }}
+      data={[
+        {
+          value: 'move',
+          label: (
+            <Tooltip label={t('planner_mode_move')} disabled={!isMobile}>
+              <Group gap={4} wrap="nowrap" justify="center" miw={isMobile ? 26 : undefined}>
+                <IconArrowsMove size={16} aria-hidden />
+                {isMobile ? (
+                  <VisuallyHidden>{t('planner_mode_move')}</VisuallyHidden>
+                ) : (
+                  <Text span size="sm">
+                    {t('planner_mode_move')}
+                  </Text>
+                )}
+              </Group>
+            </Tooltip>
+          ),
+        },
+        {
+          value: 'unschedule',
+          label: (
+            <Tooltip label={t('planner_mode_unschedule')} disabled={!isMobile}>
+              <Group gap={4} wrap="nowrap" justify="center" miw={isMobile ? 26 : undefined}>
+                <IconCalendarOff size={16} aria-hidden />
+                {isMobile ? (
+                  <VisuallyHidden>{t('planner_mode_unschedule')}</VisuallyHidden>
+                ) : (
+                  <Text span size="sm">
+                    {t('planner_mode_unschedule')}
+                  </Text>
+                )}
+              </Group>
+            </Tooltip>
+          ),
+        },
+      ]}
+    />
+  );
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
@@ -651,15 +701,20 @@ export default function SchedulePage() {
               onSelectMatch={(m) => handlePlannerEvent({ type: 'tap-tray-match', matchId: m.id })}
               rightSection={
                 isMobile ? (
-                  <ActionIcon
-                    variant="default"
-                    size="lg"
-                    aria-label={t('planner_tools_title')}
-                    onClick={() => setToolsOpened(true)}
-                  >
-                    <IconTools size={20} />
-                  </ActionIcon>
-                ) : null
+                  <Group gap="xs" wrap="nowrap">
+                    {plannerModeControl}
+                    <ActionIcon
+                      variant="default"
+                      size="lg"
+                      aria-label={t('planner_tools_title')}
+                      onClick={() => setToolsOpened(true)}
+                    >
+                      <IconTools size={20} />
+                    </ActionIcon>
+                  </Group>
+                ) : (
+                  plannerModeControl
+                )
               }
             />
             {isMobile && (

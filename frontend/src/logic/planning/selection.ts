@@ -161,12 +161,20 @@ function confirmOrPerform(
 
 export function selectionReducer(
   state: SelectionState,
-  event: SelectionEvent
+  event: SelectionEvent,
+  mode: PlannerMode = 'move'
 ): SelectionTransition {
   switch (state.kind) {
     case 'idle':
       switch (event.type) {
         case 'tap-match':
+          if (mode === 'unschedule') {
+            if (event.match.locked || event.match.played) return stay(IDLE_SELECTION);
+            return {
+              state: IDLE_SELECTION,
+              actions: [{ type: 'unschedule', matchId: event.match.matchId }],
+            };
+          }
           return stay({ kind: 'match-selected', match: event.match });
         case 'tap-tray-match':
           return stay({ kind: 'tray-match-selected', matchId: event.matchId });
@@ -247,15 +255,23 @@ export function selectionReducer(
 
 export interface PlannerState {
   zoom: ZoomLevel;
+  mode: PlannerMode;
   selection: SelectionState;
 }
 
+const PLANNER_MODES = ['move', 'unschedule'] as const;
+export type PlannerMode = (typeof PLANNER_MODES)[number];
+export function isPlannerMode(value: string): value is PlannerMode {
+  return (PLANNER_MODES as readonly string[]).includes(value);
+}
+
 export function initialPlannerState(zoom: ZoomLevel): PlannerState {
-  return { zoom, selection: IDLE_SELECTION };
+  return { zoom, mode: 'move', selection: IDLE_SELECTION };
 }
 
 export type PlannerEvent =
   | SelectionEvent
+  | { type: 'set-mode'; mode: PlannerMode }
   | { type: 'zoom-in'; anchor?: FocusTarget | null }
   | { type: 'zoom-out'; anchor?: FocusTarget | null }
   | { type: 'set-zoom'; zoom: ZoomLevel }
@@ -293,12 +309,18 @@ function zoomTo(
 }
 
 function delegate(state: PlannerState, event: SelectionEvent): PlannerTransition {
-  const { state: selection, actions } = selectionReducer(state.selection, event);
+  const { state: selection, actions } = selectionReducer(state.selection, event, state.mode);
   return { state: { ...state, selection }, actions, focus: null };
 }
 
 export function plannerReducer(state: PlannerState, event: PlannerEvent): PlannerTransition {
   switch (event.type) {
+    case 'set-mode':
+      return {
+        state: { ...state, mode: event.mode, selection: IDLE_SELECTION },
+        actions: [],
+        focus: null,
+      };
     case 'zoom-in':
       return zoomTo(state, zoomIn(state.zoom), event.anchor);
     case 'zoom-out':
