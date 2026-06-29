@@ -217,15 +217,29 @@ async def inserted_match(
         await database.execute(
             query="""
                 INSERT INTO match_sets (
-                    match_id, set_number, stage_item_input1_score, stage_item_input2_score, state
+                    match_id, set_number, stage_item_input1_score, stage_item_input2_score
                 )
-                VALUES (:match_id, 1, :score1, :score2, :state)
+                VALUES (:match_id, 1, :score1, :score2)
             """,
             values={
                 "match_id": match_row.id,
                 "score1": set_score1,
                 "score2": set_score2,
-                "state": set_state.value,
+            },
+        )
+        completed_set_count = 1 if set_state is MatchSetState.COMPLETED else 0
+        current_set_in_progress = set_state is MatchSetState.IN_PROGRESS
+        await database.execute(
+            query="""
+                UPDATE matches
+                SET completed_set_count = :completed_set_count,
+                    current_set_in_progress = :current_set_in_progress
+                WHERE id = :match_id
+            """,
+            values={
+                "match_id": match_row.id,
+                "completed_set_count": completed_set_count,
+                "current_set_in_progress": current_set_in_progress,
             },
         )
         sets = await get_sets_for_match(match_row.id)

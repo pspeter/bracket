@@ -101,12 +101,10 @@ async def get_tournament_issues(
         AND matches.start_time IS NOT NULL
         AND matches.start_time + matches.duration_minutes * INTERVAL '1 minute' < :current_time
         AND (
-            EXISTS (
-                SELECT 1
-                FROM match_sets
-                WHERE match_sets.match_id = matches.id
-                AND match_sets.state <> 'COMPLETED'
+            matches.completed_set_count < (
+                SELECT count(*) FROM match_sets WHERE match_sets.match_id = matches.id
             )
+            OR matches.current_set_in_progress
             OR NOT EXISTS (
                 SELECT 1
                 FROM match_sets
@@ -128,12 +126,8 @@ async def get_tournament_issues(
         AND matches.start_time IS NOT NULL
         AND matches.start_time < :current_time
         AND matches.start_time + matches.duration_minutes * INTERVAL '1 minute' >= :current_time
-        AND NOT EXISTS (
-            SELECT 1
-            FROM match_sets
-            WHERE match_sets.match_id = matches.id
-            AND match_sets.state <> 'NOT_STARTED'
-        )
+        AND matches.completed_set_count = 0
+        AND NOT matches.current_set_in_progress
         """,
         tournament_id,
         {"current_time": current_time},

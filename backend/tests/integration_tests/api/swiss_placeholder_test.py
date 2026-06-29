@@ -1,10 +1,9 @@
 import pytest
 
 from bracket.database import database
-from bracket.models.db.match import MatchSetState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
-from bracket.schema import match_sets, matches, rounds, stage_item_inputs, stage_items, stages
+from bracket.schema import matches, rounds, stage_item_inputs, stage_items, stages
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import DUMMY_STAGE1
 from bracket.utils.http import HTTPMethod
@@ -242,12 +241,11 @@ async def test_lower_games_per_player_blocked_when_round_started(
         # Mark all sets in the last round's matches as IN_PROGRESS to simulate a started round
         last_round = sorted(stage_item.rounds, key=lambda r: r.id)[-1]
         for match in last_round.matches:
-            for match_set in match.match_sets:
-                await database.execute(
-                    query=match_sets.update()
-                    .where(match_sets.c.id == match_set.id)
-                    .values(state=MatchSetState.IN_PROGRESS.value)
-                )
+            await database.execute(
+                query=matches.update()
+                .where(matches.c.id == match.id)
+                .values(current_set_in_progress=True)
+            )
 
         response = await send_tournament_request(
             HTTPMethod.PUT,
