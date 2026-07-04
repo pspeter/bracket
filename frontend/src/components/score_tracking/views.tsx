@@ -35,6 +35,7 @@ import {
   getDisplayScores,
   getScoreTrackingViewState,
   isEndSetDisabled,
+  nextScoresAfterAdjust,
 } from '@logic/score_tracking';
 import { computeSideSwitchState } from '@logic/side_switch';
 import {
@@ -402,14 +403,8 @@ export function ScoreTrackingMatchView({
 
   async function adjustScore(slot: 1 | 2, delta: number) {
     if (activeSet == null) return;
-    const realSlot = isSwapped ? (slot === 1 ? 2 : 1) : slot;
-    const next1 = Math.max(0, activeSet.stage_item_input1_score + (realSlot === 1 ? delta : 0));
-    const next2 = Math.max(0, activeSet.stage_item_input2_score + (realSlot === 2 ? delta : 0));
     await runAction(() =>
-      actions.scoreEdit(activeSet.id, {
-        stage_item_input1_score: next1,
-        stage_item_input2_score: next2,
-      })
+      actions.scoreEdit(activeSet.id, nextScoresAfterAdjust(activeSet, slot, delta))
     );
   }
 
