@@ -31,7 +31,11 @@ import {
 import { RefereeDisplay } from '@components/utils/referee';
 import { responseIsValid } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
-import { getScoreTrackingViewState, isEndSetDisabled } from '@logic/score_tracking';
+import {
+  getDisplayScores,
+  getScoreTrackingViewState,
+  isEndSetDisabled,
+} from '@logic/score_tracking';
 import { computeSideSwitchState } from '@logic/side_switch';
 import {
   LevelResponse,
@@ -448,15 +452,8 @@ export function ScoreTrackingMatchView({
     const isLastSet = set.set_number === numSets;
     const endDisabled = isSaving || isEndSetDisabled(set, match, isSwapped);
 
-    const teamDisplayScores = displayedTeams.map((team) =>
-      team.slot === 1
-        ? isSwapped
-          ? set.stage_item_input2_score
-          : set.stage_item_input1_score
-        : isSwapped
-          ? set.stage_item_input1_score
-          : set.stage_item_input2_score
-    );
+    const { first, second } = getDisplayScores(set, isSwapped);
+    const teamDisplayScores = [first, second];
 
     return (
       <>
@@ -546,12 +543,7 @@ export function ScoreTrackingMatchView({
   }
 
   function renderBetweenSets(completed: MatchSet, _next: MatchSet, allSets: MatchSet[]) {
-    const displayScore1 = isSwapped
-      ? completed.stage_item_input2_score
-      : completed.stage_item_input1_score;
-    const displayScore2 = isSwapped
-      ? completed.stage_item_input1_score
-      : completed.stage_item_input2_score;
+    const { first: displayScore1, second: displayScore2 } = getDisplayScores(completed, isSwapped);
 
     const setsWon1 = isSwapped ? countSetsWon(allSets, 2) : countSetsWon(allSets, 1);
     const setsWon2 = isSwapped ? countSetsWon(allSets, 1) : countSetsWon(allSets, 2);
