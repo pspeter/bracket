@@ -523,15 +523,16 @@ function MatchModalForm({
             );
           })}
         </Stack>
+        {/* Backwards verb (reopen) on the left, forward verbs (start/end) on the right. */}
         <Group grow gap="xs" mt="md">
-          {canStart && (
+          {canReopen && (
             <Button
               variant="light"
               size="xs"
               loading={isTransitioning}
-              onClick={() => applyTransition(() => startMatch(tournamentData.id, match.id))}
+              onClick={() => applyTransition(() => reopenMatch(tournamentData.id, match.id))}
             >
-              {isMultiSet ? t('start_next_set_label') : t('start_game_button')}
+              {isMultiSet ? t('reopen_set_button') : t('resume_match_button')}
             </Button>
           )}
           {canEnd && (
@@ -544,14 +545,14 @@ function MatchModalForm({
               {isMultiSet ? t('end_set_label') : t('finish_match_button')}
             </Button>
           )}
-          {canReopen && (
+          {canStart && (
             <Button
               variant="light"
               size="xs"
               loading={isTransitioning}
-              onClick={() => applyTransition(() => reopenMatch(tournamentData.id, match.id))}
+              onClick={() => applyTransition(() => startMatch(tournamentData.id, match.id))}
             >
-              {isMultiSet ? t('reopen_set_button') : t('resume_match_button')}
+              {isMultiSet ? t('start_next_set_label') : t('start_game_button')}
             </Button>
           )}
         </Group>
