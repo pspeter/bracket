@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MatchSet } from '@openapi';
 
-import { getScoreTrackingViewState, isEndSetDisabled } from './score_tracking';
+import { getDisplayScores, getScoreTrackingViewState, isEndSetDisabled } from './score_tracking';
 
 function makeSet(overrides: Partial<MatchSet> & Pick<MatchSet, 'set_number' | 'state'>): MatchSet {
   return {
@@ -166,5 +166,29 @@ describe('isEndSetDisabled', () => {
       stage_item_input2_score: 21,
     });
     expect(isEndSetDisabled(set, { ...baseMatch, two_point_advantage: true }, false)).toBe(true);
+  });
+});
+
+describe('getDisplayScores', () => {
+  it('returns scores in original order when not swapped', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 11,
+      stage_item_input2_score: 7,
+    });
+    expect(getDisplayScores(set, false)).toEqual({ first: 11, second: 7 });
+  });
+
+  it('swaps which score is shown first when isSwapped is true', () => {
+    // The team names swap sides too, so the score must move with its team:
+    // whichever side now shows input2's team must show input2's score.
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 11,
+      stage_item_input2_score: 7,
+    });
+    expect(getDisplayScores(set, true)).toEqual({ first: 7, second: 11 });
   });
 });

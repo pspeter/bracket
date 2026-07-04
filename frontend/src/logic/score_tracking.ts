@@ -22,6 +22,15 @@ export function getScoreTrackingViewState(sets: MatchSet[]): ScoreTrackingViewSt
   return { kind: 'completed' };
 }
 
+export function getDisplayScores(
+  set: Pick<MatchSet, 'stage_item_input1_score' | 'stage_item_input2_score'>,
+  isSwapped: boolean
+): { first: number; second: number } {
+  return isSwapped
+    ? { first: set.stage_item_input2_score, second: set.stage_item_input1_score }
+    : { first: set.stage_item_input1_score, second: set.stage_item_input2_score };
+}
+
 export function isEndSetDisabled(
   set: MatchSet,
   match: {
