@@ -455,20 +455,21 @@ function MatchModalForm({
           setOpened(false);
         })}
       >
-        {contextBadges.length > 0 && (
-          <Group gap="xs" mb="md">
-            {contextBadges.map((badge) => (
-              <Badge
-                key={badge.label}
-                color={contextColour}
-                variant="light"
-                aria-label={`${badge.label}: ${badge.value}`}
-              >
-                {badge.value}
-              </Badge>
-            ))}
-          </Group>
-        )}
+        <Group gap="xs" mb="md">
+          {contextBadges.map((badge) => (
+            <Badge
+              key={badge.label}
+              color={contextColour}
+              variant="light"
+              aria-label={`${badge.label}: ${badge.value}`}
+            >
+              {badge.value}
+            </Badge>
+          ))}
+          <Badge color={getStateColor(match.state)} variant="light">
+            {t(`match_state_${match.state.toLowerCase()}`)}
+          </Badge>
+        </Group>
         {shownConflicts.length > 0 && (
           <Stack gap={6} mb="md">
             <Text size="sm" fw={600}>
@@ -522,10 +523,7 @@ function MatchModalForm({
             );
           })}
         </Stack>
-        <Group gap="xs" mt="md" align="center">
-          <Badge color={getStateColor(match.state)} variant="light">
-            {t(`match_state_${match.state.toLowerCase()}`)}
-          </Badge>
+        <Group grow gap="xs" mt="md">
           <Button
             variant="light"
             size="xs"
