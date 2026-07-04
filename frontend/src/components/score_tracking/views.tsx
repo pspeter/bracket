@@ -14,13 +14,13 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconArrowsExchange, IconMinus, IconPlus } from '@tabler/icons-react';
+import { IconArrowsExchange, IconClock, IconMinus, IconPlus } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
 import { LevelBadge, LevelFilterSelect } from '@components/levels/levels';
-import { Time } from '@components/utils/datetime';
+import { formatTimeRange, Time } from '@components/utils/datetime';
 import PreloadLink from '@components/utils/link';
 import {
   formatMatchInput1,
@@ -430,11 +430,30 @@ export function ScoreTrackingMatchView({
 
   function renderNotStarted() {
     return (
-      <Center>
+      <Stack align="center" gap="lg">
+        <Group gap="sm" justify="center" wrap="nowrap">
+          <Text ta="center" fw={700} fz="lg">
+            {displayedTeams[0].name}
+          </Text>
+          <Text c="dimmed" fw={500}>
+            {t('versus_label')}
+          </Text>
+          <Text ta="center" fw={700} fz="lg">
+            {displayedTeams[1].name}
+          </Text>
+        </Group>
+        {match.start_time != null ? (
+          <Group gap={6} justify="center">
+            <IconClock size={18} color="var(--mantine-color-dimmed)" />
+            <Text fw={500} c="dimmed">
+              {formatTimeRange(match.start_time, match.duration_minutes)}
+            </Text>
+          </Group>
+        ) : null}
         <Button size="xl" loading={isSaving} onClick={() => runAction(actions.startMatch)}>
           {t('start_game_button')}
         </Button>
-      </Center>
+      </Stack>
     );
   }
 
