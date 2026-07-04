@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SWRResponse } from 'swr';
 
+import { ConfirmModal } from '@components/modals/confirm_modal';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
 import { formatStageItemInput } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
@@ -32,7 +33,7 @@ import {
 } from '@openapi';
 import { getReferees, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
-import { updateMatch, updateMatchSet } from '@services/match';
+import { resetMatch, updateMatch, updateMatchSet } from '@services/match';
 
 type RefereeValue = { kind: 'slot'; inputId: string } | { kind: 'name'; name: string } | null;
 
@@ -231,6 +232,7 @@ function MatchModalForm({
   });
 
   const [durationIsCustom, setDurationIsCustom] = useState(match.custom_duration_minutes != null);
+  const [resetModalOpened, setResetModalOpened] = useState(false);
 
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const defaultDurationMinutes =
@@ -529,7 +531,28 @@ function MatchModalForm({
         <Button fullWidth style={{ marginTop: 20 }} color="green" type="submit">
           {t('save_button')}
         </Button>
+        <Button
+          fullWidth
+          style={{ marginTop: 12 }}
+          color="red"
+          variant="light"
+          onClick={() => setResetModalOpened(true)}
+        >
+          {t('reset_match_button')}
+        </Button>
       </form>
+      <ConfirmModal
+        opened={resetModalOpened}
+        setOpened={setResetModalOpened}
+        title={t('reset_match_modal_title')}
+        message={t('reset_match_modal_message')}
+        confirmLabel={t('reset_match_button')}
+        onConfirm={async () => {
+          await resetMatch(tournamentData.id, match.id);
+          await swrStagesResponse.mutate();
+          setOpened(false);
+        }}
+      />
     </>
   );
 }

@@ -345,7 +345,7 @@ def _make_stage_item(
     now: datetime_utc,
     input1: StageItemInputFinal,
     input2: StageItemInputFinal,
-    matches: list[MatchWithDetailsDefinitive],
+    matches: list[MatchWithDetailsDefinitive | MatchWithDetails],
 ) -> StageItemWithRounds:
     return StageItemWithRounds(
         rounds=[

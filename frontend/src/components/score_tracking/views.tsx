@@ -36,7 +36,6 @@ import { computeSideSwitchState } from '@logic/side_switch';
 import {
   LevelResponse,
   MatchSet,
-  MatchSetState,
   MatchWithDetails,
   ScoreTrackingInfoResponse,
   ScoreTrackingMatchResponse,
@@ -283,11 +282,21 @@ function countSetsWon(sets: MatchSet[], slot: 1 | 2): number {
   }).length;
 }
 
+export type ScoreTrackingMatchActions = {
+  startMatch: () => Promise<void>;
+  endMatch: () => Promise<void>;
+  reopenMatch: () => Promise<void>;
+  scoreEdit: (
+    setId: number,
+    body: { stage_item_input1_score: number; stage_item_input2_score: number }
+  ) => Promise<void>;
+};
+
 export function ScoreTrackingMatchView({
   swrResponse,
   backHref,
   storageKey,
-  updateSet,
+  actions,
   levels = [],
   refereesEnabled = false,
 }: {
@@ -296,14 +305,7 @@ export function ScoreTrackingMatchView({
   storageKey: string;
   levels?: LevelResponse[];
   refereesEnabled?: boolean;
-  updateSet: (
-    setId: number,
-    body: {
-      stage_item_input1_score: number;
-      stage_item_input2_score: number;
-      state: MatchSetState;
-    }
-  ) => Promise<void>;
+  actions: ScoreTrackingMatchActions;
 }) {
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
@@ -387,16 +389,9 @@ export function ScoreTrackingMatchView({
   ];
   const displayedTeams = isSwapped ? [teams[1], teams[0]] : teams;
 
-  async function persistSet(
-    setId: number,
-    body: {
-      stage_item_input1_score: number;
-      stage_item_input2_score: number;
-      state: MatchSetState;
-    }
-  ) {
+  async function runAction(action: () => Promise<void>) {
     setIsSaving(true);
-    await updateSet(setId, body);
+    await action();
     await swrResponse.mutate();
     setIsSaving(false);
   }
@@ -406,11 +401,12 @@ export function ScoreTrackingMatchView({
     const realSlot = isSwapped ? (slot === 1 ? 2 : 1) : slot;
     const next1 = Math.max(0, activeSet.stage_item_input1_score + (realSlot === 1 ? delta : 0));
     const next2 = Math.max(0, activeSet.stage_item_input2_score + (realSlot === 2 ? delta : 0));
-    await persistSet(activeSet.id, {
-      stage_item_input1_score: next1,
-      stage_item_input2_score: next2,
-      state: 'IN_PROGRESS',
-    });
+    await runAction(() =>
+      actions.scoreEdit(activeSet.id, {
+        stage_item_input1_score: next1,
+        stage_item_input2_score: next2,
+      })
+    );
   }
 
   function toggleSides() {
@@ -429,21 +425,9 @@ export function ScoreTrackingMatchView({
   const isMultiSet = numSets > 1;
 
   function renderNotStarted() {
-    const firstSet = match.match_sets[0];
     return (
       <Center>
-        <Button
-          size="xl"
-          loading={isSaving}
-          onClick={() => {
-            if (firstSet == null) return;
-            persistSet(firstSet.id, {
-              stage_item_input1_score: firstSet.stage_item_input1_score,
-              stage_item_input2_score: firstSet.stage_item_input2_score,
-              state: 'IN_PROGRESS',
-            });
-          }}
-        >
+        <Button size="xl" loading={isSaving} onClick={() => runAction(actions.startMatch)}>
           {t('start_game_button')}
         </Button>
       </Center>
@@ -451,21 +435,9 @@ export function ScoreTrackingMatchView({
   }
 
   function renderCompleted() {
-    const lastCompleted = [...match.match_sets].reverse().find((s) => s.state === 'COMPLETED');
     return (
       <Center>
-        <Button
-          size="lg"
-          loading={isSaving}
-          onClick={() => {
-            if (lastCompleted == null) return;
-            persistSet(lastCompleted.id, {
-              stage_item_input1_score: lastCompleted.stage_item_input1_score,
-              stage_item_input2_score: lastCompleted.stage_item_input2_score,
-              state: 'IN_PROGRESS',
-            });
-          }}
-        >
+        <Button size="lg" loading={isSaving} onClick={() => runAction(actions.reopenMatch)}>
           {t('resume_match_button')}
         </Button>
       </Center>
@@ -553,13 +525,7 @@ export function ScoreTrackingMatchView({
               color="green"
               loading={isSaving}
               disabled={endDisabled}
-              onClick={() =>
-                persistSet(set.id, {
-                  stage_item_input1_score: set.stage_item_input1_score,
-                  stage_item_input2_score: set.stage_item_input2_score,
-                  state: 'COMPLETED',
-                })
-              }
+              onClick={() => runAction(actions.endMatch)}
             >
               {t('finish_match_button')}
             </Button>
@@ -569,13 +535,7 @@ export function ScoreTrackingMatchView({
               color="blue"
               loading={isSaving}
               disabled={endDisabled}
-              onClick={() =>
-                persistSet(set.id, {
-                  stage_item_input1_score: set.stage_item_input1_score,
-                  stage_item_input2_score: set.stage_item_input2_score,
-                  state: 'COMPLETED',
-                })
-              }
+              onClick={() => runAction(actions.endMatch)}
             >
               {t('end_set_label')}
             </Button>
@@ -585,7 +545,7 @@ export function ScoreTrackingMatchView({
     );
   }
 
-  function renderBetweenSets(completed: MatchSet, next: MatchSet, allSets: MatchSet[]) {
+  function renderBetweenSets(completed: MatchSet, _next: MatchSet, allSets: MatchSet[]) {
     const displayScore1 = isSwapped
       ? completed.stage_item_input2_score
       : completed.stage_item_input1_score;
@@ -619,30 +579,14 @@ export function ScoreTrackingMatchView({
           </Text>
         </Stack>
         <Stack gap="sm" align="center">
-          <Button
-            size="lg"
-            loading={isSaving}
-            onClick={() =>
-              persistSet(next.id, {
-                stage_item_input1_score: 0,
-                stage_item_input2_score: 0,
-                state: 'IN_PROGRESS',
-              })
-            }
-          >
+          <Button size="lg" loading={isSaving} onClick={() => runAction(actions.startMatch)}>
             {t('start_next_set_label')}
           </Button>
           <Button
             size="lg"
             variant="light"
             loading={isSaving}
-            onClick={() =>
-              persistSet(completed.id, {
-                stage_item_input1_score: completed.stage_item_input1_score,
-                stage_item_input2_score: completed.stage_item_input2_score,
-                state: 'IN_PROGRESS',
-              })
-            }
+            onClick={() => runAction(actions.reopenMatch)}
           >
             {t('continue_previous_set_label')}
           </Button>

@@ -898,6 +898,26 @@
         "title": "MatchSetBody",
         "type": "object"
       },
+      "MatchSetScoreEditBody": {
+        "properties": {
+          "stage_item_input1_score": {
+            "default": 0,
+            "title": "Stage Item Input1 Score",
+            "type": "integer"
+          },
+          "stage_item_input2_score": {
+            "default": 0,
+            "title": "Stage Item Input2 Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage_item_input1_score",
+          "stage_item_input2_score"
+        ],
+        "title": "MatchSetScoreEditBody",
+        "type": "object"
+      },
       "MatchSetState": {
         "enum": [
           "NOT_STARTED",
@@ -4829,6 +4849,108 @@
         ]
       }
     },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/end": {
+      "post": {
+        "operationId": "end_match_by_token_score_tracking__score_tracking_token__matches__match_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Match By Token",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/reopen": {
+      "post": {
+        "operationId": "reopen_match_by_token_score_tracking__score_tracking_token__matches__match_id__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reopen Match By Token",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
     "/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}": {
       "put": {
         "operationId": "update_match_set_by_token_score_tracking__score_tracking_token__matches__match_id__sets__set_id__put",
@@ -4896,6 +5018,127 @@
         "summary": "Update Match Set By Token",
         "tags": [
           "Match sets"
+        ]
+      }
+    },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}/score-edit": {
+      "post": {
+        "operationId": "score_edit_by_token_score_tracking__score_tracking_token__matches__match_id__sets__set_id__score_edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchSetScoreEditBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Score Edit By Token",
+        "tags": [
+          "Match sets"
+        ]
+      }
+    },
+    "/score-tracking/{score_tracking_token}/matches/{match_id}/start": {
+      "post": {
+        "operationId": "start_match_by_token_score_tracking__score_tracking_token__matches__match_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_tracking_token",
+            "required": true,
+            "schema": {
+              "title": "Score Tracking Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Match By Token",
+        "tags": [
+          "Matches"
         ]
       }
     },
@@ -6076,6 +6319,118 @@
         ]
       }
     },
+    "/tournaments/{tournament_id}/matches/{match_id}/end": {
+      "post": {
+        "operationId": "end_match_authenticated_tournaments__tournament_id__matches__match_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "End Match Authenticated",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/{match_id}/reopen": {
+      "post": {
+        "operationId": "reopen_match_authenticated_tournaments__tournament_id__matches__match_id__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Reopen Match Authenticated",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
     "/tournaments/{tournament_id}/matches/{match_id}/reschedule": {
       "post": {
         "operationId": "reschedule_match_tournaments__tournament_id__matches__match_id__reschedule_post",
@@ -6137,6 +6492,62 @@
           }
         ],
         "summary": "Reschedule Match",
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/{match_id}/reset": {
+      "post": {
+        "operationId": "reset_match_authenticated_tournaments__tournament_id__matches__match_id__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Reset Match Authenticated",
         "tags": [
           "Matches"
         ]
@@ -6280,6 +6691,137 @@
         "summary": "Update Match Set Authenticated",
         "tags": [
           "Match sets"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}/score-edit": {
+      "post": {
+        "operationId": "score_edit_authenticated_tournaments__tournament_id__matches__match_id__sets__set_id__score_edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchSetScoreEditBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Score Edit Authenticated",
+        "tags": [
+          "Match sets"
+        ]
+      }
+    },
+    "/tournaments/{tournament_id}/matches/{match_id}/start": {
+      "post": {
+        "operationId": "start_match_authenticated_tournaments__tournament_id__matches__match_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "title": "Tournament Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreTrackingMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Start Match Authenticated",
+        "tags": [
+          "Matches"
         ]
       }
     },

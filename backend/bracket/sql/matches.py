@@ -3,6 +3,12 @@ from datetime import datetime
 from heliclockter import datetime_utc
 
 from bracket.database import database
+from bracket.logic.match_sets.pointer import (
+    apply_end,
+    apply_reopen,
+    apply_reset,
+    apply_start,
+)
 from bracket.models.db.match import Match, MatchBody, MatchCreateBody, MatchWithDetails
 from bracket.models.db.tournament import Tournament
 from bracket.sql.match_sets import MATCH_SETS_SUBQUERY, sql_create_match_sets
@@ -348,4 +354,92 @@ async def sql_get_scheduled_matches_with_details(
             match.court.name if match.court is not None else "",
             match.id,
         ),
+    )
+
+
+async def _lock_match_pointer(match_id: MatchId) -> tuple[int, bool, int]:
+    lock_row = await database.fetch_one(
+        query="""
+            SELECT
+                m.completed_set_count,
+                m.current_set_in_progress,
+                (SELECT COUNT(*)::int FROM match_sets ms WHERE ms.match_id = m.id) AS num_sets
+            FROM matches m
+            WHERE m.id = :match_id
+            FOR UPDATE OF m
+        """,
+        values={"match_id": match_id},
+    )
+    if lock_row is None:
+        raise ValueError(f"Could not find match {match_id}")
+    return (
+        int(lock_row._mapping["completed_set_count"]),
+        bool(lock_row._mapping["current_set_in_progress"]),
+        int(lock_row._mapping["num_sets"]),
+    )
+
+
+async def _update_match_pointer(
+    match_id: MatchId, completed_set_count: int, current_set_in_progress: bool
+) -> None:
+    await database.execute(
+        query="""
+            UPDATE matches
+            SET completed_set_count = :completed_set_count,
+                current_set_in_progress = :current_set_in_progress
+            WHERE id = :match_id
+        """,
+        values={
+            "match_id": match_id,
+            "completed_set_count": completed_set_count,
+            "current_set_in_progress": current_set_in_progress,
+        },
+    )
+
+
+async def sql_start_match(match_id: MatchId) -> None:
+    completed, in_progress, num_sets = await _lock_match_pointer(match_id)
+    new_completed, new_in_progress = apply_start(completed, in_progress, num_sets)
+    await _update_match_pointer(match_id, new_completed, new_in_progress)
+
+
+async def sql_end_match(match_id: MatchId) -> None:
+    completed, in_progress, _num_sets = await _lock_match_pointer(match_id)
+    new_completed, new_in_progress = apply_end(completed, in_progress)
+    await _update_match_pointer(match_id, new_completed, new_in_progress)
+
+
+async def sql_reopen_match(match_id: MatchId) -> None:
+    completed, in_progress, _num_sets = await _lock_match_pointer(match_id)
+    new_completed, new_in_progress = apply_reopen(completed, in_progress)
+    await _update_match_pointer(match_id, new_completed, new_in_progress)
+
+
+async def sql_reset_match(match_id: MatchId) -> None:
+    await _lock_match_pointer(match_id)
+    await database.execute(
+        query="""
+            UPDATE match_sets
+            SET stage_item_input1_score = 0,
+                stage_item_input2_score = 0
+            WHERE match_id = :match_id
+        """,
+        values={"match_id": match_id},
+    )
+    new_completed, new_in_progress = apply_reset()
+    # A reset match must never keep completed_at, so fold it into the same UPDATE as the
+    # progress pointer rather than relying on a separate paired call.
+    await database.execute(
+        query="""
+            UPDATE matches
+            SET completed_set_count = :completed_set_count,
+                current_set_in_progress = :current_set_in_progress,
+                completed_at = NULL
+            WHERE id = :match_id
+        """,
+        values={
+            "match_id": match_id,
+            "completed_set_count": new_completed,
+            "current_set_in_progress": new_in_progress,
+        },
     )

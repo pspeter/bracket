@@ -1,9 +1,6 @@
 from bracket.database import database
-from bracket.logic.match_sets.pointer import (
-    IllegalSetTransitionError,
-    apply_pointer_transition,
-)
-from bracket.models.db.match import MatchSet, MatchSetBody
+from bracket.logic.match_sets.pointer import apply_pointer_transition
+from bracket.models.db.match import MatchSet, MatchSetBody, MatchSetScoreEditBody
 from bracket.utils.id_types import MatchId, MatchSetId, RankingId, StageItemId
 
 _MATCH_SET_STATE_CASE_OUTER = """
@@ -120,15 +117,12 @@ async def sql_update_match_set(
     current_set_in_progress = bool(lock_row._mapping["current_set_in_progress"])
     set_number = int(lock_row._mapping["set_number"])
 
-    try:
-        new_completed, new_in_progress = apply_pointer_transition(
-            completed_set_count,
-            current_set_in_progress,
-            set_number,
-            body.state,
-        )
-    except IllegalSetTransitionError:
-        raise
+    new_completed, new_in_progress = apply_pointer_transition(
+        completed_set_count,
+        current_set_in_progress,
+        set_number,
+        body.state,
+    )
 
     await database.execute(
         query="""
@@ -144,10 +138,7 @@ async def sql_update_match_set(
         },
     )
 
-    if (
-        new_completed != completed_set_count
-        or new_in_progress != current_set_in_progress
-    ):
+    if new_completed != completed_set_count or new_in_progress != current_set_in_progress:
         await database.execute(
             query="""
                 UPDATE matches
@@ -161,6 +152,37 @@ async def sql_update_match_set(
                 "current_set_in_progress": new_in_progress,
             },
         )
+
+
+async def sql_score_edit_match_set(
+    match_id: MatchId, match_set_id: MatchSetId, body: MatchSetScoreEditBody
+) -> None:
+    lock_row = await database.fetch_one(
+        query="""
+            SELECT ms.id
+            FROM matches m
+            JOIN match_sets ms ON ms.match_id = m.id
+            WHERE m.id = :match_id AND ms.id = :match_set_id
+            FOR UPDATE OF m
+        """,
+        values={"match_id": match_id, "match_set_id": match_set_id},
+    )
+    if lock_row is None:
+        raise ValueError(f"Could not find set {match_set_id} for match {match_id}")
+
+    await database.execute(
+        query="""
+            UPDATE match_sets
+            SET stage_item_input1_score = :stage_item_input1_score,
+                stage_item_input2_score = :stage_item_input2_score
+            WHERE id = :match_set_id
+        """,
+        values={
+            "match_set_id": match_set_id,
+            "stage_item_input1_score": body.stage_item_input1_score,
+            "stage_item_input2_score": body.stage_item_input2_score,
+        },
+    )
 
 
 async def sql_add_trailing_sets(

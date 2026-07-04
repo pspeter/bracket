@@ -155,3 +155,83 @@ def test_elimination_propagation_skips_none_winner() -> None:
     assert updated.stage_item_input1_id == stage_item_inputs[0].id
     assert updated.stage_item_input2 == stage_item_inputs[3]
     assert updated.stage_item_input2_id == stage_item_inputs[3].id
+
+
+def test_elimination_reset_clears_transitive_feeders() -> None:
+    """Clearing a feeder also clears downstream matches that fed from it."""
+    tournament_id = TournamentId(-1)
+    stage_item_inputs = get_stage_item_inputs_mock(tournament_id)
+
+    semi = MatchWithDetailsDefinitive(
+        id=MatchId(-1),
+        stage_item_input1=stage_item_inputs[0],
+        stage_item_input2=stage_item_inputs[1],
+        stage_item_input1_id=stage_item_inputs[0].id,
+        stage_item_input2_id=stage_item_inputs[1].id,
+        created=DUMMY_MOCK_TIME,
+        duration_minutes=90,
+        round_id=RoundId(-4),
+        match_sets=[],
+    )
+    final = MatchWithDetails(
+        id=MatchId(-2),
+        created=DUMMY_MOCK_TIME,
+        duration_minutes=90,
+        round_id=RoundId(-3),
+        match_sets=[],
+        stage_item_input1=stage_item_inputs[0],
+        stage_item_input1_id=stage_item_inputs[0].id,
+        stage_item_input1_winner_from_match_id=semi.id,
+        stage_item_input2=stage_item_inputs[2],
+        stage_item_input2_id=stage_item_inputs[2].id,
+    )
+    championship = MatchWithDetails(
+        id=MatchId(-3),
+        created=DUMMY_MOCK_TIME,
+        duration_minutes=90,
+        round_id=RoundId(-2),
+        match_sets=[],
+        stage_item_input1=stage_item_inputs[0],
+        stage_item_input1_id=stage_item_inputs[0].id,
+        stage_item_input1_winner_from_match_id=final.id,
+        stage_item_input2=stage_item_inputs[3],
+        stage_item_input2_id=stage_item_inputs[3].id,
+    )
+
+    rounds = [
+        RoundWithMatches(
+            id=RoundId(-4),
+            matches=[semi],
+            stage_item_id=StageItemId(-1),
+            created=DUMMY_MOCK_TIME,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
+            name="",
+        ),
+        RoundWithMatches(
+            id=RoundId(-3),
+            matches=[final],
+            stage_item_id=StageItemId(-1),
+            created=DUMMY_MOCK_TIME,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
+            name="",
+        ),
+        RoundWithMatches(
+            id=RoundId(-2),
+            matches=[championship],
+            stage_item_id=StageItemId(-1),
+            created=DUMMY_MOCK_TIME,
+            lifecycle_state=RoundLifecycleState.ACTIVE,
+            name="",
+        ),
+    ]
+
+    updates = get_inputs_to_update_in_subsequent_elimination_rounds(
+        RoundId(-4),
+        get_stage_item_mock(stage_item_inputs, rounds),
+        {semi.id},
+    )
+
+    assert final.id in updates
+    assert updates[final.id].stage_item_input1_id is None
+    assert championship.id in updates
+    assert updates[championship.id].stage_item_input1_id is None

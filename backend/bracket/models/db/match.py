@@ -211,6 +211,11 @@ class MatchSetBody(BaseModelORM):
     state: MatchSetState = MatchSetState.NOT_STARTED
 
 
+class MatchSetScoreEditBody(BaseModelORM):
+    stage_item_input1_score: int = 0
+    stage_item_input2_score: int = 0
+
+
 class MatchCreateBodyFrontend(BaseModelORM):
     round_id: RoundId
     court_id: CourtId | None = None

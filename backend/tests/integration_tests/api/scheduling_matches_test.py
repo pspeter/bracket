@@ -624,7 +624,8 @@ async def test_reoptimize_keeps_started_matches_fixed_and_reflows_the_rest(
             {"id": in_progress.id},
         )
         await database.execute(
-            "UPDATE matches SET completed_set_count = 1, current_set_in_progress = FALSE WHERE id = :id",
+            "UPDATE matches SET completed_set_count = 1, current_set_in_progress = FALSE "
+            "WHERE id = :id",
             {"id": completed.id},
         )
         frozen = {

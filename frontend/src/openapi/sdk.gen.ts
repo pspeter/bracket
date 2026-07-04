@@ -84,6 +84,12 @@ import type {
   DeleteTournamentTournamentsTournamentIdDeleteData,
   DeleteTournamentTournamentsTournamentIdDeleteErrors,
   DeleteTournamentTournamentsTournamentIdDeleteResponses,
+  EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostData,
+  EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostErrors,
+  EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponses,
+  EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostData,
+  EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostErrors,
+  EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponses,
   GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetData,
   GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetErrors,
   GetAuthenticatedScoreTrackingInfoTournamentsTournamentIdScoreTrackingGetResponses,
@@ -155,21 +161,42 @@ import type {
   RegisterUserUsersRegisterPostData,
   RegisterUserUsersRegisterPostErrors,
   RegisterUserUsersRegisterPostResponses,
+  ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostData,
+  ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostErrors,
+  ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponses,
+  ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostData,
+  ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostErrors,
+  ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses,
   ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostData,
   ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostErrors,
   ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostData,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostErrors,
   RescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePostResponses,
+  ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostData,
+  ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostErrors,
+  ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponses,
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostData,
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostErrors,
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostData,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostErrors,
   ScheduleMatchesTournamentsTournamentIdScheduleMatchesPostResponses,
+  ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostData,
+  ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostErrors,
+  ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponses,
+  ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostData,
+  ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostErrors,
+  ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponses,
   SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutData,
   SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutErrors,
   SetRankingForStageItemsTournamentsTournamentIdStagesStageIdRankingPutResponses,
+  StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostData,
+  StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostErrors,
+  StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponses,
+  StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostData,
+  StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostErrors,
+  StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponses,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostData,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostErrors,
   SwapMatchesTournamentsTournamentIdMatchesSwapPostResponses,
@@ -386,6 +413,48 @@ export const getScoreTrackingMatchScoreTrackingScoreTrackingTokenMatchesMatchIdG
   });
 
 /**
+ * End Match By Token
+ */
+export const endMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostResponses,
+    EndMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdEndPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/end',
+    ...options,
+  });
+
+/**
+ * Reopen Match By Token
+ */
+export const reopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses,
+    ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/reopen',
+    ...options,
+  });
+
+/**
  * Update Match Set By Token
  */
 export const updateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPut = <
@@ -408,6 +477,52 @@ export const updateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdS
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Score Edit By Token
+ */
+export const scoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostResponses,
+    ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}/score-edit',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Start Match By Token
+ */
+export const startMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostResponses,
+    StartMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdStartPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/start',
+    ...options,
   });
 
 /**
@@ -859,6 +974,50 @@ export const updateMatchByIdTournamentsTournamentIdMatchesMatchIdPut = <
   });
 
 /**
+ * End Match Authenticated
+ */
+export const endMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostResponses,
+    EndMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdEndPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/end',
+    ...options,
+  });
+
+/**
+ * Reopen Match Authenticated
+ */
+export const reopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostResponses,
+    ReopenMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdReopenPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/reopen',
+    ...options,
+  });
+
+/**
  * Reschedule Match
  */
 export const rescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePost = <
@@ -882,6 +1041,28 @@ export const rescheduleMatchTournamentsTournamentIdMatchesMatchIdReschedulePost 
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Reset Match Authenticated
+ */
+export const resetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostResponses,
+    ResetMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdResetPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/reset',
+    ...options,
   });
 
 /**
@@ -934,6 +1115,54 @@ export const updateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSet
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Score Edit Authenticated
+ */
+export const scoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostResponses,
+    ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}/score-edit',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Start Match Authenticated
+ */
+export const startMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostData,
+    ThrowOnError
+  >
+) =>
+  (options.client ?? client).post<
+    StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostResponses,
+    StartMatchAuthenticatedTournamentsTournamentIdMatchesMatchIdStartPostErrors,
+    ThrowOnError
+  >({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/tournaments/{tournament_id}/matches/{match_id}/start',
+    ...options,
   });
 
 /**

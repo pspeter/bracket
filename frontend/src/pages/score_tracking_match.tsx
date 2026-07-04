@@ -1,7 +1,12 @@
 import { useParams } from 'react-router';
 
 import { ScoreTrackingMatchView } from '@components/score_tracking/views';
-import { updateScoreTrackingMatchSet } from '@services/match';
+import {
+  endScoreTrackingMatch,
+  reopenScoreTrackingMatch,
+  scoreEditScoreTrackingMatchSet,
+  startScoreTrackingMatch,
+} from '@services/match';
 import { getScoreTrackingInfo, getScoreTrackingMatch } from '@services/score_tracking';
 
 export default function ScoreTrackingMatchPage() {
@@ -21,9 +26,29 @@ export default function ScoreTrackingMatchPage() {
       backHref={`/score-tracking/${score_tracking_token}`}
       storageKey={`score-tracking:${score_tracking_token}:${matchId}:swapped`}
       refereesEnabled={refereesEnabled}
-      updateSet={async (setId, body) => {
-        if (score_tracking_token == null || matchId == null) return;
-        await updateScoreTrackingMatchSet(score_tracking_token, tournamentId, matchId, setId, body);
+      actions={{
+        startMatch: async () => {
+          if (score_tracking_token == null || matchId == null) return;
+          await startScoreTrackingMatch(score_tracking_token, tournamentId, matchId);
+        },
+        endMatch: async () => {
+          if (score_tracking_token == null || matchId == null) return;
+          await endScoreTrackingMatch(score_tracking_token, tournamentId, matchId);
+        },
+        reopenMatch: async () => {
+          if (score_tracking_token == null || matchId == null) return;
+          await reopenScoreTrackingMatch(score_tracking_token, tournamentId, matchId);
+        },
+        scoreEdit: async (setId, body) => {
+          if (score_tracking_token == null || matchId == null) return;
+          await scoreEditScoreTrackingMatchSet(
+            score_tracking_token,
+            tournamentId,
+            matchId,
+            setId,
+            body
+          );
+        },
       }}
     />
   );
