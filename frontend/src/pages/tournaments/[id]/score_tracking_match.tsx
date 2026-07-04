@@ -35,7 +35,6 @@ export default function TournamentScoreTrackingMatchPage() {
           swrResponse={swrResponse}
           nextMatchHref={nextMatchHref}
           storageKey={`tournament-score-tracking:${tournamentData.id}:${matchId}:swapped`}
-          levels={swrTournamentResponse.data?.data.levels ?? []}
           refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}
           actions={{
             startMatch: async () => {
