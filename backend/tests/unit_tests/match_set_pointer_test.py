@@ -50,9 +50,7 @@ def test_derive_match_state_from_pointer(
 
 
 def test_apply_pointer_transition_start_and_complete() -> None:
-    completed, in_progress = apply_pointer_transition(
-        0, False, 1, MatchSetState.IN_PROGRESS
-    )
+    completed, in_progress = apply_pointer_transition(0, False, 1, MatchSetState.IN_PROGRESS)
     assert (completed, in_progress) == (0, True)
 
     completed, in_progress = apply_pointer_transition(

@@ -12,11 +12,7 @@ from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
-from bracket.sql.matches import (
-    sql_reset_match,
-    sql_set_input_ids_for_match,
-    sql_set_match_completed_at,
-)
+from bracket.sql.matches import sql_set_input_ids_for_match
 from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.rounds import set_round_lifecycle_state
 from bracket.sql.stage_items import get_stage_item
@@ -26,14 +22,21 @@ from bracket.utils.id_types import TournamentId
 async def unwire_swiss_rounds_with_incomplete_predecessor(
     tournament_id: TournamentId,
     fresh: StageItemWithRounds,
-    *,
-    reset_matches: bool = False,
 ) -> bool:
-    """Clear team assignments and revert RESOLVED rounds with incomplete predecessors."""
+    """Clear team assignments and revert RESOLVED rounds with incomplete predecessors.
+
+    Skips rounds that have already started (any match not NOT_STARTED) or that are pinned:
+    no cascade may ever modify a downstream round that has started, and pinned rounds are
+    never touched by the automated policy (consistent with ``get_rounds_to_re_resolve``).
+    """
     changed = False
     sorted_rounds = sorted(fresh.rounds, key=lambda r: r.id)
     for i, round_ in enumerate(sorted_rounds):
         if round_.lifecycle_state is not RoundLifecycleState.RESOLVED:
+            continue
+        if round_.is_pinned:
+            continue
+        if any(m.state is not MatchState.NOT_STARTED for m in round_.matches):
             continue
         predecessors = sorted_rounds[:i]
         if not predecessors:
@@ -47,24 +50,12 @@ async def unwire_swiss_rounds_with_incomplete_predecessor(
             continue
 
         for match in round_.matches:
-            if reset_matches and match.state is not MatchState.NOT_STARTED:
-                await sql_reset_match(match.id)
-                await sql_set_match_completed_at(match.id, None)
             if match.stage_item_input1_id is not None or match.stage_item_input2_id is not None:
                 await sql_set_input_ids_for_match(round_.id, match.id, [None, None])
                 changed = True
         await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.PLACEHOLDER)
         changed = True
     return changed
-
-
-async def _unwire_swiss_rounds_with_incomplete_predecessor(
-    tournament_id: TournamentId,
-    fresh: StageItemWithRounds,
-) -> bool:
-    return await unwire_swiss_rounds_with_incomplete_predecessor(
-        tournament_id, fresh, reset_matches=False
-    )
 
 
 async def _assign_teams_to_round(
@@ -134,8 +125,7 @@ async def auto_resolve_next_swiss_round(
     # Re-fetch with up-to-date ELO after recalculate_ranking_for_stage_item
     fresh = await get_stage_item(tournament_id, stage_item.id)
 
-    if await _unwire_swiss_rounds_with_incomplete_predecessor(tournament_id, fresh):
-        fresh = await get_stage_item(tournament_id, stage_item.id)
+    if await unwire_swiss_rounds_with_incomplete_predecessor(tournament_id, fresh):
         return
 
     # Pass 1: initial resolution of next PLACEHOLDER round

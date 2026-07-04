@@ -427,4 +427,19 @@ async def sql_reset_match(match_id: MatchId) -> None:
         values={"match_id": match_id},
     )
     new_completed, new_in_progress = apply_reset()
-    await _update_match_pointer(match_id, new_completed, new_in_progress)
+    # A reset match must never keep completed_at, so fold it into the same UPDATE as the
+    # progress pointer rather than relying on a separate paired call.
+    await database.execute(
+        query="""
+            UPDATE matches
+            SET completed_set_count = :completed_set_count,
+                current_set_in_progress = :current_set_in_progress,
+                completed_at = NULL
+            WHERE id = :match_id
+        """,
+        values={
+            "match_id": match_id,
+            "completed_set_count": new_completed,
+            "current_set_in_progress": new_in_progress,
+        },
+    )

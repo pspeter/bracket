@@ -1,8 +1,5 @@
 from bracket.database import database
-from bracket.logic.match_sets.pointer import (
-    IllegalSetTransitionError,
-    apply_pointer_transition,
-)
+from bracket.logic.match_sets.pointer import apply_pointer_transition
 from bracket.models.db.match import MatchSet, MatchSetBody, MatchSetScoreEditBody
 from bracket.utils.id_types import MatchId, MatchSetId, RankingId, StageItemId
 
@@ -120,15 +117,12 @@ async def sql_update_match_set(
     current_set_in_progress = bool(lock_row._mapping["current_set_in_progress"])
     set_number = int(lock_row._mapping["set_number"])
 
-    try:
-        new_completed, new_in_progress = apply_pointer_transition(
-            completed_set_count,
-            current_set_in_progress,
-            set_number,
-            body.state,
-        )
-    except IllegalSetTransitionError:
-        raise
+    new_completed, new_in_progress = apply_pointer_transition(
+        completed_set_count,
+        current_set_in_progress,
+        set_number,
+        body.state,
+    )
 
     await database.execute(
         query="""
@@ -144,10 +138,7 @@ async def sql_update_match_set(
         },
     )
 
-    if (
-        new_completed != completed_set_count
-        or new_in_progress != current_set_in_progress
-    ):
+    if new_completed != completed_set_count or new_in_progress != current_set_in_progress:
         await database.execute(
             query="""
                 UPDATE matches

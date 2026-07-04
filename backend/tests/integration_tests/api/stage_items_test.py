@@ -402,9 +402,7 @@ async def test_update_stage_item_fails_when_removed_empty_slot_is_in_started_mat
             if input_slot_4.id in {match.stage_item_input1_id, match.stage_item_input2_id}
         )
 
-        completed_set_count = (
-            len(blocking_match.match_sets) if state is MatchState.COMPLETED else 0
-        )
+        completed_set_count = len(blocking_match.match_sets) if state is MatchState.COMPLETED else 0
         await database.execute(
             query=matches.update()
             .where(matches.c.id == blocking_match.id)

@@ -72,9 +72,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        sa.text(
-            "CREATE TYPE match_set_state AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED')"
-        )
+        sa.text("CREATE TYPE match_set_state AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED')")
     )
     op.add_column(
         "match_sets",
