@@ -460,21 +460,6 @@ export type MatchSet = {
 };
 
 /**
- * MatchSetBody
- */
-export type MatchSetBody = {
-  /**
-   * Stage Item Input1 Score
-   */
-  stage_item_input1_score: number;
-  /**
-   * Stage Item Input2 Score
-   */
-  stage_item_input2_score: number;
-  state: MatchSetState;
-};
-
-/**
  * MatchSetScoreEditBody
  */
 export type MatchSetScoreEditBody = {
@@ -3221,47 +3206,6 @@ export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReope
 export type ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponse =
   ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses[keyof ReopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReopenPostResponses];
 
-export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData = {
-  body: MatchSetBody;
-  path: {
-    /**
-     * Match Id
-     */
-    match_id: number;
-    /**
-     * Set Id
-     */
-    set_id: number;
-    /**
-     * Score Tracking Token
-     */
-    score_tracking_token: string;
-  };
-  query?: never;
-  url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}';
-};
-
-export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutError =
-  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors[keyof UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors];
-
-export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: ScoreTrackingMatchResponse;
-  };
-
-export type UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponse =
-  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses];
-
 export type ScoreEditByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdScoreEditPostData =
   {
     body: MatchSetScoreEditBody;
@@ -4238,47 +4182,6 @@ export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPost
 
 export type ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponse =
   ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses[keyof ResizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPostResponses];
-
-export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData = {
-  body: MatchSetBody;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-    /**
-     * Match Id
-     */
-    match_id: number;
-    /**
-     * Set Id
-     */
-    set_id: number;
-  };
-  query?: never;
-  url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}';
-};
-
-export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutError =
-  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors[keyof UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors];
-
-export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: ScoreTrackingMatchResponse;
-  };
-
-export type UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponse =
-  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses[keyof UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses];
 
 export type ScoreEditAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdScoreEditPostData =
   {

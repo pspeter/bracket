@@ -8,7 +8,6 @@ placeholders cannot be started.
 import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchSetState
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -63,14 +62,7 @@ async def test_match_with_concrete_teams_is_startable_in_inactive_stage(
             stage = next(s for s in stages if s.id == stage_inserted.id)
             match = stage.stage_items[0].rounds[0].matches[0]
             resp = await send_tournament_request(
-                HTTPMethod.PUT,
-                f"matches/{match.id}/sets/{match.match_sets[0].id}",
-                auth_context,
-                json={
-                    "state": MatchSetState.COMPLETED.value,
-                    "stage_item_input1_score": 21,
-                    "stage_item_input2_score": 0,
-                },
+                HTTPMethod.POST, f"matches/{match.id}/start", auth_context
             )
             assert "data" in resp, resp
         finally:
@@ -135,14 +127,7 @@ async def test_match_with_unresolved_opponents_cannot_be_started(
             stage = next(s for s in stages if s.id == stage_inserted_2.id)
             match = stage.stage_items[0].rounds[0].matches[0]
             resp = await send_tournament_request(
-                HTTPMethod.PUT,
-                f"matches/{match.id}/sets/{match.match_sets[0].id}",
-                auth_context,
-                json={
-                    "state": MatchSetState.COMPLETED.value,
-                    "stage_item_input1_score": 21,
-                    "stage_item_input2_score": 0,
-                },
+                HTTPMethod.POST, f"matches/{match.id}/start", auth_context
             )
             assert "detail" in resp, resp
             assert "determined" in resp["detail"].lower()

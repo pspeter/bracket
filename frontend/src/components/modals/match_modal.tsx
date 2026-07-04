@@ -7,7 +7,6 @@ import {
   InputBase,
   Modal,
   NumberInput,
-  Select,
   Stack,
   Text,
   useCombobox,
@@ -33,16 +32,28 @@ import {
 } from '@openapi';
 import { getReferees, getTournamentById } from '@services/adapter';
 import { getMatchLookup, getStageItemLookup } from '@services/lookups';
-import { resetMatch, updateMatch, updateMatchSet } from '@services/match';
+import {
+  endMatch,
+  reopenMatch,
+  resetMatch,
+  scoreEditMatchSet,
+  startMatch,
+  updateMatch,
+} from '@services/match';
 
 type RefereeValue = { kind: 'slot'; inputId: string } | { kind: 'name'; name: string } | null;
+
+function getStateColor(state: string) {
+  if (state === 'IN_PROGRESS') return 'blue';
+  if (state === 'COMPLETED') return 'green';
+  return 'gray';
+}
 
 type SetFormValue = {
   id: number;
   set_number: number;
   stage_item_input1_score: number;
   stage_item_input2_score: number;
-  state: MatchWithDetails['match_sets'][number]['state'];
 };
 
 type MatchModalFormValues = {
@@ -211,7 +222,6 @@ function MatchModalForm({
         set_number: set.set_number,
         stage_item_input1_score: set.stage_item_input1_score,
         stage_item_input2_score: set.stage_item_input2_score,
-        state: set.state,
       })),
       custom_duration_minutes: match.custom_duration_minutes ?? match.duration_minutes,
       referee: initialReferee,
@@ -233,6 +243,7 @@ function MatchModalForm({
 
   const [durationIsCustom, setDurationIsCustom] = useState(match.custom_duration_minutes != null);
   const [resetModalOpened, setResetModalOpened] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const swrTournamentResponse = getTournamentById(tournamentData.id);
   const defaultDurationMinutes =
@@ -366,6 +377,52 @@ function MatchModalForm({
     (conflict): conflict is ActiveConflict => conflict != null
   );
 
+  // The match progress pointer only moves through the transition verbs; which verbs are
+  // legal is derived from the same set states the backend derives from the pointer.
+  const isMultiSet = match.match_sets.length > 1;
+  const hasInProgressSet = match.match_sets.some((set) => set.state === 'IN_PROGRESS');
+  const completedSetCount = match.match_sets.filter((set) => set.state === 'COMPLETED').length;
+  const canStart = !hasInProgressSet && completedSetCount < match.match_sets.length;
+  const canEnd = hasInProgressSet;
+  const canReopen = completedSetCount > 0;
+
+  // Persist edited scores of played sets one at a time so the ranking recalculation the
+  // backend runs per set never races with the next write. Scores are fully general to
+  // edit (they may flip the winner); the pointer is untouched.
+  const saveChangedSetScores = async (sets: SetFormValue[]) => {
+    for (let i = 0; i < sets.length; i += 1) {
+      const set = sets[i];
+      const initial = match.match_sets[i];
+      const changed =
+        initial != null &&
+        (set.stage_item_input1_score !== initial.stage_item_input1_score ||
+          set.stage_item_input2_score !== initial.stage_item_input2_score);
+      if (changed) {
+        // eslint-disable-next-line no-await-in-loop
+        await scoreEditMatchSet(tournamentData.id, match.id, set.id, {
+          stage_item_input1_score: set.stage_item_input1_score,
+          stage_item_input2_score: set.stage_item_input2_score,
+        });
+      }
+    }
+  };
+
+  // Transition verbs apply immediately (saving pending score edits first, so the verb acts
+  // on the scores the organizer sees) and keep the modal open for further corrections.
+  const applyTransition = async (verb: () => Promise<unknown>) => {
+    if (form.validate().hasErrors) {
+      return;
+    }
+    setIsTransitioning(true);
+    try {
+      await saveChangedSetScores(form.values.sets);
+      await verb();
+      await swrStagesResponse.mutate();
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   return (
     <>
       <form
@@ -382,25 +439,7 @@ function MatchModalForm({
               }
             : {};
 
-          // Persist each changed set one at a time so the ranking recalculation the backend
-          // runs per set never races with the next write.
-          for (let i = 0; i < values.sets.length; i += 1) {
-            const set = values.sets[i];
-            const initial = match.match_sets[i];
-            const changed =
-              initial == null ||
-              set.stage_item_input1_score !== initial.stage_item_input1_score ||
-              set.stage_item_input2_score !== initial.stage_item_input2_score ||
-              set.state !== initial.state;
-            if (changed) {
-              // eslint-disable-next-line no-await-in-loop
-              await updateMatchSet(tournamentData.id, match.id, set.id, {
-                stage_item_input1_score: set.stage_item_input1_score,
-                stage_item_input2_score: set.stage_item_input2_score,
-                state: set.state,
-              });
-            }
-          }
+          await saveChangedSetScores(values.sets);
 
           const updatedMatch = {
             id: match.id,
@@ -416,20 +455,21 @@ function MatchModalForm({
           setOpened(false);
         })}
       >
-        {contextBadges.length > 0 && (
-          <Group gap="xs" mb="md">
-            {contextBadges.map((badge) => (
-              <Badge
-                key={badge.label}
-                color={contextColour}
-                variant="light"
-                aria-label={`${badge.label}: ${badge.value}`}
-              >
-                {badge.value}
-              </Badge>
-            ))}
-          </Group>
-        )}
+        <Group gap="xs" mb="md">
+          {contextBadges.map((badge) => (
+            <Badge
+              key={badge.label}
+              color={contextColour}
+              variant="light"
+              aria-label={`${badge.label}: ${badge.value}`}
+            >
+              {badge.value}
+            </Badge>
+          ))}
+          <Badge color={getStateColor(match.state)} variant="light">
+            {t(`match_state_${match.state.toLowerCase()}`)}
+          </Badge>
+        </Group>
         {shownConflicts.length > 0 && (
           <Stack gap={6} mb="md">
             <Text size="sm" fw={600}>
@@ -446,52 +486,76 @@ function MatchModalForm({
           </Stack>
         )}
         <Stack gap="md">
-          {form.values.sets.map((set, index) => (
-            <Stack key={set.id} gap={6}>
-              {form.values.sets.length > 1 && (
-                <Text size="sm" fw={600}>
-                  {t('set_label', { number: set.set_number })}
-                </Text>
-              )}
-              <Group grow align="start" wrap="nowrap">
-                <NumberInput
-                  withAsterisk
-                  label={`${t('score_of_label')} ${team1Name}`}
-                  placeholder={`${t('score_of_label')} ${team1Name}`}
-                  {...form.getInputProps(`sets.${index}.stage_item_input1_score`)}
-                />
-                <NumberInput
-                  withAsterisk
-                  label={`${t('score_of_label')} ${team2Name}`}
-                  placeholder={`${t('score_of_label')} ${team2Name}`}
-                  {...form.getInputProps(`sets.${index}.stage_item_input2_score`)}
-                />
-              </Group>
-              <Select
-                label={
-                  form.values.sets.length > 1
-                    ? t('set_state_label', { number: set.set_number })
-                    : t('match_state_label')
-                }
-                data={[
-                  { value: 'NOT_STARTED', label: t('match_state_not_started') },
-                  { value: 'IN_PROGRESS', label: t('match_state_in_progress') },
-                  { value: 'COMPLETED', label: t('match_state_completed') },
-                ]}
-                {...form.getInputProps(`sets.${index}.state`)}
-                onChange={(value) => {
-                  if (value != null) {
-                    form.setFieldValue(`sets.${index}.state`, value as SetFormValue['state']);
-                    if (value === 'NOT_STARTED') {
-                      form.setFieldValue(`sets.${index}.stage_item_input1_score`, 0);
-                      form.setFieldValue(`sets.${index}.stage_item_input2_score`, 0);
-                    }
-                  }
-                }}
-              />
-            </Stack>
-          ))}
+          {form.values.sets.map((set, index) => {
+            const setState = match.match_sets[index]?.state ?? 'NOT_STARTED';
+            // Scores are editable for past and current sets only; unplayed sets have no
+            // score to correct, so the pointer alone decides when they open up.
+            const isPlayed = setState !== 'NOT_STARTED';
+            return (
+              <Stack key={set.id} gap={6}>
+                {form.values.sets.length > 1 && (
+                  <Group gap="xs">
+                    <Text size="sm" fw={600}>
+                      {t('set_label', { number: set.set_number })}
+                    </Text>
+                    <Badge color={getStateColor(setState)} variant="light" size="sm">
+                      {t(`match_state_${setState.toLowerCase()}`)}
+                    </Badge>
+                  </Group>
+                )}
+                <Group grow align="start" wrap="nowrap">
+                  <NumberInput
+                    withAsterisk
+                    disabled={!isPlayed}
+                    label={`${t('score_of_label')} ${team1Name}`}
+                    placeholder={`${t('score_of_label')} ${team1Name}`}
+                    {...form.getInputProps(`sets.${index}.stage_item_input1_score`)}
+                  />
+                  <NumberInput
+                    withAsterisk
+                    disabled={!isPlayed}
+                    label={`${t('score_of_label')} ${team2Name}`}
+                    placeholder={`${t('score_of_label')} ${team2Name}`}
+                    {...form.getInputProps(`sets.${index}.stage_item_input2_score`)}
+                  />
+                </Group>
+              </Stack>
+            );
+          })}
         </Stack>
+        {/* Backwards verb (reopen) on the left, forward verbs (start/end) on the right. */}
+        <Group grow gap="xs" mt="md">
+          {canReopen && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => reopenMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('reopen_set_button') : t('resume_match_button')}
+            </Button>
+          )}
+          {canEnd && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => endMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('end_set_label') : t('finish_match_button')}
+            </Button>
+          )}
+          {canStart && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => startMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('start_next_set_label') : t('start_game_button')}
+            </Button>
+          )}
+        </Group>
         {refereesEnabled && (
           <RefereeCombobox
             value={form.values.referee}

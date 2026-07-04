@@ -3,7 +3,6 @@ import {
   MatchCreateBodyFrontend,
   MatchRescheduleBody,
   MatchResizeBreakBody,
-  MatchSetBody,
   MatchSetScoreEditBody,
   MatchSwapBody,
   SchedulerWeights,
@@ -40,21 +39,9 @@ export async function updateMatch(
   return response;
 }
 
-// Scores live on sets now. Updating a single set is the unit of change for both the
-// authenticated match modal and the token-authenticated score-tracking screens.
-export async function updateMatchSet(
-  tournament_id: number,
-  match_id: number,
-  set_id: number,
-  body: MatchSetBody
-) {
-  const response = await createAxios()
-    .put(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}`, body)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
-}
-
+// Scores live on sets. A set's scores are the unit of change for both the authenticated
+// match modal and the token-authenticated score-tracking screens; match progress only
+// moves through the start/end/reopen/reset verbs below.
 export async function scoreEditMatchSet(
   tournament_id: number,
   match_id: number,
@@ -160,24 +147,6 @@ export async function reopenScoreTrackingMatch(
 ) {
   const response = await createAxios()
     .post(`score-tracking/${score_tracking_token}/matches/${match_id}/reopen`)
-    .catch((response: any) => handleRequestError(response));
-  const tournamentId =
-    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
-  if (tournamentId != null) {
-    await mutateIssues(tournamentId);
-  }
-  return response;
-}
-
-export async function updateScoreTrackingMatchSet(
-  score_tracking_token: string,
-  tournament_id: number | null,
-  match_id: number,
-  set_id: number,
-  body: MatchSetBody
-) {
-  const response = await createAxios()
-    .put(`score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}`, body)
     .catch((response: any) => handleRequestError(response));
   const tournamentId =
     tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));

@@ -8,7 +8,6 @@ having to activate the next stage.
 import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import MatchSetState
 from bracket.models.db.stage_item import StageItemWithInputsCreate
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -25,8 +24,7 @@ from bracket.utils.dummy_records import (
     DUMMY_STAGE_ITEM3,
     DUMMY_TEAM1,
 )
-from bracket.utils.http import HTTPMethod
-from tests.integration_tests.api.shared import send_tournament_request
+from tests.integration_tests.api.shared import complete_match
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import inserted_stage, inserted_team
 
@@ -85,22 +83,13 @@ async def test_completing_source_stage_item_resolves_dependent_inputs(
         await build_matches_for_stage_item(stage_item_2, tournament_id)
 
         try:
-            # Complete every match in stage item 1 via the per-set HTTP API, which triggers the
+            # Complete every match in stage item 1 via the transition verbs, which triggers the
             # recalculation + resolution hook. No stage activation is performed.
             [stage_1, _] = await get_full_tournament_details(tournament_id)
             for round_ in stage_1.stage_items[0].rounds:
                 for match in round_.matches:
                     for match_set in match.match_sets:
-                        await send_tournament_request(
-                            HTTPMethod.PUT,
-                            f"matches/{match.id}/sets/{match_set.id}",
-                            auth_context,
-                            json={
-                                "state": MatchSetState.COMPLETED.value,
-                                "stage_item_input1_score": 21,
-                                "stage_item_input2_score": 0,
-                            },
-                        )
+                        await complete_match(auth_context, match.id, match_set.id)
 
             # The dependent inputs in stage item 2 must now reference concrete teams.
             stages = await get_full_tournament_details(tournament_id)

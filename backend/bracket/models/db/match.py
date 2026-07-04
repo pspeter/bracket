@@ -205,12 +205,6 @@ class MatchBody(BaseModelORM):
     custom_duration_minutes: int | None = None
 
 
-class MatchSetBody(BaseModelORM):
-    stage_item_input1_score: int = 0
-    stage_item_input2_score: int = 0
-    state: MatchSetState = MatchSetState.NOT_STARTED
-
-
 class MatchSetScoreEditBody(BaseModelORM):
     stage_item_input1_score: int = 0
     stage_item_input2_score: int = 0
