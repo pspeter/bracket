@@ -31,6 +31,17 @@ export function getDisplayScores(
     : { first: set.stage_item_input1_score, second: set.stage_item_input2_score };
 }
 
+export function nextScoresAfterAdjust(
+  set: Pick<MatchSet, 'stage_item_input1_score' | 'stage_item_input2_score'>,
+  slot: 1 | 2,
+  delta: number
+): { stage_item_input1_score: number; stage_item_input2_score: number } {
+  return {
+    stage_item_input1_score: Math.max(0, set.stage_item_input1_score + (slot === 1 ? delta : 0)),
+    stage_item_input2_score: Math.max(0, set.stage_item_input2_score + (slot === 2 ? delta : 0)),
+  };
+}
+
 export function isEndSetDisabled(
   set: MatchSet,
   match: {

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { MatchSet } from '@openapi';
 
-import { getDisplayScores, getScoreTrackingViewState, isEndSetDisabled } from './score_tracking';
+import {
+  getDisplayScores,
+  getScoreTrackingViewState,
+  isEndSetDisabled,
+  nextScoresAfterAdjust,
+} from './score_tracking';
 
 function makeSet(overrides: Partial<MatchSet> & Pick<MatchSet, 'set_number' | 'state'>): MatchSet {
   return {
@@ -190,5 +195,51 @@ describe('getDisplayScores', () => {
       stage_item_input2_score: 7,
     });
     expect(getDisplayScores(set, true)).toEqual({ first: 7, second: 11 });
+  });
+});
+
+describe('nextScoresAfterAdjust', () => {
+  const set = makeSet({
+    set_number: 1,
+    state: 'IN_PROGRESS',
+    stage_item_input1_score: 5,
+    stage_item_input2_score: 3,
+  });
+
+  it('adjusts input1_score when slot is 1', () => {
+    expect(nextScoresAfterAdjust(set, 1, 1)).toEqual({
+      stage_item_input1_score: 6,
+      stage_item_input2_score: 3,
+    });
+  });
+
+  it('adjusts input2_score when slot is 2', () => {
+    expect(nextScoresAfterAdjust(set, 2, 1)).toEqual({
+      stage_item_input1_score: 5,
+      stage_item_input2_score: 4,
+    });
+  });
+
+  it('adjusts the score belonging to the given slot regardless of side switching', () => {
+    // The slot passed in is always the team's real (unswapped) slot, since that's
+    // what identifies whose score is being changed — a "switch sides" toggle only
+    // affects display order, not which slot a team's score lives in.
+    expect(nextScoresAfterAdjust(set, 2, -1)).toEqual({
+      stage_item_input1_score: 5,
+      stage_item_input2_score: 2,
+    });
+  });
+
+  it('clamps scores at 0', () => {
+    const zeroSet = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 0,
+      stage_item_input2_score: 0,
+    });
+    expect(nextScoresAfterAdjust(zeroSet, 1, -1)).toEqual({
+      stage_item_input1_score: 0,
+      stage_item_input2_score: 0,
+    });
   });
 });
