@@ -5,7 +5,7 @@ from heliclockter import datetime_utc
 from starlette import status
 
 from bracket.database import database
-from bracket.logic.match_sets.pointer import IllegalMatchTransitionError, IllegalSetTransitionError
+from bracket.logic.match_sets.pointer import IllegalMatchTransitionError
 from bracket.logic.match_sets.validation import validate_match_can_be_started
 from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
 from bracket.logic.ranking.elimination import (
@@ -20,7 +20,6 @@ from bracket.logic.scheduling.swiss_resolution_orchestrator import (
 )
 from bracket.models.db.match import (
     Match,
-    MatchSetBody,
     MatchSetScoreEditBody,
     MatchState,
     MatchWithDetails,
@@ -28,11 +27,7 @@ from bracket.models.db.match import (
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
-from bracket.sql.match_sets import (
-    get_sets_for_match,
-    sql_score_edit_match_set,
-    sql_update_match_set,
-)
+from bracket.sql.match_sets import get_sets_for_match, sql_score_edit_match_set
 from bracket.sql.matches import (
     sql_end_match,
     sql_get_match_with_details,
@@ -90,38 +85,13 @@ async def apply_match_change_and_recalculate(
     async with database.transaction():
         try:
             await apply_change()
-        except (IllegalSetTransitionError, IllegalMatchTransitionError) as exc:
+        except IllegalMatchTransitionError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
             ) from exc
 
         new_state = await derive_match_state_after_change(tournament_id, match)
-        return await recalculate_after_match_change(tournament_id, match, new_state=new_state)
-
-
-async def update_match_set_and_recalculate(
-    tournament_id: TournamentId,
-    match: Match,
-    match_set_id: MatchSetId,
-    body: MatchSetBody,
-) -> MatchWithDetails:
-    sets_before = await get_sets_for_match(match.id)
-    match_with_sets = match.model_copy(update={"match_sets": sets_before})
-    new_state = derive_match_state(
-        [s if s.id != match_set_id else s.model_copy(update=body.model_dump()) for s in sets_before]
-    )
-    await validate_match_can_be_started(tournament_id, match_with_sets, new_state)
-
-    async with database.transaction():
-        try:
-            await sql_update_match_set(match.id, match_set_id, body)
-        except IllegalSetTransitionError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-
         return await recalculate_after_match_change(tournament_id, match, new_state=new_state)
 
 

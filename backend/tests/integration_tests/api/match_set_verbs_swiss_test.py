@@ -18,8 +18,7 @@ from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_i
 from bracket.utils.dummy_records import DUMMY_STAGE1, DUMMY_TEAM1
 from bracket.utils.http import HTTPMethod
 from bracket.utils.id_types import StageId, StageItemId, TeamId, TournamentId
-from tests.integration_tests.api.match_set_verbs_test import _complete_match
-from tests.integration_tests.api.shared import send_tournament_request
+from tests.integration_tests.api.shared import complete_match, send_tournament_request
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     assert_row_count_and_clear,
@@ -70,7 +69,7 @@ async def test_reset_unwires_swiss_round2_after_round1_match_reset(
         try:
             for i, match in enumerate(round1.matches):
                 set_id = match.match_sets[0].id
-                await _complete_match(
+                await complete_match(
                     auth_context,
                     match.id,
                     set_id,
@@ -144,7 +143,7 @@ async def _build_swiss_stage_item_with_completed_round1(
     round1 = sorted(stage_item.rounds, key=lambda r: r.id)[0]
     for i, match in enumerate(round1.matches):
         set_id = match.match_sets[0].id
-        await _complete_match(auth_context, match.id, set_id, score1=21, score2=i)
+        await complete_match(auth_context, match.id, set_id, score1=21, score2=i)
 
     return stage_item_raw.id, round1.matches
 

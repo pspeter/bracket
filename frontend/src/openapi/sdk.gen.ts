@@ -218,12 +218,6 @@ import type {
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutData,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutErrors,
   UpdateMatchByIdTournamentsTournamentIdMatchesMatchIdPutResponses,
-  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData,
-  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors,
-  UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses,
-  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData,
-  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors,
-  UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutData,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutErrors,
   UpdatePlayerByIdTournamentsTournamentIdPlayersPlayerIdPutResponses,
@@ -452,31 +446,6 @@ export const reopenMatchByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdReop
     responseType: 'json',
     url: '/score-tracking/{score_tracking_token}/matches/{match_id}/reopen',
     ...options,
-  });
-
-/**
- * Update Match Set By Token
- */
-export const updateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPut = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutData,
-    ThrowOnError
-  >
-) =>
-  (options.client ?? client).put<
-    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutResponses,
-    UpdateMatchSetByTokenScoreTrackingScoreTrackingTokenMatchesMatchIdSetsSetIdPutErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    url: '/score-tracking/{score_tracking_token}/matches/{match_id}/sets/{set_id}',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
   });
 
 /**
@@ -1084,32 +1053,6 @@ export const resizeMatchBreakTournamentsTournamentIdMatchesMatchIdResizeBreakPos
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/matches/{match_id}/resize_break',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * Update Match Set Authenticated
- */
-export const updateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPut = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutData,
-    ThrowOnError
-  >
-) =>
-  (options.client ?? client).put<
-    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutResponses,
-    UpdateMatchSetAuthenticatedTournamentsTournamentIdMatchesMatchIdSetsSetIdPutErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}',
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -23,7 +23,7 @@ from bracket.models.db.account import UserAccountType
 from bracket.models.db.club import ClubInsertable
 from bracket.models.db.court import CourtInsertable
 from bracket.models.db.level import LevelInsertable
-from bracket.models.db.match import Match, MatchSetBody, MatchSetState
+from bracket.models.db.match import Match, MatchSetScoreEditBody, MatchSetState
 from bracket.models.db.player import PlayerInsertable
 from bracket.models.db.player_x_team import PlayerXTeamInsertable
 from bracket.models.db.ranking import RankingInsertable
@@ -60,8 +60,8 @@ from bracket.schema import (
     users,
     users_x_clubs,
 )
-from bracket.sql.match_sets import get_sets_for_match, sql_update_match_set
-from bracket.sql.matches import sql_set_match_completed_at
+from bracket.sql.match_sets import get_sets_for_match, sql_score_edit_match_set
+from bracket.sql.matches import sql_end_match, sql_set_match_completed_at, sql_start_match
 from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
 from bracket.sql.users import create_user, get_user
@@ -477,14 +477,27 @@ async def apply_match_states(tournament_id: TournamentId) -> None:
             completed_at = None
 
         match_id = assert_some(match.id)
-        for match_set in await get_sets_for_match(match_id):
-            await sql_update_match_set(
+        if set_state is MatchSetState.COMPLETED:
+            for match_set in await get_sets_for_match(match_id):
+                await sql_start_match(match_id)
+                await sql_score_edit_match_set(
+                    match_id,
+                    match_set.id,
+                    MatchSetScoreEditBody(
+                        stage_item_input1_score=score1,
+                        stage_item_input2_score=score2,
+                    ),
+                )
+                await sql_end_match(match_id)
+        elif set_state is MatchSetState.IN_PROGRESS:
+            await sql_start_match(match_id)
+            first_set = (await get_sets_for_match(match_id))[0]
+            await sql_score_edit_match_set(
                 match_id,
-                match_set.id,
-                MatchSetBody(
+                first_set.id,
+                MatchSetScoreEditBody(
                     stage_item_input1_score=score1,
                     stage_item_input2_score=score2,
-                    state=set_state,
                 ),
             )
         await sql_set_match_completed_at(match_id, completed_at)

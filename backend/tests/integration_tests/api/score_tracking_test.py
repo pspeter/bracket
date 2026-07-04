@@ -374,15 +374,14 @@ async def test_authenticated_score_tracking_update_works_when_public_link_disabl
         ) as match_inserted,
     ):
         set_id = match_inserted.match_sets[0].id
+        await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
         response = await send_tournament_request(
-            HTTPMethod.PUT,
-            f"matches/{match_inserted.id}/sets/{set_id}",
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
             auth_context,
-            json={
-                "stage_item_input1_score": 7,
-                "stage_item_input2_score": 5,
-                "state": "IN_PROGRESS",
-            },
+            json={"stage_item_input1_score": 7, "stage_item_input2_score": 5},
         )
 
         assert response["data"]["id"] == match_inserted.id

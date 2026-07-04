@@ -120,3 +120,22 @@ async def send_tournament_request(
         json=json,
         headers=auth_context.headers,
     )
+
+
+async def complete_match(
+    auth_context: AuthContext,
+    match_id: int,
+    set_id: int,
+    *,
+    score1: int = 21,
+    score2: int = 0,
+) -> JsonDict:
+    """Play out one set of a match via the transition verbs: start, score-edit, end."""
+    await send_tournament_request(HTTPMethod.POST, f"matches/{match_id}/start", auth_context)
+    await send_tournament_request(
+        HTTPMethod.POST,
+        f"matches/{match_id}/sets/{set_id}/score-edit",
+        auth_context,
+        json={"stage_item_input1_score": score1, "stage_item_input2_score": score2},
+    )
+    return await send_tournament_request(HTTPMethod.POST, f"matches/{match_id}/end", auth_context)

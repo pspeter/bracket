@@ -13,7 +13,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputInsertable,
 )
-from bracket.schema import tournaments
+from bracket.schema import rankings, tournaments
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
 from bracket.sql.stages import get_full_tournament_details
@@ -30,7 +30,11 @@ from bracket.utils.dummy_records import (
 )
 from bracket.utils.http import HTTPMethod
 from bracket.utils.id_types import MatchId
-from tests.integration_tests.api.shared import send_request, send_tournament_request
+from tests.integration_tests.api.shared import (
+    complete_match,
+    send_request,
+    send_tournament_request,
+)
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     inserted_court,
@@ -79,7 +83,7 @@ async def test_start_rejected_when_all_sets_completed(
 ) -> None:
     async with _simple_match(auth_context) as match_inserted:
         set_id = match_inserted.match_sets[0].id
-        await _complete_match(auth_context, match_inserted.id, set_id)
+        await complete_match(auth_context, match_inserted.id, set_id)
         response = await send_tournament_request(
             HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
         )
@@ -143,7 +147,7 @@ async def test_reopen_clears_completed_at(
 ) -> None:
     async with _simple_match(auth_context) as match_inserted:
         set_id = match_inserted.match_sets[0].id
-        await _complete_match(auth_context, match_inserted.id, set_id)
+        await complete_match(auth_context, match_inserted.id, set_id)
         reopened = await send_tournament_request(
             HTTPMethod.POST, f"matches/{match_inserted.id}/reopen", auth_context
         )
@@ -191,7 +195,7 @@ async def test_score_edit_flips_elimination_winner_without_pointer_change(
             loser_input_id = semi.stage_item_input2_id
             assert winner_input_id is not None and loser_input_id is not None
 
-            await _complete_match(auth_context, semi.id, semi_set_id, score1=21, score2=0)
+            await complete_match(auth_context, semi.id, semi_set_id, score1=21, score2=0)
 
             details = await get_full_tournament_details(tournament_id)
             bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
@@ -252,7 +256,7 @@ async def test_reset_unwires_elimination_bracket(
             final = bracket.rounds[1].matches[0]
             semi_set_id = semi.match_sets[0].id
 
-            await _complete_match(auth_context, semi.id, semi_set_id)
+            await complete_match(auth_context, semi.id, semi_set_id)
 
             details = await get_full_tournament_details(tournament_id)
             bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
@@ -311,9 +315,9 @@ async def test_reset_clears_completed_elimination_follower(
             semi2 = bracket.rounds[0].matches[1]
             final = bracket.rounds[1].matches[0]
 
-            await _complete_match(auth_context, semi1.id, semi1.match_sets[0].id)
-            await _complete_match(auth_context, semi2.id, semi2.match_sets[0].id)
-            await _complete_match(auth_context, final.id, final.match_sets[0].id)
+            await complete_match(auth_context, semi1.id, semi1.match_sets[0].id)
+            await complete_match(auth_context, semi2.id, semi2.match_sets[0].id)
+            await complete_match(auth_context, final.id, final.match_sets[0].id)
 
             details = await get_full_tournament_details(tournament_id)
             bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
@@ -460,8 +464,8 @@ async def test_reset_unwires_deep_elimination_bracket(
             }
             for feeder in bracket.rounds[0].matches:
                 if feeder.id in feeder_ids:
-                    await _complete_match(auth_context, feeder.id, feeder.match_sets[0].id)
-            await _complete_match(auth_context, semi.id, semi.match_sets[0].id)
+                    await complete_match(auth_context, feeder.id, feeder.match_sets[0].id)
+            await complete_match(auth_context, semi.id, semi.match_sets[0].id)
 
             details = await get_full_tournament_details(tournament_id)
             bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
@@ -553,8 +557,8 @@ async def test_score_edit_flip_winner_leaves_started_final_unchanged(
             loser_input_id = semi1.stage_item_input2_id
             assert winner_input_id is not None and loser_input_id is not None
 
-            await _complete_match(auth_context, semi1.id, semi1_set_id, score1=21, score2=0)
-            await _complete_match(auth_context, semi2.id, semi2.match_sets[0].id)
+            await complete_match(auth_context, semi1.id, semi1_set_id, score1=21, score2=0)
+            await complete_match(auth_context, semi2.id, semi2.match_sets[0].id)
 
             details = await get_full_tournament_details(tournament_id)
             bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
@@ -623,7 +627,7 @@ async def test_score_tracking_token_reopen_works(
         _score_tracking_token(auth_context.tournament.id, "reopen-token") as token,
     ):
         set_id = match_inserted.match_sets[0].id
-        await _complete_match(auth_context, match_inserted.id, set_id)
+        await complete_match(auth_context, match_inserted.id, set_id)
         reopened = await send_request(
             HTTPMethod.POST, f"score-tracking/{token}/matches/{match_inserted.id}/reopen"
         )
@@ -645,22 +649,131 @@ async def test_reset_is_not_exposed_on_score_tracking_token_route(
         assert response == {"detail": "Not Found"}
 
 
-async def _complete_match(
-    auth_context: AuthContext,
-    match_id: int,
-    set_id: int,
-    *,
-    score1: int = 21,
-    score2: int = 0,
+@pytest.mark.asyncio(loop_scope="session")
+async def test_legacy_set_state_endpoint_is_removed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    await send_tournament_request(HTTPMethod.POST, f"matches/{match_id}/start", auth_context)
-    await send_tournament_request(
-        HTTPMethod.POST,
-        f"matches/{match_id}/sets/{set_id}/score-edit",
-        auth_context,
-        json={"stage_item_input1_score": score1, "stage_item_input2_score": score2},
+    """The pre-verb ``PUT .../sets/{id}`` endpoint no longer exists on either auth path."""
+    async with (
+        _simple_match(auth_context) as match_inserted,
+        _score_tracking_token(auth_context.tournament.id, "legacy-put-token") as token,
+    ):
+        set_id = match_inserted.match_sets[0].id
+        body = {"stage_item_input1_score": 21, "stage_item_input2_score": 10, "state": "COMPLETED"}
+
+        authenticated = await send_tournament_request(
+            HTTPMethod.PUT, f"matches/{match_inserted.id}/sets/{set_id}", auth_context, json=body
+        )
+        assert authenticated == {"detail": "Not Found"}
+
+        by_token = await send_request(
+            HTTPMethod.PUT,
+            f"score-tracking/{token}/matches/{match_inserted.id}/sets/{set_id}",
+            json=body,
+        )
+        assert by_token == {"detail": "Not Found"}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_score_edit_collapses_best_of_three_to_fewer_played_sets(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Correcting a flipped past-set score can collapse a best-of-3 to two decisive sets.
+
+    The recorded history said the match went to a third set; the corrected set 1 means one
+    side actually won the first two sets, so the organizer zeroes the trailing set (it was
+    never really played) and the winner re-derives from sets won — without the match ever
+    leaving COMPLETED.
+    """
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context),
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament_id})) as t2,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as t3,
+        inserted_team(DUMMY_TEAM4.model_copy(update={"tournament_id": tournament_id})) as t4,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})) as stage,
+    ):
+        stage_item = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Elimination",
+                team_count=4,
+                type=StageType.SINGLE_ELIMINATION,
+                ranking_id=auth_context.ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(stage_item, tournament_id)
+
+        try:
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
+            semi = bracket.rounds[0].matches[0]
+            assert len(semi.match_sets) == 3
+            recorded_winner_input_id = semi.stage_item_input1_id
+            actual_winner_input_id = semi.stage_item_input2_id
+            assert recorded_winner_input_id is not None and actual_winner_input_id is not None
+
+            # Recorded history: input1 wins sets 1 and 3, input2 wins set 2.
+            for match_set, (score1, score2) in zip(
+                semi.match_sets, [(21, 15), (18, 21), (21, 10)], strict=True
+            ):
+                await complete_match(
+                    auth_context, semi.id, match_set.id, score1=score1, score2=score2
+                )
+
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
+            final = bracket.rounds[1].matches[0]
+            assert final.stage_item_input1_id == recorded_winner_input_id
+
+            # Correction: set 1 was entered flipped — input2 actually won it, so input2 won
+            # the first two sets and set 3 was never really played.
+            await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{semi.id}/sets/{semi.match_sets[0].id}/score-edit",
+                auth_context,
+                json={"stage_item_input1_score": 15, "stage_item_input2_score": 21},
+            )
+            collapsed = await send_tournament_request(
+                HTTPMethod.POST,
+                f"matches/{semi.id}/sets/{semi.match_sets[2].id}/score-edit",
+                auth_context,
+                json={"stage_item_input1_score": 0, "stage_item_input2_score": 0},
+            )
+            assert collapsed["data"]["state"] == "COMPLETED"
+            assert collapsed["data"]["completed_at"] is not None
+            assert collapsed["data"]["match_sets"][2]["stage_item_input1_score"] == 0
+            assert collapsed["data"]["match_sets"][2]["stage_item_input2_score"] == 0
+
+            details = await get_full_tournament_details(tournament_id)
+            bracket = next(si for s in details for si in s.stage_items if si.id == stage_item.id)
+            final = bracket.rounds[1].matches[0]
+            assert final.stage_item_input1_id == actual_winner_input_id
+        finally:
+            await sql_delete_stage_item_with_foreign_keys(stage_item.id)
+
+
+@asynccontextmanager
+async def _best_of_three_ranking(auth_context: AuthContext) -> AsyncIterator[None]:
+    """Temporarily configure the session-scoped ranking as best-of-3."""
+    ranking_id = auth_context.ranking.id
+    await database.execute(
+        query=rankings.update().where(rankings.c.id == ranking_id).values(num_sets=3),
     )
-    await send_tournament_request(HTTPMethod.POST, f"matches/{match_id}/end", auth_context)
+    try:
+        yield
+    finally:
+        await database.execute(
+            query=rankings.update().where(rankings.c.id == ranking_id).values(num_sets=1),
+        )
 
 
 @asynccontextmanager
