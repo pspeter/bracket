@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { MatchSet } from '@openapi';
+import { MatchSet, MatchWithDetails } from '@openapi';
 
 import {
   getDisplayScores,
+  getNextMatchOnCourt,
   getScoreTrackingViewState,
   isEndSetDisabled,
   nextScoresAfterAdjust,
@@ -75,6 +76,78 @@ describe('getScoreTrackingViewState', () => {
   it('returns completed for single set COMPLETED', () => {
     const sets = [makeSet({ set_number: 1, state: 'COMPLETED' })];
     expect(getScoreTrackingViewState(sets)).toEqual({ kind: 'completed' });
+  });
+});
+
+function makeMatch(
+  overrides: Pick<MatchWithDetails, 'id'> &
+    Partial<Pick<MatchWithDetails, 'court_id' | 'start_time' | 'state'>>
+): MatchWithDetails {
+  return {
+    court_id: null,
+    start_time: null,
+    state: 'NOT_STARTED',
+    ...overrides,
+  } as MatchWithDetails;
+}
+
+describe('getNextMatchOnCourt', () => {
+  it('returns the next match on the same court by start time', () => {
+    const current = makeMatch({ id: 1, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const next = makeMatch({ id: 2, court_id: 5, start_time: '2026-07-04T10:30:00Z' });
+    const matches = [current, next];
+    expect(getNextMatchOnCourt(matches, current)).toBe(next);
+  });
+
+  it('ignores matches on other courts', () => {
+    const current = makeMatch({ id: 1, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const otherCourt = makeMatch({ id: 2, court_id: 6, start_time: '2026-07-04T10:15:00Z' });
+    const sameCourt = makeMatch({ id: 3, court_id: 5, start_time: '2026-07-04T10:30:00Z' });
+    expect(getNextMatchOnCourt([current, otherCourt, sameCourt], current)).toBe(sameCourt);
+  });
+
+  it('skips already-completed matches and returns the next unplayed one', () => {
+    const current = makeMatch({ id: 1, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const completedNext = makeMatch({
+      id: 2,
+      court_id: 5,
+      start_time: '2026-07-04T10:30:00Z',
+      state: 'COMPLETED',
+    });
+    const unplayed = makeMatch({ id: 3, court_id: 5, start_time: '2026-07-04T11:00:00Z' });
+    expect(getNextMatchOnCourt([current, completedNext, unplayed], current)).toBe(unplayed);
+  });
+
+  it('returns null when it is the last match on the court', () => {
+    const earlier = makeMatch({ id: 1, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const current = makeMatch({ id: 2, court_id: 5, start_time: '2026-07-04T10:30:00Z' });
+    expect(getNextMatchOnCourt([earlier, current], current)).toBeNull();
+  });
+
+  it('returns null when every later match on the court is completed', () => {
+    const current = makeMatch({ id: 1, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const laterCompleted = makeMatch({
+      id: 2,
+      court_id: 5,
+      start_time: '2026-07-04T10:30:00Z',
+      state: 'COMPLETED',
+    });
+    expect(getNextMatchOnCourt([current, laterCompleted], current)).toBeNull();
+  });
+
+  it('returns null when the current match has no court assigned', () => {
+    const current = makeMatch({ id: 1, court_id: null, start_time: '2026-07-04T10:00:00Z' });
+    const other = makeMatch({ id: 2, court_id: null, start_time: '2026-07-04T10:30:00Z' });
+    expect(getNextMatchOnCourt([current, other], current)).toBeNull();
+  });
+
+  it('breaks start-time ties by id', () => {
+    const current = makeMatch({ id: 5, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const sameTimeLowerId = makeMatch({ id: 3, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    const sameTimeHigherId = makeMatch({ id: 7, court_id: 5, start_time: '2026-07-04T10:00:00Z' });
+    expect(getNextMatchOnCourt([current, sameTimeLowerId, sameTimeHigherId], current)).toBe(
+      sameTimeHigherId
+    );
   });
 });
 

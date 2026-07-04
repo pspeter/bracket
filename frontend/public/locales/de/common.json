@@ -321,7 +321,7 @@
     "resume_match_button": "Spiel fortsetzen",
     "finish_match_button": "Spiel beenden",
     "open_score_tracker_button": "Spielstandserfassung öffnen",
-    "back_to_matches_button": "Zurück zu den Spielen",
+    "next_match_button": "Nächstes Spiel",
     "match_state_not_started": "Nicht gestartet",
     "match_state_in_progress": "Läuft",
     "match_state_completed": "Abgeschlossen",

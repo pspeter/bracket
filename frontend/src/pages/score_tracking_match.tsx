@@ -1,6 +1,7 @@
 import { useParams } from 'react-router';
 
 import { ScoreTrackingMatchView } from '@components/score_tracking/views';
+import { getNextMatchOnCourt } from '@logic/score_tracking';
 import {
   endScoreTrackingMatch,
   reopenScoreTrackingMatch,
@@ -20,10 +21,18 @@ export default function ScoreTrackingMatchPage() {
   const tournamentId = swrInfoResponse.data?.data.tournament_id ?? null;
   const refereesEnabled = swrInfoResponse.data?.data.referees_enabled ?? false;
 
+  const currentMatch = swrResponse.data?.data ?? null;
+  const nextMatch =
+    currentMatch != null
+      ? getNextMatchOnCourt(swrInfoResponse.data?.data.matches ?? [], currentMatch)
+      : null;
+  const nextMatchHref =
+    nextMatch != null ? `/score-tracking/${score_tracking_token}/matches/${nextMatch.id}` : null;
+
   return (
     <ScoreTrackingMatchView
       swrResponse={swrResponse}
-      backHref={`/score-tracking/${score_tracking_token}`}
+      nextMatchHref={nextMatchHref}
       storageKey={`score-tracking:${score_tracking_token}:${matchId}:swapped`}
       refereesEnabled={refereesEnabled}
       actions={{

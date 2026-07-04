@@ -1,9 +1,13 @@
 import { ScoreTrackingMatchView } from '@components/score_tracking/views';
 import { getTournamentIdFromRouter, responseIsValid } from '@components/utils/util';
+import { getNextMatchOnCourt } from '@logic/score_tracking';
 import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getTournamentById } from '@services/adapter';
 import { endMatch, reopenMatch, scoreEditMatchSet, startMatch } from '@services/match';
-import { getTournamentScoreTrackingMatch } from '@services/score_tracking';
+import {
+  getTournamentScoreTrackingInfo,
+  getTournamentScoreTrackingMatch,
+} from '@services/score_tracking';
 import { useParams } from 'react-router';
 
 export default function TournamentScoreTrackingMatchPage() {
@@ -12,13 +16,24 @@ export default function TournamentScoreTrackingMatchPage() {
   const matchId = match_id != null ? parseInt(match_id, 10) : null;
   const swrResponse = getTournamentScoreTrackingMatch(tournamentData.id, matchId);
   const swrTournamentResponse = getTournamentById(tournamentData.id);
+  const swrInfoResponse = getTournamentScoreTrackingInfo(tournamentData.id, null);
+
+  const currentMatch = swrResponse.data?.data ?? null;
+  const nextMatch =
+    currentMatch != null
+      ? getNextMatchOnCourt(swrInfoResponse.data?.data.matches ?? [], currentMatch)
+      : null;
+  const nextMatchHref =
+    nextMatch != null
+      ? `/tournaments/${tournamentData.id}/score-tracking/matches/${nextMatch.id}`
+      : null;
 
   return (
     <TournamentLayout tournament_id={tournamentData.id}>
       {responseIsValid(swrResponse) || swrResponse.error != null ? (
         <ScoreTrackingMatchView
           swrResponse={swrResponse}
-          backHref={`/tournaments/${tournamentData.id}/score-tracking`}
+          nextMatchHref={nextMatchHref}
           storageKey={`tournament-score-tracking:${tournamentData.id}:${matchId}:swapped`}
           levels={swrTournamentResponse.data?.data.levels ?? []}
           refereesEnabled={swrTournamentResponse.data?.data.referees_enabled ?? false}

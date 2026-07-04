@@ -353,7 +353,6 @@
     "resume_match_button": "Resume match",
     "finish_match_button": "Finish match",
     "open_score_tracker_button": "Open score tracker",
-    "back_to_matches_button": "Back to matches",
     "match_state_label": "Match state",
     "match_state_not_started": "Not started",
     "match_state_in_progress": "In progress",
