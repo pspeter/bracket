@@ -524,33 +524,36 @@ function MatchModalForm({
           })}
         </Stack>
         <Group grow gap="xs" mt="md">
-          <Button
-            variant="light"
-            size="xs"
-            disabled={!canStart}
-            loading={isTransitioning}
-            onClick={() => applyTransition(() => startMatch(tournamentData.id, match.id))}
-          >
-            {isMultiSet ? t('start_next_set_label') : t('start_game_button')}
-          </Button>
-          <Button
-            variant="light"
-            size="xs"
-            disabled={!canEnd}
-            loading={isTransitioning}
-            onClick={() => applyTransition(() => endMatch(tournamentData.id, match.id))}
-          >
-            {isMultiSet ? t('end_set_label') : t('finish_match_button')}
-          </Button>
-          <Button
-            variant="light"
-            size="xs"
-            disabled={!canReopen}
-            loading={isTransitioning}
-            onClick={() => applyTransition(() => reopenMatch(tournamentData.id, match.id))}
-          >
-            {isMultiSet ? t('reopen_set_button') : t('resume_match_button')}
-          </Button>
+          {canStart && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => startMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('start_next_set_label') : t('start_game_button')}
+            </Button>
+          )}
+          {canEnd && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => endMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('end_set_label') : t('finish_match_button')}
+            </Button>
+          )}
+          {canReopen && (
+            <Button
+              variant="light"
+              size="xs"
+              loading={isTransitioning}
+              onClick={() => applyTransition(() => reopenMatch(tournamentData.id, match.id))}
+            >
+              {isMultiSet ? t('reopen_set_button') : t('resume_match_button')}
+            </Button>
+          )}
         </Group>
         {refereesEnabled && (
           <RefereeCombobox
