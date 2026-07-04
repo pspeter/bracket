@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns';
+import { addMinutes, format, parseISO } from 'date-fns';
 
 export function DateTime({ datetime }: { datetime: string }) {
   const date = parseISO(datetime);
@@ -12,6 +12,12 @@ export function Time({ datetime }: { datetime: string }) {
 
 export function formatTime(datetime: string) {
   return format(parseISO(datetime), 'HH:mm');
+}
+
+export function formatTimeRange(datetime: string, durationMinutes: number) {
+  const start = parseISO(datetime);
+  const end = addMinutes(start, durationMinutes);
+  return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')}`;
 }
 
 export function compareDateTime(datetime1: string, datetime2: string) {
