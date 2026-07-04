@@ -1,4 +1,4 @@
-import { MatchSet } from '@openapi';
+import { MatchSet, MatchWithDetails } from '@openapi';
 
 export type ScoreTrackingViewState =
   | { kind: 'not_started' }
@@ -40,6 +40,38 @@ export function nextScoresAfterAdjust(
     stage_item_input1_score: Math.max(0, set.stage_item_input1_score + (slot === 1 ? delta : 0)),
     stage_item_input2_score: Math.max(0, set.stage_item_input2_score + (slot === 2 ? delta : 0)),
   };
+}
+
+// Order scheduled matches the way they play out on a court: by start time (matches without a start
+// time sort last), breaking ties by id for a stable ordering.
+function compareMatchesByScheduleThenId(a: MatchWithDetails, b: MatchWithDetails): number {
+  if (a.start_time !== b.start_time) {
+    if (a.start_time == null) return 1;
+    if (b.start_time == null) return -1;
+    return a.start_time < b.start_time ? -1 : 1;
+  }
+  return a.id - b.id;
+}
+
+// Given the full list of scheduled matches and the current match, find the next match on the same
+// court that still needs to be played (i.e. is not completed). Returns null when there is none.
+export function getNextMatchOnCourt(
+  matches: MatchWithDetails[],
+  currentMatch: MatchWithDetails
+): MatchWithDetails | null {
+  if (currentMatch.court_id == null) return null;
+
+  const sameCourt = matches
+    .filter((match) => match.court_id === currentMatch.court_id)
+    .sort(compareMatchesByScheduleThenId);
+
+  const currentIndex = sameCourt.findIndex((match) => match.id === currentMatch.id);
+  if (currentIndex === -1) return null;
+
+  for (let i = currentIndex + 1; i < sameCourt.length; i += 1) {
+    if (sameCourt[i].state !== 'COMPLETED') return sameCourt[i];
+  }
+  return null;
 }
 
 export function isEndSetDisabled(

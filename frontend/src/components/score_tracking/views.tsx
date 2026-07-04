@@ -299,14 +299,14 @@ export type ScoreTrackingMatchActions = {
 
 export function ScoreTrackingMatchView({
   swrResponse,
-  backHref,
+  nextMatchHref,
   storageKey,
   actions,
   levels = [],
   refereesEnabled = false,
 }: {
   swrResponse: SWRResponse<ScoreTrackingMatchResponse>;
-  backHref: string;
+  nextMatchHref?: string | null;
   storageKey: string;
   levels?: LevelResponse[];
   refereesEnabled?: boolean;
@@ -454,11 +454,22 @@ export function ScoreTrackingMatchView({
 
   function renderCompleted() {
     return (
-      <Center>
+      <Stack gap="sm" align="center">
         <Button size="lg" loading={isSaving} onClick={() => runAction(actions.reopenMatch)}>
           {t('resume_match_button')}
         </Button>
-      </Center>
+        {nextMatchHref != null ? (
+          <Button
+            component={PreloadLink}
+            href={nextMatchHref}
+            size="lg"
+            color="blue"
+            variant="light"
+          >
+            {t('next_match_button')}
+          </Button>
+        ) : null}
+      </Stack>
     );
   }
 
@@ -630,14 +641,9 @@ export function ScoreTrackingMatchView({
   return (
     <Container size="sm" py="xl">
       <Stack gap="lg">
-        <Group justify="space-between">
-          <Group gap="xs">
-            <Title order={2}>{t('score_tracking_match_title')}</Title>
-            <LevelBadge levels={levels} levelId={match.level_id} />
-          </Group>
-          <Button component={PreloadLink} href={backHref} variant="subtle">
-            {t('back_to_matches_button')}
-          </Button>
+        <Group gap="xs">
+          <Title order={2}>{t('score_tracking_match_title')}</Title>
+          <LevelBadge levels={levels} levelId={match.level_id} />
         </Group>
         <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
         {renderMatchBody()}
