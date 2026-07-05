@@ -613,20 +613,7 @@ export function ScoreTrackingMatchView({
     if (viewState == null) return null;
     if (viewState.kind === 'not_started') return renderNotStarted();
     if (viewState.kind === 'completed') {
-      return (
-        <>
-          <Stack align="center" gap={4}>
-            <Button
-              variant="light"
-              leftSection={<IconArrowsExchange size={18} />}
-              onClick={toggleSides}
-            >
-              {t('switch_sides_button')}
-            </Button>
-          </Stack>
-          {renderCompleted()}
-        </>
-      );
+      return renderCompleted();
     }
     if (viewState.kind === 'between_sets') {
       return renderBetweenSets(viewState.completed, viewState.next, viewState.allSets);
