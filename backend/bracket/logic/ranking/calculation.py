@@ -2,13 +2,14 @@ import math
 from collections import defaultdict
 from decimal import Decimal
 
+from bracket.logic.apply_plan import apply_plan
+from bracket.logic.plan import PlanItem, SetTeamStats
 from bracket.logic.ranking.statistics import START_ELO, TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking, ScoringType
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.rankings import get_ranking_for_stage_item
-from bracket.sql.teams import update_team_stats
 from bracket.utils.id_types import StageItemInputId, TournamentId
 
 K = 32
@@ -146,6 +147,22 @@ def determine_team_ranking_for_stage_item(
     )
 
 
+def build_team_stats_plan(
+    stage_item: StageItemWithRounds,
+    ranking: Ranking,
+) -> list[PlanItem]:
+    """Compute the ``SetTeamStats`` writes for every concrete input of ``stage_item``."""
+    stats_per_input = determine_ranking_for_stage_item(stage_item, ranking)
+    return [
+        SetTeamStats(
+            stage_item_input_id=stage_item_input.id,
+            stats=stats_per_input[stage_item_input.id],
+        )
+        for stage_item_input in stage_item.inputs
+        if stage_item_input.team_id is not None
+    ]
+
+
 async def recalculate_ranking_for_stage_item(
     tournament_id: TournamentId,
     stage_item: StageItemWithRounds,
@@ -154,15 +171,5 @@ async def recalculate_ranking_for_stage_item(
     assert stage_item, "Stage item not found"
     assert ranking, "Ranking not found"
 
-    team_x_stage_item_input_lookup = {
-        stage_item_input.team_id: stage_item_input.id
-        for stage_item_input in stage_item.inputs
-        if stage_item_input.team_id is not None
-    }
-
-    elo_per_input = determine_ranking_for_stage_item(stage_item, ranking)
-
-    for stage_item_input_id in team_x_stage_item_input_lookup.values():
-        await update_team_stats(
-            tournament_id, stage_item_input_id, elo_per_input[stage_item_input_id]
-        )
+    plan = build_team_stats_plan(stage_item, ranking)
+    await apply_plan(tournament_id, plan)

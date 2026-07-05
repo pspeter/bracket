@@ -1,3 +1,5 @@
+from bracket.logic.apply_plan import apply_plan
+from bracket.logic.plan import PlanItem, SetMatchInputs, SetMatchRefereeSlot, SetRoundLifecycleState
 from bracket.logic.scheduling.swiss_resolution_policy import (
     get_next_round_to_resolve,
     get_rounds_to_re_resolve,
@@ -12,24 +14,18 @@ from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
-from bracket.sql.matches import sql_set_input_ids_for_match
-from bracket.sql.referees import sql_set_match_referee_slot
-from bracket.sql.rounds import set_round_lifecycle_state
 from bracket.sql.stage_items import get_stage_item
 from bracket.utils.id_types import TournamentId
 
 
-async def unwire_swiss_rounds_with_incomplete_predecessor(
-    tournament_id: TournamentId,
-    fresh: StageItemWithRounds,
-) -> bool:
-    """Clear team assignments and revert RESOLVED rounds with incomplete predecessors.
+def build_unwire_plan(fresh: StageItemWithRounds) -> list[PlanItem]:
+    """Plan clearing team assignments and reverting RESOLVED rounds with incomplete predecessors.
 
     Skips rounds that have already started (any match not NOT_STARTED) or that are pinned:
     no cascade may ever modify a downstream round that has started, and pinned rounds are
     never touched by the automated policy (consistent with ``get_rounds_to_re_resolve``).
     """
-    changed = False
+    plan: list[PlanItem] = []
     sorted_rounds = sorted(fresh.rounds, key=lambda r: r.id)
     for i, round_ in enumerate(sorted_rounds):
         if round_.lifecycle_state is not RoundLifecycleState.RESOLVED:
@@ -51,28 +47,49 @@ async def unwire_swiss_rounds_with_incomplete_predecessor(
 
         for match in round_.matches:
             if match.stage_item_input1_id is not None or match.stage_item_input2_id is not None:
-                await sql_set_input_ids_for_match(round_.id, match.id, [None, None])
-                changed = True
-        await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.PLACEHOLDER)
-        changed = True
-    return changed
+                plan.append(
+                    SetMatchInputs(round_id=round_.id, match_id=match.id, input_ids=[None, None])
+                )
+        plan.append(
+            SetRoundLifecycleState(round_id=round_.id, state=RoundLifecycleState.PLACEHOLDER)
+        )
+    return plan
 
 
-async def _assign_teams_to_round(
+async def unwire_swiss_rounds_with_incomplete_predecessor(
     tournament_id: TournamentId,
     fresh: StageItemWithRounds,
+) -> bool:
+    """Clear team assignments and revert RESOLVED rounds with incomplete predecessors.
+
+    Returns whether anything changed (i.e. the plan was non-empty).
+    """
+    plan = build_unwire_plan(fresh)
+    if plan:
+        await apply_plan(tournament_id, plan)
+    return bool(plan)
+
+
+def build_round_assignment_plan(
+    stage_item: StageItemWithRounds,
     round_: RoundWithMatches,
     *,
     advance_to_resolved: bool,
-) -> None:
-    """Run pairing selection + slot assignment for a single round and persist the result."""
-    inputs = [i for i in fresh.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
+) -> list[PlanItem]:
+    """Run pairing selection + slot assignment for a single round and plan the result.
+
+    Shared by the Swiss auto-resolution passes below and by round-1 resolution
+    (``handle_stage_activation._resolve_round_1_for_swiss_stage_item``), which resolves against a
+    ``stage_item`` whose other rounds are still all PLACEHOLDER -- the same as this function
+    computing an empty ``previous_rounds``.
+    """
+    inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
     if not inputs:
-        return
+        return []
 
     previous_rounds = [
         r
-        for r in fresh.rounds
+        for r in stage_item.rounds
         if r.lifecycle_state != RoundLifecycleState.PLACEHOLDER and r.id != round_.id
     ]
 
@@ -90,6 +107,7 @@ async def _assign_teams_to_round(
     skeleton = skeleton_from_slot_pairs(slot_pairs, bye_slot)
     slot_mapping = assign_pairs_to_slots(pairs, bye, skeleton)
 
+    plan: list[PlanItem] = []
     for match in round_.matches:
         if match.input1_slot is None or match.input2_slot is None:
             continue
@@ -97,15 +115,19 @@ async def _assign_teams_to_round(
         input2_id = slot_mapping.get(match.input2_slot)
         if input1_id is None or input2_id is None:
             continue
-        await sql_set_input_ids_for_match(round_.id, match.id, [input1_id, input2_id])
+        plan.append(
+            SetMatchInputs(round_id=round_.id, match_id=match.id, input_ids=[input1_id, input2_id])
+        )
 
         if match.referee_slot is not None:
             ref_id = slot_mapping.get(match.referee_slot)
             if ref_id is not None:
-                await sql_set_match_referee_slot(match.id, ref_id)
+                plan.append(SetMatchRefereeSlot(match_id=match.id, stage_item_input_id=ref_id))
 
     if advance_to_resolved:
-        await set_round_lifecycle_state(round_.id, tournament_id, RoundLifecycleState.RESOLVED)
+        plan.append(SetRoundLifecycleState(round_id=round_.id, state=RoundLifecycleState.RESOLVED))
+
+    return plan
 
 
 async def auto_resolve_next_swiss_round(
@@ -133,7 +155,8 @@ async def auto_resolve_next_swiss_round(
     if next_placeholder is not None:
         round_ = next((r for r in fresh.rounds if r.id == next_placeholder.id), None)
         if round_ is not None and round_.lifecycle_state == RoundLifecycleState.PLACEHOLDER:
-            await _assign_teams_to_round(tournament_id, fresh, round_, advance_to_resolved=True)
+            plan = build_round_assignment_plan(fresh, round_, advance_to_resolved=True)
+            await apply_plan(tournament_id, plan)
             # Refresh after the first resolution so pass 2 sees the updated state
             fresh = await get_stage_item(tournament_id, stage_item.id)
 
@@ -141,4 +164,5 @@ async def auto_resolve_next_swiss_round(
     for candidate in get_rounds_to_re_resolve(fresh.rounds):
         round_ = next((r for r in fresh.rounds if r.id == candidate.id), None)
         if round_ is not None and round_.lifecycle_state == RoundLifecycleState.RESOLVED:
-            await _assign_teams_to_round(tournament_id, fresh, round_, advance_to_resolved=False)
+            plan = build_round_assignment_plan(fresh, round_, advance_to_resolved=False)
+            await apply_plan(tournament_id, plan)

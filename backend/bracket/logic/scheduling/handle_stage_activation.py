@@ -1,32 +1,23 @@
 from bracket.database import database
+from bracket.logic.apply_plan import apply_plan
+from bracket.logic.plan import AssignTeamToInput, PlanItem
 from bracket.logic.ranking.calculation import (
     determine_team_ranking_for_stage_item,
 )
 from bracket.logic.ranking.statistics import TeamStatistics
-from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
-from bracket.logic.scheduling.swiss_slot_assigner import (
-    assign_pairs_to_slots,
-    skeleton_from_slot_pairs,
-)
+from bracket.logic.scheduling.swiss_resolution_orchestrator import build_round_assignment_plan
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.stage_item_inputs import StageItemInput, StageItemInputFinal
+from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
-from bracket.sql.matches import sql_set_input_ids_for_match
 from bracket.sql.rankings import get_ranking_for_stage_item
-from bracket.sql.referees import sql_set_match_referee_slot
-from bracket.sql.rounds import set_round_lifecycle_state
-from bracket.sql.stage_item_inputs import (
-    get_stage_item_input_by_id,
-    sql_set_team_id_for_stage_item_input,
-)
+from bracket.sql.stage_item_inputs import get_stage_item_input_by_id
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.id_types import (
     StageItemId,
     StageItemInputId,
-    TeamId,
     TournamentId,
 )
 from bracket.utils.types import assert_some
@@ -83,43 +74,11 @@ async def _resolve_round_1_for_swiss_stage_item(
     if first_round is None or first_round.lifecycle_state is not RoundLifecycleState.PLACEHOLDER:
         return
 
-    placeholder_round = first_round
-
-    inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
-    if not inputs:
-        return
-
-    slot_pairs = [
-        (m.input1_slot, m.input2_slot)
-        for m in placeholder_round.matches
-        if m.input1_slot is not None and m.input2_slot is not None
-    ]
-    bye_slot = next(
-        (m.referee_slot for m in placeholder_round.matches if m.referee_slot is not None),
-        None,
-    )
-
-    pairs, bye = select_round_pairing(inputs, [])
-    skeleton = skeleton_from_slot_pairs(slot_pairs, bye_slot)
-    slot_mapping = assign_pairs_to_slots(pairs, bye, skeleton)
-
-    for match in placeholder_round.matches:
-        if match.input1_slot is None or match.input2_slot is None:
-            continue
-        input1_id = slot_mapping.get(match.input1_slot)
-        input2_id = slot_mapping.get(match.input2_slot)
-        if input1_id is None or input2_id is None:
-            continue
-        await sql_set_input_ids_for_match(placeholder_round.id, match.id, [input1_id, input2_id])
-
-        if match.referee_slot is not None:
-            ref_id = slot_mapping.get(match.referee_slot)
-            if ref_id is not None:
-                await sql_set_match_referee_slot(match.id, ref_id)
-
-    await set_round_lifecycle_state(
-        placeholder_round.id, tournament_id, RoundLifecycleState.RESOLVED
-    )
+    # build_round_assignment_plan derives previous_rounds from stage_item.rounds, which are all
+    # still PLACEHOLDER at this point (round 1 is the very first round ever resolved), so it
+    # naturally computes the same empty previous_rounds this used to pass explicitly.
+    plan = build_round_assignment_plan(stage_item, first_round, advance_to_resolved=True)
+    await apply_plan(tournament_id, plan)
 
 
 async def try_resolve_first_swiss_round_when_inputs_filled(
@@ -203,8 +162,9 @@ async def resolve_dependent_inputs_for_completed_stage_item(
     # Compute every target assignment before writing anything: sibling inputs of the same
     # dependent stage item may swap teams (e.g. a ranking edit flips positions 1 and 2 of the
     # source), and updating them one row at a time would transiently violate the unique
-    # (stage_item_id, team_id) constraint.
-    assignments: list[tuple[StageItemInput, TeamId]] = []
+    # (stage_item_id, team_id) constraint. previous_team_id lets apply_plan order the batch
+    # swap-safely.
+    plan: list[PlanItem] = []
     affected_stage_item_ids: set[StageItemId] = set()
     for stage in stages:
         for stage_item in stage.stage_items:
@@ -221,22 +181,16 @@ async def resolve_dependent_inputs_for_completed_stage_item(
                 if not isinstance(target_input, StageItemInputFinal):
                     continue
 
-                assignments.append((stage_item_input, target_input.team.id))
+                plan.append(
+                    AssignTeamToInput(
+                        stage_item_input_id=stage_item_input.id,
+                        team_id=target_input.team.id,
+                        previous_team_id=stage_item_input.team_id,
+                    )
+                )
                 affected_stage_item_ids.add(stage_item.id)
 
-    # Two passes inside a transaction (a savepoint when the caller already holds one), so the
-    # intermediate NULL state is never visible outside: first clear every input whose team
-    # changes, then write the final team ids. This makes any permutation of teams among the
-    # dependent inputs safe with respect to the unique constraint.
-    async with database.transaction():
-        for stage_item_input, new_team_id in assignments:
-            if stage_item_input.team_id is not None and stage_item_input.team_id != new_team_id:
-                await sql_set_team_id_for_stage_item_input(tournament_id, stage_item_input.id, None)
-
-        for stage_item_input, new_team_id in assignments:
-            await sql_set_team_id_for_stage_item_input(
-                tournament_id, stage_item_input.id, new_team_id
-            )
+    await apply_plan(tournament_id, plan)
 
     for stage_item_id in affected_stage_item_ids:
         affected_stage_item = await get_stage_item(tournament_id, stage_item_id)

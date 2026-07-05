@@ -1,12 +1,14 @@
 from collections import defaultdict
 
+from bracket.logic.apply_plan import apply_plan
+from bracket.logic.plan import PlanItem, SetMatchInputs
 from bracket.models.db.match import Match, MatchState, derive_match_state
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
-from bracket.sql.matches import sql_set_input_ids_for_match
 from bracket.utils.id_types import (
     MatchId,
     RoundId,
+    TournamentId,
 )
 
 
@@ -165,7 +167,19 @@ def get_started_elimination_followers(
     return started
 
 
+def build_elimination_input_plan(updates: dict[MatchId, Match]) -> list[PlanItem]:
+    return [
+        SetMatchInputs(
+            round_id=match.round_id,
+            match_id=match.id,
+            input_ids=[match.stage_item_input1_id, match.stage_item_input2_id],
+        )
+        for match in updates.values()
+    ]
+
+
 async def update_inputs_in_subsequent_elimination_rounds(
+    tournament_id: TournamentId,
     current_round_id: RoundId,
     stage_item: StageItemWithRounds,
     match_ids: set[MatchId] | None = None,
@@ -173,14 +187,27 @@ async def update_inputs_in_subsequent_elimination_rounds(
     updates = get_inputs_to_update_in_subsequent_elimination_rounds(
         current_round_id, stage_item, match_ids
     )
-    for _, match in updates.items():
-        await sql_set_input_ids_for_match(
-            match.round_id, match.id, [match.stage_item_input1_id, match.stage_item_input2_id]
-        )
+    plan = build_elimination_input_plan(updates)
+    # Skip empty plans to avoid opening a pointless transaction.
+    if plan:
+        await apply_plan(tournament_id, plan)
 
 
 async def update_inputs_in_complete_elimination_stage_item(
+    tournament_id: TournamentId,
     stage_item: StageItemWithRounds,
 ) -> None:
-    for round_ in stage_item.rounds:
-        await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item)
+    # Each round's updates are computed by the pure planner against the same in-memory
+    # stage_item, which never changes across this loop (only the database does), so later
+    # iterations don't observe earlier ones' writes -- collecting every round's plan items and
+    # applying them once at the end is equivalent to applying them one round at a time.
+    plan: list[PlanItem] = [
+        item
+        for round_ in stage_item.rounds
+        for item in build_elimination_input_plan(
+            get_inputs_to_update_in_subsequent_elimination_rounds(round_.id, stage_item)
+        )
+    ]
+    # Skip empty plans to avoid opening a pointless transaction.
+    if plan:
+        await apply_plan(tournament_id, plan)
