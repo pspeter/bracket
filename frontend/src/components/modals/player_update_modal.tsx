@@ -46,7 +46,7 @@ export default function PlayerUpdateModal({
       <Modal opened={opened} onClose={() => setOpened(false)} title={t('edit_player')}>
         <form
           onSubmit={form.onSubmit(async (values) => {
-            await updatePlayer(tournament_id, player.id, values.name, values.active, null);
+            await updatePlayer(tournament_id, player.id, values.name, values.active);
             await swrPlayersResponse.mutate();
             setOpened(false);
           })}
