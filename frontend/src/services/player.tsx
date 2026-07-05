@@ -33,9 +33,9 @@ export async function updatePlayer(
   active: boolean,
   team_id: string | null
 ) {
-  // NOTE: unlike create/delete above, this has never invalidated tournament issues. Toggling
-  // `active` or moving a player between teams can plausibly change issue counts, so this looks
-  // like an accidental omission rather than a deliberate one -- preserved as-is and flagged.
+  // The backend's PlayerBody is {name, active} only -- the team_id sent here is silently
+  // dropped, team membership is unchanged, and no issue counter filters on `active`, so this
+  // update cannot change an issue count and skips invalidation.
   return performMutation(
     'put',
     `tournaments/${tournament_id}/players/${player_id}`,

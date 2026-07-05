@@ -49,13 +49,14 @@ export async function setRankingForStageItems(
   stage_id: number,
   ranking_id: number
 ) {
-  // NOTE: has never invalidated tournament issues, though changing a stage's ranking can
-  // plausibly affect ranking/standings-derived issues -- preserved as-is and flagged.
+  // Changing a stage's ranking resizes match sets (which feeds the overdue-match issue
+  // counters) and reconciles its stage items, which can reassign dependent-input teams
+  // (which feeds the unassigned-teams counter) -- so invalidate issues.
   return performMutation(
     'put',
     `tournaments/${tournament_id}/stages/${stage_id}/ranking`,
     { ranking_id },
-    { invalidateIssues: false }
+    { tournamentId: tournament_id }
   );
 }
 

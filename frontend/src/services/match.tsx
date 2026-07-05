@@ -208,10 +208,9 @@ export async function resizeMatchBreak(
 }
 
 export async function autoAssignReferees(tournament_id: number, weights?: SchedulerWeights) {
-  // NOTE: unlike every other match mutation above, this has never invalidated tournament issues.
-  // Referee assignment can plausibly affect issue counts (e.g. "missing referee"), so this looks
-  // like an accidental omission rather than a deliberate one -- preserved as-is and flagged for
-  // the architect rather than silently "fixed" here.
+  // No tournament-issue counter involves referees, so referee assignment provably cannot
+  // change any issue count today. If a referee issue source is ever added, wire this up
+  // (see AGENTS.md on tournament issue badges).
   return performMutation(
     'post',
     `tournaments/${tournament_id}/matches/auto-assign-referees`,

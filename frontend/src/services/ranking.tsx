@@ -2,11 +2,9 @@ import { ScoringType } from '@openapi';
 
 import { performMutation } from './adapter';
 
-// NOTE: none of these three has ever invalidated tournament issues (consistent across this
-// file, unlike e.g. player.tsx/round.tsx where only one sibling function omits it). Ranking
-// changes can plausibly affect standings-derived issues, so this is still worth the architect
-// double-checking, but the consistency within the file makes it read more like a deliberate
-// choice than an accident.
+// createRanking adds a ranking nothing references yet and deleteRanking only affects
+// unreferenced rankings; neither can change any issue counter, so both skip invalidation.
+// editRanking reconciles stage items and therefore invalidates (see below).
 
 export async function createRanking(tournament_id: number) {
   return performMutation(
@@ -50,8 +48,11 @@ export async function editRanking(
   } else if (scoring_type === 'SET_POINTS_WITH_MATCH_BONUS') {
     body.match_bonus_points = match_bonus_points;
   }
+  // A ranking edit reconciles every stage item using it, which can reassign dependent-input
+  // teams (the unassigned-teams issue counter) and resize match sets (the overdue counters) --
+  // so invalidate issues.
   return performMutation('put', `tournaments/${tournament_id}/rankings/${ranking_id}`, body, {
-    invalidateIssues: false,
+    tournamentId: tournament_id,
   });
 }
 

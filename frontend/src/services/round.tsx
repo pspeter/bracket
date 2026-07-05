@@ -23,10 +23,9 @@ export async function updateRound(
   name: string,
   lifecycle_state: string
 ) {
-  // NOTE: create/delete above invalidate issues; this update (rename + lifecycle_state change,
-  // e.g. activating a round) never has. Lifecycle changes can plausibly affect issue counts, so
-  // this looks like an accidental omission rather than a deliberate one -- preserved as-is and
-  // flagged for the architect.
+  // The backend performs a bare UPDATE of name + lifecycle_state with no cascade, and no
+  // issue counter reads round lifecycle -- this cannot change an issue count, so it skips
+  // invalidation.
   return performMutation(
     'put',
     `tournaments/${tournament_id}/rounds/${round_id}`,
