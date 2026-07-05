@@ -1,5 +1,5 @@
 import { UserToRegister, UserToUpdate } from '@openapi';
-import { createAxios, handleRequestError } from './adapter';
+import { createAxios, handleRequestError, performMutation } from './adapter';
 
 export async function performLogin(username: string, password: string) {
   const bodyFormData = new FormData();
@@ -28,32 +28,40 @@ export async function performLogin(username: string, password: string) {
 }
 
 export async function updateUser(user_id: number, user: UserToUpdate) {
-  return createAxios()
-    .put(`users/${user_id}`, user)
-    .catch((response: any) => handleRequestError(response));
+  // Users aren't tournament-scoped, so there's no tournament-issues key to invalidate.
+  return performMutation('put', `users/${user_id}`, user, { invalidateIssues: false });
 }
 
 export async function updatePassword(user_id: number, password: string) {
-  return createAxios()
-    .put(`users/${user_id}/password`, { password })
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'put',
+    `users/${user_id}/password`,
+    { password },
+    {
+      invalidateIssues: false,
+    }
+  );
 }
 
 export async function registerUser(user: UserToRegister, captchaToken: string | null) {
-  return createAxios()
-    .post('users/register', {
+  return performMutation(
+    'post',
+    'users/register',
+    {
       email: user.email,
       name: user.name,
       password: user.password,
       captcha_token: captchaToken,
-    })
-    .catch((response: any) => handleRequestError(response));
+    },
+    { invalidateIssues: false }
+  );
 }
 
 export async function registerDemoUser(captchaToken: string | null) {
-  return createAxios()
-    .post('users/register_demo', {
-      captcha_token: captchaToken,
-    })
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'post',
+    'users/register_demo',
+    { captcha_token: captchaToken },
+    { invalidateIssues: false }
+  );
 }

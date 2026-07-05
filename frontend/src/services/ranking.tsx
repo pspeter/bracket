@@ -1,11 +1,20 @@
 import { ScoringType } from '@openapi';
 
-import { createAxios, handleRequestError } from './adapter';
+import { performMutation } from './adapter';
+
+// NOTE: none of these three has ever invalidated tournament issues (consistent across this
+// file, unlike e.g. player.tsx/round.tsx where only one sibling function omits it). Ranking
+// changes can plausibly affect standings-derived issues, so this is still worth the architect
+// double-checking, but the consistency within the file makes it read more like a deliberate
+// choice than an accident.
 
 export async function createRanking(tournament_id: number) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/rankings`, { scoring_type: 'MATCH_POINTS' })
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/rankings`,
+    { scoring_type: 'MATCH_POINTS' },
+    { invalidateIssues: false }
+  );
 }
 
 export async function editRanking(
@@ -41,13 +50,16 @@ export async function editRanking(
   } else if (scoring_type === 'SET_POINTS_WITH_MATCH_BONUS') {
     body.match_bonus_points = match_bonus_points;
   }
-  return createAxios()
-    .put(`tournaments/${tournament_id}/rankings/${ranking_id}`, body)
-    .catch((response: any) => handleRequestError(response));
+  return performMutation('put', `tournaments/${tournament_id}/rankings/${ranking_id}`, body, {
+    invalidateIssues: false,
+  });
 }
 
 export async function deleteRanking(tournament_id: number, ranking_id: number) {
-  return createAxios()
-    .delete(`tournaments/${tournament_id}/rankings/${ranking_id}`)
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'delete',
+    `tournaments/${tournament_id}/rankings/${ranking_id}`,
+    undefined,
+    { invalidateIssues: false }
+  );
 }

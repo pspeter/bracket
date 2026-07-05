@@ -144,6 +144,84 @@ export async function mutateIssues(tournament_id: number) {
   await mutate(getIssuesKey(tournament_id));
 }
 
+export type MutationVerb = 'post' | 'put' | 'delete' | 'patch';
+
+export type MutationOptions = {
+  /**
+   * Invalidate the tournament-issues SWR key after the request settles. This is the default
+   * policy (AGENTS.md: every mutation that can change a tournament-issue count must invalidate
+   * the shared issues key). Pass `false` only where the call site deliberately skips
+   * invalidation -- no tournament scope, or the mutation genuinely cannot affect issue counts.
+   */
+  invalidateIssues?: boolean;
+  /**
+   * Tournament id whose issues key gets invalidated, or a thunk that resolves one. Required
+   * when `invalidateIssues` is true (the default); resolving to `null`/`undefined` skips
+   * invalidation for that call. The thunk form exists for token-authenticated flows that must
+   * resolve the tournament id first (see the score-tracking-token mutations in `match.tsx`).
+   */
+  tournamentId?: number | null | (() => Promise<number | null | undefined>);
+  /**
+   * When `false`, request errors are not caught here -- they propagate to the caller instead of
+   * being swallowed by `handleRequestError`. Used by the handful of call sites that intentionally
+   * let the `AxiosError` propagate: the scheduling planner mutations (which must see failures to
+   * refetch the schedule and clear the selection) and a few call sites that chain their own
+   * `.then`/`.catch` on the returned promise. Defaults to `true`, matching the historical
+   * `createAxios().<verb>(url, body).catch(handleRequestError)` behavior.
+   */
+  catchErrors?: boolean;
+};
+
+function sendMutationRequest(
+  instance: AxiosInstance,
+  method: MutationVerb,
+  url: string,
+  body?: unknown
+): Promise<AxiosResponse> {
+  switch (method) {
+    case 'post':
+      return instance.post(url, body);
+    case 'put':
+      return instance.put(url, body);
+    case 'patch':
+      return instance.patch(url, body);
+    case 'delete':
+      // None of today's call sites send a body with DELETE, so there's no config to forward.
+      return instance.delete(url);
+  }
+}
+
+/**
+ * The single seam for write requests. Same request semantics as
+ * `createAxios().<verb>(url, body).catch(handleRequestError)` -- including the return contract
+ * (an `AxiosResponse` on success, `undefined` when the catch swallows an `AxiosError`) -- plus
+ * the tournament-issues invalidation that AGENTS.md requires after every issue-affecting
+ * mutation.
+ */
+export async function performMutation(
+  method: MutationVerb,
+  url: string,
+  body?: unknown,
+  options: MutationOptions = {}
+) {
+  const { invalidateIssues = true, tournamentId = null, catchErrors = true } = options;
+
+  const request = sendMutationRequest(createAxios(), method, url, body);
+  const response = catchErrors
+    ? await request.catch((err: any) => handleRequestError(err))
+    : await request;
+
+  if (invalidateIssues) {
+    const resolvedTournamentId =
+      typeof tournamentId === 'function' ? await tournamentId() : tournamentId;
+    if (resolvedTournamentId != null) {
+      await mutateIssues(resolvedTournamentId);
+    }
+  }
+
+  return response;
+}
+
 export function getTournaments(filter: TournamentFilter): SWRResponse<TournamentsResponse> {
   return useSWR(`tournaments?filter_=${filter}`, fetcher);
 }

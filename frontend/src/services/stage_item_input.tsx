@@ -1,4 +1,4 @@
-import { createAxios, handleRequestError, mutateIssues } from './adapter';
+import { performMutation } from './adapter';
 
 export async function updateStageItemInput(
   tournament_id: number,
@@ -8,12 +8,10 @@ export async function updateStageItemInput(
   winner_position: number | null,
   winner_from_stage_item_id: number | null
 ) {
-  const response = await createAxios()
-    .put(
-      `tournaments/${tournament_id}/stage_items/${stage_item_id}/inputs/${stage_item_input_id}`,
-      { team_id, winner_position, winner_from_stage_item_id }
-    )
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'put',
+    `tournaments/${tournament_id}/stage_items/${stage_item_id}/inputs/${stage_item_input_id}`,
+    { team_id, winner_position, winner_from_stage_item_id },
+    { tournamentId: tournament_id }
+  );
 }
