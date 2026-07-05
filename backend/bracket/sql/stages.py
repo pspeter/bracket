@@ -2,6 +2,7 @@ from bracket.database import database
 from bracket.models.db.stage import Stage
 from bracket.models.db.util import StageWithStageItems
 from bracket.sql.matches import MATCH_DETAILS_COLUMNS, inputs_with_teams_cte
+from bracket.sql.rows import normalize_stage_row
 from bracket.utils.id_types import LevelId, RoundId, StageId, StageItemId, TournamentId
 from bracket.utils.types import dict_without_none
 
@@ -97,7 +98,9 @@ async def get_full_tournament_details(
         }
     )
     result = await database.fetch_all(query=query, values=values)
-    return [StageWithStageItems.model_validate(dict(x._mapping)) for x in result]
+    return [
+        StageWithStageItems.model_validate(normalize_stage_row(dict(x._mapping))) for x in result
+    ]
 
 
 async def sql_delete_stage(tournament_id: TournamentId, stage_id: StageId) -> None:
