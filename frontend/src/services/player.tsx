@@ -30,16 +30,14 @@ export async function updatePlayer(
   tournament_id: number,
   player_id: number,
   name: string,
-  active: boolean,
-  team_id: string | null
+  active: boolean
 ) {
-  // The backend's PlayerBody is {name, active} only -- the team_id sent here is silently
-  // dropped, team membership is unchanged, and no issue counter filters on `active`, so this
-  // update cannot change an issue count and skips invalidation.
+  // The backend updates name + active only, and no issue counter filters on `active`, so this
+  // cannot change an issue count and skips invalidation.
   return performMutation(
     'put',
     `tournaments/${tournament_id}/players/${player_id}`,
-    { name, active, team_id },
+    { name, active },
     { invalidateIssues: false }
   );
 }
