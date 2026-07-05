@@ -1,14 +1,18 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from bracket.config import config
-from bracket.models.db.match import Match
 from bracket.models.db.tournament import LevelResponse, Tournament
 from bracket.models.db.user import UserPublic
 from bracket.routes.auth import (
     tournament_by_score_tracking_token,
     user_authenticated_for_tournament,
+)
+from bracket.routes.match_access import (
+    ResolvedMatch,
+    resolved_match_via_token,
+    resolved_scheduled_match_via_auth,
 )
 from bracket.routes.matches import (
     get_score_tracking_match_response,
@@ -18,12 +22,11 @@ from bracket.routes.models import (
     ScoreTrackingInfoResponse,
     ScoreTrackingMatchResponse,
 )
-from bracket.routes.util import match_dependency
 from bracket.sql.courts import get_all_courts_in_tournament
 from bracket.sql.levels import sql_get_levels_for_tournament
 from bracket.sql.matches import sql_get_scheduled_matches_with_details
 from bracket.sql.tournaments import sql_get_tournament
-from bracket.utils.id_types import CourtId, MatchId, TournamentId
+from bracket.utils.id_types import CourtId, TournamentId
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -51,26 +54,6 @@ async def get_score_tracking_info(
             courts=courts,
         )
     )
-
-
-async def score_tracking_match_dependency(
-    match_id: MatchId, tournament: Tournament = Depends(tournament_by_score_tracking_token)
-) -> Match:
-    match = await match_dependency(tournament.id, match_id)
-    if match.start_time is None:
-        raise HTTPException(status_code=404, detail="Could not find scheduled match")
-    return match
-
-
-async def tournament_score_tracking_match_dependency(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-) -> Match:
-    match = await match_dependency(tournament_id, match_id)
-    if match.start_time is None:
-        raise HTTPException(status_code=404, detail="Could not find scheduled match")
-    return match
 
 
 @router.get(
@@ -105,12 +88,9 @@ async def get_authenticated_score_tracking_info(
     response_model=ScoreTrackingMatchResponse,
 )
 async def get_authenticated_score_tracking_match(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    __: Match = Depends(tournament_score_tracking_match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_scheduled_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    return await get_score_tracking_match_response(tournament_id, match_id)
+    return await get_score_tracking_match_response(resolved.tournament_id, resolved.match.id)
 
 
 @router.get(
@@ -118,8 +98,6 @@ async def get_authenticated_score_tracking_match(
     response_model=ScoreTrackingMatchResponse,
 )
 async def get_score_tracking_match(
-    match_id: MatchId,
-    tournament: Tournament = Depends(tournament_by_score_tracking_token),
-    _: Match = Depends(score_tracking_match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_token),
 ) -> ScoreTrackingMatchResponse:
-    return await get_score_tracking_match_response(tournament.id, match_id)
+    return await get_score_tracking_match_response(resolved.tournament_id, resolved.match.id)
