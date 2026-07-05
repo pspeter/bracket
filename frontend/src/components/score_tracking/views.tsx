@@ -451,17 +451,26 @@ export function ScoreTrackingMatchView({
 
   function renderCompleted() {
     return (
-      <Group grow gap="sm" justify="center" w="100%" maw={368} mx="auto">
+      <Group gap="sm" justify="center" w="100%" maw={368} mx="auto">
         <Button
           size="md"
           variant="light"
+          miw={160}
+          style={{ flex: '1 1 160px' }}
           loading={isSaving}
           onClick={() => runAction(actions.reopenMatch)}
         >
           {t('resume_match_button')}
         </Button>
         {nextMatchHref != null ? (
-          <Button component={PreloadLink} href={nextMatchHref} size="md" color="blue">
+          <Button
+            component={PreloadLink}
+            href={nextMatchHref}
+            size="md"
+            color="blue"
+            miw={160}
+            style={{ flex: '1 1 160px' }}
+          >
             {t('next_match_button')}
           </Button>
         ) : null}
