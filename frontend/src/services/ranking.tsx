@@ -1,11 +1,18 @@
 import { ScoringType } from '@openapi';
 
-import { createAxios, handleRequestError } from './adapter';
+import { performMutation } from './adapter';
+
+// createRanking adds a ranking nothing references yet and deleteRanking only affects
+// unreferenced rankings; neither can change any issue counter, so both skip invalidation.
+// editRanking reconciles stage items and therefore invalidates (see below).
 
 export async function createRanking(tournament_id: number) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/rankings`, { scoring_type: 'MATCH_POINTS' })
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/rankings`,
+    { scoring_type: 'MATCH_POINTS' },
+    { invalidateIssues: false }
+  );
 }
 
 export async function editRanking(
@@ -41,13 +48,19 @@ export async function editRanking(
   } else if (scoring_type === 'SET_POINTS_WITH_MATCH_BONUS') {
     body.match_bonus_points = match_bonus_points;
   }
-  return createAxios()
-    .put(`tournaments/${tournament_id}/rankings/${ranking_id}`, body)
-    .catch((response: any) => handleRequestError(response));
+  // A ranking edit reconciles every stage item using it, which can reassign dependent-input
+  // teams (the unassigned-teams issue counter) and resize match sets (the overdue counters) --
+  // so invalidate issues.
+  return performMutation('put', `tournaments/${tournament_id}/rankings/${ranking_id}`, body, {
+    tournamentId: tournament_id,
+  });
 }
 
 export async function deleteRanking(tournament_id: number, ranking_id: number) {
-  return createAxios()
-    .delete(`tournaments/${tournament_id}/rankings/${ranking_id}`)
-    .catch((response: any) => handleRequestError(response));
+  return performMutation(
+    'delete',
+    `tournaments/${tournament_id}/rankings/${ranking_id}`,
+    undefined,
+    { invalidateIssues: false }
+  );
 }

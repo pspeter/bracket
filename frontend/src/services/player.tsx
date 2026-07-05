@@ -1,27 +1,29 @@
-import { createAxios, handleRequestError, mutateIssues } from './adapter';
+import { performMutation } from './adapter';
 
 export async function createPlayer(tournament_id: number, name: string, active: boolean) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/players`, { name, active })
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/players`,
+    { name, active },
+    {
+      tournamentId: tournament_id,
+    }
+  );
 }
 
 export async function createMultiplePlayers(tournament_id: number, names: string, active: boolean) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/players_multi`, { names, active })
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/players_multi`,
+    { names, active },
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function deletePlayer(tournament_id: number, player_id: number) {
-  const response = await createAxios()
-    .delete(`tournaments/${tournament_id}/players/${player_id}`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('delete', `tournaments/${tournament_id}/players/${player_id}`, undefined, {
+    tournamentId: tournament_id,
+  });
 }
 
 export async function updatePlayer(
@@ -31,11 +33,13 @@ export async function updatePlayer(
   active: boolean,
   team_id: string | null
 ) {
-  return createAxios()
-    .put(`tournaments/${tournament_id}/players/${player_id}`, {
-      name,
-      active,
-      team_id,
-    })
-    .catch((response: any) => handleRequestError(response));
+  // The backend's PlayerBody is {name, active} only -- the team_id sent here is silently
+  // dropped, team membership is unchanged, and no issue counter filters on `active`, so this
+  // update cannot change an issue count and skips invalidation.
+  return performMutation(
+    'put',
+    `tournaments/${tournament_id}/players/${player_id}`,
+    { name, active, team_id },
+    { invalidateIssues: false }
+  );
 }

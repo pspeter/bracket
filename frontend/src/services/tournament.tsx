@@ -1,4 +1,4 @@
-import { createAxios, handleRequestError, mutateIssues } from './adapter';
+import { performMutation } from './adapter';
 
 export async function createTournament(
   club_id: number,
@@ -18,8 +18,11 @@ export async function createTournament(
   referees_enabled: boolean = false,
   levels: string[] | null = null
 ) {
-  return createAxios()
-    .post('tournaments', {
+  // No tournament id exists yet, so there's nothing to invalidate.
+  return performMutation(
+    'post',
+    'tournaments',
+    {
       name,
       club_id,
       dashboard_public,
@@ -36,20 +39,38 @@ export async function createTournament(
       score_tracking_enabled,
       referees_enabled,
       levels,
-    })
-    .catch((response: any) => handleRequestError(response));
+    },
+    { invalidateIssues: false }
+  );
 }
 
 export async function deleteTournament(tournament_id: number) {
-  return createAxios().delete(`tournaments/${tournament_id}`);
+  // The caller (settings.tsx) chains its own .then/.catch on this promise and must see the
+  // rejection to skip navigating away on failure -- errors are intentionally left uncaught here.
+  return performMutation('delete', `tournaments/${tournament_id}`, undefined, {
+    invalidateIssues: false,
+    catchErrors: false,
+  });
 }
 
 export async function archiveTournament(tournament_id: number) {
-  return createAxios().post(`tournaments/${tournament_id}/change-status`, { status: 'ARCHIVED' });
+  // The caller (settings.tsx) attaches its own .catch(handleRequestError) -- errors are
+  // intentionally left uncaught here, as before.
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/change-status`,
+    { status: 'ARCHIVED' },
+    { invalidateIssues: false, catchErrors: false }
+  );
 }
 
 export async function unarchiveTournament(tournament_id: number) {
-  return createAxios().post(`tournaments/${tournament_id}/change-status`, { status: 'OPEN' });
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/change-status`,
+    { status: 'OPEN' },
+    { invalidateIssues: false, catchErrors: false }
+  );
 }
 
 export async function updateTournament(
@@ -70,8 +91,16 @@ export async function updateTournament(
   referees_enabled: boolean,
   rules: string | null
 ) {
-  return createAxios()
-    .put(`tournaments/${tournament_id}`, {
+  // NOTE: the original implementation only invalidated issues on the success branch of a
+  // .then/.catch chain, skipping invalidation entirely when the update failed -- unlike every
+  // other mutation in this codebase, which invalidates unconditionally once the request settles.
+  // That read as an accidental one-off inconsistency rather than deliberate design, so this now
+  // uses the standard unconditional-invalidation behavior used everywhere else. Flagged for the
+  // architect to confirm.
+  return performMutation(
+    'put',
+    `tournaments/${tournament_id}`,
+    {
       name,
       dashboard_public,
       dashboard_endpoint,
@@ -87,10 +116,7 @@ export async function updateTournament(
       score_tracking_enabled,
       referees_enabled,
       rules,
-    })
-    .then(async (response) => {
-      await mutateIssues(tournament_id);
-      return response;
-    })
-    .catch((response: any) => handleRequestError(response));
+    },
+    { tournamentId: tournament_id }
+  );
 }

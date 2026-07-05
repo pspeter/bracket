@@ -8,22 +8,18 @@ import {
   SchedulerWeights,
   ScoreTrackingInfoResponse,
 } from '@openapi';
-import { createAxios, handleRequestError, mutateIssues } from './adapter';
+import { createAxios, handleRequestError, performMutation } from './adapter';
 
 export async function createMatch(tournament_id: number, match: MatchCreateBodyFrontend) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches`, match)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('post', `tournaments/${tournament_id}/matches`, match, {
+    tournamentId: tournament_id,
+  });
 }
 
 export async function deleteMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios()
-    .delete(`tournaments/${tournament_id}/matches/${match_id}`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('delete', `tournaments/${tournament_id}/matches/${match_id}`, undefined, {
+    tournamentId: tournament_id,
+  });
 }
 
 export async function updateMatch(
@@ -32,11 +28,9 @@ export async function updateMatch(
   match: Omit<MatchBody, 'referee_stage_item_input_id' | 'referee_name'> &
     Partial<Pick<MatchBody, 'referee_stage_item_input_id' | 'referee_name'>>
 ) {
-  const response = await createAxios()
-    .put(`tournaments/${tournament_id}/matches/${match_id}`, match)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('put', `tournaments/${tournament_id}/matches/${match_id}`, match, {
+    tournamentId: tournament_id,
+  });
 }
 
 // Scores live on sets. A set's scores are the unit of change for both the authenticated
@@ -48,43 +42,48 @@ export async function scoreEditMatchSet(
   set_id: number,
   body: MatchSetScoreEditBody
 ) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}/score-edit`, body)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/sets/${set_id}/score-edit`,
+    body,
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function startMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/start`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/start`,
+    undefined,
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function endMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/end`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/end`,
+    undefined,
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function reopenMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/reopen`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/reopen`,
+    undefined,
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function resetMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/matches/${match_id}/reset`)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/reset`,
+    undefined,
+    { tournamentId: tournament_id }
+  );
 }
 
 export async function scoreEditScoreTrackingMatchSet(
@@ -94,18 +93,15 @@ export async function scoreEditScoreTrackingMatchSet(
   set_id: number,
   body: MatchSetScoreEditBody
 ) {
-  const response = await createAxios()
-    .post(
-      `score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}/score-edit`,
-      body
-    )
-    .catch((response: any) => handleRequestError(response));
-  const tournamentId =
-    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
-  if (tournamentId != null) {
-    await mutateIssues(tournamentId);
-  }
-  return response;
+  return performMutation(
+    'post',
+    `score-tracking/${score_tracking_token}/matches/${match_id}/sets/${set_id}/score-edit`,
+    body,
+    {
+      tournamentId: async () =>
+        tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token)),
+    }
+  );
 }
 
 export async function startScoreTrackingMatch(
@@ -113,15 +109,15 @@ export async function startScoreTrackingMatch(
   tournament_id: number | null,
   match_id: number
 ) {
-  const response = await createAxios()
-    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/start`)
-    .catch((response: any) => handleRequestError(response));
-  const tournamentId =
-    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
-  if (tournamentId != null) {
-    await mutateIssues(tournamentId);
-  }
-  return response;
+  return performMutation(
+    'post',
+    `score-tracking/${score_tracking_token}/matches/${match_id}/start`,
+    undefined,
+    {
+      tournamentId: async () =>
+        tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token)),
+    }
+  );
 }
 
 export async function endScoreTrackingMatch(
@@ -129,15 +125,15 @@ export async function endScoreTrackingMatch(
   tournament_id: number | null,
   match_id: number
 ) {
-  const response = await createAxios()
-    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/end`)
-    .catch((response: any) => handleRequestError(response));
-  const tournamentId =
-    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
-  if (tournamentId != null) {
-    await mutateIssues(tournamentId);
-  }
-  return response;
+  return performMutation(
+    'post',
+    `score-tracking/${score_tracking_token}/matches/${match_id}/end`,
+    undefined,
+    {
+      tournamentId: async () =>
+        tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token)),
+    }
+  );
 }
 
 export async function reopenScoreTrackingMatch(
@@ -145,15 +141,15 @@ export async function reopenScoreTrackingMatch(
   tournament_id: number | null,
   match_id: number
 ) {
-  const response = await createAxios()
-    .post(`score-tracking/${score_tracking_token}/matches/${match_id}/reopen`)
-    .catch((response: any) => handleRequestError(response));
-  const tournamentId =
-    tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token));
-  if (tournamentId != null) {
-    await mutateIssues(tournamentId);
-  }
-  return response;
+  return performMutation(
+    'post',
+    `score-tracking/${score_tracking_token}/matches/${match_id}/reopen`,
+    undefined,
+    {
+      tournamentId: async () =>
+        tournament_id ?? (await getTournamentIdForScoreTrackingToken(score_tracking_token)),
+    }
+  );
 }
 
 async function getTournamentIdForScoreTrackingToken(score_tracking_token: string) {
@@ -170,11 +166,12 @@ async function getTournamentIdForScoreTrackingToken(score_tracking_token: string
 // schedule and clear the selection.
 
 export async function unscheduleMatch(tournament_id: number, match_id: number) {
-  const response = await createAxios().post(
-    `tournaments/${tournament_id}/matches/${match_id}/unschedule`
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/${match_id}/unschedule`,
+    undefined,
+    { tournamentId: tournament_id, catchErrors: false }
   );
-  await mutateIssues(tournament_id);
-  return response;
 }
 
 export async function rescheduleMatch(
@@ -182,18 +179,19 @@ export async function rescheduleMatch(
   match_id: number,
   match: MatchRescheduleBody
 ) {
-  const response = await createAxios().post(
+  return performMutation(
+    'post',
     `tournaments/${tournament_id}/matches/${match_id}/reschedule`,
-    match
+    match,
+    { tournamentId: tournament_id, catchErrors: false }
   );
-  await mutateIssues(tournament_id);
-  return response;
 }
 
 export async function swapMatches(tournament_id: number, body: MatchSwapBody) {
-  const response = await createAxios().post(`tournaments/${tournament_id}/matches/swap`, body);
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('post', `tournaments/${tournament_id}/matches/swap`, body, {
+    tournamentId: tournament_id,
+    catchErrors: false,
+  });
 }
 
 export async function resizeMatchBreak(
@@ -201,32 +199,34 @@ export async function resizeMatchBreak(
   match_id: number,
   body: MatchResizeBreakBody
 ) {
-  const response = await createAxios().post(
+  return performMutation(
+    'post',
     `tournaments/${tournament_id}/matches/${match_id}/resize_break`,
-    body
+    body,
+    { tournamentId: tournament_id, catchErrors: false }
   );
-  await mutateIssues(tournament_id);
-  return response;
 }
 
 export async function autoAssignReferees(tournament_id: number, weights?: SchedulerWeights) {
-  return createAxios()
-    .post(`tournaments/${tournament_id}/matches/auto-assign-referees`, weights)
-    .catch((response: any) => handleRequestError(response));
+  // No tournament-issue counter involves referees, so referee assignment provably cannot
+  // change any issue count today. If a referee issue source is ever added, wire this up
+  // (see AGENTS.md on tournament issue badges).
+  return performMutation(
+    'post',
+    `tournaments/${tournament_id}/matches/auto-assign-referees`,
+    weights,
+    { invalidateIssues: false }
+  );
 }
 
 export async function scheduleMatches(tournament_id: number, weights?: SchedulerWeights) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/schedule_matches`, weights)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('post', `tournaments/${tournament_id}/schedule_matches`, weights, {
+    tournamentId: tournament_id,
+  });
 }
 
 export async function reoptimizeMatches(tournament_id: number, weights?: SchedulerWeights) {
-  const response = await createAxios()
-    .post(`tournaments/${tournament_id}/reoptimize_matches`, weights)
-    .catch((response: any) => handleRequestError(response));
-  await mutateIssues(tournament_id);
-  return response;
+  return performMutation('post', `tournaments/${tournament_id}/reoptimize_matches`, weights, {
+    tournamentId: tournament_id,
+  });
 }
