@@ -6,10 +6,7 @@ from bracket.database import database
 from bracket.logic.levels import validate_level_id_for_tournament
 from bracket.logic.planning.template import build_template_blueprint, max_until_rank_for_template
 from bracket.logic.planning.template_service import replace_stages_from_template
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import (
-    update_inputs_in_complete_elimination_stage_item,
-)
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.scheduling.builder import determine_available_inputs
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.stage import (
@@ -212,9 +209,7 @@ async def set_ranking_for_stage_items(
 
         for stage_item in stage.stage_items:
             updated_stage_item = await get_stage_item(tournament_id, stage_item.id)
-            await recalculate_ranking_for_stage_item(tournament_id, updated_stage_item)
-            if updated_stage_item.type is StageType.SINGLE_ELIMINATION:
-                await update_inputs_in_complete_elimination_stage_item(updated_stage_item)
+            await reconcile_stage_item(tournament_id, updated_stage_item)
 
     return SuccessResponse()
 

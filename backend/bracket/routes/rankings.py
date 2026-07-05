@@ -3,10 +3,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import (
-    update_inputs_in_complete_elimination_stage_item,
-)
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.ranking import RankingBody, RankingCreateBody
 from bracket.models.db.stage_item import StageType
@@ -96,10 +93,7 @@ async def update_ranking_by_id(
         stage_item_ids = await get_stage_item_ids_by_ranking_id(ranking_id)
         for stage_item_id in stage_item_ids:
             stage_item = await get_stage_item(tournament_id, stage_item_id)
-            await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-
-            if stage_item.type == StageType.SINGLE_ELIMINATION:
-                await update_inputs_in_complete_elimination_stage_item(stage_item)
+            await reconcile_stage_item(tournament_id, stage_item)
     return SuccessResponse()
 
 

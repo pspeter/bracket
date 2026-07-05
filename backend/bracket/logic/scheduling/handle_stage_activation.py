@@ -11,7 +11,7 @@ from bracket.logic.scheduling.swiss_slot_assigner import (
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.stage_item_inputs import StageItemInputFinal
+from bracket.models.db.stage_item_inputs import StageItemInput, StageItemInputFinal
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
 from bracket.sql.matches import sql_set_input_ids_for_match
 from bracket.sql.rankings import get_ranking_for_stage_item
@@ -26,6 +26,7 @@ from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.id_types import (
     StageItemId,
     StageItemInputId,
+    TeamId,
     TournamentId,
 )
 from bracket.utils.types import assert_some
@@ -199,6 +200,11 @@ async def resolve_dependent_inputs_for_completed_stage_item(
 
     team_rankings = await get_team_rankings_lookup_for_tournament(tournament_id, stages)
 
+    # Compute every target assignment before writing anything: sibling inputs of the same
+    # dependent stage item may swap teams (e.g. a ranking edit flips positions 1 and 2 of the
+    # source), and updating them one row at a time would transiently violate the unique
+    # (stage_item_id, team_id) constraint.
+    assignments: list[tuple[StageItemInput, TeamId]] = []
     affected_stage_item_ids: set[StageItemId] = set()
     for stage in stages:
         for stage_item in stage.stage_items:
@@ -215,10 +221,22 @@ async def resolve_dependent_inputs_for_completed_stage_item(
                 if not isinstance(target_input, StageItemInputFinal):
                     continue
 
-                await sql_set_team_id_for_stage_item_input(
-                    tournament_id, stage_item_input.id, target_input.team.id
-                )
+                assignments.append((stage_item_input, target_input.team.id))
                 affected_stage_item_ids.add(stage_item.id)
+
+    # Two passes inside a transaction (a savepoint when the caller already holds one), so the
+    # intermediate NULL state is never visible outside: first clear every input whose team
+    # changes, then write the final team ids. This makes any permutation of teams among the
+    # dependent inputs safe with respect to the unique constraint.
+    async with database.transaction():
+        for stage_item_input, new_team_id in assignments:
+            if stage_item_input.team_id is not None and stage_item_input.team_id != new_team_id:
+                await sql_set_team_id_for_stage_item_input(tournament_id, stage_item_input.id, None)
+
+        for stage_item_input, new_team_id in assignments:
+            await sql_set_team_id_for_stage_item_input(
+                tournament_id, stage_item_input.id, new_team_id
+            )
 
     for stage_item_id in affected_stage_item_ids:
         affected_stage_item = await get_stage_item(tournament_id, stage_item_id)
