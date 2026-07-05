@@ -3,15 +3,13 @@ from starlette import status
 
 from bracket.config import config
 from bracket.logic.match_sets.apply_update import score_edit_and_recalculate
-from bracket.models.db.match import Match, MatchSet, MatchSetScoreEditBody
-from bracket.models.db.tournament import Tournament
-from bracket.models.db.user import UserPublic
-from bracket.routes.auth import (
-    tournament_by_score_tracking_token,
-    user_authenticated_for_tournament,
+from bracket.models.db.match import MatchSet, MatchSetScoreEditBody
+from bracket.routes.match_access import (
+    ResolvedMatch,
+    resolved_match_via_auth,
+    resolved_match_via_token,
 )
 from bracket.routes.models import ScoreTrackingMatchResponse
-from bracket.routes.util import match_dependency
 from bracket.sql.match_sets import sql_get_match_set
 from bracket.utils.id_types import MatchId, MatchSetId, TournamentId
 
@@ -28,21 +26,29 @@ async def _get_set_belonging_to_match(match_id: MatchId, match_set_id: MatchSetI
     return match_set
 
 
+async def _score_edit(
+    resolved: ResolvedMatch, set_id: MatchSetId, body: MatchSetScoreEditBody
+) -> ScoreTrackingMatchResponse:
+    await _get_set_belonging_to_match(resolved.match.id, set_id)
+    updated = await score_edit_and_recalculate(resolved.tournament_id, resolved.match, set_id, body)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
 @router.post(
     "/tournaments/{tournament_id}/matches/{match_id}/sets/{set_id}/score-edit",
     response_model=ScoreTrackingMatchResponse,
 )
 async def score_edit_authenticated(
+    # tournament_id/match_id are also resolved inside the dependency; they are re-declared
+    # here purely to keep the OpenAPI path-parameter order identical to before the refactor
+    # (FastAPI lists a route's own params before dependency params).
     tournament_id: TournamentId,
     match_id: MatchId,
     set_id: MatchSetId,
     body: MatchSetScoreEditBody,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    match: Match = Depends(match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    await _get_set_belonging_to_match(match.id, set_id)
-    updated = await score_edit_and_recalculate(tournament_id, match, set_id, body)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _score_edit(resolved, set_id, body)
 
 
 @router.post(
@@ -50,16 +56,11 @@ async def score_edit_authenticated(
     response_model=ScoreTrackingMatchResponse,
 )
 async def score_edit_by_token(
+    # match_id is also resolved inside the dependency; it is re-declared here purely to
+    # keep the OpenAPI path-parameter order identical to before the refactor.
     match_id: MatchId,
     set_id: MatchSetId,
     body: MatchSetScoreEditBody,
-    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+    resolved: ResolvedMatch = Depends(resolved_match_via_token),
 ) -> ScoreTrackingMatchResponse:
-    match = await match_dependency(tournament.id, match_id)
-    if match.start_time is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Could not find scheduled match"
-        )
-    await _get_set_belonging_to_match(match.id, set_id)
-    updated = await score_edit_and_recalculate(tournament.id, match, set_id, body)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _score_edit(resolved, set_id, body)

@@ -650,6 +650,23 @@ async def test_reset_is_not_exposed_on_score_tracking_token_route(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_score_tracking_token_verb_on_unscheduled_match_returns_404(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        _simple_match(auth_context) as match_inserted,
+        _score_tracking_token(auth_context.tournament.id, "unscheduled-token") as token,
+    ):
+        await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/unschedule", auth_context
+        )
+        response = await send_request(
+            HTTPMethod.POST, f"score-tracking/{token}/matches/{match_inserted.id}/start"
+        )
+        assert response == {"detail": "Could not find scheduled match"}
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_legacy_set_state_endpoint_is_removed(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:

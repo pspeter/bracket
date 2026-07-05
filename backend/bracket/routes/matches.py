@@ -32,9 +32,11 @@ from bracket.models.db.match import (
 )
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.user import UserPublic
-from bracket.routes.auth import (
-    tournament_by_score_tracking_token,
-    user_authenticated_for_tournament,
+from bracket.routes.auth import user_authenticated_for_tournament
+from bracket.routes.match_access import (
+    ResolvedMatch,
+    resolved_match_via_auth,
+    resolved_match_via_token,
 )
 from bracket.routes.models import (
     ScoreTrackingMatchResponse,
@@ -89,15 +91,24 @@ async def get_score_tracking_match_response(
     return ScoreTrackingMatchResponse(data=match)
 
 
-async def _scheduled_match_for_score_tracking(
-    tournament_id: TournamentId, match_id: MatchId
-) -> Match:
-    match = await match_dependency(tournament_id, match_id)
-    if match.start_time is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Could not find scheduled match"
-        )
-    return match
+async def _start(resolved: ResolvedMatch) -> ScoreTrackingMatchResponse:
+    updated = await start_match_and_recalculate(resolved.tournament_id, resolved.match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+async def _end(resolved: ResolvedMatch) -> ScoreTrackingMatchResponse:
+    updated = await end_match_and_recalculate(resolved.tournament_id, resolved.match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+async def _reopen(resolved: ResolvedMatch) -> ScoreTrackingMatchResponse:
+    updated = await reopen_match_and_recalculate(resolved.tournament_id, resolved.match)
+    return ScoreTrackingMatchResponse(data=updated)
+
+
+async def _reset(resolved: ResolvedMatch) -> ScoreTrackingMatchResponse:
+    updated = await reset_match_and_recalculate(resolved.tournament_id, resolved.match)
+    return ScoreTrackingMatchResponse(data=updated)
 
 
 @router.post(
@@ -105,13 +116,9 @@ async def _scheduled_match_for_score_tracking(
     response_model=ScoreTrackingMatchResponse,
 )
 async def start_match_authenticated(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    match: Match = Depends(match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    updated = await start_match_and_recalculate(tournament_id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _start(resolved)
 
 
 @router.post(
@@ -119,12 +126,9 @@ async def start_match_authenticated(
     response_model=ScoreTrackingMatchResponse,
 )
 async def start_match_by_token(
-    match_id: MatchId,
-    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+    resolved: ResolvedMatch = Depends(resolved_match_via_token),
 ) -> ScoreTrackingMatchResponse:
-    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
-    updated = await start_match_and_recalculate(tournament.id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _start(resolved)
 
 
 @router.post(
@@ -132,13 +136,9 @@ async def start_match_by_token(
     response_model=ScoreTrackingMatchResponse,
 )
 async def end_match_authenticated(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    match: Match = Depends(match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    updated = await end_match_and_recalculate(tournament_id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _end(resolved)
 
 
 @router.post(
@@ -146,12 +146,9 @@ async def end_match_authenticated(
     response_model=ScoreTrackingMatchResponse,
 )
 async def end_match_by_token(
-    match_id: MatchId,
-    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+    resolved: ResolvedMatch = Depends(resolved_match_via_token),
 ) -> ScoreTrackingMatchResponse:
-    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
-    updated = await end_match_and_recalculate(tournament.id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _end(resolved)
 
 
 @router.post(
@@ -159,13 +156,9 @@ async def end_match_by_token(
     response_model=ScoreTrackingMatchResponse,
 )
 async def reopen_match_authenticated(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    match: Match = Depends(match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    updated = await reopen_match_and_recalculate(tournament_id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _reopen(resolved)
 
 
 @router.post(
@@ -173,12 +166,9 @@ async def reopen_match_authenticated(
     response_model=ScoreTrackingMatchResponse,
 )
 async def reopen_match_by_token(
-    match_id: MatchId,
-    tournament: Tournament = Depends(tournament_by_score_tracking_token),
+    resolved: ResolvedMatch = Depends(resolved_match_via_token),
 ) -> ScoreTrackingMatchResponse:
-    match = await _scheduled_match_for_score_tracking(tournament.id, match_id)
-    updated = await reopen_match_and_recalculate(tournament.id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _reopen(resolved)
 
 
 @router.post(
@@ -186,13 +176,9 @@ async def reopen_match_by_token(
     response_model=ScoreTrackingMatchResponse,
 )
 async def reset_match_authenticated(
-    tournament_id: TournamentId,
-    match_id: MatchId,
-    _: UserPublic = Depends(user_authenticated_for_tournament),
-    match: Match = Depends(match_dependency),
+    resolved: ResolvedMatch = Depends(resolved_match_via_auth),
 ) -> ScoreTrackingMatchResponse:
-    updated = await reset_match_and_recalculate(tournament_id, match)
-    return ScoreTrackingMatchResponse(data=updated)
+    return await _reset(resolved)
 
 
 @router.delete("/tournaments/{tournament_id}/matches/{match_id}", response_model=SuccessResponse)
