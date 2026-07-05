@@ -235,6 +235,69 @@ async def sql_unschedule_match(match_id: MatchId) -> None:
     await database.execute(query=query, values={"match_id": match_id})
 
 
+# Fragments defining "a match with details" — the projection whose result must satisfy
+# MatchWithDetails (bracket/models/db/match.py). Shared by sql_get_match_with_details and
+# sql_get_scheduled_matches_with_details below, and by get_full_tournament_details's
+# matches_with_inputs CTE (bracket/sql/stages.py).
+
+
+def inputs_with_teams_cte(*, stages_join: str = "JOIN", extra_filter: str = "") -> str:
+    """CTE resolving a stage_item_input's slot to its team (if any).
+
+    ``stages_join`` lets callers pick INNER vs LEFT JOIN for the stage_items -> stages hop.
+    stage_items.stage_id is NOT NULL with an FK to stages.id, so both produce identical rows in
+    practice; callers keep their original join keyword rather than silently unifying it.
+    ``extra_filter`` is appended after the WHERE clause (e.g. to filter by stage_item_ids).
+    """
+    return f"""
+        inputs_with_teams AS (
+            SELECT DISTINCT ON (stage_item_inputs.id)
+                stage_item_inputs.*,
+                to_json(t.*) AS team
+            FROM stage_item_inputs
+            JOIN stage_items on stage_item_inputs.stage_item_id = stage_items.id
+            {stages_join} stages on stages.id = stage_items.stage_id
+            LEFT JOIN teams t on t.id = stage_item_inputs.team_id
+            WHERE stages.tournament_id = :tournament_id
+            {extra_filter}
+            GROUP BY stage_item_inputs.id, t.id
+        )
+    """
+
+
+# The "match with details" projection columns. Callers must alias the joined
+# inputs_with_teams rows as sii1/sii2/ref_sii, courts as c, and the rows/CTEs supplying
+# level_id / ranking columns as `stages` / `rankings`.
+MATCH_DETAILS_COLUMNS = f"""
+    to_json(sii1) AS stage_item_input1,
+    to_json(sii2) AS stage_item_input2,
+    to_json(c) AS court,
+    to_json(ref_sii) AS referee,
+    stages.level_id AS level_id,
+    rankings.side_switch_every_n_points AS side_switch_every_n_points,
+    rankings.num_sets AS num_sets,
+    rankings.max_points AS max_points,
+    rankings.last_set_max_points AS last_set_max_points,
+    rankings.two_point_advantage AS two_point_advantage,
+    {MATCH_SETS_SUBQUERY}
+"""
+
+# Join block shared verbatim by sql_get_match_with_details and
+# sql_get_scheduled_matches_with_details: resolves matches to their inputs_with_teams rows,
+# court, referee input, and the ranking config via rounds/stage_items/stages/rankings.
+MATCH_DETAILS_JOINS = """
+    FROM matches
+    JOIN rounds ON rounds.id = matches.round_id
+    JOIN stage_items ON stage_items.id = rounds.stage_item_id
+    JOIN stages ON stages.id = stage_items.stage_id
+    JOIN rankings ON rankings.id = stage_items.ranking_id
+    LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
+    LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
+    LEFT JOIN courts c ON c.id = matches.court_id
+    LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
+"""
+
+
 async def sql_get_match(match_id: MatchId) -> Match:
     query = f"""
         SELECT
@@ -255,39 +318,11 @@ async def sql_get_match_with_details(
     tournament_id: TournamentId, match_id: MatchId
 ) -> MatchWithDetails | None:
     query = f"""
-        WITH inputs_with_teams AS (
-            SELECT DISTINCT ON (stage_item_inputs.id)
-                stage_item_inputs.*,
-                to_json(t.*) AS team
-            FROM stage_item_inputs
-            JOIN stage_items on stage_item_inputs.stage_item_id = stage_items.id
-            JOIN stages on stages.id = stage_items.stage_id
-            LEFT JOIN teams t on t.id = stage_item_inputs.team_id
-            WHERE stages.tournament_id = :tournament_id
-            GROUP BY stage_item_inputs.id, t.id
-        )
+        WITH {inputs_with_teams_cte()}
         SELECT DISTINCT ON (matches.id)
             matches.*,
-            to_json(sii1) AS stage_item_input1,
-            to_json(sii2) AS stage_item_input2,
-            to_json(c) AS court,
-            to_json(ref_sii) AS referee,
-            stages.level_id AS level_id,
-            rankings.side_switch_every_n_points AS side_switch_every_n_points,
-            rankings.num_sets AS num_sets,
-            rankings.max_points AS max_points,
-            rankings.last_set_max_points AS last_set_max_points,
-            rankings.two_point_advantage AS two_point_advantage,
-            {MATCH_SETS_SUBQUERY}
-        FROM matches
-        JOIN rounds ON rounds.id = matches.round_id
-        JOIN stage_items ON stage_items.id = rounds.stage_item_id
-        JOIN stages ON stages.id = stage_items.stage_id
-        JOIN rankings ON rankings.id = stage_items.ranking_id
-        LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
-        LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
-        LEFT JOIN courts c ON c.id = matches.court_id
-        LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
+            {MATCH_DETAILS_COLUMNS}
+        {MATCH_DETAILS_JOINS}
         WHERE stages.tournament_id = :tournament_id
         AND matches.id = :match_id
         """
@@ -302,41 +337,12 @@ async def sql_get_scheduled_matches_with_details(
     court_id: CourtId | None = None,
 ) -> list[MatchWithDetails]:
     court_filter = "AND matches.court_id = :court_id" if court_id is not None else ""
-    match_sets = MATCH_SETS_SUBQUERY
     query = f"""
-        WITH inputs_with_teams AS (
-            SELECT DISTINCT ON (stage_item_inputs.id)
-                stage_item_inputs.*,
-                to_json(t.*) AS team
-            FROM stage_item_inputs
-            JOIN stage_items on stage_item_inputs.stage_item_id = stage_items.id
-            JOIN stages on stages.id = stage_items.stage_id
-            LEFT JOIN teams t on t.id = stage_item_inputs.team_id
-            WHERE stages.tournament_id = :tournament_id
-            GROUP BY stage_item_inputs.id, t.id
-        )
+        WITH {inputs_with_teams_cte()}
         SELECT DISTINCT ON (matches.id)
             matches.*,
-            to_json(sii1) AS stage_item_input1,
-            to_json(sii2) AS stage_item_input2,
-            to_json(c) AS court,
-            to_json(ref_sii) AS referee,
-            stages.level_id AS level_id,
-            rankings.side_switch_every_n_points AS side_switch_every_n_points,
-            rankings.num_sets AS num_sets,
-            rankings.max_points AS max_points,
-            rankings.last_set_max_points AS last_set_max_points,
-            rankings.two_point_advantage AS two_point_advantage,
-            {match_sets}
-        FROM matches
-        JOIN rounds ON rounds.id = matches.round_id
-        JOIN stage_items ON stage_items.id = rounds.stage_item_id
-        JOIN stages ON stages.id = stage_items.stage_id
-        JOIN rankings ON rankings.id = stage_items.ranking_id
-        LEFT JOIN inputs_with_teams sii1 ON sii1.id = matches.stage_item_input1_id
-        LEFT JOIN inputs_with_teams sii2 ON sii2.id = matches.stage_item_input2_id
-        LEFT JOIN courts c ON c.id = matches.court_id
-        LEFT JOIN inputs_with_teams ref_sii ON ref_sii.id = matches.referee_stage_item_input_id
+            {MATCH_DETAILS_COLUMNS}
+        {MATCH_DETAILS_JOINS}
         WHERE stages.tournament_id = :tournament_id
         AND matches.start_time IS NOT NULL
         {court_filter}
