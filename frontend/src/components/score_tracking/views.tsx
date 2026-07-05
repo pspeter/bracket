@@ -39,7 +39,6 @@ import {
 } from '@logic/score_tracking';
 import { computeSideSwitchState } from '@logic/side_switch';
 import {
-  LevelResponse,
   MatchSet,
   MatchWithDetails,
   ScoreTrackingInfoResponse,
@@ -302,13 +301,11 @@ export function ScoreTrackingMatchView({
   nextMatchHref,
   storageKey,
   actions,
-  levels = [],
   refereesEnabled = false,
 }: {
   swrResponse: SWRResponse<ScoreTrackingMatchResponse>;
   nextMatchHref?: string | null;
   storageKey: string;
-  levels?: LevelResponse[];
   refereesEnabled?: boolean;
   actions: ScoreTrackingMatchActions;
 }) {
@@ -641,10 +638,14 @@ export function ScoreTrackingMatchView({
   return (
     <Container size="sm" py="xl">
       <Stack gap="lg">
-        <Group gap="xs">
+        <Stack gap={0}>
           <Title order={2}>{t('score_tracking_match_title')}</Title>
-          <LevelBadge levels={levels} levelId={match.level_id} />
-        </Group>
+          {match.court != null ? (
+            <Text c="dimmed" fw={500}>
+              {match.court.name}
+            </Text>
+          ) : null}
+        </Stack>
         <RefereeDisplay match={match} refereesEnabled={refereesEnabled} />
         {renderMatchBody()}
       </Stack>
