@@ -3,20 +3,35 @@ from unittest.mock import ANY
 
 import pytest
 
+from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.models.db.ranking import ScoringType
+from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
+from bracket.models.db.stage_item_inputs import (
+    StageItemInputCreateBodyFinal,
+    StageItemInputCreateBodyTentative,
+    StageItemInputFinal,
+)
 from bracket.sql.rankings import (
     get_all_rankings_in_tournament,
     sql_delete_ranking,
 )
+from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
+from bracket.sql.stage_items import sql_create_stage_item_with_inputs
+from bracket.sql.stages import get_full_tournament_details
 from bracket.utils.dummy_records import (
     DUMMY_RANKING1,
     DUMMY_STAGE1,
+    DUMMY_STAGE2,
     DUMMY_STAGE_ITEM1,
     DUMMY_STAGE_ITEM3,
     DUMMY_TEAM1,
 )
 from bracket.utils.http import HTTPMethod
-from tests.integration_tests.api.shared import SUCCESS_RESPONSE, send_tournament_request
+from tests.integration_tests.api.shared import (
+    SUCCESS_RESPONSE,
+    complete_match,
+    send_tournament_request,
+)
 from tests.integration_tests.models import AuthContext
 from tests.integration_tests.sql import (
     inserted_ranking,
@@ -401,3 +416,144 @@ async def test_update_ranking_even_sets_round_robin_succeeds(
                     json=body,
                 )
                 assert response.get("success") is True, response
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_reflows_dependent_stage_item_inputs(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A ranking edit that flips a completed stage item's final order must re-resolve any
+    "winner of <stage item>" input elsewhere in the tournament, exactly like completing a match
+    does. Before the fix, the ranking PUT route only recalculated the ranking and (for single
+    elimination) the elimination tree, so a dependent stage item's input kept pointing at the
+    stale winner.
+    """
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id, "position": 5})
+        ) as test_ranking,
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted_1,
+        inserted_stage(
+            DUMMY_STAGE2.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted_2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t3,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t4,
+    ):
+        stage_item_1 = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_1.id,
+                name="Group",
+                team_count=3,
+                type=StageType.ROUND_ROBIN,
+                ranking_id=test_ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                ],
+            ),
+        )
+        # Slot 2 references a fixed, unrelated team (t4) rather than "winner position 2 of
+        # stage item 1": resolve_dependent_inputs_for_completed_stage_item updates each
+        # dependent input's team_id one row at a time, so having two sibling inputs both
+        # tracking positions in the same source stage item can transiently collide with the
+        # unique (stage_item_id, team_id) constraint when their target teams swap places. That
+        # ordering quirk is a pre-existing, separate issue in that function; keeping slot 2
+        # fixed isolates the propagation behavior this test is actually about.
+        stage_item_2 = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage_inserted_2.id,
+                name=DUMMY_STAGE_ITEM3.name,
+                team_count=2,
+                type=DUMMY_STAGE_ITEM3.type,
+                inputs=[
+                    StageItemInputCreateBodyTentative(
+                        slot=1, winner_from_stage_item_id=stage_item_1.id, winner_position=1
+                    ),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(stage_item_1, tournament_id)
+        await build_matches_for_stage_item(stage_item_2, tournament_id)
+
+        try:
+            # Play out the group stage so that, under the default 1.0/0.5/0.0 match points,
+            # team 1 finishes first (a win and a draw), team 2 second (two draws), and team 3
+            # last (a loss and a draw).
+            [group_stage, _] = await get_full_tournament_details(tournament_id)
+            real_matches = [
+                match
+                for round_ in group_stage.stage_items[0].rounds
+                for match in round_.matches
+                if match.stage_item_input1 is not None and match.stage_item_input2 is not None
+            ]
+            assert len(real_matches) == 3
+
+            for match in real_matches:
+                input1 = match.stage_item_input1
+                input2 = match.stage_item_input2
+                assert isinstance(input1, StageItemInputFinal)
+                assert isinstance(input2, StageItemInputFinal)
+                teams = {input1.team.id, input2.team.id}
+
+                if teams == {t1.id, t3.id}:
+                    # Team 1 beats team 3 outright.
+                    score1, score2 = (21, 0) if input1.team.id == t1.id else (0, 21)
+                else:
+                    # Team 1 vs team 2, and team 2 vs team 3, both end in a draw.
+                    score1, score2 = 10, 10
+
+                for match_set in match.match_sets:
+                    await complete_match(
+                        auth_context, match.id, match_set.id, score1=score1, score2=score2
+                    )
+
+            # With the default scoring (win=1.0, draw=0.5, loss=0.0): team 1 has 1.5 points,
+            # team 2 has 1.0, team 3 has 0.5. Team 1 is the winner, so the dependent stage
+            # item's first input must already be resolved to team 1.
+            stages = await get_full_tournament_details(tournament_id)
+            next_stage = next(s for s in stages if s.id == stage_inserted_2.id)
+            first_input = next(i for i in next_stage.stage_items[0].inputs if i.slot == 1)
+            assert isinstance(first_input, StageItemInputFinal)
+            assert first_input.team.id == t1.id
+
+            # Now edit the ranking so draws are worth more than the gap between a win and a
+            # draw: team 1 -> 1.0 (win) + 2.0 (draw) = 3.0, team 2 -> 2.0 + 2.0 = 4.0, team 3 ->
+            # 0.0 + 2.0 = 2.0. Team 2 is now the winner, purely from the ranking edit -- no
+            # match result changed.
+            body = {
+                "scoring_type": "MATCH_POINTS",
+                "win_points": "1.0",
+                "draw_points": "2.0",
+                "loss_points": "0.0",
+            }
+            response = await send_tournament_request(
+                HTTPMethod.PUT,
+                f"rankings/{test_ranking.id}",
+                auth_context,
+                json=body,
+            )
+            assert response.get("success") is True, response
+
+            # The dependent stage item's first input must now be re-resolved to team 2: this is
+            # the propagation that didn't happen before the ranking route was switched to the
+            # shared reconciliation cascade.
+            stages_after = await get_full_tournament_details(tournament_id)
+            next_stage_after = next(s for s in stages_after if s.id == stage_inserted_2.id)
+            first_input_after = next(
+                i for i in next_stage_after.stage_items[0].inputs if i.slot == 1
+            )
+            assert isinstance(first_input_after, StageItemInputFinal)
+            assert first_input_after.team.id == t2.id
+        finally:
+            await sql_delete_stage_item_with_foreign_keys(stage_item_2.id)
+            await sql_delete_stage_item_with_foreign_keys(stage_item_1.id)

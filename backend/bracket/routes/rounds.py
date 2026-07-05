@@ -3,9 +3,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.database import database
-from bracket.logic.ranking.calculation import (
-    recalculate_ranking_for_stage_item,
-)
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import (
@@ -56,7 +54,7 @@ async def delete_round(
     await sql_delete_round(round_id)
 
     stage_item = await get_stage_item(tournament_id, round_with_matches.stage_item_id)
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
+    await reconcile_stage_item(tournament_id, stage_item)
     return SuccessResponse()
 
 

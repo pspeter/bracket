@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from heliclockter import datetime_utc
 
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.scheduling.elimination import (
     build_single_elimination_stage_item,
     get_number_of_rounds_to_create_single_elimination,
@@ -107,7 +107,7 @@ async def build_matches_for_stage_item(stage_item: StageItem, tournament_id: Tou
                 400, f"Cannot automatically create matches for stage type {stage_item.type}"
             )
 
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item_with_rounds)
+    await reconcile_stage_item(tournament_id, stage_item_with_rounds)
 
 
 def determine_available_inputs(

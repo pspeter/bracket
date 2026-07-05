@@ -7,17 +7,8 @@ from starlette import status
 from bracket.database import database
 from bracket.logic.match_sets.pointer import IllegalMatchTransitionError
 from bracket.logic.match_sets.validation import validate_match_can_be_started
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import (
-    get_started_elimination_followers,
-    update_inputs_in_subsequent_elimination_rounds,
-)
-from bracket.logic.scheduling.handle_stage_activation import (
-    resolve_dependent_inputs_for_completed_stage_item,
-)
-from bracket.logic.scheduling.swiss_resolution_orchestrator import (
-    auto_resolve_next_swiss_round,
-)
+from bracket.logic.ranking.elimination import get_started_elimination_followers
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.models.db.match import (
     Match,
     MatchSetScoreEditBody,
@@ -55,13 +46,12 @@ async def recalculate_after_match_change(
     elif new_state is not MatchState.COMPLETED and match.completed_at is not None:
         await sql_set_match_completed_at(match.id, None)
 
-    await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    await auto_resolve_next_swiss_round(tournament_id, stage_item)
-
-    if stage_item.type == StageType.SINGLE_ELIMINATION:
-        await update_inputs_in_subsequent_elimination_rounds(round_.id, stage_item, {match.id})
-
-    await resolve_dependent_inputs_for_completed_stage_item(tournament_id, stage_item.id)
+    await reconcile_stage_item(
+        tournament_id,
+        stage_item,
+        changed_round_id=round_.id,
+        changed_match_ids={match.id},
+    )
 
     updated = await sql_get_match_with_details(tournament_id, match.id)
     if updated is None:

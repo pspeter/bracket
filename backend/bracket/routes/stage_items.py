@@ -7,10 +7,7 @@ from starlette import status
 from bracket.config import config
 from bracket.database import database
 from bracket.logic.planning.matches import update_start_times_of_matches
-from bracket.logic.ranking.calculation import recalculate_ranking_for_stage_item
-from bracket.logic.ranking.elimination import (
-    update_inputs_in_complete_elimination_stage_item,
-)
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.scheduling.builder import (
     build_matches_for_stage_item,
 )
@@ -563,9 +560,7 @@ async def update_stage_item(
             await build_matches_for_stage_item(updated_stage_item, tournament_id)
 
     updated_stage_item = await get_stage_item(tournament_id, stage_item_id)
-    await recalculate_ranking_for_stage_item(tournament_id, updated_stage_item)
-    if updated_stage_item.type == StageType.SINGLE_ELIMINATION:
-        await update_inputs_in_complete_elimination_stage_item(updated_stage_item)
+    await reconcile_stage_item(tournament_id, updated_stage_item)
     if team_count_changed:
         await update_start_times_of_matches(tournament_id)
     return SuccessResponse()
