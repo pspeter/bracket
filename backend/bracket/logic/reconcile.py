@@ -38,9 +38,9 @@ async def reconcile_stage_item(
     if stage_item.type is StageType.SINGLE_ELIMINATION:
         if changed_round_id is not None:
             await update_inputs_in_subsequent_elimination_rounds(
-                changed_round_id, stage_item, changed_match_ids
+                tournament_id, changed_round_id, stage_item, changed_match_ids
             )
         else:
-            await update_inputs_in_complete_elimination_stage_item(stage_item)
+            await update_inputs_in_complete_elimination_stage_item(tournament_id, stage_item)
 
     await resolve_dependent_inputs_for_completed_stage_item(tournament_id, stage_item.id)
