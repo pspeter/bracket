@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from bracket.logic.apply_plan import apply_plan
 from bracket.logic.plan import PlanItem, SetTeamStats
@@ -8,6 +8,7 @@ from bracket.logic.ranking.statistics import START_ELO, TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking, ScoringType
 from bracket.models.db.stage_item import StageType
+from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import StageItemWithRounds
 from bracket.sql.rankings import get_ranking_for_stage_item
 from bracket.utils.id_types import StageItemInputId, TournamentId
@@ -109,6 +110,54 @@ def set_statistics_for_stage_item_input(
             raise ValueError(f"Unsupported stage type: {stage_item.type}")
 
 
+def _apply_mexicano_bye_compensation(
+    stage_item: StageItemWithRounds,
+    stats: defaultdict[StageItemInputId, TeamStatistics],
+) -> None:
+    """Bank a round's average points-scored for every currently-active input absent from it.
+
+    A round only compensates once every match in it is COMPLETED, and only currently-active
+    inputs (``StageItemInputFinal.team.active``) that appear in none of that round's playing
+    slots (``stage_item_input1``/``stage_item_input2``) receive it -- detection is deliberately
+    by absence from the playing slots, not the referee slot, which is a general-purpose feature
+    and not a reliable bye marker. Once a round is fully completed its compensation is fixed:
+    later rounds cannot change it, since this only ever reads from already-completed rounds.
+    """
+    active_ids = {
+        input_.id
+        for input_ in stage_item.inputs
+        if not isinstance(input_, StageItemInputFinal) or input_.team.active
+    }
+
+    for round_ in stage_item.rounds:
+        matches = round_.matches
+        if not matches or not all(
+            isinstance(m, MatchWithDetailsDefinitive) and m.state is MatchState.COMPLETED
+            for m in matches
+        ):
+            continue
+
+        playing_points: list[Decimal] = []
+        playing_ids: set[StageItemInputId] = set()
+        for match in matches:
+            assert isinstance(match, MatchWithDetailsDefinitive)
+            completed_sets = match.completed_sets
+            playing_points.append(Decimal(sum(s.stage_item_input1_score for s in completed_sets)))
+            playing_points.append(Decimal(sum(s.stage_item_input2_score for s in completed_sets)))
+            playing_ids.add(match.stage_item_input1.id)
+            playing_ids.add(match.stage_item_input2.id)
+
+        if not playing_points:
+            continue
+
+        round_average = (sum(playing_points, Decimal(0)) / len(playing_points)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        for input_id in active_ids - playing_ids:
+            stats[input_id].points += round_average
+
+
 def determine_ranking_for_stage_item(
     stage_item: StageItemWithRounds,
     ranking: Ranking,
@@ -136,6 +185,9 @@ def determine_ranking_for_stage_item(
                 ranking,
                 stage_item,
             )
+
+    if stage_item.type is StageType.MEXICANO:
+        _apply_mexicano_bye_compensation(stage_item, input_x_stats)
 
     return input_x_stats
 

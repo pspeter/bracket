@@ -232,13 +232,7 @@ export function CreateStageItemModal({
       ranking_id: defaultRanking?.id.toString() ?? '',
     },
     validate: {
-      team_count_round_robin: (value, values) => {
-        if (value < 2) return t('at_least_two_team_validation');
-        if (values.type === 'MEXICANO' && value % 2 !== 0) {
-          return t('even_team_count_validation');
-        }
-        return null;
-      },
+      team_count_round_robin: (value) => (value < 2 ? t('at_least_two_team_validation') : null),
       team_count_elimination: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
       games_per_player: (value, values) =>
         (values.type !== 'SWISS' && values.type !== 'MEXICANO') || value >= 1

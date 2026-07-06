@@ -480,21 +480,6 @@ async def delete_stage_item(
     return SuccessResponse()
 
 
-def validate_mexicano_team_count(stage_type: StageType, team_count: int) -> None:
-    """Reject Mexicano stage items with an odd number of entrants.
-
-    Every Mexicano round pairs adjacent standings slots (1v2, 3v4, ...), which requires an even
-    field. Odd counts (byes) are not supported yet, so they are rejected with a clear error.
-    """
-    if stage_type is StageType.MEXICANO and team_count % 2 != 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Mexicano requires an even number of teams. Odd team counts are not supported yet."
-            ),
-        )
-
-
 @router.post("/tournaments/{tournament_id}/stage_items", response_model=SuccessResponse)
 async def create_stage_item(
     tournament_id: TournamentId,
@@ -506,8 +491,6 @@ async def create_stage_item(
     stages = await get_full_tournament_details(tournament_id)
     existing_stage_items = [stage_item for stage in stages for stage_item in stage.stage_items]
     check_requirement(existing_stage_items, user, "max_stage_items")
-
-    validate_mexicano_team_count(stage_body.type, stage_body.team_count)
 
     if stage_body.type is StageType.SINGLE_ELIMINATION:
         if stage_body.ranking_id is not None:
@@ -543,7 +526,6 @@ async def update_stage_item(
         )
 
     await check_foreign_keys_belong_to_tournament(stage_item_body, tournament_id)
-    validate_mexicano_team_count(stage_item.type, stage_item_body.team_count)
     team_count_changed = stage_item_body.team_count != stage_item.team_count
     ranking_changed = stage_item_body.ranking_id != stage_item.ranking_id
 
