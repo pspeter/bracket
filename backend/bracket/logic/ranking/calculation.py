@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from bracket.logic.apply_plan import apply_plan
 from bracket.logic.plan import PlanItem, SetTeamStats
@@ -8,7 +8,8 @@ from bracket.logic.ranking.statistics import START_ELO, TeamStatistics
 from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking, ScoringType
 from bracket.models.db.stage_item import StageType
-from bracket.models.db.util import StageItemWithRounds
+from bracket.models.db.stage_item_inputs import StageItemInputFinal
+from bracket.models.db.util import StageItemWithRounds, is_round_complete
 from bracket.sql.rankings import get_ranking_for_stage_item
 from bracket.utils.id_types import StageItemInputId, TournamentId
 
@@ -100,8 +101,67 @@ def set_statistics_for_stage_item_input(
             expected_score = Decimal(1.0 / (1.0 + math.pow(10.0, rating_diff / D)))
             stats[stage_item_input_id].points += int(K * (elo_score - expected_score))
 
+        case StageType.MEXICANO:
+            # Mexicano standings are hardwired to cumulative points scored, summed over every
+            # completed set of every completed match, from a zero baseline.
+            stats[stage_item_input_id].points += Decimal(total_points_for)
+
         case _:
             raise ValueError(f"Unsupported stage type: {stage_item.type}")
+
+
+def _apply_mexicano_bye_compensation(
+    stage_item: StageItemWithRounds,
+    stats: defaultdict[StageItemInputId, TeamStatistics],
+) -> None:
+    """Bank a round's average points-scored for every currently-active input absent from it.
+
+    A round only compensates once every match in it is COMPLETED, and only currently-active
+    inputs (``StageItemInputFinal.team.active``) that appear in none of that round's playing
+    slots (``stage_item_input1``/``stage_item_input2``) receive it -- detection is deliberately
+    by absence from the playing slots, not the referee slot, which is a general-purpose feature
+    and not a reliable bye marker. Once a round is fully completed its compensation is fixed:
+    later rounds cannot change it, since this only ever reads from already-completed rounds.
+
+    A resolved round can also contain a match that was never assigned a pairing at all --
+    cleared to [None, None] rather than played -- when a mid-tournament deactivation shrank the
+    active field below the round's pre-built skeleton capacity (issue #261). ``is_round_complete``
+    treats that surplus match as vacuously settled so the round's real matches still compensate
+    once completed; it is simply skipped when collecting playing points/ids below.
+    """
+    active_ids = {
+        input_.id
+        for input_ in stage_item.inputs
+        if not isinstance(input_, StageItemInputFinal) or input_.team.active
+    }
+
+    for round_ in stage_item.rounds:
+        matches = round_.matches
+        if not is_round_complete(round_):
+            continue
+
+        playing_points: list[Decimal] = []
+        playing_ids: set[StageItemInputId] = set()
+        for match in matches:
+            if not isinstance(match, MatchWithDetailsDefinitive):
+                continue
+            if match.state is not MatchState.COMPLETED:
+                continue
+            completed_sets = match.completed_sets
+            playing_points.append(Decimal(sum(s.stage_item_input1_score for s in completed_sets)))
+            playing_points.append(Decimal(sum(s.stage_item_input2_score for s in completed_sets)))
+            playing_ids.add(match.stage_item_input1.id)
+            playing_ids.add(match.stage_item_input2.id)
+
+        if not playing_points:
+            continue
+
+        round_average = (sum(playing_points, Decimal(0)) / len(playing_points)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        for input_id in active_ids - playing_ids:
+            stats[input_id].points += round_average
 
 
 def determine_ranking_for_stage_item(
@@ -131,6 +191,9 @@ def determine_ranking_for_stage_item(
                 ranking,
                 stage_item,
             )
+
+    if stage_item.type is StageType.MEXICANO:
+        _apply_mexicano_bye_compensation(stage_item, input_x_stats)
 
     return input_x_stats
 

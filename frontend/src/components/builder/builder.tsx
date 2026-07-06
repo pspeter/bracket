@@ -331,7 +331,7 @@ function StageItemRow({
             }}
           />
           <Group gap="0rem">
-            {stageItem.type === 'SWISS' ? (
+            {stageItem.type === 'SWISS' || stageItem.type === 'MEXICANO' ? (
               <Tooltip label={t('handle_swiss_system')}>
                 <ActionIcon
                   variant="transparent"
@@ -359,7 +359,7 @@ function StageItemRow({
                 >
                   {t('edit_stage_item_label')}
                 </Menu.Item>
-                {stageItem.type === 'SWISS' ? (
+                {stageItem.type === 'SWISS' || stageItem.type === 'MEXICANO' ? (
                   <Menu.Item
                     leftSection={<BiSolidWrench size="1.5rem" />}
                     component={PreloadLink}

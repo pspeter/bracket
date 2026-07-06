@@ -8,6 +8,7 @@ from ortools.sat.python import cp_model
 from starlette import status
 
 from bracket.config import currently_testing
+from bracket.logic.scheduling.standings_resolution import is_standings_resolved_stage_type
 from bracket.models.db.court import Court
 from bracket.models.db.match import (
     Match,
@@ -18,7 +19,6 @@ from bracket.models.db.match import (
     MatchWithDetailsDefinitive,
     SchedulerWeights,
 )
-from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputEmpty
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
@@ -79,7 +79,9 @@ class _MatchContext:
     # True when the match's stage item has at least one unwired (empty) input slot, e.g. a
     # knockout place filled manually only once the previous stage is fully played.
     stage_item_has_open_slot: bool
-    is_swiss: bool = False
+    # True for standings-resolved stage items (Swiss, Mexicano) whose rounds must be played
+    # strictly in sequence, because round N+1's pairings depend on round N's results.
+    is_standings_resolved: bool = False
 
 
 @dataclass(frozen=True)
@@ -247,7 +249,7 @@ def _get_match_contexts(
             input_ids=_input_ids(match, slot_id_map, stage_item.id),
             cross_stage_source_ids=_cross_stage_source_ids(match),
             stage_item_has_open_slot=_has_open_slot(stage_item),
-            is_swiss=stage_item.type == StageType.SWISS,
+            is_standings_resolved=is_standings_resolved_stage_type(stage_item.type),
         )
         for stage in stages
         for stage_item in stage.stage_items
@@ -559,16 +561,16 @@ def _precedence_pairs(contexts: list[_MatchContext]) -> list[tuple[_MatchContext
                 if feeder.match.id != successor.match.id:
                     pair_ids.add((feeder.match.id, successor.match.id))
 
-    # Swiss stage items require strictly sequential rounds: every match in round N must
-    # finish (plus the default break) before any match in round N+1 can start, because
-    # Swiss pairings for round N+1 are determined by the results of round N.
-    swiss_by_item: dict[StageItemId, dict[int, list[_MatchContext]]] = defaultdict(
+    # Standings-resolved stage items (Swiss, Mexicano) require strictly sequential rounds: every
+    # match in round N must finish (plus the default break) before any match in round N+1 can
+    # start, because round N+1's pairings are determined by the results of round N.
+    sequential_by_item: dict[StageItemId, dict[int, list[_MatchContext]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for context in contexts:
-        if context.is_swiss:
-            swiss_by_item[context.stage_item_id][context.round_index].append(context)
-    for rounds_by_index in swiss_by_item.values():
+        if context.is_standings_resolved:
+            sequential_by_item[context.stage_item_id][context.round_index].append(context)
+    for rounds_by_index in sequential_by_item.values():
         for round_index in sorted(rounds_by_index):
             if round_index + 1 not in rounds_by_index:
                 continue

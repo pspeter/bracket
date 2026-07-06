@@ -10,7 +10,10 @@ from bracket.logic.scheduling.round_robin import (
     build_round_robin_stage_item,
     get_number_of_rounds_to_create_round_robin,
 )
-from bracket.logic.scheduling.swiss_skeleton import build_swiss_skeleton
+from bracket.logic.scheduling.standings_resolution import (
+    get_standings_resolved_strategy,
+    is_standings_resolved_stage_type,
+)
 from bracket.models.db.match import MatchCreateBody
 from bracket.models.db.round import RoundInsertable, RoundLifecycleState
 from bracket.models.db.stage_item import StageItem, StageType
@@ -33,14 +36,17 @@ from tests.integration_tests.mocks import MOCK_NOW
 async def create_rounds_for_new_stage_item(
     tournament_id: TournamentId, stage_item: StageItem
 ) -> None:
+    # Standings-resolved stage items (e.g. Swiss) get their rounds from the placeholder skeleton
+    # rather than an eager fixed count.
+    if is_standings_resolved_stage_type(stage_item.type):
+        return None
+
     rounds_count: int
     match stage_item.type:
         case StageType.ROUND_ROBIN:
             rounds_count = get_number_of_rounds_to_create_round_robin(stage_item.team_count)
         case StageType.SINGLE_ELIMINATION:
             rounds_count = get_number_of_rounds_to_create_single_elimination(stage_item.team_count)
-        case StageType.SWISS:
-            return None
         case other:
             raise NotImplementedError(f"No round creation implementation for {other}")
 
@@ -54,14 +60,18 @@ async def create_rounds_for_new_stage_item(
         )
 
 
-async def build_swiss_placeholder_skeleton(
+async def build_standings_resolved_placeholder_skeleton(
     tournament_id: TournamentId, stage_item: StageItem
 ) -> None:
-    """Generate placeholder rounds and slot-matches for a Swiss stage item on creation."""
-    if stage_item.games_per_player is None:
+    """Generate placeholder rounds and slot-matches for a standings-resolved stage item on creation.
+
+    The round/match/bye structure comes from the stage type's registered skeleton builder.
+    """
+    strategy = get_standings_resolved_strategy(stage_item.type)
+    if strategy is None or stage_item.games_per_player is None:
         return
     tournament = await sql_get_tournament(tournament_id)
-    skeleton = build_swiss_skeleton(stage_item.team_count, stage_item.games_per_player)
+    skeleton = strategy.skeleton_builder(stage_item.team_count, stage_item.games_per_player)
     for round_skeleton in skeleton.rounds:
         round_id = await sql_create_round(
             RoundInsertable(
@@ -93,14 +103,15 @@ async def build_matches_for_stage_item(stage_item: StageItem, tournament_id: Tou
     await create_rounds_for_new_stage_item(tournament_id, stage_item)
     stage_item_with_rounds = await get_stage_item(tournament_id, stage_item.id)
 
+    if is_standings_resolved_stage_type(stage_item.type):
+        await build_standings_resolved_placeholder_skeleton(tournament_id, stage_item)
+        return None
+
     match stage_item.type:
         case StageType.ROUND_ROBIN:
             await build_round_robin_stage_item(tournament_id, stage_item_with_rounds)
         case StageType.SINGLE_ELIMINATION:
             await build_single_elimination_stage_item(tournament_id, stage_item_with_rounds)
-        case StageType.SWISS:
-            await build_swiss_placeholder_skeleton(tournament_id, stage_item)
-            return None
 
         case _:
             raise HTTPException(

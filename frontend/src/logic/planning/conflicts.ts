@@ -50,7 +50,7 @@ export interface ConflictRound {
 
 export interface ConflictStageItem {
   id: number;
-  type: 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS';
+  type: 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS' | 'MEXICANO';
   inputs: ConflictInput[];
   rounds: ConflictRound[];
 }

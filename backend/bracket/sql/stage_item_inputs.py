@@ -37,6 +37,27 @@ async def get_stage_item_input_by_id(
     return TypeAdapter(StageItemInput).validate_python(result)
 
 
+async def get_stage_item_ids_for_team(
+    tournament_id: TournamentId, team_id: TeamId
+) -> list[StageItemId]:
+    """Every stage item that currently has ``team_id`` assigned to one of its inputs.
+
+    Used to fan a team's activation-state change (see routes/teams.py) out to reconciliation for
+    each affected stage item, so a deactivation/reactivation is reflected in future round
+    resolutions and standings, not just in the ``teams`` row.
+    """
+    query = """
+        SELECT DISTINCT stage_item_id
+        FROM stage_item_inputs
+        WHERE team_id = :team_id
+        AND tournament_id = :tournament_id
+    """
+    results = await database.fetch_all(
+        query=query, values={"team_id": team_id, "tournament_id": tournament_id}
+    )
+    return [StageItemId(result["stage_item_id"]) for result in results]
+
+
 async def get_stage_item_ids_by_ranking_id(ranking_id: RankingId) -> list[StageItemId]:
     query = """
         SELECT id

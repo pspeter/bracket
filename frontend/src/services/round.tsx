@@ -1,16 +1,5 @@
 import { performMutation } from './adapter';
 
-export async function createRound(tournament_id: number, stage_item_id: number) {
-  return performMutation(
-    'post',
-    `tournaments/${tournament_id}/rounds`,
-    { stage_item_id },
-    {
-      tournamentId: tournament_id,
-    }
-  );
-}
-
 export async function deleteRound(tournament_id: number, round_id: number) {
   return performMutation('delete', `tournaments/${tournament_id}/rounds/${round_id}`, undefined, {
     tournamentId: tournament_id,

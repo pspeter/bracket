@@ -4,7 +4,7 @@ import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
-    _resolve_round_1_for_swiss_stage_item,
+    _resolve_round_1_for_standings_resolved_stage_item,
 )
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
@@ -59,7 +59,7 @@ async def test_completing_round1_auto_resolves_round2(
         assert len(stage_item.rounds) == 2
 
         # Resolve round 1 (simulates stage activation)
-        await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+        await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, stage_item)
 
         stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
         round1 = sorted(stage_item.rounds, key=lambda r: r.id)[0]

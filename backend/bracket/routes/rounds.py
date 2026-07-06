@@ -4,12 +4,9 @@ from starlette import status
 from bracket.config import config
 from bracket.database import database
 from bracket.logic.reconcile import reconcile_stage_item
-from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import (
     Round,
-    RoundCreateBody,
-    RoundInsertable,
     RoundLifecycleState,
     RoundUpdateBody,
     SwapMatchInputsBody,
@@ -26,16 +23,11 @@ from bracket.routes.util import (
 )
 from bracket.sql.matches import sql_delete_match, sql_set_input_ids_for_match
 from bracket.sql.rounds import (
-    get_next_round_name,
-    sql_create_round,
     sql_delete_round,
     sql_set_round_is_pinned,
 )
 from bracket.sql.stage_items import get_stage_item
-from bracket.sql.stages import get_full_tournament_details
-from bracket.sql.validation import check_foreign_keys_belong_to_tournament
 from bracket.utils.id_types import RoundId, TournamentId
-from tests.integration_tests.mocks import MOCK_NOW
 
 router = APIRouter(prefix=config.api_prefix)
 
@@ -55,43 +47,6 @@ async def delete_round(
 
     stage_item = await get_stage_item(tournament_id, round_with_matches.stage_item_id)
     await reconcile_stage_item(tournament_id, stage_item)
-    return SuccessResponse()
-
-
-@router.post("/tournaments/{tournament_id}/rounds", response_model=SuccessResponse)
-async def create_round(
-    tournament_id: TournamentId,
-    round_body: RoundCreateBody,
-    user: UserPublic = Depends(user_authenticated_for_tournament),
-    _: Tournament = Depends(disallow_archived_tournament),
-) -> SuccessResponse:
-    await check_foreign_keys_belong_to_tournament(round_body, tournament_id)
-
-    stages = await get_full_tournament_details(tournament_id)
-    existing_rounds = [
-        round_
-        for stage in stages
-        for stage_item in stage.stage_items
-        for round_ in stage_item.rounds
-    ]
-    check_requirement(existing_rounds, user, "max_rounds")
-
-    stage_item = await get_stage_item(tournament_id, stage_item_id=round_body.stage_item_id)
-
-    if not stage_item.type.supports_dynamic_number_of_rounds:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Stage type {stage_item.type} doesn't support manual creation of rounds",
-        )
-
-    await sql_create_round(
-        RoundInsertable(
-            created=MOCK_NOW,
-            stage_item_id=round_body.stage_item_id,
-            name=await get_next_round_name(tournament_id, round_body.stage_item_id),
-        ),
-    )
-
     return SuccessResponse()
 
 

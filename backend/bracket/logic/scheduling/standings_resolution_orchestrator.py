@@ -1,19 +1,18 @@
 from bracket.logic.apply_plan import apply_plan
 from bracket.logic.plan import PlanItem, SetMatchInputs, SetMatchRefereeSlot, SetRoundLifecycleState
-from bracket.logic.scheduling.swiss_resolution_policy import (
+from bracket.logic.scheduling.standings_resolution import (
+    get_standings_resolved_strategy,
+    is_standings_resolved_stage_type,
+)
+from bracket.logic.scheduling.standings_resolution_policy import (
     get_next_round_to_resolve,
     get_rounds_to_re_resolve,
 )
-from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
-from bracket.logic.scheduling.swiss_slot_assigner import (
-    assign_pairs_to_slots,
-    skeleton_from_slot_pairs,
-)
+from bracket.logic.scheduling.swiss_slot_assigner import skeleton_from_slot_pairs
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
-from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
-from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
+from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, is_round_complete
 from bracket.sql.stage_items import get_stage_item
 from bracket.utils.id_types import TournamentId
 
@@ -38,9 +37,7 @@ def build_unwire_plan(fresh: StageItemWithRounds) -> list[PlanItem]:
         if not predecessors:
             continue
         predecessors_complete = all(
-            all(m.state is MatchState.COMPLETED for m in prev.matches)
-            for prev in predecessors
-            if prev.matches
+            is_round_complete(prev) for prev in predecessors if prev.matches
         )
         if predecessors_complete:
             continue
@@ -56,7 +53,7 @@ def build_unwire_plan(fresh: StageItemWithRounds) -> list[PlanItem]:
     return plan
 
 
-async def unwire_swiss_rounds_with_incomplete_predecessor(
+async def unwire_rounds_with_incomplete_predecessor(
     tournament_id: TournamentId,
     fresh: StageItemWithRounds,
 ) -> bool:
@@ -78,11 +75,16 @@ def build_round_assignment_plan(
 ) -> list[PlanItem]:
     """Run pairing selection + slot assignment for a single round and plan the result.
 
-    Shared by the Swiss auto-resolution passes below and by round-1 resolution
-    (``handle_stage_activation._resolve_round_1_for_swiss_stage_item``), which resolves against a
-    ``stage_item`` whose other rounds are still all PLACEHOLDER -- the same as this function
-    computing an empty ``previous_rounds``.
+    The pairing selector and slot assigner are looked up from the stage type's registered
+    standings-resolved strategy. Shared by the auto-resolution passes below and by round-1
+    resolution (``handle_stage_activation._resolve_round_1_for_standings_resolved_stage_item``),
+    which resolves against a ``stage_item`` whose other rounds are still all PLACEHOLDER -- the
+    same as this function computing an empty ``previous_rounds``.
     """
+    strategy = get_standings_resolved_strategy(stage_item.type)
+    if strategy is None:
+        return []
+
     inputs = [i for i in stage_item.inputs if isinstance(i, StageItemInputFinal) and i.team.active]
     if not inputs:
         return []
@@ -103,9 +105,9 @@ def build_round_assignment_plan(
         None,
     )
 
-    pairs, bye = select_round_pairing(inputs, previous_rounds)
+    pairs, bye = strategy.pairing_selector(inputs, previous_rounds)
     skeleton = skeleton_from_slot_pairs(slot_pairs, bye_slot)
-    slot_mapping = assign_pairs_to_slots(pairs, bye, skeleton)
+    slot_mapping = strategy.slot_assigner(pairs, bye, skeleton)
 
     plan: list[PlanItem] = []
     for match in round_.matches:
@@ -113,8 +115,11 @@ def build_round_assignment_plan(
             continue
         input1_id = slot_mapping.get(match.input1_slot)
         input2_id = slot_mapping.get(match.input2_slot)
-        if input1_id is None or input2_id is None:
-            continue
+        # If the active pool is smaller than this round's pre-built skeleton (a mid-tournament
+        # deactivation shrinking the field, see issue #261), the pairing selector produces fewer
+        # pairs than there are matches, so some slots have no mapping. Write [None, None] rather
+        # than skipping: this both clears any stale assignment a since-deactivated input left
+        # behind, and (via `is_round_complete`) keeps the surplus match from blocking the round.
         plan.append(
             SetMatchInputs(round_id=round_.id, match_id=match.id, input_ids=[input1_id, input2_id])
         )
@@ -130,24 +135,24 @@ def build_round_assignment_plan(
     return plan
 
 
-async def auto_resolve_next_swiss_round(
+async def auto_resolve_next_round(
     tournament_id: TournamentId,
     stage_item: StageItemWithRounds,
 ) -> None:
-    """After ranking recalculation, resolve or re-resolve Swiss rounds as the policy dictates.
+    """After ranking recalculation, resolve or re-resolve rounds as the policy dictates.
 
-    Two passes:
+    Applies to standings-resolved stage items only. Two passes:
     1. Resolve the next PLACEHOLDER round ready for initial resolution.
     2. Re-resolve any RESOLVED not-started non-pinned rounds (so upstream score corrections
        flow into future pairings while leaving pinned and locked rounds untouched).
     """
-    if stage_item.type != StageType.SWISS:
+    if not is_standings_resolved_stage_type(stage_item.type):
         return
 
     # Re-fetch with up-to-date ELO after recalculate_ranking_for_stage_item
     fresh = await get_stage_item(tournament_id, stage_item.id)
 
-    if await unwire_swiss_rounds_with_incomplete_predecessor(tournament_id, fresh):
+    if await unwire_rounds_with_incomplete_predecessor(tournament_id, fresh):
         return
 
     # Pass 1: initial resolution of next PLACEHOLDER round

@@ -96,6 +96,7 @@ stage_items = Table(
             "SINGLE_ELIMINATION",
             "SWISS",
             "ROUND_ROBIN",
+            "MEXICANO",
             name="stage_type",
         ),
         nullable=False,

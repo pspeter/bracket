@@ -1148,20 +1148,6 @@ export type RefereeNamesResponse = {
 };
 
 /**
- * RoundCreateBody
- */
-export type RoundCreateBody = {
-  /**
-   * Name
-   */
-  name: string | null;
-  /**
-   * Stage Item Id
-   */
-  stage_item_id: number;
-};
-
-/**
  * RoundLifecycleState
  */
 export type RoundLifecycleState = 'ACTIVE' | 'PLACEHOLDER' | 'RESOLVED' | 'LOCKED';
@@ -1831,7 +1817,7 @@ export type StageTemplateCreateBody = {
 /**
  * StageType
  */
-export type StageType = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS';
+export type StageType = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS' | 'MEXICANO';
 
 /**
  * StageUpdateBody
@@ -4727,38 +4713,6 @@ export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostRespons
 
 export type ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponse =
   ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses[keyof ReoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPostResponses];
-
-export type CreateRoundTournamentsTournamentIdRoundsPostData = {
-  body: RoundCreateBody;
-  path: {
-    /**
-     * Tournament Id
-     */
-    tournament_id: number;
-  };
-  query?: never;
-  url: '/tournaments/{tournament_id}/rounds';
-};
-
-export type CreateRoundTournamentsTournamentIdRoundsPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError;
-};
-
-export type CreateRoundTournamentsTournamentIdRoundsPostError =
-  CreateRoundTournamentsTournamentIdRoundsPostErrors[keyof CreateRoundTournamentsTournamentIdRoundsPostErrors];
-
-export type CreateRoundTournamentsTournamentIdRoundsPostResponses = {
-  /**
-   * Successful Response
-   */
-  200: SuccessResponse;
-};
-
-export type CreateRoundTournamentsTournamentIdRoundsPostResponse =
-  CreateRoundTournamentsTournamentIdRoundsPostResponses[keyof CreateRoundTournamentsTournamentIdRoundsPostResponses];
 
 export type DeleteRoundTournamentsTournamentIdRoundsRoundIdDeleteData = {
   body?: never;
