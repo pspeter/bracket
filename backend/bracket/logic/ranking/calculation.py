@@ -9,7 +9,7 @@ from bracket.models.db.match import MatchState, MatchWithDetailsDefinitive
 from bracket.models.db.ranking import Ranking, ScoringType
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
-from bracket.models.db.util import StageItemWithRounds
+from bracket.models.db.util import StageItemWithRounds, is_round_complete
 from bracket.sql.rankings import get_ranking_for_stage_item
 from bracket.utils.id_types import StageItemInputId, TournamentId
 
@@ -122,6 +122,12 @@ def _apply_mexicano_bye_compensation(
     by absence from the playing slots, not the referee slot, which is a general-purpose feature
     and not a reliable bye marker. Once a round is fully completed its compensation is fixed:
     later rounds cannot change it, since this only ever reads from already-completed rounds.
+
+    A resolved round can also contain a match that was never assigned a pairing at all --
+    cleared to [None, None] rather than played -- when a mid-tournament deactivation shrank the
+    active field below the round's pre-built skeleton capacity (issue #261). ``is_round_complete``
+    treats that surplus match as vacuously settled so the round's real matches still compensate
+    once completed; it is simply skipped when collecting playing points/ids below.
     """
     active_ids = {
         input_.id
@@ -131,16 +137,16 @@ def _apply_mexicano_bye_compensation(
 
     for round_ in stage_item.rounds:
         matches = round_.matches
-        if not matches or not all(
-            isinstance(m, MatchWithDetailsDefinitive) and m.state is MatchState.COMPLETED
-            for m in matches
-        ):
+        if not is_round_complete(round_):
             continue
 
         playing_points: list[Decimal] = []
         playing_ids: set[StageItemInputId] = set()
         for match in matches:
-            assert isinstance(match, MatchWithDetailsDefinitive)
+            if not isinstance(match, MatchWithDetailsDefinitive):
+                continue
+            if match.state is not MatchState.COMPLETED:
+                continue
             completed_sets = match.completed_sets
             playing_points.append(Decimal(sum(s.stage_item_input1_score for s in completed_sets)))
             playing_points.append(Decimal(sum(s.stage_item_input2_score for s in completed_sets)))

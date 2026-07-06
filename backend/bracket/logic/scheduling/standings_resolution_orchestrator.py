@@ -12,7 +12,7 @@ from bracket.logic.scheduling.swiss_slot_assigner import skeleton_from_slot_pair
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
-from bracket.models.db.util import RoundWithMatches, StageItemWithRounds
+from bracket.models.db.util import RoundWithMatches, StageItemWithRounds, is_round_complete
 from bracket.sql.stage_items import get_stage_item
 from bracket.utils.id_types import TournamentId
 
@@ -37,9 +37,7 @@ def build_unwire_plan(fresh: StageItemWithRounds) -> list[PlanItem]:
         if not predecessors:
             continue
         predecessors_complete = all(
-            all(m.state is MatchState.COMPLETED for m in prev.matches)
-            for prev in predecessors
-            if prev.matches
+            is_round_complete(prev) for prev in predecessors if prev.matches
         )
         if predecessors_complete:
             continue
@@ -117,8 +115,11 @@ def build_round_assignment_plan(
             continue
         input1_id = slot_mapping.get(match.input1_slot)
         input2_id = slot_mapping.get(match.input2_slot)
-        if input1_id is None or input2_id is None:
-            continue
+        # If the active pool is smaller than this round's pre-built skeleton (a mid-tournament
+        # deactivation shrinking the field, see issue #261), the pairing selector produces fewer
+        # pairs than there are matches, so some slots have no mapping. Write [None, None] rather
+        # than skipping: this both clears any stale assignment a since-deactivated input left
+        # behind, and (via `is_round_complete`) keeps the surplus match from blocking the round.
         plan.append(
             SetMatchInputs(round_id=round_.id, match_id=match.id, input_ids=[input1_id, input2_id])
         )

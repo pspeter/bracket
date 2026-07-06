@@ -7,10 +7,9 @@ from bracket.logic.ranking.calculation import (
 from bracket.logic.ranking.statistics import TeamStatistics
 from bracket.logic.scheduling.standings_resolution import is_standings_resolved_stage_type
 from bracket.logic.scheduling.standings_resolution_orchestrator import build_round_assignment_plan
-from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
-from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
+from bracket.models.db.util import StageItemWithRounds, StageWithStageItems, is_round_complete
 from bracket.sql.rankings import get_ranking_for_stage_item
 from bracket.sql.stage_item_inputs import get_stage_item_input_by_id
 from bracket.sql.stage_items import get_stage_item
@@ -153,7 +152,7 @@ async def resolve_dependent_inputs_for_completed_stage_item(
 
     source_matches = [match for round_ in source_stage_item.rounds for match in round_.matches]
     if not source_matches or not all(
-        match.state is MatchState.COMPLETED for match in source_matches
+        is_round_complete(round_) for round_ in source_stage_item.rounds
     ):
         return
 

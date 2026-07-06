@@ -10,6 +10,7 @@ from heliclockter import datetime_utc
 from bracket.config import config
 from bracket.database import database
 from bracket.logic.levels import validate_level_id_for_tournament
+from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.subscriptions import check_requirement
 from bracket.logic.teams import get_team_logo_path
 from bracket.models.db.player import PlayerBody
@@ -44,6 +45,8 @@ from bracket.sql.players import (
     get_player_team_ids,
     insert_player,
 )
+from bracket.sql.stage_item_inputs import get_stage_item_ids_for_team
+from bracket.sql.stage_items import get_stage_item
 from bracket.sql.teams import (
     get_team_by_id,
     get_team_count,
@@ -152,6 +155,14 @@ async def update_team_by_id(
         values=team_body.model_dump(exclude={"player_ids"}),
     )
     await update_team_members(team.id, tournament_id, team_body.player_ids)
+
+    if team_body.active != team.active:
+        # A (de)activation changes who counts as an active input for standings-resolved stage
+        # types (Mexicano, Swiss): future round resolutions and the running standings need to
+        # react immediately, not just on the next unrelated score change (issue #261).
+        for stage_item_id in await get_stage_item_ids_for_team(tournament_id, team.id):
+            stage_item = await get_stage_item(tournament_id, stage_item_id)
+            await reconcile_stage_item(tournament_id, stage_item)
 
     return SingleTeamResponse(
         data=assert_some(

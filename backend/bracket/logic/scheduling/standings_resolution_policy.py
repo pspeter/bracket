@@ -1,6 +1,6 @@
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
-from bracket.models.db.util import RoundWithMatches
+from bracket.models.db.util import RoundWithMatches, is_round_complete
 
 
 def get_rounds_to_re_resolve(rounds: list[RoundWithMatches]) -> list[RoundWithMatches]:
@@ -31,6 +31,6 @@ def get_next_round_to_resolve(rounds: list[RoundWithMatches]) -> RoundWithMatche
         if i == 0:
             return round_
         prev_round = sorted_rounds[i - 1]
-        if prev_round.matches and all(m.state == MatchState.COMPLETED for m in prev_round.matches):
+        if is_round_complete(prev_round):
             return round_
     return None
