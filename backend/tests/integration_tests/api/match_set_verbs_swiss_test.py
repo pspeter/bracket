@@ -6,7 +6,7 @@ import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
-    _resolve_round_1_for_swiss_stage_item,
+    _resolve_round_1_for_standings_resolved_stage_item,
 )
 from bracket.models.db.match import Match, MatchState
 from bracket.models.db.round import RoundLifecycleState
@@ -61,7 +61,7 @@ async def test_reset_unwires_swiss_round2_after_round1_match_reset(
         )
         await build_matches_for_stage_item(stage_item_raw, tournament_id)
         stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
-        await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+        await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, stage_item)
 
         round1 = sorted(stage_item.rounds, key=lambda r: r.id)[0]
         round2 = sorted(stage_item.rounds, key=lambda r: r.id)[1]
@@ -138,7 +138,7 @@ async def _build_swiss_stage_item_with_completed_round1(
     )
     await build_matches_for_stage_item(stage_item_raw, tournament_id)
     stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
-    await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+    await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, stage_item)
 
     round1 = sorted(stage_item.rounds, key=lambda r: r.id)[0]
     for i, match in enumerate(round1.matches):

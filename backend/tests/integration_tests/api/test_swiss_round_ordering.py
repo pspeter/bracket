@@ -7,8 +7,9 @@ tournament has been rescheduled / rebuilt a few times), that heap order diverges
 
 1. The planning page renders rounds/matches in the order the API returns them, so they would
    suddenly flip into a scrambled (e.g. reversed) order on a background refetch.
-2. ``_resolve_round_1_for_swiss_stage_item`` resolved whichever placeholder round happened to be
-   first in that order rather than round 1, leaving the real round 1 a placeholder that shows TBD.
+2. ``_resolve_round_1_for_standings_resolved_stage_item`` resolved whichever placeholder round
+   happened to be first in that order rather than round 1, leaving the real round 1 a placeholder
+   that shows TBD.
 """
 
 import pytest
@@ -16,7 +17,7 @@ from heliclockter import datetime_utc
 
 from bracket.database import database
 from bracket.logic.scheduling.handle_stage_activation import (
-    _resolve_round_1_for_swiss_stage_item,
+    _resolve_round_1_for_standings_resolved_stage_item,
 )
 from bracket.models.db.match import Match, MatchInsertable
 from bracket.models.db.round import RoundInsertable, RoundLifecycleState
@@ -278,7 +279,7 @@ async def test_resolve_round_1_targets_lowest_id_round_regardless_of_order(
             # Mimic the scrambled order the buggy SQL returned: hand the rounds over reversed,
             # so the first placeholder in iteration order is NOT round 1.
             scrambled = stage_item.model_copy(update={"rounds": list(reversed(stage_item.rounds))})
-            await _resolve_round_1_for_swiss_stage_item(tournament_id, scrambled)
+            await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, scrambled)
 
             stage_item = await _get_swiss_stage_item(tournament_id, stage_inserted.id)
             rounds_sorted = sorted(stage_item.rounds, key=lambda round_: round_.id)

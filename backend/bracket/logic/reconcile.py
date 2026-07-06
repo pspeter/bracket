@@ -6,8 +6,8 @@ from bracket.logic.ranking.elimination import (
 from bracket.logic.scheduling.handle_stage_activation import (
     resolve_dependent_inputs_for_completed_stage_item,
 )
-from bracket.logic.scheduling.swiss_resolution_orchestrator import (
-    auto_resolve_next_swiss_round,
+from bracket.logic.scheduling.standings_resolution_orchestrator import (
+    auto_resolve_next_round,
 )
 from bracket.models.db.stage_item import StageType
 from bracket.models.db.util import StageItemWithRounds
@@ -33,7 +33,7 @@ async def reconcile_stage_item(
         raise ValueError("changed_match_ids may only be passed together with changed_round_id")
 
     await recalculate_ranking_for_stage_item(tournament_id, stage_item)
-    await auto_resolve_next_swiss_round(tournament_id, stage_item)
+    await auto_resolve_next_round(tournament_id, stage_item)
 
     if stage_item.type is StageType.SINGLE_ELIMINATION:
         if changed_round_id is not None:

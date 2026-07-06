@@ -9,7 +9,7 @@ import pytest
 
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
 from bracket.logic.scheduling.handle_stage_activation import (
-    _resolve_round_1_for_swiss_stage_item,
+    _resolve_round_1_for_standings_resolved_stage_item,
 )
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage import Stage
@@ -68,7 +68,7 @@ async def _build_resolved_swiss_stage(
     await build_matches_for_stage_item(stage_item_raw, tournament_id)
 
     stage_item: StageItemWithRounds = await get_stage_item(tournament_id, stage_item_raw.id)
-    await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+    await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, stage_item)
 
     stage_item = await get_stage_item(tournament_id, stage_item_raw.id)
     round1, _ = sorted(stage_item.rounds, key=lambda r: r.id)

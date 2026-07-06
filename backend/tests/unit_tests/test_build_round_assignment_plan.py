@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 
 from bracket.logic.plan import SetMatchInputs, SetRoundLifecycleState
-from bracket.logic.scheduling.swiss_resolution_orchestrator import build_round_assignment_plan
+from bracket.logic.scheduling.standings_resolution_orchestrator import build_round_assignment_plan
 from bracket.models.db.match import Match, MatchWithDetails, MatchWithDetailsDefinitive
 from bracket.models.db.round import RoundLifecycleState
 from bracket.models.db.stage_item import StageType

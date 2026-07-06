@@ -5,10 +5,10 @@ from bracket.logic.ranking.calculation import (
     determine_team_ranking_for_stage_item,
 )
 from bracket.logic.ranking.statistics import TeamStatistics
-from bracket.logic.scheduling.swiss_resolution_orchestrator import build_round_assignment_plan
+from bracket.logic.scheduling.standings_resolution import is_standings_resolved_stage_type
+from bracket.logic.scheduling.standings_resolution_orchestrator import build_round_assignment_plan
 from bracket.models.db.match import MatchState
 from bracket.models.db.round import RoundLifecycleState
-from bracket.models.db.stage_item import StageType
 from bracket.models.db.stage_item_inputs import StageItemInputFinal
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
 from bracket.sql.rankings import get_ranking_for_stage_item
@@ -60,11 +60,11 @@ async def get_team_rankings_lookup_for_tournament(
     }
 
 
-async def _resolve_round_1_for_swiss_stage_item(
+async def _resolve_round_1_for_standings_resolved_stage_item(
     tournament_id: TournamentId,
     stage_item: StageItemWithRounds,
 ) -> None:
-    """Fill in concrete team assignments for round 1 of a Swiss stage item."""
+    """Fill in concrete team assignments for round 1 of a standings-resolved stage item."""
     # Round 1 is the lowest-id round. Resolve that specific round rather than the first
     # placeholder in iteration order: the rounds can arrive in any order, so picking the first
     # placeholder could resolve a later round (leaving the real round 1 a placeholder that shows
@@ -81,11 +81,11 @@ async def _resolve_round_1_for_swiss_stage_item(
     await apply_plan(tournament_id, plan)
 
 
-async def try_resolve_first_swiss_round_when_inputs_filled(
+async def try_resolve_first_round_when_inputs_filled(
     tournament_id: TournamentId,
     stage_item_id: StageItemId,
 ) -> None:
-    """Resolve round 1 of a Swiss stage item as soon as all of its slots are filled.
+    """Resolve round 1 of a standings-resolved stage item as soon as all of its slots are filled.
 
     Round 1 is resolved once every input has a concrete team assigned. It is a no-op unless round 1
     is still a placeholder and every input is concrete, which keeps it safe to call repeatedly
@@ -107,7 +107,7 @@ async def try_resolve_first_swiss_round_when_inputs_filled(
         )
 
         stage_item = await get_stage_item(tournament_id, stage_item_id)
-        if stage_item.type is not StageType.SWISS:
+        if not is_standings_resolved_stage_type(stage_item.type):
             return
 
         # All inputs must reference concrete teams before we can pair round 1.
@@ -123,7 +123,7 @@ async def try_resolve_first_swiss_round_when_inputs_filled(
         ):
             return
 
-        await _resolve_round_1_for_swiss_stage_item(tournament_id, stage_item)
+        await _resolve_round_1_for_standings_resolved_stage_item(tournament_id, stage_item)
 
 
 async def resolve_dependent_inputs_for_completed_stage_item(
@@ -194,5 +194,7 @@ async def resolve_dependent_inputs_for_completed_stage_item(
 
     for stage_item_id in affected_stage_item_ids:
         affected_stage_item = await get_stage_item(tournament_id, stage_item_id)
-        if affected_stage_item.type == StageType.SWISS:
-            await _resolve_round_1_for_swiss_stage_item(tournament_id, affected_stage_item)
+        if is_standings_resolved_stage_type(affected_stage_item.type):
+            await _resolve_round_1_for_standings_resolved_stage_item(
+                tournament_id, affected_stage_item
+            )

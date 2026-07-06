@@ -42,7 +42,7 @@ def _make_round(
 
 
 def test_returns_none_for_no_rounds() -> None:
-    from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_next_round_to_resolve
 
     assert get_next_round_to_resolve([]) is None
 
@@ -51,7 +51,7 @@ def test_returns_none_for_no_rounds() -> None:
 
 
 def test_placeholder_with_no_predecessor_resolves() -> None:
-    from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_next_round_to_resolve
 
     r1 = _make_round(1, RoundLifecycleState.PLACEHOLDER, [MatchState.NOT_STARTED])
     result = get_next_round_to_resolve([r1])
@@ -63,7 +63,7 @@ def test_placeholder_with_no_predecessor_resolves() -> None:
 
 
 def test_placeholder_after_completed_round_resolves() -> None:
-    from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_next_round_to_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
     r2 = _make_round(2, RoundLifecycleState.PLACEHOLDER, [MatchState.NOT_STARTED])
@@ -76,7 +76,7 @@ def test_placeholder_after_completed_round_resolves() -> None:
 
 
 def test_placeholder_blocked_when_predecessor_incomplete() -> None:
-    from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_next_round_to_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED, MatchState.NOT_STARTED])
     r2 = _make_round(2, RoundLifecycleState.PLACEHOLDER, [MatchState.NOT_STARTED])
@@ -89,7 +89,7 @@ def test_placeholder_blocked_when_predecessor_incomplete() -> None:
 
 def test_sequential_only_next_placeholder_returned() -> None:
     """When R1 is complete and R2+R3 are PLACEHOLDER, only R2 is returned."""
-    from bracket.logic.scheduling.swiss_resolution_policy import get_next_round_to_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_next_round_to_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
     r2 = _make_round(2, RoundLifecycleState.PLACEHOLDER, [MatchState.NOT_STARTED])
@@ -104,7 +104,7 @@ def test_sequential_only_next_placeholder_returned() -> None:
 
 def test_pinned_resolved_round_excluded_from_re_resolution() -> None:
     """A RESOLVED pinned round must never be returned for re-resolution."""
-    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_rounds_to_re_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
     r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED], is_pinned=True)
@@ -114,7 +114,7 @@ def test_pinned_resolved_round_excluded_from_re_resolution() -> None:
 
 def test_resolved_not_started_not_pinned_eligible_for_re_resolution() -> None:
     """A RESOLVED not-started non-pinned round IS returned for re-resolution."""
-    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_rounds_to_re_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
     r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.NOT_STARTED])
@@ -125,7 +125,7 @@ def test_resolved_not_started_not_pinned_eligible_for_re_resolution() -> None:
 
 def test_locked_resolved_round_not_eligible_for_re_resolution() -> None:
     """A RESOLVED round that has started (LOCKED) must never be re-resolved."""
-    from bracket.logic.scheduling.swiss_resolution_policy import get_rounds_to_re_resolve
+    from bracket.logic.scheduling.standings_resolution_policy import get_rounds_to_re_resolve
 
     r1 = _make_round(1, RoundLifecycleState.LOCKED, [MatchState.COMPLETED])
     r2 = _make_round(2, RoundLifecycleState.RESOLVED, [MatchState.IN_PROGRESS])
