@@ -33,9 +33,6 @@ import type {
   CreateRankingTournamentsTournamentIdRankingsPostData,
   CreateRankingTournamentsTournamentIdRankingsPostErrors,
   CreateRankingTournamentsTournamentIdRankingsPostResponses,
-  CreateRoundTournamentsTournamentIdRoundsPostData,
-  CreateRoundTournamentsTournamentIdRoundsPostErrors,
-  CreateRoundTournamentsTournamentIdRoundsPostResponses,
   CreateSinglePlayerTournamentsTournamentIdPlayersPostData,
   CreateSinglePlayerTournamentsTournamentIdPlayersPostErrors,
   CreateSinglePlayerTournamentsTournamentIdPlayersPostResponses,
@@ -1349,27 +1346,6 @@ export const reoptimizeMatchesTournamentsTournamentIdReoptimizeMatchesPost = <
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/tournaments/{tournament_id}/reoptimize_matches',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * Create Round
- */
-export const createRoundTournamentsTournamentIdRoundsPost = <ThrowOnError extends boolean = false>(
-  options: Options<CreateRoundTournamentsTournamentIdRoundsPostData, ThrowOnError>
-) =>
-  (options.client ?? client).post<
-    CreateRoundTournamentsTournamentIdRoundsPostResponses,
-    CreateRoundTournamentsTournamentIdRoundsPostErrors,
-    ThrowOnError
-  >({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/tournaments/{tournament_id}/rounds',
     ...options,
     headers: {
       'Content-Type': 'application/json',

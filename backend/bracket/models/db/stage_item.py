@@ -16,10 +16,6 @@ class StageType(EnumAutoStr):
     SWISS = auto()
     MEXICANO = auto()
 
-    @property
-    def supports_dynamic_number_of_rounds(self) -> bool:
-        return self in [StageType.SWISS, StageType.MEXICANO]
-
 
 class StageItemInsertable(BaseModelORM):
     stage_id: StageId

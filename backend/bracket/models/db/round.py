@@ -31,11 +31,6 @@ class RoundUpdateBody(BaseModelORM):
     lifecycle_state: RoundLifecycleState
 
 
-class RoundCreateBody(BaseModelORM):
-    name: str | None = None
-    stage_item_id: StageItemId
-
-
 class SwapMatchInputsBody(BaseModelORM):
     match1_id: MatchId
     match2_id: MatchId
