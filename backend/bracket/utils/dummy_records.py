@@ -49,7 +49,6 @@ DUMMY_TOURNAMENT = TournamentInsertable(
     dashboard_endpoint="endpoint-test",
     logo_path=None,
     players_can_be_in_multiple_teams=True,
-    auto_assign_courts=True,
     duration_minutes=10,
     margin_minutes=5,
     max_team_size=4,

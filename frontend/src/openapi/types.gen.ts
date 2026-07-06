@@ -2024,10 +2024,6 @@ export type TokenResponse = {
  */
 export type TournamentBody = {
   /**
-   * Auto Assign Courts
-   */
-  auto_assign_courts: boolean;
-  /**
    * Club Id
    */
   club_id: number;
@@ -2143,10 +2139,6 @@ export type TournamentStatus = 'OPEN' | 'ARCHIVED';
  */
 export type TournamentUpdateBody = {
   /**
-   * Auto Assign Courts
-   */
-  auto_assign_courts: boolean;
-  /**
    * Dashboard Endpoint
    */
   dashboard_endpoint: unknown | string;
@@ -2208,10 +2200,6 @@ export type TournamentUpdateBody = {
  * TournamentWithLevels
  */
 export type TournamentWithLevels = {
-  /**
-   * Auto Assign Courts
-   */
-  auto_assign_courts: boolean;
   /**
    * Club Id
    */

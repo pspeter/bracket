@@ -53,7 +53,6 @@ function GeneralTournamentForm({
       dashboard_public: true,
       dashboard_endpoint: '',
       players_can_be_in_multiple_teams: false,
-      auto_assign_courts: true,
       duration_minutes: 10,
       margin_minutes: 5,
       referees_enabled: false,
@@ -84,7 +83,6 @@ function GeneralTournamentForm({
           values.dashboard_public,
           values.dashboard_endpoint,
           values.players_can_be_in_multiple_teams,
-          values.auto_assign_courts,
           dayjs(values.start_time).toISOString(),
           values.duration_minutes,
           values.margin_minutes,
@@ -182,11 +180,6 @@ function GeneralTournamentForm({
         mt="md"
         label={t('miscellaneous_label')}
         {...form.getInputProps('players_can_be_in_multiple_teams', { type: 'checkbox' })}
-      />
-      <Checkbox
-        mt="md"
-        label={t('auto_assign_courts_label')}
-        {...form.getInputProps('auto_assign_courts', { type: 'checkbox' })}
       />
       <Checkbox
         mt="md"

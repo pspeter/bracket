@@ -36,7 +36,6 @@
     "at_least_one_player_validation": "Inserisci almeno un giocatore",
     "at_least_one_team_validation": "Inserisci almeno una squadra",
     "at_least_two_team_validation": "Servono almeno due squadre",
-    "auto_assign_courts_label": "Assegnare automaticamente i campi alle partite",
     "auto_assign_teams_label": "Assegna automaticamente i team",
     "auto_create_matches_button": "Pianifica automaticamente il nuovo round",
     "back_home_nav": "Riportami alla pagina iniziale",

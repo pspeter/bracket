@@ -350,7 +350,6 @@ async def create_big_dev_tournament(club_id: ClubId, insert_dummy: InsertDummy) 
                 "club_id": club_id,
                 "name": BIG_DEV_TOURNAMENT_NAME,
                 "dashboard_endpoint": "big-unscheduled-tournament",
-                "auto_assign_courts": False,
             },
         )
     )

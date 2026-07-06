@@ -36,7 +36,6 @@
     "at_least_one_player_validation": "Εισάγετε τουλάχιστον έναν παίκτη",
     "at_least_one_team_validation": "Εισάγετε τουλάχιστον μία ομάδα",
     "at_least_two_team_validation": "Χρειάζονται τουλάχιστον δύο ομάδες",
-    "auto_assign_courts_label": "Αυτόματη εκχώρηση δικαστηρίων σε αγώνες",
     "auto_assign_teams_label": "Αυτόματη ανάθεση ομάδων",
     "auto_create_matches_button": "Plan new round automatically",
     "back_home_nav": "Επιστρέψτε με στην αρχική σελίδα",

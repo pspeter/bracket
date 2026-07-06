@@ -26,7 +26,6 @@ def _create_body(endpoint: str, club_id: int, levels: list[str] | None = None) -
         "dashboard_public": True,
         "dashboard_endpoint": endpoint,
         "players_can_be_in_multiple_teams": False,
-        "auto_assign_courts": False,
         "duration_minutes": 10,
         "margin_minutes": 5,
         "signup_enabled": False,

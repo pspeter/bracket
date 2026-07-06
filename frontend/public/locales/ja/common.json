@@ -36,7 +36,6 @@
     "at_least_one_player_validation": "少なくとも1人のプレイヤーを入力してください",
     "at_least_one_team_validation": "少なくとも1つのチームを入力してください",
     "at_least_two_team_validation": "少なくとも2つのチームが必要",
-    "auto_assign_courts_label": "自動的に裁判所を一致させます",
     "auto_assign_teams_label": "チームを自動割り当て",
     "auto_create_matches_button": "Plan new round automatically",
     "back_home_nav": "ホームページに戻る",

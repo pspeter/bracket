@@ -3812,10 +3812,6 @@
       },
       "TournamentBody": {
         "properties": {
-          "auto_assign_courts": {
-            "title": "Auto Assign Courts",
-            "type": "boolean"
-          },
           "club_id": {
             "title": "Club Id",
             "type": "integer"
@@ -3918,7 +3914,6 @@
           "dashboard_public",
           "dashboard_endpoint",
           "players_can_be_in_multiple_teams",
-          "auto_assign_courts",
           "duration_minutes",
           "margin_minutes",
           "signup_enabled",
@@ -4006,10 +4001,6 @@
       },
       "TournamentUpdateBody": {
         "properties": {
-          "auto_assign_courts": {
-            "title": "Auto Assign Courts",
-            "type": "boolean"
-          },
           "dashboard_endpoint": {
             "anyOf": [
               {},
@@ -4093,7 +4084,6 @@
           "dashboard_public",
           "dashboard_endpoint",
           "players_can_be_in_multiple_teams",
-          "auto_assign_courts",
           "duration_minutes",
           "margin_minutes",
           "signup_enabled",
@@ -4109,10 +4099,6 @@
       },
       "TournamentWithLevels": {
         "properties": {
-          "auto_assign_courts": {
-            "title": "Auto Assign Courts",
-            "type": "boolean"
-          },
           "club_id": {
             "title": "Club Id",
             "type": "integer"
@@ -4264,7 +4250,6 @@
           "dashboard_endpoint",
           "logo_path",
           "players_can_be_in_multiple_teams",
-          "auto_assign_courts",
           "status",
           "signup_enabled",
           "signup_token",
