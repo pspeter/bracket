@@ -16,7 +16,10 @@ from bracket.logic.scheduling.round_robin import (
     get_number_of_rounds_to_create_round_robin,
     get_round_robin_combinations,
 )
-from bracket.logic.scheduling.swiss_skeleton import build_swiss_skeleton
+from bracket.logic.scheduling.standings_resolution import (
+    get_standings_resolved_strategy,
+    is_standings_resolved_stage_type,
+)
 from bracket.logic.subscriptions import check_requirement
 from bracket.models.db.match import MatchCreateBody, MatchState
 from bracket.models.db.round import RoundInsertable, RoundLifecycleState
@@ -371,19 +374,26 @@ async def resize_non_elimination_stage_item(
     await clear_removed_winner_positions(stage_item_id, new_team_count)
 
 
-async def adjust_swiss_games_per_player(
+async def adjust_games_per_player(
     tournament_id: TournamentId,
     stage_item_id: StageItemId,
     stage_item: StageItemWithRounds,
     new_games_per_player: int,
 ) -> None:
-    """Append or remove trailing PLACEHOLDER rounds when games-per-player changes."""
+    """Append or remove trailing PLACEHOLDER rounds when games-per-player changes.
+
+    Shared by every standings-resolved stage type (Swiss, Mexicano); the round/match structure
+    comes from the stage type's registered skeleton builder.
+    """
+    strategy = get_standings_resolved_strategy(stage_item.type)
     old_games_per_player = stage_item.games_per_player
-    if old_games_per_player is None or new_games_per_player == old_games_per_player:
+    if strategy is None or old_games_per_player is None:
+        return
+    if new_games_per_player == old_games_per_player:
         return
 
-    old_skeleton = build_swiss_skeleton(stage_item.team_count, old_games_per_player)
-    new_skeleton = build_swiss_skeleton(stage_item.team_count, new_games_per_player)
+    old_skeleton = strategy.skeleton_builder(stage_item.team_count, old_games_per_player)
+    new_skeleton = strategy.skeleton_builder(stage_item.team_count, new_games_per_player)
     current_rounds = sorted(stage_item.rounds, key=lambda r: r.id)
 
     if new_skeleton.round_count > old_skeleton.round_count:
@@ -470,6 +480,21 @@ async def delete_stage_item(
     return SuccessResponse()
 
 
+def validate_mexicano_team_count(stage_type: StageType, team_count: int) -> None:
+    """Reject Mexicano stage items with an odd number of entrants.
+
+    Every Mexicano round pairs adjacent standings slots (1v2, 3v4, ...), which requires an even
+    field. Odd counts (byes) are not supported yet, so they are rejected with a clear error.
+    """
+    if stage_type is StageType.MEXICANO and team_count % 2 != 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Mexicano requires an even number of teams. Odd team counts are not supported yet."
+            ),
+        )
+
+
 @router.post("/tournaments/{tournament_id}/stage_items", response_model=SuccessResponse)
 async def create_stage_item(
     tournament_id: TournamentId,
@@ -481,6 +506,8 @@ async def create_stage_item(
     stages = await get_full_tournament_details(tournament_id)
     existing_stage_items = [stage_item for stage in stages for stage_item in stage.stage_items]
     check_requirement(existing_stage_items, user, "max_stage_items")
+
+    validate_mexicano_team_count(stage_body.type, stage_body.team_count)
 
     if stage_body.type is StageType.SINGLE_ELIMINATION:
         if stage_body.ranking_id is not None:
@@ -516,6 +543,7 @@ async def update_stage_item(
         )
 
     await check_foreign_keys_belong_to_tournament(stage_item_body, tournament_id)
+    validate_mexicano_team_count(stage_item.type, stage_item_body.team_count)
     team_count_changed = stage_item_body.team_count != stage_item.team_count
     ranking_changed = stage_item_body.ranking_id != stage_item.ranking_id
 
@@ -544,8 +572,10 @@ async def update_stage_item(
             old_num_sets = old_ranking.num_sets if old_ranking is not None else 1
             await sql_resize_sets_for_stage_item(stage_item_id, old_num_sets, new_ranking.num_sets)
 
-        if stage_item_body.games_per_player is not None and stage_item.type is StageType.SWISS:
-            await adjust_swiss_games_per_player(
+        if stage_item_body.games_per_player is not None and is_standings_resolved_stage_type(
+            stage_item.type
+        ):
+            await adjust_games_per_player(
                 tournament_id, stage_item_id, stage_item, stage_item_body.games_per_player
             )
         await resize_stage_item_if_needed(tournament_id, stage_item_id, stage_item, stage_item_body)

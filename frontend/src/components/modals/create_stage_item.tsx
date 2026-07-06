@@ -74,13 +74,13 @@ export function CreateStagesFromTemplateButtons({
   setSelectedType,
   t,
 }: {
-  selectedType: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION';
-  setSelectedType: (type: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION') => void;
+  selectedType: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION' | 'MEXICANO';
+  setSelectedType: (type: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION' | 'MEXICANO') => void;
   t: Translator;
 }) {
   return (
     <Grid grow>
-      <Grid.Col span={{ base: 12, sm: 4 }}>
+      <Grid.Col span={{ base: 12, sm: 3 }}>
         <StageSelectCard
           title={t('round_robin_label')}
           description={t('round_robin_description')}
@@ -91,7 +91,7 @@ export function CreateStagesFromTemplateButtons({
           }}
         />
       </Grid.Col>
-      <Grid.Col span={{ base: 12, sm: 4 }}>
+      <Grid.Col span={{ base: 12, sm: 3 }}>
         <StageSelectCard
           title={t('single_elimination_label')}
           description={t('single_elimination_description')}
@@ -102,7 +102,7 @@ export function CreateStagesFromTemplateButtons({
           }}
         />
       </Grid.Col>
-      <Grid.Col span={{ base: 12, sm: 4 }}>
+      <Grid.Col span={{ base: 12, sm: 3 }}>
         <StageSelectCard
           title={t('swiss_label')}
           description={t('swiss_description')}
@@ -110,6 +110,17 @@ export function CreateStagesFromTemplateButtons({
           selected={selectedType === 'SWISS'}
           onClick={() => {
             setSelectedType('SWISS');
+          }}
+        />
+      </Grid.Col>
+      <Grid.Col span={{ base: 12, sm: 3 }}>
+        <StageSelectCard
+          title={t('mexicano_label')}
+          description={t('mexicano_description')}
+          image="/icons/swiss-stage-item.svg"
+          selected={selectedType === 'MEXICANO'}
+          onClick={() => {
+            setSelectedType('MEXICANO');
           }}
         />
       </Grid.Col>
@@ -165,7 +176,7 @@ function TeamCountInput({ form }: { form: UseFormReturnType<any> }) {
 
 function GamesPerPlayerInput({ form }: { form: UseFormReturnType<any> }) {
   const { t } = useTranslation();
-  if (form.values.type !== 'SWISS') return null;
+  if (form.values.type !== 'SWISS' && form.values.type !== 'MEXICANO') return null;
   return (
     <NumberInput
       withAsterisk
@@ -188,7 +199,7 @@ function getTeamCount(values: any) {
 }
 
 interface FormValues {
-  type: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION';
+  type: 'ROUND_ROBIN' | 'SWISS' | 'SINGLE_ELIMINATION' | 'MEXICANO';
   team_count_round_robin: number;
   team_count_elimination: number;
   games_per_player: number;
@@ -221,10 +232,18 @@ export function CreateStageItemModal({
       ranking_id: defaultRanking?.id.toString() ?? '',
     },
     validate: {
-      team_count_round_robin: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
+      team_count_round_robin: (value, values) => {
+        if (value < 2) return t('at_least_two_team_validation');
+        if (values.type === 'MEXICANO' && value % 2 !== 0) {
+          return t('even_team_count_validation');
+        }
+        return null;
+      },
       team_count_elimination: (value) => (value >= 2 ? null : t('at_least_two_team_validation')),
       games_per_player: (value, values) =>
-        values.type !== 'SWISS' || value >= 1 ? null : t('at_least_two_team_validation'),
+        (values.type !== 'SWISS' && values.type !== 'MEXICANO') || value >= 1
+          ? null
+          : t('at_least_two_team_validation'),
     },
   });
 
@@ -252,7 +271,7 @@ export function CreateStageItemModal({
               values.type,
               getTeamCount(values),
               Number(values.ranking_id),
-              values.type === 'SWISS' ? values.games_per_player : null
+              values.type === 'SWISS' || values.type === 'MEXICANO' ? values.games_per_player : null
             );
             await swrStagesResponse.mutate();
             await swrAvailableInputsResponse.mutate();

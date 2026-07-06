@@ -1831,7 +1831,7 @@ export type StageTemplateCreateBody = {
 /**
  * StageType
  */
-export type StageType = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS';
+export type StageType = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS' | 'MEXICANO';
 
 /**
  * StageUpdateBody

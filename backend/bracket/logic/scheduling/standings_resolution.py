@@ -9,13 +9,16 @@ all such stage types. Each type plugs in two pure strategy functions plus a skel
 - the **pairing selector**: which inputs meet in a round, and who (if anyone) gets the bye;
 - the **slot assigner**: which selected pair lands in which match slot.
 
-Swiss is currently the only registered type.
+Swiss and Mexicano are the registered types.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from bracket.logic.scheduling.mexicano_round_pairing import select_mexicano_round_pairing
+from bracket.logic.scheduling.mexicano_skeleton import build_mexicano_skeleton
+from bracket.logic.scheduling.mexicano_slot_assigner import assign_mexicano_pairs_to_slots
 from bracket.logic.scheduling.swiss_round_pairing import select_round_pairing
 from bracket.logic.scheduling.swiss_skeleton import (
     RoundSkeleton,
@@ -64,6 +67,11 @@ STANDINGS_RESOLVED_STRATEGIES: dict[StageType, StandingsResolvedStrategy] = {
         pairing_selector=select_round_pairing,
         slot_assigner=assign_pairs_to_slots,
         skeleton_builder=build_swiss_skeleton,
+    ),
+    StageType.MEXICANO: StandingsResolvedStrategy(
+        pairing_selector=select_mexicano_round_pairing,
+        slot_assigner=assign_mexicano_pairs_to_slots,
+        skeleton_builder=build_mexicano_skeleton,
     ),
 }
 

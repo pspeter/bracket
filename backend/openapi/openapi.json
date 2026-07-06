@@ -3510,7 +3510,8 @@
         "enum": [
           "ROUND_ROBIN",
           "SINGLE_ELIMINATION",
-          "SWISS"
+          "SWISS",
+          "MEXICANO"
         ],
         "title": "StageType",
         "type": "string"

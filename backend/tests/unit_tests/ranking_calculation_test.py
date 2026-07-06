@@ -212,6 +212,86 @@ def test_determine_ranking_for_stage_item_swiss() -> None:
     }
 
 
+def test_determine_ranking_for_stage_item_mexicano_accumulates_points_scored() -> None:
+    """Mexicano points are the cumulative points scored across all completed sets, from a zero
+    baseline (not the Swiss ELO baseline)."""
+    tournament_id = TournamentId(-1)
+    now = datetime_utc.now()
+    input1 = StageItemInputFinal(
+        id=StageItemInputId(-1),
+        team_id=TeamId(-1),
+        slot=1,
+        tournament_id=tournament_id,
+        team=Team(**DUMMY_TEAM1.model_dump(), id=TeamId(-1)),
+    )
+    input2 = StageItemInputFinal(
+        id=StageItemInputId(-2),
+        team_id=TeamId(-2),
+        slot=2,
+        tournament_id=tournament_id,
+        team=Team(**DUMMY_TEAM2.model_dump(), id=TeamId(-2)),
+    )
+
+    from bracket.models.db.match import MatchSet, MatchSetState
+    from bracket.utils.id_types import MatchSetId
+
+    def make_sets(match_id: MatchId, scores: list[tuple[int, int]]) -> list[MatchSet]:
+        return [
+            MatchSet(
+                id=MatchSetId(int(match_id) * 10 + i),
+                match_id=match_id,
+                set_number=i + 1,
+                stage_item_input1_score=s1,
+                stage_item_input2_score=s2,
+                state=MatchSetState.COMPLETED,
+            )
+            for i, (s1, s2) in enumerate(scores)
+        ]
+
+    stage_item = StageItemWithRounds(
+        rounds=[
+            RoundWithMatches(
+                id=RoundId(-1),
+                matches=[
+                    MatchWithDetailsDefinitive(
+                        id=MatchId(-1),
+                        stage_item_input1=input1,
+                        stage_item_input2=input2,
+                        created=now,
+                        duration_minutes=90,
+                        round_id=RoundId(-1),
+                        match_sets=make_sets(MatchId(-1), [(21, 10), (15, 21)]),
+                    ),
+                ],
+                stage_item_id=StageItemId(-1),
+                created=now,
+                lifecycle_state=RoundLifecycleState.ACTIVE,
+                name="",
+            )
+        ],
+        inputs=[input1, input2],
+        type_name="Mexicano",
+        team_count=2,
+        ranking_id=None,
+        id=StageItemId(-1),
+        stage_id=StageId(-1),
+        name="",
+        created=now,
+        type=StageType.MEXICANO,
+    )
+
+    result = determine_ranking_for_stage_item(
+        stage_item, _ranking(tournament_id, now, win="3.0", draw="1.0")
+    )
+    # 1-1 draw on sets; points are total points scored, not match/ELO points.
+    assert result[StageItemInputId(-1)] == TeamStatistics(
+        wins=0, draws=1, losses=0, points=Decimal("36"), set_difference=0, point_difference=5
+    )
+    assert result[StageItemInputId(-2)] == TeamStatistics(
+        wins=0, draws=1, losses=0, points=Decimal("31"), set_difference=0, point_difference=-5
+    )
+
+
 def test_team_statistics_has_set_and_point_difference() -> None:
     stats = TeamStatistics()
     assert stats.set_difference == 0

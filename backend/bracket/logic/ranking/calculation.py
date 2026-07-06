@@ -100,6 +100,11 @@ def set_statistics_for_stage_item_input(
             expected_score = Decimal(1.0 / (1.0 + math.pow(10.0, rating_diff / D)))
             stats[stage_item_input_id].points += int(K * (elo_score - expected_score))
 
+        case StageType.MEXICANO:
+            # Mexicano standings are hardwired to cumulative points scored, summed over every
+            # completed set of every completed match, from a zero baseline.
+            stats[stage_item_input_id].points += Decimal(total_points_for)
+
         case _:
             raise ValueError(f"Unsupported stage type: {stage_item.type}")
 

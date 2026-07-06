@@ -158,7 +158,9 @@ export function UpdateStageItemModal({
             values.name,
             values.ranking_id,
             teamCount,
-            stageItem.type === 'SWISS' ? values.games_per_player : null
+            stageItem.type === 'SWISS' || stageItem.type === 'MEXICANO'
+              ? values.games_per_player
+              : null
           );
           await swrStagesResponse.mutate();
           setOpened(false);
@@ -183,7 +185,7 @@ export function UpdateStageItemModal({
             onChange={(value) => form.setFieldValue('team_count_round_robin', Number(value))}
           />
         )}
-        {stageItem.type === 'SWISS' && (
+        {(stageItem.type === 'SWISS' || stageItem.type === 'MEXICANO') && (
           <NumberInput
             withAsterisk
             label={t('games_per_player_label')}

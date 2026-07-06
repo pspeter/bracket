@@ -9,6 +9,7 @@ from bracket.logic.match_sets.pointer import IllegalMatchTransitionError
 from bracket.logic.match_sets.validation import validate_match_can_be_started
 from bracket.logic.ranking.elimination import get_started_elimination_followers
 from bracket.logic.reconcile import reconcile_stage_item
+from bracket.logic.scheduling.standings_resolution import is_standings_resolved_stage_type
 from bracket.models.db.match import (
     Match,
     MatchSetScoreEditBody,
@@ -133,7 +134,7 @@ def _get_started_downstream_matches(
     """
     if stage_item.type == StageType.SINGLE_ELIMINATION:
         return get_started_elimination_followers(stage_item, {match.id})
-    if stage_item.type == StageType.SWISS:
+    if is_standings_resolved_stage_type(stage_item.type):
         return [
             subsequent_match
             for subsequent_round in stage_item.rounds

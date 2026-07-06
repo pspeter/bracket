@@ -14,10 +14,11 @@ class StageType(EnumAutoStr):
     ROUND_ROBIN = auto()
     SINGLE_ELIMINATION = auto()
     SWISS = auto()
+    MEXICANO = auto()
 
     @property
     def supports_dynamic_number_of_rounds(self) -> bool:
-        return self in [StageType.SWISS]
+        return self in [StageType.SWISS, StageType.MEXICANO]
 
 
 class StageItemInsertable(BaseModelORM):
