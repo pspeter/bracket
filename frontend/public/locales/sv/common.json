@@ -36,7 +36,6 @@
     "at_least_one_player_validation": "Ange minst en spelare",
     "at_least_one_team_validation": "Ange minst ett team",
     "at_least_two_team_validation": "Behöver minst två lag",
-    "auto_assign_courts_label": "Tilldela spelplaner automatiskt till matcher",
     "auto_assign_teams_label": "Tilldela lag automatiskt",
     "auto_create_matches_button": "Planera en ny runda automatiskt",
     "back_home_nav": "Ta mig tillbaka till startsidan",

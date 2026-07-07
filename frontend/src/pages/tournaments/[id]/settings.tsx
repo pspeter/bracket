@@ -190,7 +190,6 @@ function GeneralTournamentForm({
       dashboard_public: tournament.dashboard_public,
       dashboard_endpoint: tournament.dashboard_endpoint,
       players_can_be_in_multiple_teams: tournament.players_can_be_in_multiple_teams,
-      auto_assign_courts: tournament.auto_assign_courts,
       duration_minutes: tournament.duration_minutes,
       margin_minutes: tournament.margin_minutes,
       signup_enabled: tournament.signup_enabled,
@@ -233,7 +232,6 @@ function GeneralTournamentForm({
           values.dashboard_public,
           values.dashboard_endpoint,
           values.players_can_be_in_multiple_teams,
-          values.auto_assign_courts,
           dayjs(values.start_time).toISOString(),
           values.duration_minutes,
           values.margin_minutes,
@@ -530,11 +528,6 @@ function GeneralTournamentForm({
           mt="md"
           label={t('miscellaneous_label')}
           {...form.getInputProps('players_can_be_in_multiple_teams', { type: 'checkbox' })}
-        />
-        <Checkbox
-          mt="md"
-          label={t('auto_assign_courts_label')}
-          {...form.getInputProps('auto_assign_courts', { type: 'checkbox' })}
         />
       </Fieldset>
 
