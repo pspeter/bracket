@@ -1,7 +1,7 @@
 """Add ON DELETE CASCADE to users_x_clubs
 
 Revision ID: 274385f2a757
-Revises:
+Revises: f06b973ae9b2
 Create Date: 2023-04-15 11:08:57.406407
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str | None = "274385f2a757"
-down_revision: str | None = None
+down_revision: str | None = "f06b973ae9b2"
 branch_labels: str | None = None
 depends_on: str | None = None
 

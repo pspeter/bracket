@@ -38,7 +38,7 @@ def add_missing_rankings(tournaments_without_ranking: list[Any]) -> None:
                     RETURNING id
                     """
                 ),
-                tournament_id=tournament.id,
+                {"tournament_id": tournament.id},
             )
             .scalar_one()
         )
@@ -54,8 +54,7 @@ def add_missing_rankings(tournaments_without_ranking: list[Any]) -> None:
                 )
                 """
             ),
-            tournament_id=tournament.id,
-            ranking_id=ranking_id,
+            {"tournament_id": tournament.id, "ranking_id": ranking_id},
         )
 
 
@@ -84,13 +83,15 @@ def upgrade() -> None:
     tournaments_without_ranking = (
         op.get_bind()
         .execute(
-            """
-            SELECT * FROM tournaments WHERE (
-                SELECT NOT EXISTS (
-                   SELECT 1 FROM rankings WHERE rankings.tournament_id = tournaments.id
+            sa.text(
+                """
+                SELECT * FROM tournaments WHERE (
+                    SELECT NOT EXISTS (
+                       SELECT 1 FROM rankings WHERE rankings.tournament_id = tournaments.id
+                    )
                 )
+                """
             )
-            """
         )
         .fetchall()
     )

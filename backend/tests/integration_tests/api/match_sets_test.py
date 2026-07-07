@@ -99,6 +99,7 @@ async def test_multi_set_play_flow(
             sets = match_detail["data"]["match_sets"]
             assert len(sets) == 3
 
+            completed = None
             for i, set_id in enumerate(s["id"] for s in sets):
                 started = await send_tournament_request(
                     HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
@@ -120,9 +121,9 @@ async def test_multi_set_play_flow(
                 for j in range(i + 1, 3):
                     assert completed["data"]["match_sets"][j]["state"] == "NOT_STARTED"
 
-            final = completed
-            assert final["data"]["state"] == "COMPLETED"
-            assert final["data"]["completed_at"] is not None
+            assert completed is not None
+            assert completed["data"]["state"] == "COMPLETED"
+            assert completed["data"]["completed_at"] is not None
         finally:
             await send_tournament_request(
                 HTTPMethod.PUT,

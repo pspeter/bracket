@@ -36,11 +36,13 @@ def upgrade() -> None:
     op.add_column("matches", sa.Column("stage_item_input2_id", sa.BigInteger(), nullable=True))
 
     # Fill stage item input ids
-    matches = op.get_bind().execute("SELECT id, team1_id, team2_id FROM matches").fetchall()
-    stage_item_inputs = (
-        op.get_bind().execute("SELECT id, team_id FROM stage_item_inputs").fetchall()
+    matches = (
+        op.get_bind().execute(sa.text("SELECT id, team1_id, team2_id FROM matches")).fetchall()
     )
-    stage_item_inputs = {input["team_id"]: input["id"] for input in stage_item_inputs}
+    stage_item_inputs_rows = (
+        op.get_bind().execute(sa.text("SELECT id, team_id FROM stage_item_inputs")).fetchall()
+    )
+    stage_item_inputs = {row.team_id: row.id for row in stage_item_inputs_rows}
     for match in matches:
         op.get_bind().execute(
             sa.text(
@@ -51,9 +53,11 @@ def upgrade() -> None:
             WHERE id = :match_id
             """
             ),
-            input1_id=stage_item_inputs[match["team1_id"]],
-            input2_id=stage_item_inputs[match["team2_id"]],
-            match_id=match["id"],
+            {
+                "input1_id": stage_item_inputs[match.team1_id],
+                "input2_id": stage_item_inputs[match.team2_id],
+                "match_id": match.id,
+            },
         )
 
     op.drop_constraint("matches_team1_id_fkey", "matches", type_="foreignkey")
