@@ -19,27 +19,16 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    # `stage_type` already exists at this point: it's the enum backing `stage_items.type`,
-    # created by the initial baseline migration. `create_type=False` avoids trying (and
-    # failing, since checkfirst silently skips label changes) to add the unused
-    # `SWISS_DYNAMIC_TEAMS` value that this migration never actually needed.
+    # No `type` column here: stages never gained standings-resolution logic of their
+    # own (that lives on stage_items), so there's nothing to back with the shared
+    # `stage_type` enum.
     op.create_table(
         "stages",
         sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
         sa.Column("created", sa.DateTime(timezone=True), nullable=False),
         sa.Column("tournament_id", sa.BigInteger(), nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default="false", nullable=False),
-        sa.Column(
-            "type",
-            ENUM(
-                "SINGLE_ELIMINATION",
-                "SWISS",
-                "ROUND_ROBIN",
-                name="stage_type",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
         sa.Column(
             "status",
             ENUM(
@@ -58,6 +47,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_stages_id"), "stages", ["id"], unique=False)
+    op.create_index(op.f("ix_stages_name"), "stages", ["name"], unique=False)
+    op.create_index(op.f("ix_stages_tournament_id"), "stages", ["tournament_id"], unique=False)
 
     # Rounds already reach their stage through stage_item_id -> stage_items -> stage_id;
     # tournament_id is a redundant, unused legacy link and can just be dropped.
@@ -77,6 +68,8 @@ def downgrade() -> None:
         "rounds_tournament_id_fkey", "rounds", "tournaments", ["tournament_id"], ["id"]
     )
 
+    op.drop_index(op.f("ix_stages_tournament_id"), table_name="stages")
+    op.drop_index(op.f("ix_stages_name"), table_name="stages")
     op.drop_index(op.f("ix_stages_id"), table_name="stages")
     op.drop_table("stages")
     op.execute("DROP TYPE stage_status")

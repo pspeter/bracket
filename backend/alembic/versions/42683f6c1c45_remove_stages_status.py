@@ -20,6 +20,7 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     op.drop_column("stages", "status")
+    op.execute("DROP TYPE stage_status")
 
 
 def downgrade() -> None:

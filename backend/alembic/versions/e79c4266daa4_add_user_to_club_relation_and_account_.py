@@ -33,6 +33,10 @@ def upgrade() -> None:
         "users_x_clubs",
         sa.Column("relation", user_x_club_relation, server_default="OWNER", nullable=False),
     )
+    # The defaults above only exist to backfill pre-existing rows; the application always
+    # sets both columns explicitly on insert, so drop the server-side defaults again.
+    op.alter_column("users", "account_type", server_default=None)
+    op.alter_column("users_x_clubs", "relation", server_default=None)
 
 
 def downgrade() -> None:

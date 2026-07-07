@@ -46,6 +46,9 @@ def upgrade() -> None:
         sa.Column("draw_points", sa.Numeric(), nullable=False),
         sa.Column("loss_points", sa.Numeric(), nullable=False),
     )
+    op.create_index(
+        op.f("ix_ranking_match_points_id"), "ranking_match_points", ["id"], unique=False
+    )
     op.create_table(
         "ranking_set_points",
         sa.Column("id", sa.BigInteger(), primary_key=True),
@@ -57,6 +60,7 @@ def upgrade() -> None:
             unique=True,
         ),
     )
+    op.create_index(op.f("ix_ranking_set_points_id"), "ranking_set_points", ["id"], unique=False)
     op.create_table(
         "ranking_set_points_with_match_bonus",
         sa.Column("id", sa.BigInteger(), primary_key=True),
@@ -73,6 +77,12 @@ def upgrade() -> None:
             nullable=False,
             server_default="1.0",
         ),
+    )
+    op.create_index(
+        op.f("ix_ranking_set_points_with_match_bonus_id"),
+        "ranking_set_points_with_match_bonus",
+        ["id"],
+        unique=False,
     )
 
     # 3. Migrate existing rankings to MATCH_POINTS subtype
@@ -140,8 +150,14 @@ def downgrade() -> None:
     op.drop_column("rankings", "num_sets")
     op.drop_column("rankings", "scoring_type")
 
+    op.drop_index(
+        op.f("ix_ranking_set_points_with_match_bonus_id"),
+        table_name="ranking_set_points_with_match_bonus",
+    )
     op.drop_table("ranking_set_points_with_match_bonus")
+    op.drop_index(op.f("ix_ranking_set_points_id"), table_name="ranking_set_points")
     op.drop_table("ranking_set_points")
+    op.drop_index(op.f("ix_ranking_match_points_id"), table_name="ranking_match_points")
     op.drop_table("ranking_match_points")
 
     op.execute("DROP TYPE scoring_type")
