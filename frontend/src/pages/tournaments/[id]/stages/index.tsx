@@ -93,16 +93,14 @@ export default function StagesPage() {
             placeholder={t('filter_level_placeholder')}
             allLevelsLabel={t('all_levels_label')}
           />
-          <Group align="top">
-            <Builder
-              tournament={tournamentDataFull}
-              registeredTeamCount={totalTeamCount}
-              swrStagesResponse={swrStagesResponse}
-              swrAvailableInputsResponse={swrAvailableInputsResponse}
-              rankings={rankings}
-              stages={filteredStages}
-            />
-          </Group>
+          <Builder
+            tournament={tournamentDataFull}
+            registeredTeamCount={totalTeamCount}
+            swrStagesResponse={swrStagesResponse}
+            swrAvailableInputsResponse={swrAvailableInputsResponse}
+            rankings={rankings}
+            stages={filteredStages}
+          />
         </Stack>
       </>
     );
