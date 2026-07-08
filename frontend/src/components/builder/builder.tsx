@@ -1,8 +1,10 @@
 import {
   ActionIcon,
+  Badge,
   Card,
   CheckIcon,
   Combobox,
+  Divider,
   Group,
   InputBase,
   Menu,
@@ -45,6 +47,8 @@ import {
   formatStageItemInputTentative,
 } from '@components/utils/stage_item_input';
 import {
+  FullTeamWithPlayers,
+  LevelResponse,
   Ranking,
   StageItemInputOptionsResponse,
   StageItemWithRounds,
@@ -52,7 +56,7 @@ import {
   StagesWithStageItemsResponse,
   TournamentWithLevels,
 } from '@openapi';
-import { getStageItemLookup, getTeamsLookup } from '@services/lookups';
+import { getAssignedTeamIds, getStageItemLookup, getTeamsLookup } from '@services/lookups';
 import { deleteStage } from '@services/stage';
 import { deleteStageItem } from '@services/stage_item';
 import { updateStageItemInput } from '@services/stage_item_input';
@@ -568,6 +572,8 @@ export default function Builder({
   rankings: Ranking[];
   stages?: StageWithStageItems[];
 }) {
+  const { t } = useTranslation();
+  const teamsMap = getTeamsLookup(tournament != null ? tournament.id : -1);
   const stages: StageWithStageItems[] =
     filteredStages ?? (swrStagesResponse.data != null ? swrStagesResponse.data.data : []);
 
@@ -576,9 +582,12 @@ export default function Builder({
     return <RequestErrorAlert error={swrAvailableInputsResponse.error} />;
   }
 
-  const cols = stages
-    .sort((s1: StageWithStageItems, s2: StageWithStageItems) => (s1.id > s2.id ? 1 : -1))
-    .map((stage) => (
+  const sortedStages = stages.sort((s1: StageWithStageItems, s2: StageWithStageItems) =>
+    s1.id > s2.id ? 1 : -1
+  );
+
+  const stageColumns = (sectionStages: StageWithStageItems[]) =>
+    sectionStages.map((stage) => (
       <StageColumn
         key={stage.id}
         tournament={tournament}
@@ -608,5 +617,65 @@ export default function Builder({
       </h4>
     </Stack>
   );
-  return cols.concat([button]);
+
+  if (tournament.levels.length === 0) {
+    return (
+      <Group align="top">
+        {stageColumns(sortedStages)}
+        {button}
+      </Group>
+    );
+  }
+
+  const assignedTeamIds = new Set(
+    swrStagesResponse.data != null ? getAssignedTeamIds(swrStagesResponse) : []
+  );
+  const teams: FullTeamWithPlayers[] = teamsMap != null ? Object.values(teamsMap) : [];
+  const unassignedTeamCountForLevel = (levelId: number | null) =>
+    teams.filter((team) => (team.level_id ?? null) === levelId && !assignedTeamIds.has(team.id))
+      .length;
+
+  const sections: { level: LevelResponse | null; stages: StageWithStageItems[] }[] = [];
+  const levelsByPosition = [...tournament.levels].sort((l1, l2) => l1.position - l2.position);
+  for (const level of levelsByPosition) {
+    const levelStages = sortedStages.filter((stage) => stage.level_id === level.id);
+    if (levelStages.length > 0) {
+      sections.push({ level, stages: levelStages });
+    }
+  }
+  const noLevelStages = sortedStages.filter((stage) => stage.level_id == null);
+  if (noLevelStages.length > 0) {
+    sections.push({ level: null, stages: noLevelStages });
+  }
+
+  return (
+    <Stack gap="md">
+      {sections.map((section, index) => (
+        <Stack key={section.level != null ? section.level.id : 'no-level'} gap="xs">
+          {index > 0 ? <Divider /> : null}
+          <Group gap="xs">
+            {section.level != null ? (
+              <LevelBadge levels={tournament.levels} levelId={section.level.id} />
+            ) : (
+              <Badge color="gray" variant="light">
+                {t('no_level_section_label')}
+              </Badge>
+            )}
+            <Text c="dimmed" size="sm">
+              {section.level != null
+                ? t('level_unassigned_teams_notice', {
+                    count: unassignedTeamCountForLevel(section.level.id),
+                  })
+                : t('no_level_unassigned_teams_notice', {
+                    count: unassignedTeamCountForLevel(null),
+                  })}
+            </Text>
+          </Group>
+          <Group align="top">{stageColumns(section.stages)}</Group>
+        </Stack>
+      ))}
+      {sections.length > 0 ? <Divider /> : null}
+      <Group align="top">{button}</Group>
+    </Stack>
+  );
 }
