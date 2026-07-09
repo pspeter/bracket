@@ -382,7 +382,10 @@ function MatchModalForm({
   const isMultiSet = match.match_sets.length > 1;
   const hasInProgressSet = match.match_sets.some((set) => set.state === 'IN_PROGRESS');
   const completedSetCount = match.match_sets.filter((set) => set.state === 'COMPLETED').length;
-  const canStart = !hasInProgressSet && completedSetCount < match.match_sets.length;
+  // A COMPLETED match may still have unplayed sets (best-of-n decided early); the backend
+  // refuses to start those, so don't offer it.
+  const canStart =
+    !hasInProgressSet && completedSetCount < match.match_sets.length && match.state !== 'COMPLETED';
   const canEnd = hasInProgressSet;
   const canReopen = completedSetCount > 0;
 

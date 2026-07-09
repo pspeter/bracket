@@ -4,7 +4,7 @@ import { Ranking } from '@openapi';
 
 import { Translator } from './types';
 
-import { getRankingTitle } from './rankings';
+import { getPlayAllSetsDefault, getRankingTitle } from './rankings';
 
 const t = ((key: string) => (key === 'ranking_title' ? 'Ranking' : key)) as unknown as Translator;
 
@@ -27,6 +27,22 @@ function makeRanking(overrides: Partial<Ranking>): Ranking {
     ...overrides,
   } as Ranking;
 }
+
+describe('getPlayAllSetsDefault', () => {
+  // Mirrors the backend's per-scoring-type creation defaults: only "set points" scoring
+  // gives every set intrinsic value, so only there do all sets play out by default.
+  it('defaults to best-of behaviour for MATCH_POINTS', () => {
+    expect(getPlayAllSetsDefault('MATCH_POINTS')).toBe(false);
+  });
+
+  it('defaults to playing out all sets for SET_POINTS', () => {
+    expect(getPlayAllSetsDefault('SET_POINTS')).toBe(true);
+  });
+
+  it('defaults to best-of behaviour for SET_POINTS_WITH_MATCH_BONUS', () => {
+    expect(getPlayAllSetsDefault('SET_POINTS_WITH_MATCH_BONUS')).toBe(false);
+  });
+});
 
 describe('getRankingTitle', () => {
   it('uses the custom name when one is set', () => {

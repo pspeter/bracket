@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from bracket.logic.apply_plan import apply_plan
 from bracket.logic.plan import PlanItem, SetMatchInputs
-from bracket.models.db.match import Match, MatchState, derive_match_state
+from bracket.models.db.match import Match, MatchState
 from bracket.models.db.stage_item_inputs import StageItemInput
 from bracket.models.db.util import StageItemWithRounds
 from bracket.utils.id_types import (
@@ -78,7 +78,7 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
 
     for subsequent_round in subsequent_rounds:
         for subsequent_match in subsequent_round.matches:
-            if derive_match_state(subsequent_match.match_sets) is not MatchState.NOT_STARTED:
+            if subsequent_match.state is not MatchState.NOT_STARTED:
                 # This follower has already started: it must never be touched by a cascade, and
                 # since it never changes, nothing it feeds further downstream changes either.
                 continue
@@ -118,10 +118,7 @@ def get_inputs_to_update_in_subsequent_elimination_rounds(
                     updated.stage_item_input2_winner_from_match_id is not None
                     and updated.stage_item_input2_id is None
                 )
-                if (
-                    derive_match_state(updated.match_sets) is not MatchState.COMPLETED
-                    or has_unresolved_inputs
-                ):
+                if updated.state is not MatchState.COMPLETED or has_unresolved_inputs:
                     cleared_match_ids.add(subsequent_match.id)
 
     return {
@@ -160,7 +157,7 @@ def get_started_elimination_followers(
             if follower.id in seen:
                 continue
             seen.add(follower.id)
-            if derive_match_state(follower.match_sets) is not MatchState.NOT_STARTED:
+            if follower.state is not MatchState.NOT_STARTED:
                 started.append(follower)
             else:
                 frontier.append(follower.id)

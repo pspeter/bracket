@@ -298,6 +298,10 @@ export type Match = {
    */
   match_sets: Array<MatchSet>;
   /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
+  /**
    * Referee Name
    */
   referee_name: string | null;
@@ -561,6 +565,10 @@ export type MatchWithDetails = {
    */
   num_sets: number;
   /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
+  /**
    * Referee
    */
   referee: StageItemInputTentative | StageItemInputFinal | StageItemInputEmpty | null;
@@ -680,6 +688,10 @@ export type MatchWithDetailsDefinitive = {
    * Num Sets
    */
   num_sets: number;
+  /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
   /**
    * Referee
    */
@@ -962,6 +974,10 @@ export type Ranking = {
    */
   num_sets: number;
   /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
+  /**
    * Position
    */
   position: number;
@@ -1013,6 +1029,10 @@ export type RankingMatchPointsBody = {
    * Num Sets
    */
   num_sets: number;
+  /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
   /**
    * Position
    */
@@ -1078,6 +1098,10 @@ export type RankingSetPointsBody = {
    */
   num_sets: number;
   /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
+  /**
    * Position
    */
   position: number | null;
@@ -1123,6 +1147,10 @@ export type RankingSetPointsWithMatchBonusBody = {
    * Num Sets
    */
   num_sets: number;
+  /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
   /**
    * Position
    */
@@ -2471,6 +2499,10 @@ export type MatchWritable = {
    */
   match_sets: Array<MatchSet>;
   /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
+  /**
    * Referee Name
    */
   referee_name: string | null;
@@ -2579,6 +2611,10 @@ export type MatchWithDetailsWritable = {
    * Num Sets
    */
   num_sets: number;
+  /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
   /**
    * Referee
    */
@@ -2698,6 +2734,10 @@ export type MatchWithDetailsDefinitiveWritable = {
    * Num Sets
    */
   num_sets: number;
+  /**
+   * Play All Sets
+   */
+  play_all_sets: boolean;
   /**
    * Referee
    */

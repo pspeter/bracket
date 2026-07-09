@@ -45,6 +45,7 @@ import {
 } from '@logic/planning/layout';
 import { FocusTarget, GridMatchRef, PlannerEvent, SelectionState } from '@logic/planning/selection';
 import { ZOOM_PX_PER_MINUTE, ZoomLevel } from '@logic/planning/zoom';
+import { getVisibleSets } from '@logic/score_tracking';
 import { Court, MatchSet, MatchWithDetails } from '@openapi';
 import { MatchLookupEntry, getStageItemLookup } from '@services/lookups';
 import { getSetScoreColors, getSetsWon } from '../../utils/match_sets';
@@ -291,7 +292,7 @@ function MatchCard({
     <Box
       style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', gap: 3, alignItems: 'center' }}
     >
-      {match.match_sets.map((set: MatchSet) => {
+      {getVisibleSets(match).map((set: MatchSet) => {
         const colours = getSetScoreColors(set);
         const bg = side === 's1' ? colours.s1 : colours.s2;
         const value = side === 's1' ? set.stage_item_input1_score : set.stage_item_input2_score;

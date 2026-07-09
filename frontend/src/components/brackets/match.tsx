@@ -16,6 +16,7 @@ import {
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { TournamentMinimal } from '@components/utils/tournament';
+import { getVisibleSets } from '@logic/score_tracking';
 import {
   MatchSet,
   MatchWithDetails,
@@ -118,7 +119,7 @@ export default function Match({
 
   const multiSetScores = (side: 's1' | 's2') => (
     <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-      {match.match_sets.map((set) => scoreCell(set, side))}
+      {getVisibleSets(match).map((set) => scoreCell(set, side))}
     </div>
   );
 

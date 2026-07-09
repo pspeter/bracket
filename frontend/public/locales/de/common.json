@@ -244,6 +244,8 @@
     "planning_of_matches_legend": "Planung der Spiele",
     "planning_spotlight_description": "Spielplanung ändern",
     "planning_title": "Planung",
+    "play_all_sets_description": "Wenn deaktiviert, endet ein Spiel, sobald eine Seite die Mehrheit der Sätze gewonnen hat.",
+    "play_all_sets_label": "Alle Sätze ausspielen",
     "player_name_input_placeholder": "Bester Spieler aller Zeiten",
     "players_spotlight_description": "Spieler ansehen, hinzufügen oder löschen",
     "players_title": "Spieler",

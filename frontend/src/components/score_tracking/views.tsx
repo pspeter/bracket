@@ -34,6 +34,7 @@ import { getScoreColors } from '@logic/colors';
 import {
   getDisplayScores,
   getScoreTrackingViewState,
+  getVisibleSets,
   isEndSetDisabled,
   nextScoresAfterAdjust,
 } from '@logic/score_tracking';
@@ -95,7 +96,7 @@ function MatchSetScores({
   if (isMultiSet) {
     return (
       <div style={{ display: 'flex', gap: '3px', justifyContent: 'flex-end' }}>
-        {match.match_sets.map((set) => (
+        {getVisibleSets(match).map((set) => (
           <SetScoreChip key={set.id} set={set} side={side} />
         ))}
       </div>
@@ -326,7 +327,9 @@ export function ScoreTrackingMatchView({
   const matchData = responseIsValid(swrResponse) ? swrResponse.data!.data : null;
   const n = matchData?.side_switch_every_n_points ?? null;
 
-  const viewState = matchData ? getScoreTrackingViewState(matchData.match_sets) : null;
+  const viewState = matchData
+    ? getScoreTrackingViewState(matchData.match_sets, matchData.state)
+    : null;
   const activeSet = viewState?.kind === 'playing' ? viewState.set : null;
   const combinedScore = activeSet
     ? activeSet.stage_item_input1_score + activeSet.stage_item_input2_score

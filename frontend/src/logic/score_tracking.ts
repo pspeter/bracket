@@ -1,4 +1,4 @@
-import { MatchSet, MatchWithDetails } from '@openapi';
+import { MatchSet, MatchState, MatchWithDetails } from '@openapi';
 
 export type ScoreTrackingViewState =
   | { kind: 'not_started' }
@@ -6,7 +6,14 @@ export type ScoreTrackingViewState =
   | { kind: 'between_sets'; completed: MatchSet; next: MatchSet; allSets: MatchSet[] }
   | { kind: 'completed' };
 
-export function getScoreTrackingViewState(sets: MatchSet[]): ScoreTrackingViewState {
+export function getScoreTrackingViewState(
+  sets: MatchSet[],
+  matchState?: MatchState
+): ScoreTrackingViewState {
+  // A COMPLETED match is final even when not every set was played (best-of-n mode ends the
+  // match at a set-win majority), so never offer a next set on it.
+  if (matchState === 'COMPLETED') return { kind: 'completed' };
+
   const inProgress = sets.find((s) => s.state === 'IN_PROGRESS');
   if (inProgress) return { kind: 'playing', set: inProgress };
 
@@ -20,6 +27,16 @@ export function getScoreTrackingViewState(sets: MatchSet[]): ScoreTrackingViewSt
     return { kind: 'not_started' };
   }
   return { kind: 'completed' };
+}
+
+// Unplayed sets on a completed match were never played (best-of-n ended the match early), so
+// score displays hide them: a Bo3 won 2-0 shows two sets.
+export function getVisibleSets<S extends Pick<MatchSet, 'state'>>(match: {
+  state: MatchState;
+  match_sets: S[];
+}): S[] {
+  if (match.state !== 'COMPLETED') return match.match_sets;
+  return match.match_sets.filter((s) => s.state !== 'NOT_STARTED');
 }
 
 export function getDisplayScores(

@@ -25,6 +25,9 @@ export async function editRanking(
   max_points: number,
   last_set_max_points: number | null,
   two_point_advantage: boolean,
+  // Both flags must always be sent: the backend's per-scoring-type body defaults would
+  // otherwise silently overwrite the stored values on save.
+  play_all_sets: boolean,
   draws_allowed: boolean,
   name: string,
   win_points?: string,
@@ -41,6 +44,7 @@ export async function editRanking(
     max_points,
     last_set_max_points,
     two_point_advantage,
+    play_all_sets,
     draws_allowed,
   };
   if (scoring_type === 'MATCH_POINTS') {

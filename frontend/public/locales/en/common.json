@@ -244,6 +244,8 @@
     "planning_of_matches_legend": "Planning of matches",
     "planning_spotlight_description": "Change planning of matches",
     "planning_title": "Planning",
+    "play_all_sets_description": "When off, a match ends as soon as one side has won a majority of sets.",
+    "play_all_sets_label": "Play out all sets",
     "player_name_input_placeholder": "Best Player Ever",
     "players_spotlight_description": "View, add or delete players",
     "players_title": "players",

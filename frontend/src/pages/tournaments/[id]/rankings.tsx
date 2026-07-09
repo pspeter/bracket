@@ -31,7 +31,7 @@ import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getRankings, getStages, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
 
-import { getRankingTitle } from '@components/utils/rankings';
+import { getPlayAllSetsDefault, getRankingTitle } from '@components/utils/rankings';
 
 function RankingDeleteButton({
   t,
@@ -91,6 +91,7 @@ function EditRankingForm({
       max_points: ranking.max_points,
       last_set_max_points: ranking.last_set_max_points ?? 15,
       two_point_advantage: ranking.two_point_advantage,
+      play_all_sets: ranking.play_all_sets,
       draws_allowed: ranking.draws_allowed,
       position: ranking.position,
       side_switch_enabled: ranking.side_switch_every_n_points != null,
@@ -116,6 +117,7 @@ function EditRankingForm({
           values.max_points,
           values.num_sets > 2 ? values.last_set_max_points : null,
           values.two_point_advantage,
+          values.play_all_sets,
           values.draws_allowed,
           values.name,
           values.win_points,
@@ -156,6 +158,14 @@ function EditRankingForm({
               },
             ]}
             {...form.getInputProps('scoring_type')}
+            onChange={(value) => {
+              if (value == null) return;
+              const scoringType = value as ScoringType;
+              form.setFieldValue('scoring_type', scoringType);
+              // The scoring type implies whether dead rubbers are worth playing, so switching
+              // it re-applies that type's default (still overridable before saving).
+              form.setFieldValue('play_all_sets', getPlayAllSetsDefault(scoringType));
+            }}
           />
           {form.values.scoring_type === 'MATCH_POINTS' && (
             <>
@@ -198,6 +208,14 @@ function EditRankingForm({
             <Text c="red" size="sm" mt="xs">
               {t('even_sets_single_elim_error')}
             </Text>
+          )}
+          {form.values.num_sets > 1 && (
+            <Checkbox
+              mt="lg"
+              label={t('play_all_sets_label')}
+              description={t('play_all_sets_description')}
+              {...form.getInputProps('play_all_sets', { type: 'checkbox' })}
+            />
           )}
           <NumberInput
             mt="1rem"

@@ -27,6 +27,7 @@ from bracket.sql.match_sets import get_sets_for_match, sql_score_edit_match_set
 from bracket.sql.matches import (
     sql_end_match,
     sql_get_match_with_details,
+    sql_get_play_all_sets_for_match,
     sql_reopen_match,
     sql_reset_match,
     sql_set_match_completed_at,
@@ -69,7 +70,8 @@ async def recalculate_after_match_change(
 
 async def derive_match_state_after_change(tournament_id: TournamentId, match: Match) -> MatchState:
     sets = await get_sets_for_match(match.id)
-    return derive_match_state(sets)
+    play_all_sets = await sql_get_play_all_sets_for_match(match.id)
+    return derive_match_state(sets, play_all_sets=play_all_sets)
 
 
 async def apply_match_change_and_recalculate(

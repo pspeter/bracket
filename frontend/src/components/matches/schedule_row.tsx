@@ -11,6 +11,7 @@ import {
 } from '@components/utils/match';
 import { RefereeDisplay } from '@components/utils/referee';
 import { getScoreColors } from '@logic/colors';
+import { getVisibleSets } from '@logic/score_tracking';
 import { LevelResponse, MatchSet, MatchWithDetails } from '@openapi';
 import { stringToColour } from '@services/lookups';
 import { getSetScoreColors } from '../../utils/match_sets';
@@ -65,7 +66,7 @@ export function ScheduleRow({
 
   const multiSetScoreCell = (side: 's1' | 's2') => (
     <div style={{ display: 'flex', gap: '3px', justifyContent: 'flex-end' }}>
-      {match.match_sets.map((set) => setScoreChip(set, side))}
+      {getVisibleSets(match).map((set) => setScoreChip(set, side))}
     </div>
   );
 

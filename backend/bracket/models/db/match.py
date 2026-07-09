@@ -41,21 +41,44 @@ class MatchSet(BaseModelORM):
     state: MatchSetState
 
 
-def derive_match_state(sets: list["MatchSet"]) -> MatchState:
-    """Derive a match's overall state from the states of its sets.
+def count_set_wins(sets: list["MatchSet"]) -> tuple[int, int]:
+    """Count completed-set wins per side; drawn sets count toward neither."""
+    completed = [s for s in sets if s.state is MatchSetState.COMPLETED]
+    wins1 = sum(1 for s in completed if s.stage_item_input1_score > s.stage_item_input2_score)
+    wins2 = sum(1 for s in completed if s.stage_item_input2_score > s.stage_item_input1_score)
+    return wins1, wins2
+
+
+def is_match_decided(sets: list["MatchSet"], play_all_sets: bool) -> bool:
+    """Whether one side holds a best-of-n majority of set wins.
+
+    Best-of-n mode is active only when ``play_all_sets`` is off and the match has more than
+    one set; the majority target counts the total pre-created set rows as ``num_sets``.
+    """
+    if play_all_sets or len(sets) <= 1:
+        return False
+    majority = len(sets) // 2 + 1
+    return max(count_set_wins(sets)) >= majority
+
+
+def derive_match_state(sets: list["MatchSet"], *, play_all_sets: bool = True) -> MatchState:
+    """Derive a match's overall state from the states (and scores) of its sets.
 
     Set states are derived positionally from the match progress pointer at read time,
     so this reflects the pointer invariant: a contiguous COMPLETED prefix, at most one
     IN_PROGRESS set, then NOT_STARTED.
 
     - all sets NOT_STARTED (or no sets) -> NOT_STARTED
-    - all sets COMPLETED -> COMPLETED
-    - anything else (any IN_PROGRESS, or a mix of COMPLETED and NOT_STARTED) -> IN_PROGRESS
+    - no set IN_PROGRESS and (all sets COMPLETED, or one side holds a best-of-n
+      majority of set wins) -> COMPLETED
+    - anything else -> IN_PROGRESS
     """
     states = {match_set.state for match_set in sets}
     if not states or states == {MatchSetState.NOT_STARTED}:
         return MatchState.NOT_STARTED
     if states == {MatchSetState.COMPLETED}:
+        return MatchState.COMPLETED
+    if MatchSetState.IN_PROGRESS not in states and is_match_decided(sets, play_all_sets):
         return MatchState.COMPLETED
     return MatchState.IN_PROGRESS
 
@@ -94,6 +117,9 @@ class Match(MatchInsertable):
     stage_item_input1: StageItemInput | None = None
     stage_item_input2: StageItemInput | None = None
     match_sets: list[MatchSet] = []
+    # Copied from the ranking applicable to this match's stage item wherever the match is
+    # hydrated with details; the default preserves play-out-all-sets behaviour elsewhere.
+    play_all_sets: bool = True
 
     @field_validator("match_sets", mode="before")
     @staticmethod
@@ -107,7 +133,7 @@ class Match(MatchInsertable):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def state(self) -> MatchState:
-        return derive_match_state(self.match_sets)
+        return derive_match_state(self.match_sets, play_all_sets=self.play_all_sets)
 
     @property
     def completed_sets(self) -> list["MatchSet"]:
@@ -126,7 +152,7 @@ class Match(MatchInsertable):
         )
 
     def get_winner(self) -> StageItemInput | None:
-        if derive_match_state(self.match_sets) is not MatchState.COMPLETED:
+        if self.state is not MatchState.COMPLETED:
             return None
 
         sets1 = self.sets_won_by_input1
