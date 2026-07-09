@@ -2,12 +2,23 @@ import pytest
 
 from bracket.database import database
 from bracket.schema import players, teams
-from bracket.utils.dummy_records import DUMMY_LEVEL1, DUMMY_LEVEL2, DUMMY_TEAM1, DUMMY_TEAM2
+from bracket.utils.dummy_records import (
+    DUMMY_LEVEL1,
+    DUMMY_LEVEL2,
+    DUMMY_PLAYER1,
+    DUMMY_TEAM1,
+    DUMMY_TEAM2,
+)
 from bracket.utils.http import HTTPMethod
 from bracket.utils.types import JsonDict
 from tests.integration_tests.api.shared import send_request, send_tournament_request
 from tests.integration_tests.models import AuthContext
-from tests.integration_tests.sql import enabled_signup, inserted_level, inserted_team
+from tests.integration_tests.sql import (
+    enabled_signup,
+    inserted_level,
+    inserted_player,
+    inserted_team,
+)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -143,6 +154,31 @@ async def test_signup_join_team_copies_level_to_player(
 
     player = next(p for p in players_response["data"]["players"] if p["name"] == "Team Joiner")
     assert player["level_id"] == level.id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_signup_rejects_duplicate_player_name(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    signup_token = "duplicate-name-token"
+    tournament_id = auth_context.tournament.id
+
+    async with (
+        enabled_signup(tournament_id, signup_token),
+        inserted_player(DUMMY_PLAYER1.model_copy(update={"tournament_id": tournament_id})),
+    ):
+        response: JsonDict = await send_request(
+            HTTPMethod.POST,
+            f"signup/{signup_token}",
+            json={"player_name": "player 01", "team_action": "none"},
+        )
+
+        remaining_players = await database.fetch_all(
+            query=players.select().where(players.c.tournament_id == tournament_id)
+        )
+
+    assert response["detail"] == "A player with this name already exists"
+    assert [p["name"] for p in remaining_players] == ["Player 01"]
 
 
 @pytest.mark.asyncio(loop_scope="session")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from bracket.config import config
 from bracket.database import database
@@ -19,6 +19,7 @@ from bracket.sql.players import (
     get_all_players_in_tournament,
     get_player_count,
     insert_player,
+    player_name_exists,
     sql_delete_player,
 )
 from bracket.utils.db import fetch_one_parsed
@@ -27,6 +28,8 @@ from bracket.utils.pagination import PaginationPlayers
 from bracket.utils.types import assert_some
 
 router = APIRouter(prefix=config.api_prefix)
+
+_PLAYER_NAME_ALREADY_EXISTS = "A player with this name already exists"
 
 
 @router.get("/tournaments/{tournament_id}/players", response_model=PlayersResponse)
@@ -54,6 +57,12 @@ async def update_player_by_id(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SinglePlayerResponse:
+    if await player_name_exists(tournament_id, player_body.name, except_player_id=player_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_PLAYER_NAME_ALREADY_EXISTS,
+        )
+
     await database.execute(
         query=players.update().where(
             (players.c.id == player_id) & (players.c.tournament_id == tournament_id)
@@ -93,6 +102,13 @@ async def create_single_player(
 ) -> SuccessResponse:
     existing_players = await get_all_players_in_tournament(tournament_id)
     check_requirement(existing_players, user, "max_players")
+
+    if await player_name_exists(tournament_id, player_body.name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_PLAYER_NAME_ALREADY_EXISTS,
+        )
+
     await insert_player(player_body, tournament_id)
     return SuccessResponse()
 
@@ -107,6 +123,21 @@ async def create_multiple_players(
     player_names = [player.strip() for player in player_body.names.split("\n") if len(player) > 0]
     existing_players = await get_all_players_in_tournament(tournament_id)
     check_requirement(existing_players, user, "max_players", additions=len(player_names))
+
+    seen_names_lower: set[str] = set()
+    for player_name in player_names:
+        if player_name.lower() in seen_names_lower:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A player with the name '{player_name}' already exists",
+            )
+        seen_names_lower.add(player_name.lower())
+
+        if await player_name_exists(tournament_id, player_name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A player with the name '{player_name}' already exists",
+            )
 
     for player_name in player_names:
         await insert_player(PlayerBody(name=player_name, active=player_body.active), tournament_id)

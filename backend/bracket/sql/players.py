@@ -69,6 +69,35 @@ async def get_all_players_in_tournament(
     return [PlayerWithTeams.model_validate(x) for x in result]
 
 
+async def player_name_exists(
+    tournament_id: TournamentId, name: str, *, except_player_id: PlayerId | None = None
+) -> bool:
+    """Case-insensitive check for duplicate player name in tournament.
+
+    When `except_player_id` is given, that player is excluded from the check, which allows
+    e.g. updating a player without the name colliding with itself.
+    """
+    except_player_filter = "AND id != :except_player_id" if except_player_id is not None else ""
+    query = f"""
+        SELECT COUNT(*) AS cnt
+        FROM players
+        WHERE tournament_id = :tournament_id AND LOWER(name) = LOWER(:name)
+        {except_player_filter}
+        """
+    row = await database.fetch_one(
+        query=query,
+        values=dict_without_none(
+            {
+                "tournament_id": tournament_id,
+                "name": name,
+                "except_player_id": except_player_id,
+            }
+        ),
+    )
+    assert row is not None
+    return int(row["cnt"]) > 0
+
+
 async def get_player_by_id(player_id: PlayerId, tournament_id: TournamentId) -> Player | None:
     query = """
         SELECT *
