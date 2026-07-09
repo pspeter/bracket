@@ -102,7 +102,7 @@ def upgrade() -> None:
 
     op.alter_column("stage_items", "ranking_id", nullable=False)
     op.create_foreign_key(
-        "stage_items_x_rankings_id_fkey", "stage_items", "rankings", ["ranking_id"], ["id"]
+        "stage_items_ranking_id_fkey", "stage_items", "rankings", ["ranking_id"], ["id"]
     )
 
     op.add_column(
@@ -125,7 +125,7 @@ def downgrade() -> None:
     op.drop_column("stage_item_inputs", "wins")
     op.drop_column("stage_item_inputs", "points")
 
-    op.drop_constraint("stage_items_x_rankings_id_fkey", "stage_items", type_="foreignkey")
+    op.drop_constraint("stage_items_ranking_id_fkey", "stage_items", type_="foreignkey")
     op.drop_column("stage_items", "ranking_id")
     op.drop_index(op.f("ix_rankings_tournament_id"), table_name="rankings")
     op.drop_index(op.f("ix_rankings_id"), table_name="rankings")

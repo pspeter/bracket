@@ -30,6 +30,18 @@ def upgrade() -> None:
         "ALTER TABLE matches "
         "RENAME COLUMN team2_winner_from_match_id TO stage_item_input2_winner_from_match_id"
     )
+    # Renaming a column does not rename the constraints derived from it; keep the FK
+    # names in sync with what metadata.create_all() would generate for the new names.
+    op.execute(
+        "ALTER TABLE matches "
+        "RENAME CONSTRAINT matches_team1_winner_from_match_id_fkey "
+        "TO matches_stage_item_input1_winner_from_match_id_fkey"
+    )
+    op.execute(
+        "ALTER TABLE matches "
+        "RENAME CONSTRAINT matches_team2_winner_from_match_id_fkey "
+        "TO matches_stage_item_input2_winner_from_match_id_fkey"
+    )
 
     # Change foreign keys
     op.add_column("matches", sa.Column("stage_item_input1_id", sa.BigInteger(), nullable=True))

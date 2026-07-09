@@ -26,6 +26,20 @@ def upgrade() -> None:
     op.add_column(
         "matches", sa.Column("team2_winner_from_match_id", sa.BigInteger(), nullable=True)
     )
+    op.create_foreign_key(
+        "matches_team1_winner_from_match_id_fkey",
+        "matches",
+        "matches",
+        ["team1_winner_from_match_id"],
+        ["id"],
+    )
+    op.create_foreign_key(
+        "matches_team2_winner_from_match_id_fkey",
+        "matches",
+        "matches",
+        ["team2_winner_from_match_id"],
+        ["id"],
+    )
 
     op.alter_column(
         "matches",
@@ -57,6 +71,13 @@ def upgrade() -> None:
         "team_stage_item_id",
         nullable=True,
         new_column_name="winner_from_stage_item_id",
+    )
+    # Renaming a column does not rename the constraints derived from it; keep the FK
+    # name in sync with what metadata.create_all() would generate for the new name.
+    op.execute(
+        "ALTER TABLE stage_item_inputs "
+        "RENAME CONSTRAINT stage_item_inputs_team_stage_item_id_fkey "
+        "TO stage_item_inputs_winner_from_stage_item_id_fkey"
     )
     op.alter_column(
         "stage_item_inputs",
