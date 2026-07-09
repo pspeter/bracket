@@ -20,9 +20,8 @@ from bracket.routes.models import (
 )
 from bracket.schema import players_x_teams, teams
 from bracket.sql.levels import sql_get_levels_for_tournament
-from bracket.sql.players import get_all_players_in_tournament, insert_player
+from bracket.sql.players import get_all_players_in_tournament, insert_player, player_name_exists
 from bracket.sql.signup import (
-    check_player_name_exists,
     count_players_on_team,
     get_signup_team_info_rows,
 )
@@ -92,7 +91,7 @@ async def post_signup(
     body: SignupBody,
     tournament: Tournament = Depends(tournament_by_signup_token),
 ) -> SuccessResponse:
-    if await check_player_name_exists(tournament.id, body.player_name):
+    if await player_name_exists(tournament.id, body.player_name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A player with this name already exists",

@@ -31,20 +31,6 @@ async def get_tournament_by_score_tracking_token(score_tracking_token: str) -> T
     return Tournament.model_validate(result) if result is not None else None
 
 
-async def check_player_name_exists(tournament_id: TournamentId, name: str) -> bool:
-    """Case-insensitive check for duplicate player name in tournament."""
-    query = """
-        SELECT COUNT(*) AS cnt
-        FROM players
-        WHERE tournament_id = :tournament_id AND LOWER(name) = LOWER(:name)
-        """
-    row = await database.fetch_one(
-        query=query, values={"tournament_id": tournament_id, "name": name}
-    )
-    assert row is not None
-    return int(row["cnt"]) > 0
-
-
 async def count_players_on_team(team_id: TeamId, tournament_id: TournamentId) -> int:
     query = """
         SELECT COUNT(*) AS cnt
