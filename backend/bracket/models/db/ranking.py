@@ -37,6 +37,7 @@ class RankingBase(BaseModel):
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
     side_switch_every_n_points: int | None = None
+    draws_allowed: bool = True
 
 
 # Keep for backwards-compatibility with insert helpers / existing SQL insert code
@@ -66,6 +67,7 @@ class RankingMatchPointsBody(BaseModel):
     two_point_advantage: bool = True
     position: int | None = None
     side_switch_every_n_points: int | None = None
+    draws_allowed: bool = True
 
 
 class RankingSetPointsBody(BaseModel):
@@ -77,6 +79,7 @@ class RankingSetPointsBody(BaseModel):
     two_point_advantage: bool = True
     position: int | None = None
     side_switch_every_n_points: int | None = None
+    draws_allowed: bool = True
 
 
 class RankingSetPointsWithMatchBonusBody(BaseModel):
@@ -89,6 +92,7 @@ class RankingSetPointsWithMatchBonusBody(BaseModel):
     two_point_advantage: bool = True
     position: int | None = None
     side_switch_every_n_points: int | None = None
+    draws_allowed: bool = True
 
 
 RankingBody = Annotated[

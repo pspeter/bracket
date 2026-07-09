@@ -91,6 +91,7 @@ function EditRankingForm({
       max_points: ranking.max_points,
       last_set_max_points: ranking.last_set_max_points ?? 15,
       two_point_advantage: ranking.two_point_advantage,
+      draws_allowed: ranking.draws_allowed,
       position: ranking.position,
       side_switch_enabled: ranking.side_switch_every_n_points != null,
       side_switch_every_n_points: ranking.side_switch_every_n_points ?? 7,
@@ -115,6 +116,7 @@ function EditRankingForm({
           values.max_points,
           values.num_sets > 2 ? values.last_set_max_points : null,
           values.two_point_advantage,
+          values.draws_allowed,
           values.name,
           values.win_points,
           values.draw_points,
@@ -208,6 +210,11 @@ function EditRankingForm({
             mt="lg"
             label={t('two_point_advantage_label')}
             {...form.getInputProps('two_point_advantage', { type: 'checkbox' })}
+          />
+          <Checkbox
+            mt="lg"
+            label={t('allow_draws_label')}
+            {...form.getInputProps('draws_allowed', { type: 'checkbox' })}
           />
           {form.values.num_sets > 2 && (
             <NumberInput

@@ -157,6 +157,7 @@ describe('isEndSetDisabled', () => {
     max_points: 21,
     last_set_max_points: null as number | null,
     num_sets: 3,
+    draws_allowed: true,
   };
 
   it('is disabled when no score has reached the limit', () => {
@@ -244,6 +245,36 @@ describe('isEndSetDisabled', () => {
       stage_item_input2_score: 21,
     });
     expect(isEndSetDisabled(set, { ...baseMatch, two_point_advantage: true }, false)).toBe(true);
+  });
+
+  it('is disabled at a tied score when draws_allowed=false, even if the limit is reached', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 21,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, draws_allowed: false }, false)).toBe(true);
+  });
+
+  it('is enabled at a non-tied score reaching the limit when draws_allowed=false', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 15,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, draws_allowed: false }, false)).toBe(false);
+  });
+
+  it('respects isSwapped when checking the tie for draws_allowed=false', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'IN_PROGRESS',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 21,
+    });
+    expect(isEndSetDisabled(set, { ...baseMatch, draws_allowed: false }, true)).toBe(true);
   });
 });
 

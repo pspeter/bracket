@@ -154,6 +154,7 @@ class MatchWithDetails(Match):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    draws_allowed: bool = True
 
     @field_validator("stage_item_input1", "stage_item_input2", "court", "referee", mode="before")
     @staticmethod
@@ -181,6 +182,7 @@ class MatchWithDetailsDefinitive(Match):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    draws_allowed: bool = True
 
     @property
     def stage_item_inputs(self) -> list[StageItemInput]:

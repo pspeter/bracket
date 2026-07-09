@@ -62,6 +62,7 @@ async def test_rankings_endpoint(
                     "max_points": 21,
                     "last_set_max_points": None,
                     "two_point_advantage": True,
+                    "draws_allowed": True,
                     "match_points": {
                         "win_points": "1.0",
                         "draw_points": "0.5",
@@ -335,6 +336,33 @@ async def test_update_ranking_side_switch(
             updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
             updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
             assert updated.side_switch_every_n_points == 7
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_draws_allowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "win_points": "1.0",
+        "draw_points": "0.5",
+        "loss_points": "0.0",
+        "position": 0,
+        "draws_allowed": False,
+    }
+    async with inserted_team(
+        DUMMY_TEAM1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ):
+        async with inserted_ranking(
+            DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+        ) as ranking_inserted:
+            response = await send_tournament_request(
+                HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+            )
+            assert response["success"] is True
+            updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+            updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+            assert updated.draws_allowed is False
 
 
 @pytest.mark.asyncio(loop_scope="session")

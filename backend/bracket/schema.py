@@ -317,6 +317,7 @@ rankings = Table(
     Column("two_point_advantage", Boolean, nullable=False, server_default="true"),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
     Column("side_switch_every_n_points", Integer, nullable=True),
+    Column("draws_allowed", Boolean, nullable=False, server_default="true"),
 )
 
 ranking_match_points = Table(

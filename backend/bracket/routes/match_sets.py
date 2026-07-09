@@ -3,6 +3,7 @@ from starlette import status
 
 from bracket.config import config
 from bracket.logic.match_sets.apply_update import score_edit_and_recalculate
+from bracket.logic.match_sets.validation import validate_draws_allowed_for_score_edit
 from bracket.models.db.match import MatchSet, MatchSetScoreEditBody
 from bracket.routes.match_access import (
     ResolvedMatch,
@@ -29,7 +30,10 @@ async def _get_set_belonging_to_match(match_id: MatchId, match_set_id: MatchSetI
 async def _score_edit(
     resolved: ResolvedMatch, set_id: MatchSetId, body: MatchSetScoreEditBody
 ) -> ScoreTrackingMatchResponse:
-    await _get_set_belonging_to_match(resolved.match.id, set_id)
+    match_set = await _get_set_belonging_to_match(resolved.match.id, set_id)
+    await validate_draws_allowed_for_score_edit(
+        resolved.tournament_id, resolved.match, match_set.state, body
+    )
     updated = await score_edit_and_recalculate(resolved.tournament_id, resolved.match, set_id, body)
     return ScoreTrackingMatchResponse(data=updated)
 

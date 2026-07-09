@@ -279,6 +279,7 @@ MATCH_DETAILS_COLUMNS = f"""
     rankings.max_points AS max_points,
     rankings.last_set_max_points AS last_set_max_points,
     rankings.two_point_advantage AS two_point_advantage,
+    rankings.draws_allowed AS draws_allowed,
     {MATCH_SETS_SUBQUERY}
 """
 
