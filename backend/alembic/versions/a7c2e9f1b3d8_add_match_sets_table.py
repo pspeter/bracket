@@ -39,6 +39,7 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("match_id", "set_number"),
     )
+    op.create_index(op.f("ix_match_sets_id"), "match_sets", ["id"], unique=False)
 
     # 2. Backfill one set per existing match copying its current score and state.
     op.execute(
@@ -98,5 +99,6 @@ def downgrade() -> None:
         """
     )
     op.create_index("ix_matches_state", "matches", ["state"])
+    op.drop_index(op.f("ix_match_sets_id"), table_name="match_sets")
     op.drop_table("match_sets")
     op.execute("DROP TYPE IF EXISTS match_set_state")

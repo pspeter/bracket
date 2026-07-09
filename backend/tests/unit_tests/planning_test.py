@@ -895,8 +895,8 @@ async def test_reorder_skips_matches_without_court(
 
 
 def _tournament_with_referees() -> Tournament:
-    data = {**DUMMY_TOURNAMENT.model_dump(), "referees_enabled": True}
-    return Tournament(**data, id=TournamentId(-1))
+    data = {**DUMMY_TOURNAMENT.model_dump(), "referees_enabled": True, "id": TournamentId(-1)}
+    return Tournament.model_validate(data)
 
 
 def _team(team_id: int, level_id: LevelId | None = None) -> Team:

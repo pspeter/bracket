@@ -35,6 +35,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Re-add DRAFT to the enum. Note: PostgreSQL keeps enum values once added, so this
-    # is a best-effort restore of the value (existing rows are unaffected).
-    op.execute("ALTER TYPE round_lifecycle_state ADD VALUE IF NOT EXISTS 'DRAFT'")
+    # Re-add DRAFT to the enum. ALTER TYPE ... ADD VALUE cannot be used in the same
+    # transaction as the new value itself, and the next downgrade (d7e2b4f9a1c8) reads
+    # 'DRAFT' within the same `alembic downgrade` transaction, so recreate the type
+    # with DRAFT included instead of adding it in place.
+    op.execute("ALTER TABLE rounds ALTER COLUMN lifecycle_state DROP DEFAULT")
+    op.execute("ALTER TYPE round_lifecycle_state RENAME TO round_lifecycle_state_old")
+    op.execute(
+        "CREATE TYPE round_lifecycle_state AS ENUM "
+        "('DRAFT', 'ACTIVE', 'PLACEHOLDER', 'RESOLVED', 'LOCKED')"
+    )
+    op.execute(
+        "ALTER TABLE rounds ALTER COLUMN lifecycle_state "
+        "TYPE round_lifecycle_state "
+        "USING lifecycle_state::text::round_lifecycle_state"
+    )
+    op.execute("ALTER TABLE rounds ALTER COLUMN lifecycle_state SET DEFAULT 'ACTIVE'")
+    op.execute("DROP TYPE round_lifecycle_state_old")

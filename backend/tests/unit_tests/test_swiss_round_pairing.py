@@ -29,9 +29,7 @@ def _input(n: int, elo: int = 1000) -> StageItemInputFinal:
         wins=0,
         draws=0,
         losses=0,
-        team=Team(
-            **{**DUMMY_TEAM1.model_dump(), "id": TeamId(n), "active": True},
-        ),
+        team=Team.model_validate({**DUMMY_TEAM1.model_dump(), "id": TeamId(n), "active": True}),
     )
 
 

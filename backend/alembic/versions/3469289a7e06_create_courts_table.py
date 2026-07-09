@@ -32,7 +32,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_courts_id"), "courts", ["id"], unique=False)
     op.add_column("matches", sa.Column("court_id", sa.BigInteger(), nullable=True))
-    op.create_foreign_key("matches_courts_fkey", "matches", "courts", ["court_id"], ["id"])
+    op.create_foreign_key("matches_court_id_fkey", "matches", "courts", ["court_id"], ["id"])
     op.create_index(op.f("ix_courts_tournament_id"), "courts", ["tournament_id"], unique=False)
     op.add_column(
         "tournaments",
@@ -46,7 +46,7 @@ def downgrade() -> None:
     op.alter_column("matches", "label", server_default=None)
     op.drop_column("tournaments", "auto_assign_courts")
     op.drop_index(op.f("ix_courts_tournament_id"), table_name="courts")
-    op.drop_constraint("matches_courts_fkey", "matches", type_="foreignkey")
+    op.drop_constraint("matches_court_id_fkey", "matches", type_="foreignkey")
     op.drop_column("matches", "court_id")
     op.drop_index(op.f("ix_courts_id"), table_name="courts")
     op.drop_table("courts")

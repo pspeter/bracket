@@ -48,16 +48,6 @@ async def sql_delete_levels_of_tournament(tournament_id: TournamentId) -> None:
     await database.execute(query=query, values={"tournament_id": tournament_id})
 
 
-async def sql_get_level(level_id: LevelId) -> Level | None:
-    query = """
-        SELECT *
-        FROM levels
-        WHERE id = :level_id
-        """
-    result = await database.fetch_one(query=query, values={"level_id": level_id})
-    return Level.model_validate(result) if result is not None else None
-
-
 async def sql_get_level_for_tournament(
     tournament_id: TournamentId, level_id: LevelId
 ) -> Level | None:

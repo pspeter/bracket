@@ -17,9 +17,20 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    # Add DRAFT and ACTIVE to the existing round_lifecycle_state enum
-    op.execute("ALTER TYPE round_lifecycle_state ADD VALUE 'DRAFT'")
-    op.execute("ALTER TYPE round_lifecycle_state ADD VALUE 'ACTIVE'")
+    # ALTER TYPE ... ADD VALUE cannot be used in the same transaction as the new value
+    # itself (Alembic runs the whole upgrade in one transaction), so recreate the enum
+    # type with DRAFT and ACTIVE included instead of adding them in place.
+    op.execute("ALTER TYPE round_lifecycle_state RENAME TO round_lifecycle_state_old")
+    op.execute(
+        "CREATE TYPE round_lifecycle_state AS ENUM "
+        "('DRAFT', 'ACTIVE', 'PLACEHOLDER', 'RESOLVED', 'LOCKED')"
+    )
+    op.execute(
+        "ALTER TABLE rounds ALTER COLUMN lifecycle_state "
+        "TYPE round_lifecycle_state "
+        "USING lifecycle_state::text::round_lifecycle_state"
+    )
+    op.execute("DROP TYPE round_lifecycle_state_old")
 
     # Migrate existing is_draft data into lifecycle_state
     op.execute(

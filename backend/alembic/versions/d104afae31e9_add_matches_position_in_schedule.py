@@ -23,6 +23,10 @@ def upgrade() -> None:
         "tournaments",
         sa.Column("start_time", sa.DateTime(timezone=True), nullable=False, server_default="now()"),
     )
+    # The default above only exists to backfill pre-existing rows (the string literal
+    # 'now()' is even frozen by Postgres to the time the migration runs); the
+    # application always sets start_time explicitly on insert, so drop it again.
+    op.alter_column("tournaments", "start_time", server_default=None)
 
 
 def downgrade() -> None:

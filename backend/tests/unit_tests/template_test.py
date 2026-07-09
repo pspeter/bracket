@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 
 from bracket.logic.planning.template import (
@@ -9,14 +11,14 @@ from bracket.models.db.stage_item import StageType
 
 
 def make_config(**kwargs):  # type: ignore[no-untyped-def]
-    defaults = dict(
+    defaults = TemplateConfig(
         groups=4,
         total_teams=16,
         until_rank=2,
         include_semi_final=True,
         group_stage_type=StageType.ROUND_ROBIN,
     )
-    return TemplateConfig(**{**defaults, **kwargs})
+    return dataclasses.replace(defaults, **kwargs)
 
 
 def stage_names(bp):  # type: ignore[no-untyped-def]

@@ -30,17 +30,31 @@ def upgrade() -> None:
         "ALTER TABLE matches "
         "RENAME COLUMN team2_winner_from_match_id TO stage_item_input2_winner_from_match_id"
     )
+    # Renaming a column does not rename the constraints derived from it; keep the FK
+    # names in sync with what metadata.create_all() would generate for the new names.
+    op.execute(
+        "ALTER TABLE matches "
+        "RENAME CONSTRAINT matches_team1_winner_from_match_id_fkey "
+        "TO matches_stage_item_input1_winner_from_match_id_fkey"
+    )
+    op.execute(
+        "ALTER TABLE matches "
+        "RENAME CONSTRAINT matches_team2_winner_from_match_id_fkey "
+        "TO matches_stage_item_input2_winner_from_match_id_fkey"
+    )
 
     # Change foreign keys
     op.add_column("matches", sa.Column("stage_item_input1_id", sa.BigInteger(), nullable=True))
     op.add_column("matches", sa.Column("stage_item_input2_id", sa.BigInteger(), nullable=True))
 
     # Fill stage item input ids
-    matches = op.get_bind().execute("SELECT id, team1_id, team2_id FROM matches").fetchall()
-    stage_item_inputs = (
-        op.get_bind().execute("SELECT id, team_id FROM stage_item_inputs").fetchall()
+    matches = (
+        op.get_bind().execute(sa.text("SELECT id, team1_id, team2_id FROM matches")).fetchall()
     )
-    stage_item_inputs = {input["team_id"]: input["id"] for input in stage_item_inputs}
+    stage_item_inputs_rows = (
+        op.get_bind().execute(sa.text("SELECT id, team_id FROM stage_item_inputs")).fetchall()
+    )
+    stage_item_inputs = {row.team_id: row.id for row in stage_item_inputs_rows}
     for match in matches:
         op.get_bind().execute(
             sa.text(
@@ -51,9 +65,11 @@ def upgrade() -> None:
             WHERE id = :match_id
             """
             ),
-            input1_id=stage_item_inputs[match["team1_id"]],
-            input2_id=stage_item_inputs[match["team2_id"]],
-            match_id=match["id"],
+            {
+                "input1_id": stage_item_inputs[match.team1_id],
+                "input2_id": stage_item_inputs[match.team2_id],
+                "match_id": match.id,
+            },
         )
 
     op.drop_constraint("matches_team1_id_fkey", "matches", type_="foreignkey")
