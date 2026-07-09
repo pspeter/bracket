@@ -142,6 +142,131 @@ async def test_score_edit_and_end_complete_match(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_match_detail_response_carries_draws_allowed_from_ranking(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with _simple_match(auth_context) as match_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
+        assert response["data"]["draws_allowed"] is True
+
+    async with (
+        _draws_disallowed_ranking(auth_context),
+        _simple_match(auth_context) as match_inserted,
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
+        assert response["data"]["draws_allowed"] is False
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_end_rejected_at_equal_scores_when_draws_disallowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        _draws_disallowed_ranking(auth_context),
+        _simple_match(auth_context) as match_inserted,
+    ):
+        set_id = match_inserted.match_sets[0].id
+        await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
+        await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 10, "stage_item_input2_score": 10},
+        )
+        response = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/end", auth_context
+        )
+        assert response == {"detail": "Cannot end: draws are not allowed for this ranking"}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_editing_completed_set_to_equal_scores_rejected_when_draws_disallowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        _draws_disallowed_ranking(auth_context),
+        _simple_match(auth_context) as match_inserted,
+    ):
+        set_id = match_inserted.match_sets[0].id
+        await complete_match(auth_context, match_inserted.id, set_id, score1=21, score2=10)
+        response = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 15, "stage_item_input2_score": 15},
+        )
+        assert response == {"detail": "Cannot edit: draws are not allowed for this ranking"}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_editing_in_progress_set_to_equal_scores_succeeds_when_draws_disallowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with (
+        _draws_disallowed_ranking(auth_context),
+        _simple_match(auth_context) as match_inserted,
+    ):
+        set_id = match_inserted.match_sets[0].id
+        await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
+        response = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 5, "stage_item_input2_score": 5},
+        )
+        assert response["data"]["match_sets"][0]["stage_item_input1_score"] == 5
+        assert response["data"]["match_sets"][0]["stage_item_input2_score"] == 5
+        assert response["data"]["match_sets"][0]["state"] == "IN_PROGRESS"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_end_at_equal_scores_still_succeeds_when_draws_allowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with _simple_match(auth_context) as match_inserted:
+        set_id = match_inserted.match_sets[0].id
+        await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/start", auth_context
+        )
+        await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 10, "stage_item_input2_score": 10},
+        )
+        response = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{match_inserted.id}/end", auth_context
+        )
+        assert response["data"]["state"] == "COMPLETED"
+        assert response["data"]["match_sets"][0]["state"] == "COMPLETED"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_editing_completed_set_to_equal_scores_still_succeeds_when_draws_allowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    async with _simple_match(auth_context) as match_inserted:
+        set_id = match_inserted.match_sets[0].id
+        await complete_match(auth_context, match_inserted.id, set_id, score1=21, score2=10)
+        response = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{match_inserted.id}/sets/{set_id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 15, "stage_item_input2_score": 15},
+        )
+        assert response["data"]["match_sets"][0]["stage_item_input1_score"] == 15
+        assert response["data"]["match_sets"][0]["stage_item_input2_score"] == 15
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_reopen_clears_completed_at(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
@@ -790,6 +915,21 @@ async def _best_of_three_ranking(auth_context: AuthContext) -> AsyncIterator[Non
     finally:
         await database.execute(
             query=rankings.update().where(rankings.c.id == ranking_id).values(num_sets=1),
+        )
+
+
+@asynccontextmanager
+async def _draws_disallowed_ranking(auth_context: AuthContext) -> AsyncIterator[None]:
+    """Temporarily configure the session-scoped ranking to disallow draws."""
+    ranking_id = auth_context.ranking.id
+    await database.execute(
+        query=rankings.update().where(rankings.c.id == ranking_id).values(draws_allowed=False),
+    )
+    try:
+        yield
+    finally:
+        await database.execute(
+            query=rankings.update().where(rankings.c.id == ranking_id).values(draws_allowed=True),
         )
 
 

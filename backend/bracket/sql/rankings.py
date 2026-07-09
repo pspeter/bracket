@@ -54,6 +54,7 @@ def _row_to_ranking(row: Record) -> Ranking:
         max_points=m["max_points"],
         last_set_max_points=m.get("last_set_max_points"),
         two_point_advantage=m["two_point_advantage"],
+        draws_allowed=m["draws_allowed"],
         level_id=m.get("level_id"),
         side_switch_every_n_points=m.get("side_switch_every_n_points"),
         match_points=match_points,
@@ -176,7 +177,8 @@ async def sql_update_ranking(
                 max_points = :max_points,
                 last_set_max_points = :last_set_max_points,
                 two_point_advantage = :two_point_advantage,
-                side_switch_every_n_points = :side_switch_every_n_points
+                side_switch_every_n_points = :side_switch_every_n_points,
+                draws_allowed = :draws_allowed
             WHERE rankings.tournament_id = :tournament_id
             AND rankings.id = :ranking_id
         """,
@@ -191,6 +193,7 @@ async def sql_update_ranking(
             "last_set_max_points": ranking_body.last_set_max_points,
             "two_point_advantage": ranking_body.two_point_advantage,
             "side_switch_every_n_points": ranking_body.side_switch_every_n_points,
+            "draws_allowed": ranking_body.draws_allowed,
         },
     )
 
@@ -244,10 +247,12 @@ async def sql_create_ranking(
         query="""
             INSERT INTO rankings
             (tournament_id, position, name, scoring_type, num_sets, max_points,
-             last_set_max_points, two_point_advantage, level_id, side_switch_every_n_points)
+             last_set_max_points, two_point_advantage, level_id, side_switch_every_n_points,
+             draws_allowed)
             VALUES (
                 :tournament_id, :position, :name, :scoring_type, :num_sets, :max_points,
-                :last_set_max_points, :two_point_advantage, :level_id, :side_switch_every_n_points
+                :last_set_max_points, :two_point_advantage, :level_id, :side_switch_every_n_points,
+                :draws_allowed
             )
             RETURNING id
         """,
@@ -262,6 +267,7 @@ async def sql_create_ranking(
             "two_point_advantage": ranking_body.two_point_advantage,
             "level_id": level_id,
             "side_switch_every_n_points": ranking_body.side_switch_every_n_points,
+            "draws_allowed": ranking_body.draws_allowed,
         },
     )
     await _insert_subtype_row(ranking_id, ranking_body)

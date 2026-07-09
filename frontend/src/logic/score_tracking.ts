@@ -81,10 +81,11 @@ export function isEndSetDisabled(
     max_points: number;
     last_set_max_points: number | null;
     num_sets: number;
+    draws_allowed: boolean;
   },
   isSwapped: boolean
 ): boolean {
-  const { two_point_advantage, max_points, last_set_max_points, num_sets } = match;
+  const { two_point_advantage, max_points, last_set_max_points, num_sets, draws_allowed } = match;
   const limit =
     set.set_number === num_sets && last_set_max_points != null ? last_set_max_points : max_points;
   const s1 = isSwapped ? set.stage_item_input2_score : set.stage_item_input1_score;
@@ -92,5 +93,6 @@ export function isEndSetDisabled(
   const maxScore = Math.max(s1, s2);
   if (maxScore < limit) return true;
   if (two_point_advantage && Math.abs(s1 - s2) < 2) return true;
+  if (!draws_allowed && s1 === s2) return true;
   return false;
 }

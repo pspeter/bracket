@@ -6,13 +6,17 @@ from starlette import status
 
 from bracket.database import database
 from bracket.logic.match_sets.pointer import IllegalMatchTransitionError
-from bracket.logic.match_sets.validation import validate_match_can_be_started
+from bracket.logic.match_sets.validation import (
+    validate_draws_allowed_for_end,
+    validate_match_can_be_started,
+)
 from bracket.logic.ranking.elimination import get_started_elimination_followers
 from bracket.logic.reconcile import reconcile_stage_item
 from bracket.logic.scheduling.standings_resolution import is_standings_resolved_stage_type
 from bracket.models.db.match import (
     Match,
     MatchSetScoreEditBody,
+    MatchSetState,
     MatchState,
     MatchWithDetails,
     derive_match_state,
@@ -111,6 +115,10 @@ async def start_match_and_recalculate(
 
 
 async def end_match_and_recalculate(tournament_id: TournamentId, match: Match) -> MatchWithDetails:
+    sets = await get_sets_for_match(match.id)
+    in_progress_set = next((s for s in sets if s.state is MatchSetState.IN_PROGRESS), None)
+    if in_progress_set is not None:
+        await validate_draws_allowed_for_end(tournament_id, match, in_progress_set)
     return await apply_match_change_and_recalculate(
         tournament_id, match, lambda: sql_end_match(match.id)
     )

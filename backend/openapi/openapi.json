@@ -981,6 +981,11 @@
             ],
             "title": "Custom Duration Minutes"
           },
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
+          },
           "duration_minutes": {
             "title": "Duration Minutes",
             "type": "integer"
@@ -1245,6 +1250,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "draws_allowed",
           "state"
         ],
         "title": "MatchWithDetails",
@@ -1301,6 +1307,11 @@
             ],
             "title": "Custom Duration Minutes"
           },
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
+          },
           "duration_minutes": {
             "title": "Duration Minutes",
             "type": "integer"
@@ -1559,6 +1570,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "draws_allowed",
           "state"
         ],
         "title": "MatchWithDetailsDefinitive",
@@ -1859,6 +1871,11 @@
             "title": "Created",
             "type": "string"
           },
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -1960,6 +1977,7 @@
           "last_set_max_points",
           "two_point_advantage",
           "side_switch_every_n_points",
+          "draws_allowed",
           "id",
           "created",
           "match_points",
@@ -1982,6 +2000,11 @@
             ],
             "default": "0.5",
             "title": "Draw Points"
+          },
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
           },
           "last_set_max_points": {
             "anyOf": [
@@ -2086,7 +2109,8 @@
           "last_set_max_points",
           "two_point_advantage",
           "position",
-          "side_switch_every_n_points"
+          "side_switch_every_n_points",
+          "draws_allowed"
         ],
         "title": "RankingMatchPointsBody",
         "type": "object"
@@ -2119,6 +2143,11 @@
       },
       "RankingSetPointsBody": {
         "properties": {
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
+          },
           "last_set_max_points": {
             "anyOf": [
               {
@@ -2193,13 +2222,19 @@
           "last_set_max_points",
           "two_point_advantage",
           "position",
-          "side_switch_every_n_points"
+          "side_switch_every_n_points",
+          "draws_allowed"
         ],
         "title": "RankingSetPointsBody",
         "type": "object"
       },
       "RankingSetPointsWithMatchBonusBody": {
         "properties": {
+          "draws_allowed": {
+            "default": true,
+            "title": "Draws Allowed",
+            "type": "boolean"
+          },
           "last_set_max_points": {
             "anyOf": [
               {
@@ -2288,7 +2323,8 @@
           "last_set_max_points",
           "two_point_advantage",
           "position",
-          "side_switch_every_n_points"
+          "side_switch_every_n_points",
+          "draws_allowed"
         ],
         "title": "RankingSetPointsWithMatchBonusBody",
         "type": "object"

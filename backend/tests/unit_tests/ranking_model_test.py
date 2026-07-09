@@ -133,6 +133,7 @@ def test_schema_rankings_has_new_columns() -> None:
     assert "max_points" in cols
     assert "last_set_max_points" in cols
     assert "two_point_advantage" in cols
+    assert "draws_allowed" in cols
     assert "win_points" not in cols
     assert "draw_points" not in cols
     assert "loss_points" not in cols
@@ -158,6 +159,23 @@ def test_migration_add_ranking_name_exists_and_chains_from_head() -> None:
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
     assert migration.down_revision == "b9d3e7f1a2c4"
+    assert callable(migration.upgrade)
+    assert callable(migration.downgrade)
+
+
+def test_migration_add_draws_allowed_exists_and_chains_from_head() -> None:
+    import importlib.util
+    from pathlib import Path
+
+    versions_dir = Path(__file__).parent.parent.parent / "alembic" / "versions"
+    files = list(versions_dir.glob("*add_draws_allowed_to_rankings*.py"))
+    assert files, "No add_draws_allowed_to_rankings migration file found"
+    path = files[0]
+    spec = importlib.util.spec_from_file_location("migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.down_revision == "d9f3b1a7c5e2"
     assert callable(migration.upgrade)
     assert callable(migration.downgrade)
 
@@ -246,3 +264,40 @@ def test_ranking_new_base_fields() -> None:
     assert ranking.two_point_advantage is True
     assert ranking.match_points is not None
     assert ranking.match_points.win_points == Decimal("1.0")
+
+
+def test_ranking_draws_allowed_defaults_to_true() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        scoring_type=ScoringType.MATCH_POINTS,
+    )
+    assert ranking.draws_allowed is True
+
+
+def test_ranking_draws_allowed_can_be_set_false() -> None:
+    now = datetime_utc.now()
+    ranking = Ranking(
+        id=RankingId(1),
+        tournament_id=TournamentId(1),
+        created=now,
+        position=0,
+        scoring_type=ScoringType.MATCH_POINTS,
+        draws_allowed=False,
+    )
+    assert ranking.draws_allowed is False
+
+
+def test_ranking_body_variants_default_draws_allowed_to_true() -> None:
+    from bracket.models.db.ranking import (
+        RankingMatchPointsBody,
+        RankingSetPointsBody,
+        RankingSetPointsWithMatchBonusBody,
+    )
+
+    assert RankingMatchPointsBody().draws_allowed is True
+    assert RankingSetPointsBody().draws_allowed is True
+    assert RankingSetPointsWithMatchBonusBody().draws_allowed is True

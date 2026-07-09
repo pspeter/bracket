@@ -25,6 +25,7 @@ export async function editRanking(
   max_points: number,
   last_set_max_points: number | null,
   two_point_advantage: boolean,
+  draws_allowed: boolean,
   name: string,
   win_points?: string,
   draw_points?: string,
@@ -40,6 +41,7 @@ export async function editRanking(
     max_points,
     last_set_max_points,
     two_point_advantage,
+    draws_allowed,
   };
   if (scoring_type === 'MATCH_POINTS') {
     body.win_points = win_points;

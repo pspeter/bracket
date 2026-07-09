@@ -24,6 +24,7 @@
     "all_matches_radio_label": "All matches",
     "all_matches_scheduled_description": "Matches have been scheduled on all courts in this round. Add a new round or add a new court for more matches.",
     "all_matches_scheduled_title": "All scheduled",
+    "allow_draws_label": "Allow draws",
     "api_docs_title": "API docs",
     "apply_break_button": "Set",
     "archive_tournament_button": "Archive Tournament",

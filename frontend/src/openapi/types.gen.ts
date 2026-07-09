@@ -521,6 +521,10 @@ export type MatchWithDetails = {
    */
   custom_duration_minutes: number | null;
   /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
+  /**
    * Duration Minutes
    */
   duration_minutes: number;
@@ -636,6 +640,10 @@ export type MatchWithDetailsDefinitive = {
    * Custom Duration Minutes
    */
   custom_duration_minutes: number | null;
+  /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
   /**
    * Duration Minutes
    */
@@ -925,6 +933,10 @@ export type Ranking = {
    */
   created: string;
   /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
+  /**
    * Id
    */
   id: number;
@@ -977,6 +989,10 @@ export type RankingMatchPointsBody = {
    * Draw Points
    */
   draw_points: number | string;
+  /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
   /**
    * Last Set Max Points
    */
@@ -1042,6 +1058,10 @@ export type RankingMatchPointsData = {
  */
 export type RankingSetPointsBody = {
   /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
+  /**
    * Last Set Max Points
    */
   last_set_max_points: number | null;
@@ -1079,6 +1099,10 @@ export type RankingSetPointsBody = {
  * RankingSetPointsWithMatchBonusBody
  */
 export type RankingSetPointsWithMatchBonusBody = {
+  /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
   /**
    * Last Set Max Points
    */
@@ -2516,6 +2540,10 @@ export type MatchWithDetailsWritable = {
    */
   custom_duration_minutes: number | null;
   /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
+  /**
    * Duration Minutes
    */
   duration_minutes: number;
@@ -2630,6 +2658,10 @@ export type MatchWithDetailsDefinitiveWritable = {
    * Custom Duration Minutes
    */
   custom_duration_minutes: number | null;
+  /**
+   * Draws Allowed
+   */
+  draws_allowed: boolean;
   /**
    * Duration Minutes
    */

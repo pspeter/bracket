@@ -24,6 +24,7 @@
     "all_matches_radio_label": "Alle Spiele",
     "all_matches_scheduled_description": "Die Spiele wurden in dieser Runde auf allen Gerichten geplant. Füge eine neue Runde hinzu oder füge ein neues Gericht für weitere Spiele hinzu.",
     "all_matches_scheduled_title": "Alle Spiele geplant",
+    "allow_draws_label": "Unentschieden erlauben",
     "api_docs_title": "API Dokumentation",
     "apply_break_button": "Setzen",
     "archive_tournament_button": "Turnier archivieren",
