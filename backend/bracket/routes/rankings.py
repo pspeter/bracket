@@ -35,6 +35,33 @@ from bracket.utils.id_types import RankingId, TournamentId
 router = APIRouter(prefix=config.api_prefix)
 
 
+def _normalize_best_of_n_invariants(ranking_body: RankingBody) -> RankingBody:
+    """Enforce the best-of-n coupling between `play_all_sets`, `num_sets` and `draws_allowed`.
+
+    Best-of-n mode is active whenever `play_all_sets` is off and `num_sets` is greater than
+    one. In that mode an even `num_sets` can never produce a clean set-win majority, so it is
+    rejected with a 422 (mirroring the existing even-sets/single-elimination check below).
+    `draws_allowed` is silently normalized to false, since best-of-n depends on every set
+    having a winner to guarantee the match does too. Single-set rankings and rankings with
+    `play_all_sets` on are untouched.
+    """
+    if ranking_body.play_all_sets or ranking_body.num_sets <= 1:
+        return ranking_body
+
+    if ranking_body.num_sets % 2 == 0:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Even number of sets is not supported in best-of-n mode (play out all sets off)."
+            ),
+        )
+
+    if ranking_body.draws_allowed:
+        return ranking_body.model_copy(update={"draws_allowed": False})
+
+    return ranking_body
+
+
 @router.get("/tournaments/{tournament_id}/rankings")
 async def get_rankings(
     tournament_id: TournamentId,
@@ -52,6 +79,8 @@ async def update_ranking_by_id(
     _: UserPublic = Depends(user_authenticated_for_tournament),
     __: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    ranking_body = _normalize_best_of_n_invariants(ranking_body)
+
     if ranking_body.num_sets % 2 == 0:
         stage_items_for_ranking = await get_stage_items_for_ranking(tournament_id, ranking_id)
         if any(si.type == StageType.SINGLE_ELIMINATION for si in stage_items_for_ranking):
@@ -115,6 +144,8 @@ async def create_ranking(
     user: UserPublic = Depends(user_authenticated_for_tournament),
     _: Tournament = Depends(disallow_archived_tournament),
 ) -> SuccessResponse:
+    ranking_body = _normalize_best_of_n_invariants(ranking_body)
+
     existing_rankings = await get_all_rankings_in_tournament(tournament_id)
     check_requirement(existing_rankings, user, "max_rankings")
 
