@@ -45,12 +45,18 @@ async def recalculate_after_match_change(
     new_state: MatchState,
 ) -> MatchWithDetails:
     round_ = await get_round_by_id(tournament_id, match.round_id)
-    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
 
     if new_state is MatchState.COMPLETED and match.completed_at is None:
         await sql_set_match_completed_at(match.id, datetime_utc.now())
     elif new_state is not MatchState.COMPLETED and match.completed_at is not None:
         await sql_set_match_completed_at(match.id, None)
+
+    # Fetched only now, after the completed_at write above: reconcile_stage_item's own
+    # completed_at bookkeeping (bracket.logic.reconcile._sync_completed_at_for_stage_item)
+    # compares each match's *snapshotted* completed_at against its (already up to date)
+    # derived state, so fetching post-write here keeps this match a no-op for that step
+    # instead of a redundant second write with a slightly later timestamp.
+    stage_item = await get_stage_item(tournament_id, round_.stage_item_id)
 
     await reconcile_stage_item(
         tournament_id,

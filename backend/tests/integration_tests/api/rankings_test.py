@@ -728,12 +728,18 @@ async def _flip_standings_via_ranking_edit(
     After ``_play_group_with_t1_win_and_draws``: team 1 -> 1.0 (win) + 2.0 (draw) = 3.0, team 2
     -> 2.0 + 2.0 = 4.0, team 3 -> 0.0 + 2.0 = 2.0. Team 2 overtakes team 1 purely from the
     ranking edit -- no match result changed.
+
+    ``play_all_sets`` is passed explicitly, matching the ranking's actual (default) value: the
+    `RankingMatchPointsBody` variant used here defaults it to False, which would otherwise read
+    as a genuine best-of-n change and trip the play_all_sets force-gate against this test's
+    already-completed sets.
     """
     body = {
         "scoring_type": "MATCH_POINTS",
         "win_points": "1.0",
         "draw_points": "2.0",
         "loss_points": "0.0",
+        "play_all_sets": True,
     }
     response = await send_tournament_request(
         HTTPMethod.PUT, f"rankings/{ranking_id}", auth_context, json=body
