@@ -33,7 +33,13 @@ export async function editRanking(
   win_points?: string,
   draw_points?: string,
   loss_points?: string,
-  match_bonus_points?: string
+  match_bonus_points?: string,
+  // A `num_sets` or `play_all_sets` change on a ranking with in-progress or completed sets is
+  // rejected with a 409 unless this is set: both can rewrite existing matches' derived state
+  // (resizing set rows, or instantly completing/regressing best-of-n matches). The caller
+  // (EditRankingForm) submits with `force` false first, and only retries with it true once the
+  // organizer has confirmed the 409 through the force-confirm modal.
+  force: boolean = false
 ) {
   const body: Record<string, unknown> = {
     scoring_type,
@@ -54,11 +60,16 @@ export async function editRanking(
   } else if (scoring_type === 'SET_POINTS_WITH_MATCH_BONUS') {
     body.match_bonus_points = match_bonus_points;
   }
+  const url = `tournaments/${tournament_id}/rankings/${ranking_id}${force ? '?force=true' : ''}`;
   // A ranking edit reconciles every stage item using it, which can reassign dependent-input
   // teams (the unassigned-teams issue counter) and resize match sets (the overdue counters) --
   // so invalidate issues.
-  return performMutation('put', `tournaments/${tournament_id}/rankings/${ranking_id}`, body, {
+  //
+  // catchErrors is off so the caller (EditRankingForm) can see a 409 and prompt for `force`
+  // instead of it being swallowed by the default handleRequestError notification.
+  return performMutation('put', url, body, {
     tournamentId: tournament_id,
+    catchErrors: false,
   });
 }
 

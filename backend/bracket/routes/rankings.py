@@ -89,15 +89,24 @@ async def update_ranking_by_id(
                 detail="Even number of sets is not supported for single elimination brackets.",
             )
 
-    # Detect a change in the configured number of sets so existing matches' set rows can be
-    # resized. When matches already have in-progress or completed sets this is destructive, so
-    # it is refused with a 409 unless explicitly forced.
+    # Detect a change to a field that feeds match state derivation, so existing matches' set
+    # rows/states can be reconciled. `num_sets` changes existing matches' set rows (resized);
+    # `play_all_sets` changes how the same set rows derive a match's state (e.g. a decided
+    # best-of-n match can complete or regress instantly). Both are destructive when matches
+    # already have in-progress or completed sets, so they are refused with a 409 unless
+    # explicitly forced. `draws_allowed` has no derived-state impact and stays ungated.
     existing_rankings = await get_all_rankings_in_tournament(tournament_id)
-    old_num_sets = next(
-        (r.num_sets for r in existing_rankings if r.id == ranking_id), ranking_body.num_sets
+    existing_ranking = next((r for r in existing_rankings if r.id == ranking_id), None)
+    old_num_sets = existing_ranking.num_sets if existing_ranking else ranking_body.num_sets
+    old_play_all_sets = (
+        existing_ranking.play_all_sets if existing_ranking else ranking_body.play_all_sets
     )
 
-    if ranking_body.num_sets != old_num_sets and not force:
+    derived_state_config_changed = (
+        ranking_body.num_sets != old_num_sets or ranking_body.play_all_sets != old_play_all_sets
+    )
+
+    if derived_state_config_changed and not force:
         if await sql_ranking_has_active_sets(ranking_id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -7,7 +7,8 @@ import pytest
 
 from bracket.database import database
 from bracket.logic.scheduling.builder import build_matches_for_stage_item
-from bracket.models.db.match import Match, MatchState
+from bracket.models.db.match import Match, MatchSetState, MatchState
+from bracket.models.db.ranking import RankingMatchPointsBody
 from bracket.models.db.stage_item import StageItemWithInputsCreate, StageType
 from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
@@ -1097,6 +1098,148 @@ async def test_play_all_sets_on_still_requires_every_set(
             auth_context, semi.id, semi.match_sets[2].id, score1=21, score2=10
         )
         assert third["data"]["state"] == "COMPLETED"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ranking_play_all_sets_change_requires_force_when_active(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Flipping `play_all_sets` off on a ranking with an early-decided-but-not-completed Bo3
+    match (2-0, third set unplayed and IN_PROGRESS under play-all-sets) is refused with a 409
+    unless forced, exactly like the existing `num_sets` gate. Forcing it through completes the
+    match on the spot: `completed_at` is stamped and the winner advances into the elimination
+    final -- the reconciliation path (#270) picking up where the per-match best-of-n
+    auto-completion path (#267) leaves off."""
+    tournament_id = auth_context.tournament.id
+    ranking_id = auth_context.ranking.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=True),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        winner_input_id = semi.stage_item_input1_id
+        assert len(semi.match_sets) == 3
+
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        two_up = await complete_match(
+            auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10
+        )
+        assert two_up["data"]["state"] == "IN_PROGRESS"
+        assert two_up["data"]["completed_at"] is None
+
+        body = RankingMatchPointsBody(num_sets=3, play_all_sets=False).model_dump(mode="json")
+
+        blocked = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}", auth_context, json=body
+        )
+        assert "force=true" in blocked["detail"]
+
+        # Unaffected by the gate: the match is untouched by a rejected request.
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        assert bracket.rounds[0].matches[0].state == MatchState.IN_PROGRESS
+
+        forced = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}?force=true", auth_context, json=body
+        )
+        assert forced["success"] is True
+
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi_after = bracket.rounds[0].matches[0]
+        assert semi_after.state == MatchState.COMPLETED
+        assert semi_after.completed_at is not None
+        assert semi_after.match_sets[2].state == MatchSetState.NOT_STARTED
+
+        final = bracket.rounds[1].matches[0]
+        assert final.stage_item_input1_id == winner_input_id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ranking_play_all_sets_change_needs_no_force_without_active_sets(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A ranking with no started sets never needs `force=true`, mirroring `num_sets`."""
+    ranking_id = auth_context.ranking.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=True),
+        _four_team_elimination(auth_context),
+    ):
+        body = RankingMatchPointsBody(num_sets=3, play_all_sets=False).model_dump(mode="json")
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}", auth_context, json=body
+        )
+        assert response["success"] is True
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ranking_play_all_sets_change_on_regresses_early_ended_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Flipping `play_all_sets` back on for a ranking with a best-of-n-decided match (2-0,
+    third set never played) regresses that match to in-progress: `completed_at` is cleared and
+    the previously-blocked third set becomes startable again."""
+    tournament_id = auth_context.tournament.id
+    ranking_id = auth_context.ranking.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        decided = await complete_match(
+            auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10
+        )
+        assert decided["data"]["state"] == "COMPLETED"
+        assert decided["data"]["completed_at"] is not None
+
+        body = RankingMatchPointsBody(num_sets=3, play_all_sets=True).model_dump(mode="json")
+
+        blocked = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}", auth_context, json=body
+        )
+        assert "force=true" in blocked["detail"]
+
+        forced = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}?force=true", auth_context, json=body
+        )
+        assert forced["success"] is True
+
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi_after = bracket.rounds[0].matches[0]
+        assert semi_after.state == MatchState.IN_PROGRESS
+        assert semi_after.completed_at is None
+
+        third_started = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{semi.id}/start", auth_context
+        )
+        assert third_started["data"]["match_sets"][2]["state"] == "IN_PROGRESS"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ranking_draws_allowed_change_never_gated(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """`draws_allowed` has no derived-state impact, so it is never gated behind `force`, even
+    on a ranking with active sets."""
+    tournament_id = auth_context.tournament.id
+    ranking_id = auth_context.ranking.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=True),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+
+        body = RankingMatchPointsBody(
+            num_sets=3, play_all_sets=True, draws_allowed=False
+        ).model_dump(mode="json")
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_id}", auth_context, json=body
+        )
+        assert response["success"] is True
 
 
 @asynccontextmanager
