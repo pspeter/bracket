@@ -12,6 +12,16 @@ export function getPlayAllSetsDefault(scoringType: ScoringType): boolean {
 }
 
 /**
+ * Best-of-n mode is active whenever "play out all sets" is off and there is more than one
+ * set: a match then completes as soon as one side reaches a set-win majority. In that mode
+ * `draws_allowed` is forced off and `num_sets` must be odd, both enforced by the backend and
+ * mirrored here so the form can show the same invariant before saving.
+ */
+export function isBestOfNMode(playAllSets: boolean, numSets: number): boolean {
+  return !playAllSets && numSets > 1;
+}
+
+/**
  * The label shown for a ranking. Uses the ranking's custom name when one is set,
  * otherwise falls back to the positional default "Ranking <position + 1>".
  */

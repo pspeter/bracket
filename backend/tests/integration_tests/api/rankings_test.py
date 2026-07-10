@@ -435,8 +435,12 @@ async def test_update_ranking_draws_allowed(
 async def test_update_ranking_even_sets_single_elimination_returns_422(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """PUT with even num_sets returns 422 for a SINGLE_ELIMINATION stage item."""
-    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2}
+    """PUT with even num_sets returns 422 for a SINGLE_ELIMINATION stage item.
+
+    `play_all_sets` is explicitly on so best-of-n mode isn't active, isolating this test to the
+    single-elimination-specific rule rather than the separately-covered best-of-n invariant.
+    """
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2, "play_all_sets": True}
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
         DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})
@@ -487,11 +491,168 @@ async def test_update_ranking_odd_sets_single_elimination_succeeds(
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_even_sets_best_of_n_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT with an even num_sets while best-of-n mode is active (play_all_sets off) returns 422,
+    regardless of stage item type -- unlike the single-elimination-specific rule, this check
+    applies uniformly because an even set count can never yield a clean majority winner.
+    """
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2, "play_all_sets": False}
+    tournament_id = auth_context.tournament.id
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})
+    ) as test_ranking:
+        async with inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage:
+            async with inserted_stage_item(
+                DUMMY_STAGE_ITEM1.model_copy(
+                    update={"stage_id": stage.id, "ranking_id": test_ranking.id}
+                )
+            ):
+                response = await send_tournament_request(
+                    HTTPMethod.PUT,
+                    f"rankings/{test_ranking.id}",
+                    auth_context,
+                    json=body,
+                )
+                assert "detail" in response
+                assert "best-of-n" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_create_ranking_even_sets_best_of_n_returns_422(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """POST with an even num_sets while best-of-n mode is active returns 422."""
+    response = await send_tournament_request(
+        HTTPMethod.POST,
+        "rankings",
+        auth_context,
+        json={"scoring_type": "MATCH_POINTS", "num_sets": 4, "play_all_sets": False},
+    )
+    assert "detail" in response
+    assert "best-of-n" in response["detail"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_best_of_n_normalizes_draws_allowed_to_false(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """PUT with best-of-n mode active (play_all_sets off, odd num_sets > 1) and draws_allowed
+    true is silently normalized to draws_allowed false, guaranteeing every set -- and therefore
+    every match -- has a winner.
+    """
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "num_sets": 3,
+        "play_all_sets": False,
+        "draws_allowed": True,
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+        )
+        assert response.get("success") is True, response
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.draws_allowed is False
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_create_ranking_best_of_n_normalizes_draws_allowed_to_false(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """POST with best-of-n mode active and draws_allowed true is normalized to false."""
+    response = await send_tournament_request(
+        HTTPMethod.POST,
+        "rankings",
+        auth_context,
+        json={
+            "scoring_type": "MATCH_POINTS",
+            "num_sets": 3,
+            "play_all_sets": False,
+            "draws_allowed": True,
+        },
+    )
+    assert response.get("success") is True, response
+
+    tournament_id = auth_context.tournament.id
+    rankings_list = await get_all_rankings_in_tournament(tournament_id)
+    created = next(r for r in rankings_list if r.position != 0)
+    try:
+        assert created.num_sets == 3
+        assert created.play_all_sets is False
+        assert created.draws_allowed is False
+    finally:
+        await sql_delete_ranking(tournament_id, created.id)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_single_set_keeps_independent_draws_allowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A single-set ranking (num_sets == 1) is never in best-of-n mode, so draws_allowed stays
+    freely configurable even with play_all_sets off.
+    """
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "num_sets": 1,
+        "play_all_sets": False,
+        "draws_allowed": True,
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+        )
+        assert response.get("success") is True, response
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.draws_allowed is True
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_play_all_sets_on_keeps_independent_draws_allowed(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A ranking with play_all_sets on is never in best-of-n mode even with num_sets > 1, so
+    draws_allowed and even num_sets both keep today's independent behaviour.
+    """
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "num_sets": 2,
+        "play_all_sets": True,
+        "draws_allowed": True,
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+        )
+        assert response.get("success") is True, response
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.draws_allowed is True
+        assert updated.num_sets == 2
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_update_ranking_even_sets_round_robin_succeeds(
     startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
 ) -> None:
-    """PUT with even num_sets is allowed when all associated stage items are ROUND_ROBIN."""
-    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2}
+    """PUT with even num_sets is allowed when all associated stage items are ROUND_ROBIN.
+
+    `play_all_sets` is explicitly on here so best-of-n mode isn't active: this test is only
+    about the single-elimination-specific even-sets rule, which the best-of-n invariant
+    (covered separately) doesn't touch.
+    """
+    body = {"scoring_type": "MATCH_POINTS", "num_sets": 2, "play_all_sets": True}
     tournament_id = auth_context.tournament.id
     async with inserted_ranking(
         DUMMY_RANKING1.model_copy(update={"tournament_id": tournament_id})

@@ -4,7 +4,7 @@ import { Ranking } from '@openapi';
 
 import { Translator } from './types';
 
-import { getPlayAllSetsDefault, getRankingTitle } from './rankings';
+import { getPlayAllSetsDefault, getRankingTitle, isBestOfNMode } from './rankings';
 
 const t = ((key: string) => (key === 'ranking_title' ? 'Ranking' : key)) as unknown as Translator;
 
@@ -41,6 +41,23 @@ describe('getPlayAllSetsDefault', () => {
 
   it('defaults to best-of behaviour for SET_POINTS_WITH_MATCH_BONUS', () => {
     expect(getPlayAllSetsDefault('SET_POINTS_WITH_MATCH_BONUS')).toBe(false);
+  });
+});
+
+describe('isBestOfNMode', () => {
+  it('is inactive when play_all_sets is on, regardless of num_sets', () => {
+    expect(isBestOfNMode(true, 1)).toBe(false);
+    expect(isBestOfNMode(true, 3)).toBe(false);
+  });
+
+  it('is inactive for a single-set ranking, regardless of play_all_sets', () => {
+    expect(isBestOfNMode(false, 1)).toBe(false);
+    expect(isBestOfNMode(true, 1)).toBe(false);
+  });
+
+  it('is active when play_all_sets is off and num_sets is greater than one', () => {
+    expect(isBestOfNMode(false, 3)).toBe(true);
+    expect(isBestOfNMode(false, 2)).toBe(true);
   });
 });
 

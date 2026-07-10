@@ -31,7 +31,7 @@ import TournamentLayout from '@pages/tournaments/_tournament_layout';
 import { getRankings, getStages, getTournamentById } from '@services/adapter';
 import { createRanking, deleteRanking, editRanking } from '@services/ranking';
 
-import { getPlayAllSetsDefault, getRankingTitle } from '@components/utils/rankings';
+import { getPlayAllSetsDefault, getRankingTitle, isBestOfNMode } from '@components/utils/rankings';
 
 function RankingDeleteButton({
   t,
@@ -99,14 +99,26 @@ function EditRankingForm({
     },
     validate: {},
   });
-  const hasEvenSetsError =
+  const isBestOfNActive = isBestOfNMode(form.values.play_all_sets, form.values.num_sets);
+  const hasEvenSetsSingleElimError =
     form.values.num_sets % 2 === 0 &&
     stageItemsForRanking.some((si) => si.type === 'SINGLE_ELIMINATION');
+  const hasEvenSetsBestOfNError = isBestOfNActive && form.values.num_sets % 2 === 0;
+  const hasEvenSetsError = hasEvenSetsSingleElimError || hasEvenSetsBestOfNError;
+  // Draws are forced off whenever best-of-n mode is active, regardless of the checkbox's
+  // last stored value, so the invariant holds even if the field wasn't explicitly touched.
+  const effectiveDrawsAllowed = isBestOfNActive ? false : form.values.draws_allowed;
   const rankingTitle = getRankingTitle(ranking, t);
 
   return (
     <form
       onSubmit={form.onSubmit(async (values) => {
+        // Draws are forced off whenever best-of-n mode is active, regardless of the
+        // checkbox's last stored value, so the invariant holds even if a client submits
+        // without the field having been touched (the backend also normalizes this).
+        const submittedDrawsAllowed = isBestOfNMode(values.play_all_sets, values.num_sets)
+          ? false
+          : values.draws_allowed;
         await editRanking(
           tournament.id,
           ranking.id,
@@ -118,7 +130,7 @@ function EditRankingForm({
           values.num_sets > 2 ? values.last_set_max_points : null,
           values.two_point_advantage,
           values.play_all_sets,
-          values.draws_allowed,
+          submittedDrawsAllowed,
           values.name,
           values.win_points,
           values.draw_points,
@@ -204,7 +216,12 @@ function EditRankingForm({
             label={t('num_sets_label')}
             {...form.getInputProps('num_sets')}
           />
-          {hasEvenSetsError && (
+          {hasEvenSetsBestOfNError && (
+            <Text c="red" size="sm" mt="xs">
+              {t('even_sets_best_of_n_error')}
+            </Text>
+          )}
+          {!hasEvenSetsBestOfNError && hasEvenSetsSingleElimError && (
             <Text c="red" size="sm" mt="xs">
               {t('even_sets_single_elim_error')}
             </Text>
@@ -232,7 +249,10 @@ function EditRankingForm({
           <Checkbox
             mt="lg"
             label={t('allow_draws_label')}
+            description={isBestOfNActive ? t('allow_draws_disabled_best_of_n_hint') : undefined}
+            disabled={isBestOfNActive}
             {...form.getInputProps('draws_allowed', { type: 'checkbox' })}
+            checked={effectiveDrawsAllowed}
           />
           {form.values.num_sets > 2 && (
             <NumberInput
