@@ -33,6 +33,7 @@ import { responseIsValid } from '@components/utils/util';
 import { getScoreColors } from '@logic/colors';
 import {
   getDisplayScores,
+  getHighlightedDisplayScores,
   getScoreTrackingViewState,
   getVisibleSets,
   isEndSetDisabled,
@@ -423,6 +424,38 @@ export function ScoreTrackingMatchView({
   const numSets = match.num_sets;
   const isMultiSet = numSets > 1;
 
+  function renderCompletedScoreRow(teamIndex: 0 | 1) {
+    const visibleSets = getVisibleSets(match);
+
+    return (
+      <Group key={displayedTeams[teamIndex].slot} justify="space-between" wrap="nowrap" gap="md">
+        <Text fw={500} style={{ flex: '1 1 auto', minWidth: 0 }}>
+          {displayedTeams[teamIndex].name}
+        </Text>
+        <Group gap="xs" wrap="nowrap" style={{ flex: '0 0 auto' }}>
+          {visibleSets.map((set) => {
+            const scores = getHighlightedDisplayScores(set, isSwapped);
+            const score = teamIndex === 0 ? scores.first : scores.second;
+            const maxScore = Math.max(set.stage_item_input1_score, set.stage_item_input2_score);
+            const minWidth = maxScore >= 100 ? '3rem' : maxScore >= 10 ? '2.5rem' : '2rem';
+            return (
+              <Text
+                key={set.id}
+                ta="center"
+                fz="xl"
+                fw={score.isHigher ? 900 : 500}
+                lh={1.2}
+                style={{ minWidth }}
+              >
+                {score.value}
+              </Text>
+            );
+          })}
+        </Group>
+      </Group>
+    );
+  }
+
   function renderNotStarted() {
     return (
       <Stack align="center" gap="lg">
@@ -454,30 +487,38 @@ export function ScoreTrackingMatchView({
 
   function renderCompleted() {
     return (
-      <Group gap="sm" justify="center" w="100%" maw={368} mx="auto">
-        <Button
-          size="md"
-          variant="light"
-          miw={160}
-          style={{ flex: '1 1 160px' }}
-          loading={isSaving}
-          onClick={() => runAction(actions.reopenMatch)}
-        >
-          {t('resume_match_button')}
-        </Button>
-        {nextMatchHref != null ? (
+      <Stack gap="lg" align="center">
+        <Card withBorder radius="md" p="md" w="100%" maw={520}>
+          <Stack gap="sm">
+            {renderCompletedScoreRow(0)}
+            {renderCompletedScoreRow(1)}
+          </Stack>
+        </Card>
+        <Group gap="sm" justify="center" w="100%" maw={368}>
           <Button
-            component={PreloadLink}
-            href={nextMatchHref}
             size="md"
-            color="blue"
+            variant="light"
             miw={160}
             style={{ flex: '1 1 160px' }}
+            loading={isSaving}
+            onClick={() => runAction(actions.reopenMatch)}
           >
-            {t('next_match_button')}
+            {t('resume_match_button')}
           </Button>
-        ) : null}
-      </Group>
+          {nextMatchHref != null ? (
+            <Button
+              component={PreloadLink}
+              href={nextMatchHref}
+              size="md"
+              color="blue"
+              miw={160}
+              style={{ flex: '1 1 160px' }}
+            >
+              {t('next_match_button')}
+            </Button>
+          ) : null}
+        </Group>
+      </Stack>
     );
   }
 
@@ -633,14 +674,19 @@ export function ScoreTrackingMatchView({
     return renderPlaying(viewState.set);
   }
 
+  const title =
+    viewState?.kind === 'completed'
+      ? t('score_tracking_match_over_title')
+      : t('score_tracking_match_title');
+
   return (
     <Container size="sm" py="xl">
       <Stack gap="lg">
         <Stack gap={0}>
-          <Title order={2}>{t('score_tracking_match_title')}</Title>
+          <Title order={2}>{title}</Title>
           {match.court != null ? (
             <Text c="dimmed" fw={500}>
-              {match.court.name}
+              {t('court_label')}: {match.court.name}
             </Text>
           ) : null}
         </Stack>

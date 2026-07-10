@@ -48,6 +48,19 @@ export function getDisplayScores(
     : { first: set.stage_item_input1_score, second: set.stage_item_input2_score };
 }
 
+export type HighlightedDisplayScore = { value: number; isHigher: boolean };
+
+export function getHighlightedDisplayScores(
+  set: Pick<MatchSet, 'stage_item_input1_score' | 'stage_item_input2_score'>,
+  isSwapped: boolean
+): { first: HighlightedDisplayScore; second: HighlightedDisplayScore } {
+  const { first, second } = getDisplayScores(set, isSwapped);
+  return {
+    first: { value: first, isHigher: first > second },
+    second: { value: second, isHigher: second > first },
+  };
+}
+
 export function nextScoresAfterAdjust(
   set: Pick<MatchSet, 'stage_item_input1_score' | 'stage_item_input2_score'>,
   slot: 1 | 2,

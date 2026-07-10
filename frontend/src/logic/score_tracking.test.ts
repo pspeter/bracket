@@ -4,6 +4,7 @@ import { MatchSet, MatchWithDetails } from '@openapi';
 
 import {
   getDisplayScores,
+  getHighlightedDisplayScores,
   getNextMatchOnCourt,
   getScoreTrackingViewState,
   getVisibleSets,
@@ -353,6 +354,47 @@ describe('getDisplayScores', () => {
       stage_item_input2_score: 7,
     });
     expect(getDisplayScores(set, true)).toEqual({ first: 7, second: 11 });
+  });
+});
+
+describe('getHighlightedDisplayScores', () => {
+  it('marks only the higher visible score', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'COMPLETED',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 17,
+    });
+    expect(getHighlightedDisplayScores(set, false)).toEqual({
+      first: { value: 21, isHigher: true },
+      second: { value: 17, isHigher: false },
+    });
+  });
+
+  it('keeps the highlight with the score when sides are swapped', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'COMPLETED',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 17,
+    });
+    expect(getHighlightedDisplayScores(set, true)).toEqual({
+      first: { value: 17, isHigher: false },
+      second: { value: 21, isHigher: true },
+    });
+  });
+
+  it('does not mark either score on a draw', () => {
+    const set = makeSet({
+      set_number: 1,
+      state: 'COMPLETED',
+      stage_item_input1_score: 21,
+      stage_item_input2_score: 21,
+    });
+    expect(getHighlightedDisplayScores(set, false)).toEqual({
+      first: { value: 21, isHigher: false },
+      second: { value: 21, isHigher: false },
+    });
   });
 });
 
