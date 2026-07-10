@@ -36,6 +36,7 @@ class RankingBase(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    play_all_sets: bool = True
     side_switch_every_n_points: int | None = None
     draws_allowed: bool = True
 
@@ -65,6 +66,9 @@ class RankingMatchPointsBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    # Best-of behaviour by default: only the points of the whole match count here, so there
+    # is no reason to play out dead rubbers.
+    play_all_sets: bool = False
     position: int | None = None
     side_switch_every_n_points: int | None = None
     draws_allowed: bool = True
@@ -77,6 +81,8 @@ class RankingSetPointsBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    # Every set's points count toward standings, so play them all by default.
+    play_all_sets: bool = True
     position: int | None = None
     side_switch_every_n_points: int | None = None
     draws_allowed: bool = True
@@ -90,6 +96,8 @@ class RankingSetPointsWithMatchBonusBody(BaseModel):
     max_points: int = 21
     last_set_max_points: int | None = None
     two_point_advantage: bool = True
+    # The match bonus dominates, so best-of behaviour is the expected default.
+    play_all_sets: bool = False
     position: int | None = None
     side_switch_every_n_points: int | None = None
     draws_allowed: bool = True

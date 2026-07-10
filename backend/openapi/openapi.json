@@ -488,6 +488,11 @@
             "title": "Match Sets",
             "type": "array"
           },
+          "play_all_sets": {
+            "default": true,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "referee_name": {
             "anyOf": [
               {
@@ -641,6 +646,7 @@
           "stage_item_input1",
           "stage_item_input2",
           "match_sets",
+          "play_all_sets",
           "state"
         ],
         "title": "Match",
@@ -1056,6 +1062,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": true,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "referee": {
             "anyOf": [
               {
@@ -1242,6 +1253,7 @@
           "stage_item_input1",
           "stage_item_input2",
           "match_sets",
+          "play_all_sets",
           "court",
           "referee",
           "level_id",
@@ -1382,6 +1394,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": true,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "referee": {
             "anyOf": [
               {
@@ -1562,6 +1579,7 @@
           "stage_item_input1",
           "stage_item_input2",
           "match_sets",
+          "play_all_sets",
           "level_id",
           "court",
           "referee",
@@ -1927,6 +1945,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": true,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "position": {
             "title": "Position",
             "type": "integer"
@@ -1976,6 +1999,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "play_all_sets",
           "side_switch_every_n_points",
           "draws_allowed",
           "id",
@@ -2051,6 +2075,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": false,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "position": {
             "anyOf": [
               {
@@ -2108,6 +2137,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "play_all_sets",
           "position",
           "side_switch_every_n_points",
           "draws_allowed"
@@ -2180,6 +2210,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": true,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "position": {
             "anyOf": [
               {
@@ -2221,6 +2256,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "play_all_sets",
           "position",
           "side_switch_every_n_points",
           "draws_allowed"
@@ -2280,6 +2316,11 @@
             "title": "Num Sets",
             "type": "integer"
           },
+          "play_all_sets": {
+            "default": false,
+            "title": "Play All Sets",
+            "type": "boolean"
+          },
           "position": {
             "anyOf": [
               {
@@ -2322,6 +2363,7 @@
           "max_points",
           "last_set_max_points",
           "two_point_advantage",
+          "play_all_sets",
           "position",
           "side_switch_every_n_points",
           "draws_allowed"

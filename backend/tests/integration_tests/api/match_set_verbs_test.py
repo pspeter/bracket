@@ -13,6 +13,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputInsertable,
 )
+from bracket.models.db.util import StageItemWithRounds
 from bracket.schema import rankings, tournaments
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
@@ -29,7 +30,7 @@ from bracket.utils.dummy_records import (
     DUMMY_TEAM4,
 )
 from bracket.utils.http import HTTPMethod
-from bracket.utils.id_types import MatchId
+from bracket.utils.id_types import MatchId, StageItemId, TournamentId
 from tests.integration_tests.api.shared import (
     complete_match,
     send_request,
@@ -903,18 +904,219 @@ async def test_score_edit_collapses_best_of_three_to_fewer_played_sets(
             await sql_delete_stage_item_with_foreign_keys(stage_item.id)
 
 
+@pytest.mark.asyncio(loop_scope="session")
+async def test_best_of_n_completes_match_at_set_majority(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """In a Bo3 with "play out all sets" off, winning two sets ends the match on the spot:
+    no dead rubber is started, ``completed_at`` is stamped, and the winner advances into the
+    elimination final through the ordinary reconciliation path."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        winner_input_id = semi.stage_item_input1_id
+        assert len(semi.match_sets) == 3
+
+        first = await complete_match(
+            auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15
+        )
+        assert first["data"]["state"] == "IN_PROGRESS"
+        assert first["data"]["completed_at"] is None
+
+        decided = await complete_match(
+            auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10
+        )
+        assert decided["data"]["state"] == "COMPLETED"
+        assert decided["data"]["completed_at"] is not None
+        assert decided["data"]["play_all_sets"] is False
+        assert decided["data"]["match_sets"][2]["state"] == "NOT_STARTED"
+
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        final = bracket.rounds[1].matches[0]
+        assert final.stage_item_input1_id == winner_input_id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_best_of_n_start_rejected_on_decided_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        await complete_match(auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10)
+
+        response = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{semi.id}/start", auth_context
+        )
+        assert response == {"detail": "Cannot start: the match is already decided"}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_best_of_n_reopen_regresses_early_ended_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Reopening the decisive set of an early-ended match puts it back in progress with the
+    remaining set startable again."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        await complete_match(auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10)
+
+        reopened = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{semi.id}/reopen", auth_context
+        )
+        assert reopened["data"]["state"] == "IN_PROGRESS"
+        assert reopened["data"]["completed_at"] is None
+        assert reopened["data"]["match_sets"][1]["state"] == "IN_PROGRESS"
+
+        # Flip the reopened set so the match stands 1-1 after ending it: the third set
+        # must be startable again.
+        await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{semi.id}/sets/{semi.match_sets[1].id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 10, "stage_item_input2_score": 21},
+        )
+        levelled = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{semi.id}/end", auth_context
+        )
+        assert levelled["data"]["state"] == "IN_PROGRESS"
+
+        third_started = await send_tournament_request(
+            HTTPMethod.POST, f"matches/{semi.id}/start", auth_context
+        )
+        assert third_started["data"]["match_sets"][2]["state"] == "IN_PROGRESS"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_best_of_n_score_edit_undecides_early_ended_match(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Editing a set score so the majority evaporates regresses the early-ended match to
+    in-progress via derivation; no set rows are deleted."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        await complete_match(auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10)
+
+        undecided = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{semi.id}/sets/{semi.match_sets[1].id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 10, "stage_item_input2_score": 10},
+        )
+        assert undecided["data"]["state"] == "IN_PROGRESS"
+        assert undecided["data"]["completed_at"] is None
+        assert len(undecided["data"]["match_sets"]) == 3
+        assert undecided["data"]["match_sets"][2]["state"] == "NOT_STARTED"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_best_of_n_surplus_completed_sets_keep_counting(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A history-rewriting edit that makes the match "really" decided after two sets leaves the
+    surplus third set recorded and counting toward set statistics; the winner is unaffected."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=False),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        winner_input_id = semi.stage_item_input1_id
+
+        # A full three-setter: input1 wins sets 1 and 3, input2 wins set 2.
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        await complete_match(auth_context, semi.id, semi.match_sets[1].id, score1=10, score2=21)
+        await complete_match(auth_context, semi.id, semi.match_sets[2].id, score1=21, score2=10)
+
+        # Correction: input1 actually won set 2 as well, so the match was decided after two
+        # sets and set 3 is surplus history.
+        edited = await send_tournament_request(
+            HTTPMethod.POST,
+            f"matches/{semi.id}/sets/{semi.match_sets[1].id}/score-edit",
+            auth_context,
+            json={"stage_item_input1_score": 21, "stage_item_input2_score": 19},
+        )
+        assert edited["data"]["state"] == "COMPLETED"
+        assert edited["data"]["completed_at"] is not None
+        assert len(edited["data"]["match_sets"]) == 3
+        assert all(s["state"] == "COMPLETED" for s in edited["data"]["match_sets"])
+
+        # The surplus set still counts toward set statistics: the winner is 3-0 up in sets.
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        winner_input = next(i for i in bracket.inputs if i.id == winner_input_id)
+        assert winner_input.set_difference == 3
+
+        final = bracket.rounds[1].matches[0]
+        assert final.stage_item_input1_id == winner_input_id
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_play_all_sets_on_still_requires_every_set(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """With "play out all sets" on (the pre-existing behaviour), a 2-0 lead in a Bo3 does not
+    complete the match; the third set must be played."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        _best_of_three_ranking(auth_context, play_all_sets=True),
+        _four_team_elimination(auth_context) as stage_item_id,
+    ):
+        bracket = await _get_stage_item_details(tournament_id, stage_item_id)
+        semi = bracket.rounds[0].matches[0]
+        await complete_match(auth_context, semi.id, semi.match_sets[0].id, score1=21, score2=15)
+        two_up = await complete_match(
+            auth_context, semi.id, semi.match_sets[1].id, score1=21, score2=10
+        )
+        assert two_up["data"]["state"] == "IN_PROGRESS"
+        assert two_up["data"]["completed_at"] is None
+        assert two_up["data"]["play_all_sets"] is True
+
+        third = await complete_match(
+            auth_context, semi.id, semi.match_sets[2].id, score1=21, score2=10
+        )
+        assert third["data"]["state"] == "COMPLETED"
+
+
 @asynccontextmanager
-async def _best_of_three_ranking(auth_context: AuthContext) -> AsyncIterator[None]:
+async def _best_of_three_ranking(
+    auth_context: AuthContext, *, play_all_sets: bool = True
+) -> AsyncIterator[None]:
     """Temporarily configure the session-scoped ranking as best-of-3."""
     ranking_id = auth_context.ranking.id
     await database.execute(
-        query=rankings.update().where(rankings.c.id == ranking_id).values(num_sets=3),
+        query=rankings.update()
+        .where(rankings.c.id == ranking_id)
+        .values(num_sets=3, play_all_sets=play_all_sets),
     )
     try:
         yield
     finally:
         await database.execute(
-            query=rankings.update().where(rankings.c.id == ranking_id).values(num_sets=1),
+            query=rankings.update()
+            .where(rankings.c.id == ranking_id)
+            .values(num_sets=1, play_all_sets=True),
         )
 
 
@@ -931,6 +1133,47 @@ async def _draws_disallowed_ranking(auth_context: AuthContext) -> AsyncIterator[
         await database.execute(
             query=rankings.update().where(rankings.c.id == ranking_id).values(draws_allowed=True),
         )
+
+
+@asynccontextmanager
+async def _four_team_elimination(auth_context: AuthContext) -> AsyncIterator[StageItemId]:
+    """A 4-team single elimination stage item (two semis feeding a final), built and torn down."""
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as t1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament_id})) as t2,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as t3,
+        inserted_team(DUMMY_TEAM4.model_copy(update={"tournament_id": tournament_id})) as t4,
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})) as stage,
+    ):
+        stage_item = await sql_create_stage_item_with_inputs(
+            tournament_id,
+            StageItemWithInputsCreate(
+                stage_id=stage.id,
+                name="Elimination",
+                team_count=4,
+                type=StageType.SINGLE_ELIMINATION,
+                ranking_id=auth_context.ranking.id,
+                inputs=[
+                    StageItemInputCreateBodyFinal(slot=1, team_id=t1.id),
+                    StageItemInputCreateBodyFinal(slot=2, team_id=t2.id),
+                    StageItemInputCreateBodyFinal(slot=3, team_id=t3.id),
+                    StageItemInputCreateBodyFinal(slot=4, team_id=t4.id),
+                ],
+            ),
+        )
+        await build_matches_for_stage_item(stage_item, tournament_id)
+        try:
+            yield stage_item.id
+        finally:
+            await sql_delete_stage_item_with_foreign_keys(stage_item.id)
+
+
+async def _get_stage_item_details(
+    tournament_id: TournamentId, stage_item_id: StageItemId
+) -> StageItemWithRounds:
+    details = await get_full_tournament_details(tournament_id)
+    return next(si for s in details for si in s.stage_items if si.id == stage_item_id)
 
 
 @asynccontextmanager

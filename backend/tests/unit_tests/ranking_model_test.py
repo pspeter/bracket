@@ -180,6 +180,29 @@ def test_migration_add_draws_allowed_exists_and_chains_from_head() -> None:
     assert callable(migration.downgrade)
 
 
+def test_schema_rankings_has_play_all_sets_column() -> None:
+    from bracket.schema import rankings
+
+    assert "play_all_sets" in rankings.c.keys()
+
+
+def test_migration_add_play_all_sets_exists_and_chains_from_draws_allowed() -> None:
+    import importlib.util
+    from pathlib import Path
+
+    versions_dir = Path(__file__).parent.parent.parent / "alembic" / "versions"
+    files = list(versions_dir.glob("*add_play_all_sets_to_rankings*.py"))
+    assert files, "No add_play_all_sets_to_rankings migration file found"
+    path = files[0]
+    spec = importlib.util.spec_from_file_location("migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.down_revision == "b6e3f9a2c7d5"
+    assert callable(migration.upgrade)
+    assert callable(migration.downgrade)
+
+
 def test_schema_subtype_tables_exist() -> None:
     from bracket.schema import (
         ranking_match_points,

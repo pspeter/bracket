@@ -1,6 +1,15 @@
-import { Ranking } from '@openapi';
+import { Ranking, ScoringType } from '@openapi';
 
 import { Translator } from './types';
+
+/**
+ * The default for "Play out all sets" per scoring type, mirroring the backend's creation
+ * defaults: only "set points" scoring gives every set intrinsic standings value, so only
+ * there do all sets play out by default.
+ */
+export function getPlayAllSetsDefault(scoringType: ScoringType): boolean {
+  return scoringType === 'SET_POINTS';
+}
 
 /**
  * The label shown for a ranking. Uses the ranking's custom name when one is set,

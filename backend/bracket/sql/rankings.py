@@ -54,6 +54,7 @@ def _row_to_ranking(row: Record) -> Ranking:
         max_points=m["max_points"],
         last_set_max_points=m.get("last_set_max_points"),
         two_point_advantage=m["two_point_advantage"],
+        play_all_sets=m["play_all_sets"],
         draws_allowed=m["draws_allowed"],
         level_id=m.get("level_id"),
         side_switch_every_n_points=m.get("side_switch_every_n_points"),
@@ -177,6 +178,7 @@ async def sql_update_ranking(
                 max_points = :max_points,
                 last_set_max_points = :last_set_max_points,
                 two_point_advantage = :two_point_advantage,
+                play_all_sets = :play_all_sets,
                 side_switch_every_n_points = :side_switch_every_n_points,
                 draws_allowed = :draws_allowed
             WHERE rankings.tournament_id = :tournament_id
@@ -192,6 +194,7 @@ async def sql_update_ranking(
             "max_points": ranking_body.max_points,
             "last_set_max_points": ranking_body.last_set_max_points,
             "two_point_advantage": ranking_body.two_point_advantage,
+            "play_all_sets": ranking_body.play_all_sets,
             "side_switch_every_n_points": ranking_body.side_switch_every_n_points,
             "draws_allowed": ranking_body.draws_allowed,
         },
@@ -247,12 +250,13 @@ async def sql_create_ranking(
         query="""
             INSERT INTO rankings
             (tournament_id, position, name, scoring_type, num_sets, max_points,
-             last_set_max_points, two_point_advantage, level_id, side_switch_every_n_points,
-             draws_allowed)
+             last_set_max_points, two_point_advantage, play_all_sets, level_id,
+             side_switch_every_n_points, draws_allowed)
             VALUES (
                 :tournament_id, :position, :name, :scoring_type, :num_sets, :max_points,
-                :last_set_max_points, :two_point_advantage, :level_id, :side_switch_every_n_points,
-                :draws_allowed
+                :last_set_max_points, :two_point_advantage, :play_all_sets, :level_id,
+                :side_switch_every_n_points, :draws_allowed
+
             )
             RETURNING id
         """,
@@ -265,6 +269,7 @@ async def sql_create_ranking(
             "max_points": ranking_body.max_points,
             "last_set_max_points": ranking_body.last_set_max_points,
             "two_point_advantage": ranking_body.two_point_advantage,
+            "play_all_sets": ranking_body.play_all_sets,
             "level_id": level_id,
             "side_switch_every_n_points": ranking_body.side_switch_every_n_points,
             "draws_allowed": ranking_body.draws_allowed,

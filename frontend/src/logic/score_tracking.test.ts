@@ -6,6 +6,7 @@ import {
   getDisplayScores,
   getNextMatchOnCourt,
   getScoreTrackingViewState,
+  getVisibleSets,
   isEndSetDisabled,
   nextScoresAfterAdjust,
 } from './score_tracking';
@@ -76,6 +77,59 @@ describe('getScoreTrackingViewState', () => {
   it('returns completed for single set COMPLETED', () => {
     const sets = [makeSet({ set_number: 1, state: 'COMPLETED' })];
     expect(getScoreTrackingViewState(sets)).toEqual({ kind: 'completed' });
+  });
+
+  it('trusts a COMPLETED match over remaining not-started sets (best-of-n early end)', () => {
+    // A Bo3 decided 2-0: the backend derives COMPLETED even though set 3 was never played.
+    // The tracker must not offer "start next set" on a decided match.
+    const sets = [
+      makeSet({ set_number: 1, state: 'COMPLETED', stage_item_input1_score: 21 }),
+      makeSet({ set_number: 2, state: 'COMPLETED', stage_item_input1_score: 21 }),
+      makeSet({ set_number: 3, state: 'NOT_STARTED' }),
+    ];
+    expect(getScoreTrackingViewState(sets, 'COMPLETED')).toEqual({ kind: 'completed' });
+  });
+
+  it('keeps between_sets when the match is not completed', () => {
+    const set1 = makeSet({ set_number: 1, state: 'COMPLETED' });
+    const set2 = makeSet({ set_number: 2, state: 'NOT_STARTED' });
+    expect(getScoreTrackingViewState([set1, set2], 'IN_PROGRESS')).toEqual({
+      kind: 'between_sets',
+      completed: set1,
+      next: set2,
+      allSets: [set1, set2],
+    });
+  });
+});
+
+describe('getVisibleSets', () => {
+  it('hides unplayed sets on a completed match', () => {
+    // A Bo3 won 2-0 shows two sets, period.
+    const played = [
+      makeSet({ set_number: 1, state: 'COMPLETED', stage_item_input1_score: 21 }),
+      makeSet({ set_number: 2, state: 'COMPLETED', stage_item_input1_score: 21 }),
+    ];
+    const unplayed = makeSet({ set_number: 3, state: 'NOT_STARTED' });
+    expect(getVisibleSets({ state: 'COMPLETED', match_sets: [...played, unplayed] })).toEqual(
+      played
+    );
+  });
+
+  it('shows all sets while the match is still in progress', () => {
+    const sets = [
+      makeSet({ set_number: 1, state: 'COMPLETED', stage_item_input1_score: 21 }),
+      makeSet({ set_number: 2, state: 'IN_PROGRESS' }),
+      makeSet({ set_number: 3, state: 'NOT_STARTED' }),
+    ];
+    expect(getVisibleSets({ state: 'IN_PROGRESS', match_sets: sets })).toEqual(sets);
+  });
+
+  it('shows all sets on a fully played completed match', () => {
+    const sets = [
+      makeSet({ set_number: 1, state: 'COMPLETED', stage_item_input1_score: 21 }),
+      makeSet({ set_number: 2, state: 'COMPLETED', stage_item_input1_score: 21 }),
+    ];
+    expect(getVisibleSets({ state: 'COMPLETED', match_sets: sets })).toEqual(sets);
   });
 });
 

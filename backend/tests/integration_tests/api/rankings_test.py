@@ -62,6 +62,7 @@ async def test_rankings_endpoint(
                     "max_points": 21,
                     "last_set_max_points": None,
                     "two_point_advantage": True,
+                    "play_all_sets": True,
                     "draws_allowed": True,
                     "match_points": {
                         "win_points": "1.0",
@@ -139,6 +140,71 @@ async def test_create_ranking_set_points_with_match_bonus(
     assert bonus_ranking.set_points_with_bonus is not None
     assert bonus_ranking.set_points_with_bonus.match_bonus_points == Decimal("2.0")
     await sql_delete_ranking(tournament_id, bonus_ranking.id)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize(
+    ("scoring_type", "expected_play_all_sets"),
+    [
+        ("MATCH_POINTS", False),
+        ("SET_POINTS", True),
+        ("SET_POINTS_WITH_MATCH_BONUS", False),
+    ],
+)
+async def test_create_ranking_play_all_sets_default_per_scoring_type(
+    startup_and_shutdown_uvicorn_server: None,
+    auth_context: AuthContext,
+    scoring_type: str,
+    expected_play_all_sets: bool,
+) -> None:
+    response = await send_tournament_request(
+        HTTPMethod.POST,
+        "rankings",
+        auth_context,
+        json={"scoring_type": scoring_type},
+    )
+    assert response.get("success") is True, response
+
+    tournament_id = auth_context.tournament.id
+    rankings_list = await get_all_rankings_in_tournament(tournament_id)
+    created = next(r for r in rankings_list if r.position != 0)
+    try:
+        assert created.scoring_type == ScoringType(scoring_type)
+        assert created.play_all_sets is expected_play_all_sets
+    finally:
+        await sql_delete_ranking(tournament_id, created.id)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_update_ranking_round_trips_play_all_sets(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    body = {
+        "scoring_type": "MATCH_POINTS",
+        "num_sets": 3,
+        "play_all_sets": True,
+    }
+    async with inserted_ranking(
+        DUMMY_RANKING1.model_copy(update={"tournament_id": auth_context.tournament.id})
+    ) as ranking_inserted:
+        response = await send_tournament_request(
+            HTTPMethod.PUT, f"rankings/{ranking_inserted.id}", auth_context, json=body
+        )
+        assert response["success"] is True
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.play_all_sets is True
+
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"rankings/{ranking_inserted.id}",
+            auth_context,
+            json={**body, "play_all_sets": False},
+        )
+        assert response["success"] is True
+        updated_rankings = await get_all_rankings_in_tournament(auth_context.tournament.id)
+        updated = next(r for r in updated_rankings if r.id == ranking_inserted.id)
+        assert updated.play_all_sets is False
 
 
 @pytest.mark.asyncio(loop_scope="session")

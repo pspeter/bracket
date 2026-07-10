@@ -51,6 +51,55 @@ def test_derive_match_state(sets: list[MatchSet], expected: MatchState) -> None:
     assert derive_match_state(sets) is expected
 
 
+def _completed_set(score1: int, score2: int) -> MatchSet:
+    return _set(MatchSetState.COMPLETED, score1, score2)
+
+
+_NOT_STARTED = _set(MatchSetState.NOT_STARTED)
+_IN_PROGRESS = _set(MatchSetState.IN_PROGRESS)
+
+
+@pytest.mark.parametrize(
+    ("sets", "expected"),
+    [
+        # Majority reached in a Bo3: decided without playing the dead rubber.
+        ([_completed_set(21, 10), _completed_set(21, 15), _NOT_STARTED], MatchState.COMPLETED),
+        # One set apiece: not decided yet.
+        ([_completed_set(21, 10), _completed_set(10, 21), _NOT_STARTED], MatchState.IN_PROGRESS),
+        # A drawn set counts toward neither side: 1 win is not a Bo3 majority.
+        ([_completed_set(21, 10), _completed_set(10, 10), _NOT_STARTED], MatchState.IN_PROGRESS),
+        # A set in progress always keeps the match in progress, even at majority.
+        ([_completed_set(21, 10), _completed_set(21, 15), _IN_PROGRESS], MatchState.IN_PROGRESS),
+        # Surplus completed sets (history rewritten by edits) don't undo completion.
+        (
+            [_completed_set(10, 21), _completed_set(21, 15), _completed_set(21, 15)],
+            MatchState.COMPLETED,
+        ),
+        # Bo5: 3 wins decide; 2 wins plus a draw do not.
+        (
+            [_completed_set(21, 1), _completed_set(21, 1), _completed_set(21, 1)]
+            + [_NOT_STARTED, _NOT_STARTED],
+            MatchState.COMPLETED,
+        ),
+        (
+            [_completed_set(21, 1), _completed_set(21, 1), _completed_set(10, 10)]
+            + [_NOT_STARTED, _NOT_STARTED],
+            MatchState.IN_PROGRESS,
+        ),
+        # Single-set matches behave as before regardless of the flag.
+        ([_completed_set(21, 10)], MatchState.COMPLETED),
+        ([_NOT_STARTED], MatchState.NOT_STARTED),
+    ],
+)
+def test_derive_match_state_best_of_n(sets: list[MatchSet], expected: MatchState) -> None:
+    assert derive_match_state(sets, play_all_sets=False) is expected
+
+
+def test_derive_match_state_play_all_sets_requires_every_set() -> None:
+    sets = [_completed_set(21, 10), _completed_set(21, 15), _NOT_STARTED]
+    assert derive_match_state(sets, play_all_sets=True) is MatchState.IN_PROGRESS
+
+
 def _match_with_sets(sets: list[MatchSet]) -> Match:
     return Match(
         id=MatchId(1),
@@ -106,6 +155,18 @@ def test_get_winner_three_sets_majority() -> None:
     assert match.get_winner() is match.stage_item_input1
     match2 = _match_with_inputs([_completed(10, 21), _completed(21, 5), _completed(19, 21)])
     assert match2.get_winner() is match2.stage_item_input2
+
+
+def test_match_state_uses_play_all_sets_flag() -> None:
+    sets = [_completed(21, 10), _completed(21, 15), _set(MatchSetState.NOT_STARTED)]
+    best_of_three = _match_with_inputs(sets).model_copy(update={"play_all_sets": False})
+    assert best_of_three.state is MatchState.COMPLETED
+    assert best_of_three.get_winner() is best_of_three.stage_item_input1
+
+    play_out_all = _match_with_inputs(sets)
+    assert play_out_all.play_all_sets is True
+    assert play_out_all.state is MatchState.IN_PROGRESS
+    assert play_out_all.get_winner() is None
 
 
 def test_derived_state_property_matches_helper() -> None:

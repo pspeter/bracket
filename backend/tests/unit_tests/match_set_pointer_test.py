@@ -26,6 +26,28 @@ def test_derive_match_state_from_pointer(
     assert derive_match_state_from_pointer(completed, num_sets, in_progress) is expected
 
 
+@pytest.mark.parametrize(
+    ("completed", "num_sets", "in_progress", "match_decided", "expected"),
+    [
+        # A decided best-of-n match is COMPLETED once no set is in progress.
+        (2, 3, False, True, MatchState.COMPLETED),
+        # Undecided (split or drawn sets): still in progress.
+        (2, 3, False, False, MatchState.IN_PROGRESS),
+        # A set in progress keeps the match in progress even at majority.
+        (2, 3, True, True, MatchState.IN_PROGRESS),
+    ],
+)
+def test_derive_match_state_from_pointer_best_of_n(
+    completed: int, num_sets: int, in_progress: bool, match_decided: bool, expected: MatchState
+) -> None:
+    assert (
+        derive_match_state_from_pointer(
+            completed, num_sets, in_progress, match_decided=match_decided
+        )
+        is expected
+    )
+
+
 def test_apply_start_from_not_started() -> None:
     assert apply_start(0, False, 3) == (0, True)
 
@@ -42,6 +64,15 @@ def test_apply_start_rejects_when_already_in_progress() -> None:
 def test_apply_start_rejects_when_all_sets_completed() -> None:
     with pytest.raises(IllegalMatchTransitionError):
         apply_start(3, False, 3)
+
+
+def test_apply_start_rejects_when_match_is_decided() -> None:
+    with pytest.raises(IllegalMatchTransitionError, match="decided"):
+        apply_start(2, False, 3, match_decided=True)
+
+
+def test_apply_start_between_sets_when_not_decided() -> None:
+    assert apply_start(2, False, 3, match_decided=False) == (2, True)
 
 
 def test_apply_end_completes_current_set() -> None:

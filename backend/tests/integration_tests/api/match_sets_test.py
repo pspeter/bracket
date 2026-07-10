@@ -86,7 +86,7 @@ async def test_multi_set_play_flow(
                 HTTPMethod.PUT,
                 f"rankings/{ranking_id}?force=true",
                 auth_context,
-                json=RankingMatchPointsBody(num_sets=3).model_dump(mode="json"),
+                json=RankingMatchPointsBody(num_sets=3, play_all_sets=True).model_dump(mode="json"),
             )
 
             # Re-fetch the match via a no-op score edit to see the resized set list.
@@ -129,7 +129,7 @@ async def test_multi_set_play_flow(
                 HTTPMethod.PUT,
                 f"rankings/{ranking_id}?force=true",
                 auth_context,
-                json=RankingMatchPointsBody(num_sets=1).model_dump(mode="json"),
+                json=RankingMatchPointsBody(num_sets=1, play_all_sets=True).model_dump(mode="json"),
             )
 
 
@@ -168,7 +168,7 @@ async def test_num_sets_change_requires_force_when_active_and_resizes(
         ) as match_inserted,
     ):
         ranking_id = auth_context.ranking.id
-        body = RankingMatchPointsBody(num_sets=3).model_dump(mode="json")
+        body = RankingMatchPointsBody(num_sets=3, play_all_sets=True).model_dump(mode="json")
 
         try:
             # A completed set blocks reducing/changing num_sets without force.
@@ -201,5 +201,5 @@ async def test_num_sets_change_requires_force_when_active_and_resizes(
                 HTTPMethod.PUT,
                 f"rankings/{ranking_id}?force=true",
                 auth_context,
-                json=RankingMatchPointsBody(num_sets=1).model_dump(mode="json"),
+                json=RankingMatchPointsBody(num_sets=1, play_all_sets=True).model_dump(mode="json"),
             )

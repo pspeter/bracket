@@ -9,7 +9,13 @@ from bracket.logic.match_sets.pointer import (
     apply_reset,
     apply_start,
 )
-from bracket.models.db.match import Match, MatchBody, MatchCreateBody, MatchWithDetails
+from bracket.models.db.match import (
+    Match,
+    MatchBody,
+    MatchCreateBody,
+    MatchWithDetails,
+    is_match_decided,
+)
 from bracket.models.db.tournament import Tournament
 from bracket.sql.match_sets import MATCH_SETS_SUBQUERY, sql_create_match_sets
 from bracket.utils.id_types import (
@@ -46,6 +52,25 @@ async def sql_delete_matches_for_stage_item_id(stage_item_id: StageItemId) -> No
         )
         """
     await database.execute(query=query, values={"stage_item_id": stage_item_id})
+
+
+async def sql_get_play_all_sets_for_match(match_id: MatchId) -> bool:
+    """Return the "play out all sets" flag of the ranking applicable to a match.
+
+    Falls back to True (play out all sets) when no ranking is found.
+    """
+    query = """
+        SELECT rankings.play_all_sets
+        FROM matches
+        JOIN rounds ON rounds.id = matches.round_id
+        JOIN stage_items ON stage_items.id = rounds.stage_item_id
+        JOIN rankings ON rankings.id = stage_items.ranking_id
+        WHERE matches.id = :match_id
+        """
+    result = await database.fetch_one(query=query, values={"match_id": match_id})
+    if result is None:
+        return True
+    return bool(result._mapping["play_all_sets"])
 
 
 async def sql_get_num_sets_for_round(round_id: RoundId) -> int:
@@ -279,6 +304,7 @@ MATCH_DETAILS_COLUMNS = f"""
     rankings.max_points AS max_points,
     rankings.last_set_max_points AS last_set_max_points,
     rankings.two_point_advantage AS two_point_advantage,
+    rankings.play_all_sets AS play_all_sets,
     rankings.draws_allowed AS draws_allowed,
     {MATCH_SETS_SUBQUERY}
 """
@@ -386,6 +412,19 @@ async def _lock_match_pointer(match_id: MatchId) -> tuple[int, bool, int]:
     )
 
 
+async def _is_match_decided(match_id: MatchId) -> bool:
+    """Whether one side already holds a best-of-n majority of this match's set wins.
+
+    Callers must hold the match pointer lock so the set states this reads are stable.
+    """
+    from bracket.sql.match_sets import get_sets_for_match
+
+    play_all_sets = await sql_get_play_all_sets_for_match(match_id)
+    if play_all_sets:
+        return False
+    return is_match_decided(await get_sets_for_match(match_id), play_all_sets)
+
+
 async def _update_match_pointer(
     match_id: MatchId, completed_set_count: int, current_set_in_progress: bool
 ) -> None:
@@ -406,7 +445,10 @@ async def _update_match_pointer(
 
 async def sql_start_match(match_id: MatchId) -> None:
     completed, in_progress, num_sets = await _lock_match_pointer(match_id)
-    new_completed, new_in_progress = apply_start(completed, in_progress, num_sets)
+    match_decided = await _is_match_decided(match_id)
+    new_completed, new_in_progress = apply_start(
+        completed, in_progress, num_sets, match_decided=match_decided
+    )
     await _update_match_pointer(match_id, new_completed, new_in_progress)
 
 

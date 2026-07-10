@@ -315,6 +315,7 @@ rankings = Table(
     Column("max_points", Integer, nullable=False, server_default="21"),
     Column("last_set_max_points", Integer, nullable=True),
     Column("two_point_advantage", Boolean, nullable=False, server_default="true"),
+    Column("play_all_sets", Boolean, nullable=False, server_default="true"),
     Column("level_id", BigInteger, ForeignKey("levels.id"), nullable=True),
     Column("side_switch_every_n_points", Integer, nullable=True),
     Column("draws_allowed", Boolean, nullable=False, server_default="true"),
