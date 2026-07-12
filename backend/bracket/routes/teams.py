@@ -45,6 +45,7 @@ from bracket.sql.players import (
     get_player_team_ids,
     insert_player,
 )
+from bracket.sql.referees import sql_clear_referee_assignments_for_team
 from bracket.sql.stage_item_inputs import get_stage_item_ids_for_team
 from bracket.sql.stage_items import get_stage_item
 from bracket.sql.teams import (
@@ -163,6 +164,14 @@ async def update_team_by_id(
         for stage_item_id in await get_stage_item_ids_for_team(tournament_id, team.id):
             stage_item = await get_stage_item(tournament_id, stage_item_id)
             await reconcile_stage_item(tournament_id, stage_item)
+
+        if not team_body.active:
+            # Inactive teams are excluded from referee duty universally (issue #282); proactively
+            # clear any not-yet-started match where this team is still assigned as referee. An
+            # in-progress match's referee is left untouched. The freed slot is left empty for an
+            # organizer to fill via "auto-assign referee" rather than auto-backfilled here, since
+            # that's a heavyweight solve better left an explicit, visible action.
+            await sql_clear_referee_assignments_for_team(tournament_id, team.id)
 
     return SingleTeamResponse(
         data=assert_some(

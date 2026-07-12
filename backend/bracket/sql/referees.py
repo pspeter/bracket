@@ -1,5 +1,5 @@
 from bracket.database import database
-from bracket.utils.id_types import MatchId, StageItemInputId, TournamentId
+from bracket.utils.id_types import MatchId, StageItemInputId, TeamId, TournamentId
 
 
 async def sql_set_match_abstract_referee_slot(match_id: MatchId, slot: int) -> None:
@@ -64,3 +64,27 @@ async def sql_clear_match_referee(match_id: MatchId) -> None:
         WHERE matches.id = :match_id
         """
     await database.execute(query=query, values={"match_id": match_id})
+
+
+async def sql_clear_referee_assignments_for_team(
+    tournament_id: TournamentId, team_id: TeamId
+) -> None:
+    """Proactively un-assign a deactivated team from every not-yet-started match it referees.
+
+    Mirrors the Mexicano round-recalculation precedent (issue #261): a deactivation reacts
+    immediately rather than waiting for the next unrelated change. "Not yet started" uses the
+    same match-progress-pointer condition as elsewhere (e.g. sql/tournament_issues.py): no set
+    completed and no set in progress. In-progress matches keep their referee untouched.
+    """
+    query = """
+        UPDATE matches
+        SET referee_stage_item_input_id = NULL
+        WHERE matches.referee_stage_item_input_id IN (
+            SELECT id FROM stage_item_inputs
+            WHERE stage_item_inputs.team_id = :team_id
+            AND stage_item_inputs.tournament_id = :tournament_id
+        )
+        AND matches.completed_set_count = 0
+        AND NOT matches.current_set_in_progress
+        """
+    await database.execute(query=query, values={"team_id": team_id, "tournament_id": tournament_id})
