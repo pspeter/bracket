@@ -3,7 +3,7 @@ from contextlib import AbstractAsyncContextManager
 import pytest
 
 from bracket.database import database
-from bracket.models.db.match import Match
+from bracket.models.db.match import Match, MatchSetState
 from bracket.models.db.stage_item_inputs import (
     StageItemInputEmpty,
     StageItemInputFinal,
@@ -380,6 +380,163 @@ async def test_patch_match_both_referee_fields_rejected(
         )
         assert "detail" in response
         assert "success" not in response
+
+        await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_patch_match_referee_slot_inactive_team_rejected(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """A referee slot belonging to an inactive team is rejected: inactive teams are excluded
+    from referee duty universally (issue #282), the manual path honouring the same rule as the
+    auto-scheduler and the frontend dropdown.
+    """
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tournament_id})) as team1,
+        inserted_team(DUMMY_TEAM2.model_copy(update={"tournament_id": tournament_id})) as team2,
+        inserted_team(
+            DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id, "active": False})
+        ) as team3,
+        _final_input(tournament_id, stage_item_inserted.id, 0, team1.id) as input1,
+        _final_input(tournament_id, stage_item_inserted.id, 1, team2.id) as input2,
+        _final_input(tournament_id, stage_item_inserted.id, 2, team3.id) as referee_input,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": input1.id,
+                    "stage_item_input2_id": input2.id,
+                    "court_id": None,
+                }
+            )
+        ) as match_inserted,
+    ):
+        response = await send_tournament_request(
+            HTTPMethod.PUT,
+            f"matches/{match_inserted.id}",
+            auth_context,
+            None,
+            {"round_id": round_inserted.id, "referee_stage_item_input_id": referee_input.id},
+        )
+        assert "detail" in response
+        assert "success" not in response
+
+        match_after = await fetch_one_parsed_certain(
+            database, Match, query=matches.select().where(matches.c.id == match_inserted.id)
+        )
+        assert match_after.referee_stage_item_input_id is None
+
+        await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_deactivating_team_clears_not_started_referee_assignment(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """Deactivating a team proactively clears its referee assignment on a not-yet-started
+    match, mirroring the existing Mexicano round-recalculation precedent (issue #282).
+    """
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as team3,
+        _final_input(tournament_id, stage_item_inserted.id, 2, team3.id) as referee_input,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": None,
+                    "stage_item_input2_id": None,
+                    "court_id": None,
+                    "referee_stage_item_input_id": referee_input.id,
+                }
+            )
+        ) as match_inserted,
+    ):
+        await send_tournament_request(
+            HTTPMethod.PUT,
+            f"teams/{team3.id}",
+            auth_context,
+            json={"name": team3.name, "active": False, "player_ids": []},
+        )
+
+        match_after = await fetch_one_parsed_certain(
+            database, Match, query=matches.select().where(matches.c.id == match_inserted.id)
+        )
+        assert match_after.referee_stage_item_input_id is None
+
+        await assert_row_count_and_clear(matches, 1)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_deactivating_team_keeps_in_progress_referee_assignment(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """An in-progress match's referee assignment is left untouched by deactivation: only
+    not-yet-started matches are proactively un-assigned (issue #282).
+    """
+    tournament_id = auth_context.tournament.id
+    async with (
+        inserted_stage(
+            DUMMY_STAGE1.model_copy(update={"tournament_id": tournament_id})
+        ) as stage_inserted,
+        inserted_stage_item(
+            DUMMY_STAGE_ITEM1.model_copy(
+                update={"stage_id": stage_inserted.id, "ranking_id": auth_context.ranking.id}
+            )
+        ) as stage_item_inserted,
+        inserted_round(
+            DUMMY_ROUND1.model_copy(update={"stage_item_id": stage_item_inserted.id})
+        ) as round_inserted,
+        inserted_team(DUMMY_TEAM3.model_copy(update={"tournament_id": tournament_id})) as team3,
+        _final_input(tournament_id, stage_item_inserted.id, 2, team3.id) as referee_input,
+        inserted_match(
+            DUMMY_MATCH1.model_copy(
+                update={
+                    "round_id": round_inserted.id,
+                    "stage_item_input1_id": None,
+                    "stage_item_input2_id": None,
+                    "court_id": None,
+                    "referee_stage_item_input_id": referee_input.id,
+                }
+            ),
+            set_state=MatchSetState.IN_PROGRESS,
+        ) as match_inserted,
+    ):
+        await send_tournament_request(
+            HTTPMethod.PUT,
+            f"teams/{team3.id}",
+            auth_context,
+            json={"name": team3.name, "active": False, "player_ids": []},
+        )
+
+        match_after = await fetch_one_parsed_certain(
+            database, Match, query=matches.select().where(matches.c.id == match_inserted.id)
+        )
+        assert match_after.referee_stage_item_input_id == referee_input.id
 
         await assert_row_count_and_clear(matches, 1)
 

@@ -7,7 +7,7 @@ from bracket.models.db.stage_item_inputs import (
     StageItemInputCreateBodyFinal,
     StageItemInputCreateBodyTentative,
 )
-from bracket.schema import stage_item_inputs, tournaments
+from bracket.schema import stage_item_inputs, teams, tournaments
 from bracket.sql.referees import sql_set_match_referee_slot
 from bracket.sql.shared import sql_delete_stage_item_with_foreign_keys
 from bracket.sql.stage_items import sql_create_stage_item_with_inputs
@@ -282,6 +282,77 @@ async def test_auto_assign_referees_assigns_placeholder_matches(
     assert all(
         m.referee_stage_item_input_id in slots_by_stage[stage_two.id] for m in placeholder_matches
     )
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_auto_assign_referees_excludes_inactive_team(
+    startup_and_shutdown_uvicorn_server: None, auth_context: AuthContext
+) -> None:
+    """An inactive team is never picked as referee, even when it's the only same-stage
+    candidate for a match (issue #282): that match is left unassigned rather than handed to it.
+    """
+    tid = auth_context.tournament.id
+
+    # Schedule with referees disabled so "schedule_matches" itself assigns none (it would
+    # otherwise assign referees too, before this test gets a chance to deactivate t3), then
+    # enable referees and deactivate t3 so only the standalone auto-assign endpoint is exercised.
+    async with (
+        inserted_court(DUMMY_COURT1.model_copy(update={"tournament_id": tid})),
+        inserted_stage(DUMMY_STAGE1.model_copy(update={"tournament_id": tid})) as stage,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t1,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t2,
+        inserted_team(DUMMY_TEAM1.model_copy(update={"tournament_id": tid})) as t3,
+    ):
+        si = await _setup_round_robin_3teams(tid, stage.id, t1.id, t2.id, t3.id)
+        await send_tournament_request(HTTPMethod.POST, "schedule_matches", auth_context)
+
+        await database.execute(query=teams.update().where(teams.c.id == t3.id).values(active=False))
+        await database.execute(
+            query=tournaments.update().where(tournaments.c.id == tid).values(referees_enabled=True)
+        )
+        try:
+            t3_slot_id = await database.fetch_val(
+                query=stage_item_inputs.select().where(stage_item_inputs.c.team_id == t3.id),
+                column="id",
+            )
+
+            response = await send_tournament_request(HTTPMethod.POST, _ENDPOINT, auth_context)
+
+            stages_after = await get_full_tournament_details(tid)
+            await sql_delete_stage_item_with_foreign_keys(si.id)
+        finally:
+            await database.execute(
+                query=tournaments.update()
+                .where(tournaments.c.id == tid)
+                .values(referees_enabled=False)
+            )
+
+    assert response == SUCCESS_RESPONSE
+
+    scheduled_after = [
+        m
+        for s in stages_after
+        for si_ in s.stage_items
+        for r in si_.rounds
+        for m in r.matches
+        if m.court_id is not None and m.start_time is not None
+    ]
+    assert len(scheduled_after) == 3
+
+    # t3's slot is never assigned as referee anywhere.
+    assert all(m.referee_stage_item_input_id != t3_slot_id for m in scheduled_after)
+
+    # The T1-vs-T2 match's only same-stage candidate is t3 (inactive), so it's left unassigned;
+    # the other two matches each have an active third team available and get one.
+    t1_vs_t2 = next(
+        m
+        for m in scheduled_after
+        if {m.stage_item_input1.team_id, m.stage_item_input2.team_id} == {t1.id, t2.id}  # type: ignore[union-attr]
+    )
+    others = [m for m in scheduled_after if m.id != t1_vs_t2.id]
+    assert t1_vs_t2.referee_stage_item_input_id is None
+    assert len(others) == 2
+    assert all(m.referee_stage_item_input_id is not None for m in others)
 
 
 @pytest.mark.asyncio(loop_scope="session")

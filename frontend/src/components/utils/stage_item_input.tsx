@@ -52,3 +52,10 @@ export function formatStageItemInput(
   }
   return null;
 }
+
+// Inactive teams are excluded from referee duty universally, across every stage type (issue
+// #282): a resolved (Final) slot naming an inactive team is never a referee candidate. Tentative
+// and Empty slots don't yet name a team, so they stay eligible exactly as they do for playing.
+export function isEligibleRefereeSlot(stage_item_input: StageItemInput) {
+  return !('team' in stage_item_input) || stage_item_input.team.active;
+}

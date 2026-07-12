@@ -20,7 +20,7 @@ import { SWRResponse } from 'swr';
 
 import { ConfirmModal } from '@components/modals/confirm_modal';
 import { formatMatchInput1, formatMatchInput2 } from '@components/utils/match';
-import { formatStageItemInput } from '@components/utils/stage_item_input';
+import { formatStageItemInput, isEligibleRefereeSlot } from '@components/utils/stage_item_input';
 import { TournamentMinimal } from '@components/utils/tournament';
 import { CONFLICT_COLOURS, levelSwatchColour } from '@logic/colors';
 import { computeConflictFlags } from '@logic/planning/conflicts';
@@ -263,7 +263,8 @@ function MatchModalForm({
   // Group A" placeholders, and still-empty positions), mirroring how playing slots are picked.
   // Slots are restricted to the match's stage — not just its level — because a later stage's slot
   // names a participant who is still unknown while this match is played; the backend enforces the
-  // same rule (see eligible_referee_slot_ids).
+  // same rule (see eligible_referee_slot_ids). An inactive team is also excluded universally,
+  // mirroring the backend's isEligibleRefereeSlot-equivalent filter.
   const matchStageId = matchEntry?.stage.id;
   const ownInputIds = new Set(
     [match.stage_item_input1_id, match.stage_item_input2_id].filter((id) => id != null)
@@ -274,6 +275,7 @@ function MatchModalForm({
         .flatMap((stage) => stage.stage_items)
         .flatMap((stageItem) => stageItem.inputs)
         .filter((input) => !ownInputIds.has(input.id))
+        .filter(isEligibleRefereeSlot)
         .map((input) => ({
           value: `${input.id}`,
           label: formatStageItemInput(input, stageItemsLookup) ?? t('empty_slot'),

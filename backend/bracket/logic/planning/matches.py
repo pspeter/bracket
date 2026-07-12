@@ -19,7 +19,7 @@ from bracket.models.db.match import (
     MatchWithDetailsDefinitive,
     SchedulerWeights,
 )
-from bracket.models.db.stage_item_inputs import StageItemInputEmpty
+from bracket.models.db.stage_item_inputs import StageItemInputEmpty, StageItemInputFinal
 from bracket.models.db.tournament import Tournament
 from bracket.models.db.util import StageItemWithRounds, StageWithStageItems
 from bracket.sql.courts import get_all_courts_in_tournament
@@ -184,13 +184,16 @@ def _referee_slots_by_stage(
     later stage's slot (e.g. "1st of the group stage") names a team that is still unknown while
     an earlier stage is being played, so it must never be picked to referee an earlier match.
     Within a stage, unresolved slots are allowed exactly as they are for playing slots; they
-    simply resolve to a team later. Slots are returned sorted for deterministic candidate
-    ordering.
+    simply resolve to a team later. A Final slot whose team is inactive is excluded universally
+    -- an inactive team never referees, in any stage type (issue #282). Slots are returned sorted
+    for deterministic candidate ordering.
     """
     by_stage: dict[StageId, list[StageItemInputId]] = defaultdict(list)
     for stage in stages:
         for stage_item in stage.stage_items:
             for input_ in stage_item.inputs:
+                if isinstance(input_, StageItemInputFinal) and not input_.team.active:
+                    continue
                 by_stage[stage.id].append(input_.id)
     return {stage_id: sorted(slot_ids) for stage_id, slot_ids in by_stage.items()}
 
